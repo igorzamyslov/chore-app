@@ -159,6 +159,13 @@ track record (Dynamic Links †2025, Extensions/ML †2027).
 
 ## 7. Code quality & testing strategy
 
+> Full strategy — including the non-happy-path E2E catalog, testability
+> requirements (stable semantic IDs, injectable clock, seedable local
+> backend), and the zero-flake policy — lives in
+> [docs/specs/testing-strategy.md](docs/specs/testing-strategy.md).
+> Decided 2026-07-24: every interaction gets happy + error/edge coverage at
+> an explicitly chosen layer; E2E covers all paths that need the real stack.
+
 - **Lints**: `very_good_analysis` (strict), `dart analyze` in CI, `dart format --set-exit-if-changed`.
 - **Unit tests**: recurrence engine (property-based via `glados` or table-driven,
   DST cases), rotation logic, filter/sort logic. These are pure functions — keep them that way.

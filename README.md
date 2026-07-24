@@ -1,17 +1,26 @@
-# chore_app
+# Chores
 
-A new Flutter project.
+Family chores + shared shopping list app (Android & iOS, Flutter).
+See [DESIGN.md](DESIGN.md) for the full product and architecture design;
+specs for individual components live in [docs/specs/](docs/specs/).
 
-## Getting Started
+## Setup after cloning
 
-This project is a starting point for a Flutter application.
+```sh
+flutter pub get
+lefthook install   # activates the git hooks (brew install lefthook)
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Checks
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Every commit runs (via [lefthook.yml](lefthook.yml)):
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| Check | Command |
+|---|---|
+| Format | `dart format` (auto-fixes staged files) |
+| Analyze | `flutter analyze --fatal-infos --fatal-warnings` |
+| Tests | `flutter test` |
+| Lockfile | `dart pub get --enforce-lockfile --offline` |
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same
+checks — keep them in sync.

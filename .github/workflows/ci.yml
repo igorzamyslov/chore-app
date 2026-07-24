@@ -1,0 +1,22 @@
+# Mirrors the lefthook pre-commit checks exactly — hooks are the fast local
+# feedback, CI is the enforcement (hooks can be bypassed with --no-verify).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze --fatal-infos --fatal-warnings
+      - run: flutter test
