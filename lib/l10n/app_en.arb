@@ -96,13 +96,32 @@
   "@choresOccurrenceMoreActionsTooltip": {
     "description": "Tooltip for a chore occurrence tile's trailing overflow-menu button."
   },
-  "choresOccurrenceDueLabel": "Due {date}",
-  "@choresOccurrenceDueLabel": {
-    "description": "Overdue chore occurrence's due-date label; {date} is already locale-formatted (e.g. 'Jul 20').",
+
+  "choresDueToday": "Today",
+  "@choresDueToday": {
+    "description": "Chore occurrence tile's per-tile due text when the occurrence is due today. Shown on every tile regardless of which section it's in, independent of the 'Today' section header."
+  },
+  "choresDueTomorrow": "Tomorrow",
+  "@choresDueTomorrow": {
+    "description": "Chore occurrence tile's per-tile due text when the occurrence is due tomorrow."
+  },
+  "choresDueInDays": "{count, plural, one{In 1 day} other{In {count} days}}",
+  "@choresDueInDays": {
+    "description": "Chore occurrence tile's per-tile due text for an occurrence due 2-7 days from now.",
     "placeholders": {
-      "date": {
-        "type": "String",
-        "example": "Jul 20"
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "choresDueOverdue": "{count, plural, one{Overdue · 1 day} other{Overdue · {count} days}}",
+  "@choresDueOverdue": {
+    "description": "Chore occurrence tile's per-tile due text for an overdue occurrence, shown in the theme's error color. {count} is the number of days since the due date.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
       }
     }
   },
@@ -122,6 +141,10 @@
   "choresSectionThisWeek": "This week",
   "@choresSectionThisWeek": {
     "description": "Chores list section header: occurrences due later this week."
+  },
+  "choresSectionThisMonth": "This month",
+  "@choresSectionThisMonth": {
+    "description": "Chores list section header: occurrences due after the coming Sunday, but still within the current calendar month."
   },
   "choresSectionLater": "Later",
   "@choresSectionLater": {
@@ -152,6 +175,91 @@
   "choresErrorMessage": "Could not load your chores.",
   "@choresErrorMessage": {
     "description": "Chores list load-error message."
+  },
+
+  "choresSnackbarDone": "Done",
+  "@choresSnackbarDone": {
+    "description": "Undo snackbar message after completing a one-off occurrence (no next occurrence is created)."
+  },
+  "choresSnackbarDoneNextDue": "Done — next due {dueText}",
+  "@choresSnackbarDoneNextDue": {
+    "description": "Undo snackbar message after completing a recurring occurrence. {dueText} is the next occurrence's already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31').",
+    "placeholders": {
+      "dueText": {
+        "type": "String",
+        "example": "Tomorrow"
+      }
+    }
+  },
+  "choresSnackbarSkipped": "Skipped",
+  "@choresSnackbarSkipped": {
+    "description": "Undo snackbar message after skipping a one-off occurrence (no next occurrence is created)."
+  },
+  "choresSnackbarSkippedNextDue": "Skipped — next due {dueText}",
+  "@choresSnackbarSkippedNextDue": {
+    "description": "Undo snackbar message after skipping a recurring occurrence. {dueText} is the next occurrence's already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31').",
+    "placeholders": {
+      "dueText": {
+        "type": "String",
+        "example": "Tomorrow"
+      }
+    }
+  },
+  "choresSnackbarUndo": "Undo",
+  "@choresSnackbarUndo": {
+    "description": "Action label of the undo snackbar shown after completing or skipping an occurrence; reopens it via ChoreService.reopenOccurrence."
+  },
+
+  "choresDoneHeader": "{count, plural, one{Done today (1)} other{Done today ({count})}}",
+  "@choresDoneHeader": {
+    "description": "Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "choresDoneStatusDone": "Done",
+  "@choresDoneStatusDone": {
+    "description": "Done-today section row marker for an occurrence that was completed, as opposed to skipped."
+  },
+  "choresDoneStatusSkipped": "Skipped",
+  "@choresDoneStatusSkipped": {
+    "description": "Done-today section row marker for an occurrence that was skipped, as opposed to completed."
+  },
+  "choresDoneClosedByLabel": "by {name}",
+  "@choresDoneClosedByLabel": {
+    "description": "Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "choresDoneReopen": "Reopen",
+  "@choresDoneReopen": {
+    "description": "Done-today section row action: undoes the close and restores the occurrence to pending, via ChoreService.reopenOccurrence."
+  },
+
+  "choresPausedHeader": "{count, plural, one{Paused (1)} other{Paused ({count})}}",
+  "@choresPausedHeader": {
+    "description": "Header of the collapsed-by-default 'Paused' section, showing how many chores are paused.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "choresPausedBadge": "Paused",
+  "@choresPausedBadge": {
+    "description": "Paused-section row badge marking a chore as paused."
+  },
+  "choresPausedResume": "Resume",
+  "@choresPausedResume": {
+    "description": "Paused-section row action: unpauses the chore via ChoreService.unpauseChore."
   },
 
   "choreFormEditTitle": "Edit chore",

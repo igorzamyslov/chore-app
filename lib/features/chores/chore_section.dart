@@ -18,7 +18,11 @@ enum ChoreSection {
   /// Due after tomorrow, up to and including the coming Sunday.
   thisWeek,
 
-  /// Due after the coming Sunday.
+  /// Due after the coming Sunday, but still within [today]'s calendar
+  /// month.
+  thisMonth,
+
+  /// Due after the coming Sunday, in a later calendar month.
   later,
 }
 
@@ -35,6 +39,8 @@ extension ChoreSectionLabel on ChoreSection {
         return l10n.choresSectionTomorrow;
       case ChoreSection.thisWeek:
         return l10n.choresSectionThisWeek;
+      case ChoreSection.thisMonth:
+        return l10n.choresSectionThisMonth;
       case ChoreSection.later:
         return l10n.choresSectionLater;
     }
@@ -45,7 +51,16 @@ extension ChoreSectionLabel on ChoreSection {
 ///
 /// "This week" ends on the coming Sunday (inclusive); on a Sunday, that
 /// range is empty (there's no "coming Sunday" left this week), so the very
-/// next day (Monday) already falls into [ChoreSection.later].
+/// next day (Monday) is evaluated against [ChoreSection.thisMonth] instead
+/// (and falls into [ChoreSection.later] unless it happens to still be
+/// [today]'s calendar month).
+///
+/// "This month" is due after the coming Sunday but still in [today]'s
+/// calendar year/month. When the coming Sunday already falls in the next
+/// calendar month (i.e. near month end), every date through that Sunday is
+/// still caught by [ChoreSection.thisWeek], so [ChoreSection.thisMonth]
+/// naturally ends up empty that week — there's no date left in [today]'s
+/// month after the Sunday for it to hold.
 ChoreSection sectionFor({
   required PlainDate today,
   required PlainDate dueDate,
@@ -63,6 +78,9 @@ ChoreSection sectionFor({
   final sunday = today.addDays(7 - today.weekday);
   if (dueDate.isAfter(tomorrow) && dueDate.isOnOrBefore(sunday)) {
     return ChoreSection.thisWeek;
+  }
+  if (dueDate.year == today.year && dueDate.month == today.month) {
+    return ChoreSection.thisMonth;
   }
   return ChoreSection.later;
 }

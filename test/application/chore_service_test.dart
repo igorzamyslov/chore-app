@@ -647,6 +647,138 @@ void main() {
     );
   });
 
+  group('reopenOccurrence', () {
+    test(
+      'reopening a completed recurring occurrence the same day restores it '
+      'to pending (clearing closedOn/completedBy, keeping the assignee) and '
+      'deletes the auto-created next occurrence',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final m2 = await _insertMember(db, 'm2', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Rotation',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [m1, m2],
+        );
+        final closed = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(closed!.id, completedBy: m1);
+
+        // Rotation advanced to m2's fresh pending occurrence.
+        final rotated = await repo.pendingOccurrenceOf(chore.id);
+        expect(rotated!.assignedMemberId, m2);
+
+        await serviceOn(PlainDate(2026, 1, 1)).reopenOccurrence(closed.id);
+
+        // The rotated-to occurrence is gone; the original is pending again,
+        // for the original (m1) assignee, with its close fields cleared.
+        final restored = await repo.pendingOccurrenceOf(chore.id);
+        expect(restored!.id, closed.id);
+        expect(restored.assignedMemberId, m1);
+        expect(restored.status, OccurrenceStatus.pending);
+        expect(restored.closedOn, isNull);
+        expect(restored.completedBy, isNull);
+
+        final rotatedRow = await (db.select(
+          db.choreOccurrences,
+        )..where((tbl) => tbl.id.equals(rotated.id))).getSingleOrNull();
+        expect(rotatedRow, isNull);
+      },
+    );
+
+    test(
+      'reopening a skipped one-off occurrence restores it, with no next '
+      'occurrence to delete',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'One-off',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final closed = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(PlainDate(2026, 1, 1)).skipOccurrence(closed!.id);
+        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+
+        await serviceOn(PlainDate(2026, 1, 1)).reopenOccurrence(closed.id);
+
+        final restored = await repo.pendingOccurrenceOf(chore.id);
+        expect(restored!.id, closed.id);
+        expect(restored.status, OccurrenceStatus.pending);
+        expect(restored.closedOn, isNull);
+      },
+    );
+
+    test('throws StateError for an occurrence that is still pending', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+
+      await expectLater(
+        serviceOn(PlainDate(2026, 1, 1)).reopenOccurrence(pending!.id),
+        throwsStateError,
+      );
+    });
+
+    test(
+      'throws StateError for an occurrence closed on an earlier day (the '
+      'catch-up day-boundary case): closed yesterday, reopened today',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'One-off',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final closed = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(closed!.id, completedBy: m1);
+
+        await expectLater(
+          serviceOn(PlainDate(2026, 1, 2)).reopenOccurrence(closed.id),
+          throwsStateError,
+        );
+      },
+    );
+
+    test('throws StateError for a nonexistent occurrence', () async {
+      await expectLater(
+        serviceOn(PlainDate(2026, 1, 1)).reopenOccurrence('no-such-id'),
+        throwsStateError,
+      );
+    });
+
+    test('throws StateError when the chore has been deleted', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final closed = await repo.pendingOccurrenceOf(chore.id);
+      await serviceOn(
+        PlainDate(2026, 1, 1),
+      ).completeOccurrence(closed!.id, completedBy: m1);
+      await repo.softDeleteChore(chore.id);
+
+      await expectLater(
+        serviceOn(PlainDate(2026, 1, 1)).reopenOccurrence(closed.id),
+        throwsStateError,
+      );
+    });
+  });
+
   group('read-after-write consistency', () {
     test(
       'watchPendingOccurrences and watchActiveChores reflect state right '

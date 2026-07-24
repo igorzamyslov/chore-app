@@ -112,6 +112,43 @@ final pendingOccurrencesProvider = StreamProvider<List<OccurrenceWithChore>>((
       );
 });
 
+/// Occurrences of the bootstrap household closed (done or skipped) today,
+/// each joined with its chore, category, assigned member, and completer.
+///
+/// Backs the chores list's collapsed 'Done today' section (spec
+/// `docs/specs/ux-round-2.md` A3).
+final closedTodayOccurrencesProvider =
+    StreamProvider<List<ClosedOccurrenceWithChore>>((ref) async* {
+      final householdId = await ref.watch(bootstrapProvider.future);
+      final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
+      yield* ref
+          .watch(choreRepositoryProvider)
+          .watchClosedOnDate(householdId, today);
+    });
+
+/// Paused chores of the bootstrap household, each joined with its ordered
+/// assignee ids and resolved category.
+///
+/// Backs the chores list's collapsed 'Paused' section (spec
+/// `docs/specs/ux-round-2.md` A5). Built on [ChoreRepository.watchActiveChores]
+/// (which already includes paused chores) rather than a new repository
+/// query, since filtering down to the paused subset needs no SQL of its
+/// own.
+final pausedChoresProvider = StreamProvider<List<ChoreWithDetails>>((
+  ref,
+) async* {
+  final householdId = await ref.watch(bootstrapProvider.future);
+  yield* ref
+      .watch(choreRepositoryProvider)
+      .watchActiveChores(householdId)
+      .map(
+        (chores) => [
+          for (final details in chores)
+            if (details.chore.pausedAt != null) details,
+        ],
+      );
+});
+
 /// Every member of the bootstrap household, ordered by name.
 final membersProvider = StreamProvider<List<Member>>((ref) async* {
   final householdId = await ref.watch(bootstrapProvider.future);

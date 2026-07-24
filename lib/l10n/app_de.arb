@@ -24,12 +24,17 @@
 
   "choresOccurrenceCompleteTooltip": "Erledigen",
   "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",
-  "choresOccurrenceDueLabel": "Fällig am {date}",
+
+  "choresDueToday": "Heute",
+  "choresDueTomorrow": "Morgen",
+  "choresDueInDays": "{count, plural, one{In 1 Tag} other{In {count} Tagen}}",
+  "choresDueOverdue": "{count, plural, one{Überfällig · 1 Tag} other{Überfällig · {count} Tage}}",
 
   "choresSectionOverdue": "Überfällig",
   "choresSectionToday": "Heute",
   "choresSectionTomorrow": "Morgen",
   "choresSectionThisWeek": "Diese Woche",
+  "choresSectionThisMonth": "Diesen Monat",
   "choresSectionLater": "Später",
 
   "choresFilterMemberTooltip": "Nach Mitglied filtern",
@@ -39,6 +44,22 @@
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
+
+  "choresSnackbarDone": "Erledigt",
+  "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
+  "choresSnackbarSkipped": "Übersprungen",
+  "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
+  "choresSnackbarUndo": "Rückgängig",
+
+  "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
+  "choresDoneStatusDone": "Erledigt",
+  "choresDoneStatusSkipped": "Übersprungen",
+  "choresDoneClosedByLabel": "von {name}",
+  "choresDoneReopen": "Wieder öffnen",
+
+  "choresPausedHeader": "{count, plural, one{Pausiert (1)} other{Pausiert ({count})}}",
+  "choresPausedBadge": "Pausiert",
+  "choresPausedResume": "Fortsetzen",
 
   "choreFormEditTitle": "Aufgabe bearbeiten",
   "choreFormNewTitle": "Neue Aufgabe",

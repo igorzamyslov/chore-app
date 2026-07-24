@@ -51,6 +51,35 @@ class OccurrenceWithChore {
   final Member? assignedMember;
 }
 
+/// A closed (done/skipped/missed) occurrence joined with its chore,
+/// category, assigned member, and the member who completed it (if any).
+class ClosedOccurrenceWithChore {
+  /// Creates a closed-occurrence detail view.
+  const ClosedOccurrenceWithChore({
+    required this.occurrence,
+    required this.chore,
+    this.category,
+    this.assignedMember,
+    this.completedByMember,
+  });
+
+  /// The occurrence row itself.
+  final ChoreOccurrence occurrence;
+
+  /// The chore this occurrence belongs to.
+  final Chore chore;
+
+  /// The chore's category, or `null` if uncategorized.
+  final Category? category;
+
+  /// The member this occurrence was assigned to, or `null` if unassigned.
+  final Member? assignedMember;
+
+  /// The member who completed this occurrence, or `null` if it wasn't
+  /// completed (e.g. it was skipped rather than done).
+  final Member? completedByMember;
+}
+
 /// Repository for chores, their assignees, and their occurrences.
 ///
 /// Occurrence creation/closing decisions (recurrence math, "what's due
@@ -427,6 +456,64 @@ class ChoreRepository {
             chore: row.readTable(db.chores),
             category: row.readTableOrNull(db.categories),
             assignedMember: row.readTableOrNull(db.members),
+          ),
+      ];
+    });
+  }
+
+  /// Watches occurrences of active chores in [householdId] closed (done or
+  /// skipped — never missed) with `closedOn == date`, joined with their
+  /// chore, category, assigned member, and completer, ordered by chore
+  /// title.
+  ///
+  /// Backs the chores list's collapsed 'Done today' section (see
+  /// `docs/specs/ux-round-2.md` A3); the caller passes today's date.
+  Stream<List<ClosedOccurrenceWithChore>> watchClosedOnDate(
+    String householdId,
+    PlainDate date,
+  ) {
+    final completedByMember = db.members.createAlias('completed_by_member');
+    final query =
+        db.select(db.choreOccurrences).join([
+            innerJoin(
+              db.chores,
+              db.chores.id.equalsExp(db.choreOccurrences.choreId),
+            ),
+            leftOuterJoin(
+              db.categories,
+              db.categories.id.equalsExp(db.chores.categoryId),
+            ),
+            leftOuterJoin(
+              db.members,
+              db.members.id.equalsExp(db.choreOccurrences.assignedMemberId),
+            ),
+            leftOuterJoin(
+              completedByMember,
+              completedByMember.id.equalsExp(db.choreOccurrences.completedBy),
+            ),
+          ])
+          ..where(
+            db.chores.householdId.equals(householdId) &
+                db.chores.deletedAt.isNull() &
+                db.choreOccurrences.closedOn.equalsValue(date) &
+                (db.choreOccurrences.status.equalsValue(
+                      OccurrenceStatus.done,
+                    ) |
+                    db.choreOccurrences.status.equalsValue(
+                      OccurrenceStatus.skipped,
+                    )),
+          )
+          ..orderBy([OrderingTerm(expression: db.chores.title)]);
+
+    return query.watch().map((rows) {
+      return [
+        for (final row in rows)
+          ClosedOccurrenceWithChore(
+            occurrence: row.readTable(db.choreOccurrences),
+            chore: row.readTable(db.chores),
+            category: row.readTableOrNull(db.categories),
+            assignedMember: row.readTableOrNull(db.members),
+            completedByMember: row.readTableOrNull(completedByMember),
           ),
       ];
     });

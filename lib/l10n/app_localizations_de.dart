@@ -69,8 +69,31 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresOccurrenceMoreActionsTooltip => 'Weitere Aktionen';
 
   @override
-  String choresOccurrenceDueLabel(String date) {
-    return 'Fällig am $date';
+  String get choresDueToday => 'Heute';
+
+  @override
+  String get choresDueTomorrow => 'Morgen';
+
+  @override
+  String choresDueInDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'In $count Tagen',
+      one: 'In 1 Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choresDueOverdue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Überfällig · $count Tage',
+      one: 'Überfällig · 1 Tag',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -84,6 +107,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get choresSectionThisWeek => 'Diese Woche';
+
+  @override
+  String get choresSectionThisMonth => 'Diesen Monat';
 
   @override
   String get choresSectionLater => 'Später';
@@ -106,6 +132,67 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get choresErrorMessage =>
       'Deine Aufgaben konnten nicht geladen werden.';
+
+  @override
+  String get choresSnackbarDone => 'Erledigt';
+
+  @override
+  String choresSnackbarDoneNextDue(String dueText) {
+    return 'Erledigt — nächste Fälligkeit $dueText';
+  }
+
+  @override
+  String get choresSnackbarSkipped => 'Übersprungen';
+
+  @override
+  String choresSnackbarSkippedNextDue(String dueText) {
+    return 'Übersprungen — nächste Fälligkeit $dueText';
+  }
+
+  @override
+  String get choresSnackbarUndo => 'Rückgängig';
+
+  @override
+  String choresDoneHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Heute erledigt ($count)',
+      one: 'Heute erledigt (1)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get choresDoneStatusDone => 'Erledigt';
+
+  @override
+  String get choresDoneStatusSkipped => 'Übersprungen';
+
+  @override
+  String choresDoneClosedByLabel(String name) {
+    return 'von $name';
+  }
+
+  @override
+  String get choresDoneReopen => 'Wieder öffnen';
+
+  @override
+  String choresPausedHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Pausiert ($count)',
+      one: 'Pausiert (1)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get choresPausedBadge => 'Pausiert';
+
+  @override
+  String get choresPausedResume => 'Fortsetzen';
 
   @override
   String get choreFormEditTitle => 'Aufgabe bearbeiten';

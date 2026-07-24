@@ -8,12 +8,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 
+/// Widget coverage for the complete/skip undo snackbar (see
+/// `docs/specs/ux-round-2.md` A4).
 void main() {
   // 2026-07-22 is a Wednesday.
   final today = DateTime(2026, 7, 22, 9);
 
   testChoreApp(
-    'skip creates the next occurrence',
+    'completing a recurring chore shows the "next due" snackbar, and UNDO '
+    'restores the original occurrence',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -25,35 +28,42 @@ void main() {
       );
       final chore = await service.createChore(
         householdId: householdId,
-        title: 'Weekly chore',
+        title: 'Recurring chore',
         startDate: PlainDate(2026, 7, 22),
         assignmentMode: AssignmentMode.anyone,
         recurrence: Recurrence.weekly(),
       );
       await tester.pumpAndSettle();
-      // The "Today" section header, plus the tile's own due text (A1: due
-      // text on every tile) — two matches.
-      expect(find.text('Today'), findsNWidgets(2));
 
       await tester.tap(
-        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chores.menu.skip'));
+
+      // Weekly, due exactly 7 days out from today: "In 7 days".
+      expect(find.text('Done — next due In 7 days'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
+      expect(find.text('Done today (1)'), findsOneWidget);
+
+      await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
 
-      // Skipping today's occurrence inserts the next weekly slot, 7 days
-      // out (2026-07-29) — still in July, so "This month", not "Today".
-      expect(find.text('Today'), findsNothing);
-      expect(find.text('This month'), findsOneWidget);
-      expect(find.text('Weekly chore'), findsOneWidget);
+      // Restored: back under "Today", the "This month"/"Done today"
+      // sections it briefly created/populated are gone.
+      expect(find.bySemanticsIdentifier('chores.done.header'), findsNothing);
+      expect(find.text('This month'), findsNothing);
+      expect(find.text('Today'), findsNWidgets(2));
+      expect(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },
   );
 
   testChoreApp(
-    'pause removes the tile',
+    'completing a one-off chore shows the bare "Done" snackbar',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -70,24 +80,22 @@ void main() {
         assignmentMode: AssignmentMode.anyone,
       );
       await tester.pumpAndSettle();
-      expect(find.text('One-off chore'), findsOneWidget);
 
       await tester.tap(
-        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
-      await tester.pumpAndSettle();
 
-      expect(find.text('One-off chore'), findsNothing);
-      expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
+      expect(find.text('Done'), findsOneWidget);
+      expect(find.text('Done — next due In 7 days'), findsNothing);
 
       handle.dispose();
     },
   );
 
   testChoreApp(
-    'delete asks for confirmation; cancel keeps it, confirm removes it',
+    'skipping a recurring chore shows the "next due" snackbar with '
+    '"Skipped"',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -99,37 +107,22 @@ void main() {
       );
       final chore = await service.createChore(
         householdId: householdId,
-        title: 'Deletable chore',
+        title: 'Recurring chore',
         startDate: PlainDate(2026, 7, 22),
         assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.weekly(),
       );
       await tester.pumpAndSettle();
 
-      Future<void> openMenuAndDelete() async {
-        await tester.tap(
-          find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsIdentifier('chores.menu.delete'));
-        await tester.pumpAndSettle();
-      }
-
-      // Cancel: the confirmation dialog closes, the tile stays.
-      await openMenuAndDelete();
-      expect(
-        find.bySemanticsIdentifier('chores.delete.confirm'),
-        findsOneWidget,
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
       );
-      await tester.tap(find.bySemanticsIdentifier('chores.delete.cancel'));
       await tester.pumpAndSettle();
-      expect(find.text('Deletable chore'), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('chores.menu.skip'));
+      await tester.pumpAndSettle();
 
-      // Confirm: the tile is removed.
-      await openMenuAndDelete();
-      await tester.tap(find.bySemanticsIdentifier('chores.delete.confirm'));
-      await tester.pumpAndSettle();
-      expect(find.text('Deletable chore'), findsNothing);
-      expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
+      expect(find.text('Skipped — next due In 7 days'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
 
       handle.dispose();
     },

@@ -13,6 +13,7 @@ import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/domain/recurrence/recurrence_engine.dart';
 import 'package:chore_app/domain/rotation.dart';
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart';
 
 /// Orchestrates chore/occurrence lifecycle rules on top of [ChoreRepository]
 /// primitives.
@@ -207,6 +208,49 @@ class ChoreService {
         choreId: choreId,
         dueDate: dueDate,
         assignedMemberId: assignedMemberId,
+      );
+    });
+  }
+
+  /// Reopens a closed-today occurrence: in one transaction, deletes the
+  /// chore's current pending occurrence (if any) and resets [occurrenceId]
+  /// back to pending, clearing `closedOn`/`completedBy` while keeping its
+  /// assignee.
+  ///
+  /// This is the undo path for [completeOccurrence]/[skipOccurrence] (see
+  /// `docs/specs/ux-round-2.md` A3/A4 and `docs/specs/occurrence-lifecycle.md`
+  /// §2). The "closed today" restriction is enforced here, at the service
+  /// level — [ChoreRepository] has no notion of "today".
+  ///
+  /// Throws [StateError] if the chore has been deleted, or if
+  /// [occurrenceId] isn't currently closed with `closedOn == today`.
+  Future<void> reopenOccurrence(String occurrenceId) async {
+    final today = _today;
+    await database.transaction(() async {
+      final occurrence = await _findOccurrence(occurrenceId);
+      if (occurrence == null ||
+          occurrence.status == OccurrenceStatus.pending ||
+          occurrence.closedOn != today) {
+        throw StateError(
+          'Occurrence $occurrenceId is not a closed-today occurrence',
+        );
+      }
+      final choreDetails = await chores.getChore(occurrence.choreId);
+      if (choreDetails == null || choreDetails.chore.deletedAt != null) {
+        throw StateError('Chore ${occurrence.choreId} has been deleted');
+      }
+
+      await chores.deletePendingOccurrences(occurrence.choreId);
+
+      await (database.update(
+        database.choreOccurrences,
+      )..where((tbl) => tbl.id.equals(occurrenceId))).write(
+        ChoreOccurrencesCompanion(
+          status: const Value(OccurrenceStatus.pending),
+          closedOn: const Value(null),
+          completedBy: const Value(null),
+          updatedAt: Value(clock.now().toUtc().toIso8601String()),
+        ),
       );
     });
   }

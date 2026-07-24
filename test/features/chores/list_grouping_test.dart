@@ -34,24 +34,35 @@ void main() {
       }
 
       // Boundaries: yesterday (overdue), today, tomorrow, the coming Sunday
-      // (still "this week"), and the following Monday ("later").
+      // (still "this week"), the following Monday (same month, "this
+      // month"), and a date in August ("later").
       await seed('Overdue chore', PlainDate(2026, 7, 21));
       await seed('Today chore', PlainDate(2026, 7, 22));
       await seed('Tomorrow chore', PlainDate(2026, 7, 23));
       await seed('This week chore', PlainDate(2026, 7, 26));
-      await seed('Later chore', PlainDate(2026, 7, 27));
+      await seed('This month chore', PlainDate(2026, 7, 27));
+      await seed('Later chore', PlainDate(2026, 8, 3));
 
       await tester.pumpAndSettle();
 
+      // The lone extra 'Today'/'Tomorrow' entries below aren't a mistake:
+      // A1 puts due text on every tile, and for a chore due today (or
+      // tomorrow) that due text reads exactly 'Today' (or 'Tomorrow') too
+      // — same string as the section header, appearing a second time right
+      // after the tile's title.
       const expectedOrder = [
         'Overdue',
         'Overdue chore',
         'Today',
         'Today chore',
+        'Today',
         'Tomorrow',
         'Tomorrow chore',
+        'Tomorrow',
         'This week',
         'This week chore',
+        'This month',
+        'This month chore',
         'Later',
         'Later chore',
       ];

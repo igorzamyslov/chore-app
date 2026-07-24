@@ -109,6 +109,31 @@ Idempotent: a second call the same day changes nothing.
 Both throw `StateError` if the chore doesn't exist or is soft-deleted;
 `pauseChore` on a paused chore (and unpause on unpaused) is a no-op.
 
+### reopenOccurrence(String occurrenceId)
+The undo path for `completeOccurrence`/`skipOccurrence` (spec
+`docs/specs/ux-round-2.md` A3/A4: the "Done today" section's Reopen action
+and the complete/skip snackbars' UNDO action). In one transaction:
+
+- delete the chore's current pending occurrence (if any) — a chore has at
+  most one pending occurrence at a time, so this is exactly the occurrence
+  that was inserted when [occurrenceId] was closed;
+- reset [occurrenceId] itself back to `pending`, clearing `closed_on` and
+  `completed_by`, while leaving `assigned_member_id` untouched (the
+  occurrence is restored with the same assignee it had before closing).
+
+Throws `StateError` if the chore has been deleted, or if [occurrenceId]
+isn't currently closed with `closed_on == today` — i.e. it's still
+`pending`, or it was closed on an earlier day. **This "closed today"
+restriction is enforced at the SERVICE level**, per spec A3:
+`ChoreRepository` has no notion of "today" — [occurrenceId]'s `closed_on`
+is compared against `_today` (this service's usual clock-derived value),
+computed once per call like every other public method here.
+
+Note this is more permissive about occurrence *status* than the UI that
+calls it: the chores list only ever offers Reopen on `done`/`skipped` rows
+(the "Done today" section excludes `missed`), but this method itself
+accepts any non-pending status, so long as `closed_on` is today.
+
 ## 3. Testing requirements
 
 Integration-style over a real in-memory `AppDatabase` (no mocks), fixed

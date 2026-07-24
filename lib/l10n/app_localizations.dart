@@ -206,11 +206,29 @@ abstract class AppLocalizations {
   /// **'More actions'**
   String get choresOccurrenceMoreActionsTooltip;
 
-  /// Overdue chore occurrence's due-date label; {date} is already locale-formatted (e.g. 'Jul 20').
+  /// Chore occurrence tile's per-tile due text when the occurrence is due today. Shown on every tile regardless of which section it's in, independent of the 'Today' section header.
   ///
   /// In en, this message translates to:
-  /// **'Due {date}'**
-  String choresOccurrenceDueLabel(String date);
+  /// **'Today'**
+  String get choresDueToday;
+
+  /// Chore occurrence tile's per-tile due text when the occurrence is due tomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get choresDueTomorrow;
+
+  /// Chore occurrence tile's per-tile due text for an occurrence due 2-7 days from now.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{In 1 day} other{In {count} days}}'**
+  String choresDueInDays(int count);
+
+  /// Chore occurrence tile's per-tile due text for an overdue occurrence, shown in the theme's error color. {count} is the number of days since the due date.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Overdue · 1 day} other{Overdue · {count} days}}'**
+  String choresDueOverdue(int count);
 
   /// Chores list section header: occurrences due before today.
   ///
@@ -235,6 +253,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This week'**
   String get choresSectionThisWeek;
+
+  /// Chores list section header: occurrences due after the coming Sunday, but still within the current calendar month.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get choresSectionThisMonth;
 
   /// Chores list section header: occurrences due after this week.
   ///
@@ -277,6 +301,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
+
+  /// Undo snackbar message after completing a one-off occurrence (no next occurrence is created).
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get choresSnackbarDone;
+
+  /// Undo snackbar message after completing a recurring occurrence. {dueText} is the next occurrence's already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31').
+  ///
+  /// In en, this message translates to:
+  /// **'Done — next due {dueText}'**
+  String choresSnackbarDoneNextDue(String dueText);
+
+  /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get choresSnackbarSkipped;
+
+  /// Undo snackbar message after skipping a recurring occurrence. {dueText} is the next occurrence's already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31').
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped — next due {dueText}'**
+  String choresSnackbarSkippedNextDue(String dueText);
+
+  /// Action label of the undo snackbar shown after completing or skipping an occurrence; reopens it via ChoreService.reopenOccurrence.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get choresSnackbarUndo;
+
+  /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Done today (1)} other{Done today ({count})}}'**
+  String choresDoneHeader(int count);
+
+  /// Done-today section row marker for an occurrence that was completed, as opposed to skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get choresDoneStatusDone;
+
+  /// Done-today section row marker for an occurrence that was skipped, as opposed to completed.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get choresDoneStatusSkipped;
+
+  /// Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).
+  ///
+  /// In en, this message translates to:
+  /// **'by {name}'**
+  String choresDoneClosedByLabel(String name);
+
+  /// Done-today section row action: undoes the close and restores the occurrence to pending, via ChoreService.reopenOccurrence.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get choresDoneReopen;
+
+  /// Header of the collapsed-by-default 'Paused' section, showing how many chores are paused.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Paused (1)} other{Paused ({count})}}'**
+  String choresPausedHeader(int count);
+
+  /// Paused-section row badge marking a chore as paused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get choresPausedBadge;
+
+  /// Paused-section row action: unpauses the chore via ChoreService.unpauseChore.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get choresPausedResume;
 
   /// Chore form app bar title when editing an existing chore.
   ///

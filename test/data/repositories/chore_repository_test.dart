@@ -503,4 +503,156 @@ void main() {
       },
     );
   });
+
+  group('watchClosedOnDate', () {
+    test(
+      'includes done/skipped closed on the given date; excludes missed, '
+      'pending, other dates, and deleted chores; orders by title',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final date = PlainDate(2026, 1, 10);
+
+        final doneChore = await repo.createChore(
+          householdId: householdId,
+          title: 'B done chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.fixed,
+          assigneeMemberIds: [m1],
+        );
+        final doneOccurrence = await repo.insertOccurrence(
+          choreId: doneChore.id,
+          dueDate: date,
+          assignedMemberId: m1,
+        );
+        await repo.closeOccurrence(
+          doneOccurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: date,
+          completedBy: m1,
+        );
+
+        final skippedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'A skipped chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final skippedOccurrence = await repo.insertOccurrence(
+          choreId: skippedChore.id,
+          dueDate: date,
+        );
+        await repo.closeOccurrence(
+          skippedOccurrence.id,
+          status: OccurrenceStatus.skipped,
+          closedOn: date,
+        );
+
+        final missedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Missed chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final missedOccurrence = await repo.insertOccurrence(
+          choreId: missedChore.id,
+          dueDate: date,
+        );
+        await repo.closeOccurrence(
+          missedOccurrence.id,
+          status: OccurrenceStatus.missed,
+          closedOn: date,
+        );
+
+        final pendingChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Pending chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(choreId: pendingChore.id, dueDate: date);
+
+        final otherDateChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Other date chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final otherDateOccurrence = await repo.insertOccurrence(
+          choreId: otherDateChore.id,
+          dueDate: date,
+        );
+        await repo.closeOccurrence(
+          otherDateOccurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: date.addDays(1),
+        );
+
+        final deletedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Deleted chore',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final deletedOccurrence = await repo.insertOccurrence(
+          choreId: deletedChore.id,
+          dueDate: date,
+        );
+        await repo.closeOccurrence(
+          deletedOccurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: date,
+        );
+        await repo.softDeleteChore(deletedChore.id);
+
+        final rows = await repo.watchClosedOnDate(householdId, date).first;
+
+        expect(
+          rows.map((r) => r.chore.title),
+          ['A skipped chore', 'B done chore'],
+        );
+
+        final done = rows.singleWhere((r) => r.chore.id == doneChore.id);
+        expect(done.occurrence.status, OccurrenceStatus.done);
+        expect(done.completedByMember?.id, m1);
+        expect(done.assignedMember?.id, m1);
+
+        final skipped = rows.singleWhere(
+          (r) => r.chore.id == skippedChore.id,
+        );
+        expect(skipped.occurrence.status, OccurrenceStatus.skipped);
+        expect(skipped.completedByMember, isNull);
+      },
+    );
+
+    test('reacts to a fresh close landing on the watched date', () async {
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final occurrence = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 5),
+      );
+
+      final emissions = <int>[];
+      final sub = repo
+          .watchClosedOnDate(householdId, PlainDate(2026, 1, 5))
+          .listen((rows) => emissions.add(rows.length));
+      addTearDown(sub.cancel);
+      await pumpEventQueue();
+
+      expect(emissions.last, 0);
+
+      await repo.closeOccurrence(
+        occurrence.id,
+        status: OccurrenceStatus.done,
+        closedOn: PlainDate(2026, 1, 5),
+      );
+      await pumpEventQueue();
+
+      expect(emissions.last, 1);
+    });
+  });
 }
