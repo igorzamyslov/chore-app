@@ -11,6 +11,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +68,11 @@ final householdRepositoryProvider = Provider<HouseholdRepository>((ref) {
   return HouseholdRepository(ref.watch(appDatabaseProvider));
 });
 
+/// The shopping repository, built on [appDatabaseProvider].
+final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
+  return ShoppingRepository(ref.watch(appDatabaseProvider));
+});
+
 /// The chore lifecycle service, built on [appDatabaseProvider],
 /// [choreRepositoryProvider], and [clockProvider].
 final choreServiceProvider = Provider<ChoreService>((ref) {
@@ -118,6 +124,24 @@ final choreCategoriesProvider = StreamProvider<List<Category>>((ref) async* {
   yield* ref
       .watch(categoryRepositoryProvider)
       .watchCategories(householdId, CategoryKind.chore);
+});
+
+/// Every active shopping item of the bootstrap household, joined with its
+/// resolved category, in [ShoppingRepository.watchActiveItems] order:
+/// unchecked first, then by category sort order, then by name.
+final shoppingItemsProvider = StreamProvider<List<ShoppingItemWithCategory>>((
+  ref,
+) async* {
+  final householdId = await ref.watch(bootstrapProvider.future);
+  yield* ref.watch(shoppingRepositoryProvider).watchActiveItems(householdId);
+});
+
+/// Active shopping categories of the bootstrap household.
+final shoppingCategoriesProvider = StreamProvider<List<Category>>((ref) async* {
+  final householdId = await ref.watch(bootstrapProvider.future);
+  yield* ref
+      .watch(categoryRepositoryProvider)
+      .watchCategories(householdId, CategoryKind.shopping);
 });
 
 /// The member who acts on behalf of the user for v1's single-user flows

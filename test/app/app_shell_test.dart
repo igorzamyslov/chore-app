@@ -27,7 +27,13 @@ void main() {
 
       await tester.tap(find.bySemanticsIdentifier('shell.tab.shopping'));
       await tester.pumpAndSettle();
-      expect(find.text('Shopping — coming soon'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Shopping'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
       await tester.pumpAndSettle();

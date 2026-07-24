@@ -151,6 +151,20 @@ class ShoppingRepository {
     );
   }
 
+  /// Soft-deletes a single item immediately.
+  ///
+  /// Unlike a chore delete, this isn't gated behind a confirmation dialog —
+  /// shopping items are cheap and low-stakes (see
+  /// `docs/specs/design-language.md`).
+  Future<void> deleteItem(String id) async {
+    final now = _isoNow();
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.equals(id))).write(
+      ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+    );
+  }
+
   /// Soft-deletes every active, checked item in [householdId].
   Future<void> clearChecked(String householdId) async {
     final now = _isoNow();

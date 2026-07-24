@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
+import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:flutter/material.dart';
 
 /// The three top-level tabs, in display order.
@@ -72,7 +73,7 @@ class _AppShellState extends State<AppShell> {
         index: _selected.index,
         children: const [
           ChoresListScreen(),
-          _PlaceholderScreen(title: 'Shopping'),
+          ShoppingListScreen(),
           _PlaceholderScreen(title: 'Settings'),
         ],
       ),
