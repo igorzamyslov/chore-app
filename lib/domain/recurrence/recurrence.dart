@@ -1,0 +1,322 @@
+/// The unit of time a [Recurrence] repeats on.
+enum RecurrenceUnit {
+  /// Every N days.
+  day,
+
+  /// Every N ISO weeks (Monday..Sunday).
+  week,
+
+  /// Every N months.
+  month,
+}
+
+/// How the due date of the next occurrence is anchored.
+enum RecurrenceAnchor {
+  /// A fixed calendar series starting from the chore's start date. Missing
+  /// an occurrence does not shift the rest of the series (e.g. "trash every
+  /// Tuesday").
+  schedule,
+
+  /// The next due date is N units after the actual completion date (e.g.
+  /// "water plants every 4 days" — doing it late shifts everything after).
+  completion,
+}
+
+/// How a month-unit [Recurrence] picks its target day within the month.
+enum MonthlyMode {
+  /// Target day = the start date's day of month, clamped to the target
+  /// month's length.
+  dayOfMonth,
+
+  /// The [Recurrence.monthlyOrdinal]-th [Recurrence.monthlyWeekday] of the
+  /// month (e.g. "the first Saturday", "the last Friday").
+  nthWeekday,
+}
+
+/// A rule describing how often and on what pattern a chore recurs.
+///
+/// This unnamed constructor is intentionally permissive (no validation) so
+/// it stays `const`-able; use [Recurrence.validated] or one of the named
+/// convenience factories to construct a rule that is guaranteed consistent.
+class Recurrence {
+  /// Creates a recurrence rule without validating field combinations.
+  ///
+  /// Prefer [Recurrence.validated] or a named factory such as
+  /// [Recurrence.everyNDays], which enforce the invariants documented on
+  /// each field.
+  const Recurrence({
+    required this.interval,
+    required this.unit,
+    required this.anchor,
+    this.weekdays = const {},
+    this.monthlyMode = MonthlyMode.dayOfMonth,
+    this.monthlyOrdinal,
+    this.monthlyWeekday,
+  });
+
+  /// Creates a recurrence rule, throwing [ArgumentError] if the fields form
+  /// an inconsistent combination:
+  ///
+  /// - [interval] < 1.
+  /// - [weekdays] non-empty when [unit] is not [RecurrenceUnit.week], or any
+  ///   value outside 1..7.
+  /// - [monthlyOrdinal] or [monthlyWeekday] set when [monthlyMode] is not
+  ///   [MonthlyMode.nthWeekday].
+  /// - [monthlyMode] is [MonthlyMode.nthWeekday] and [monthlyOrdinal] is not
+  ///   one of `{1, 2, 3, 4, -1}`, or [monthlyWeekday] is not in 1..7, or
+  ///   either is null.
+  /// - [monthlyMode] is [MonthlyMode.nthWeekday] when [unit] is not
+  ///   [RecurrenceUnit.month].
+  /// - [monthlyMode] is [MonthlyMode.nthWeekday] when [anchor] is
+  ///   [RecurrenceAnchor.completion] (nth-weekday pinning only makes sense
+  ///   for a fixed calendar series).
+  factory Recurrence.validated({
+    required int interval,
+    required RecurrenceUnit unit,
+    required RecurrenceAnchor anchor,
+    Set<int> weekdays = const {},
+    MonthlyMode monthlyMode = MonthlyMode.dayOfMonth,
+    int? monthlyOrdinal,
+    int? monthlyWeekday,
+  }) {
+    if (interval < 1) {
+      throw ArgumentError.value(interval, 'interval', 'Must be >= 1');
+    }
+    if (weekdays.isNotEmpty && unit != RecurrenceUnit.week) {
+      throw ArgumentError.value(
+        weekdays,
+        'weekdays',
+        'Only valid when unit == week',
+      );
+    }
+    if (weekdays.any((weekday) => weekday < 1 || weekday > 7)) {
+      throw ArgumentError.value(weekdays, 'weekdays', 'Values must be in 1..7');
+    }
+    if (monthlyMode != MonthlyMode.nthWeekday) {
+      if (monthlyOrdinal != null) {
+        throw ArgumentError.value(
+          monthlyOrdinal,
+          'monthlyOrdinal',
+          'Only valid when monthlyMode == nthWeekday',
+        );
+      }
+      if (monthlyWeekday != null) {
+        throw ArgumentError.value(
+          monthlyWeekday,
+          'monthlyWeekday',
+          'Only valid when monthlyMode == nthWeekday',
+        );
+      }
+    } else {
+      if (unit != RecurrenceUnit.month) {
+        throw ArgumentError.value(
+          unit,
+          'unit',
+          'nthWeekday mode requires unit == month',
+        );
+      }
+      if (anchor == RecurrenceAnchor.completion) {
+        throw ArgumentError.value(
+          anchor,
+          'anchor',
+          'nthWeekday mode is not supported with a completion anchor',
+        );
+      }
+      if (monthlyOrdinal == null ||
+          !{1, 2, 3, 4, -1}.contains(monthlyOrdinal)) {
+        throw ArgumentError.value(
+          monthlyOrdinal,
+          'monthlyOrdinal',
+          'Must be 1, 2, 3, 4, or -1',
+        );
+      }
+      if (monthlyWeekday == null || monthlyWeekday < 1 || monthlyWeekday > 7) {
+        throw ArgumentError.value(
+          monthlyWeekday,
+          'monthlyWeekday',
+          'Must be in 1..7',
+        );
+      }
+    }
+    return Recurrence(
+      interval: interval,
+      unit: unit,
+      anchor: anchor,
+      weekdays: weekdays,
+      monthlyMode: monthlyMode,
+      monthlyOrdinal: monthlyOrdinal,
+      monthlyWeekday: monthlyWeekday,
+    );
+  }
+
+  /// Creates a day-unit rule that recurs every [n] days.
+  factory Recurrence.everyNDays(
+    int n, {
+    RecurrenceAnchor anchor = RecurrenceAnchor.schedule,
+  }) {
+    return Recurrence.validated(
+      interval: n,
+      unit: RecurrenceUnit.day,
+      anchor: anchor,
+    );
+  }
+
+  /// Creates a week-unit rule.
+  ///
+  /// An empty [weekdays] derives its effective weekday from the chore's
+  /// start date.
+  factory Recurrence.weekly({
+    int interval = 1,
+    Set<int> weekdays = const {},
+    RecurrenceAnchor anchor = RecurrenceAnchor.schedule,
+  }) {
+    return Recurrence.validated(
+      interval: interval,
+      unit: RecurrenceUnit.week,
+      anchor: anchor,
+      weekdays: weekdays,
+    );
+  }
+
+  /// Creates a month-unit rule targeting the start date's day of month
+  /// (clamped to each target month's length).
+  factory Recurrence.monthlyOnDay({
+    int interval = 1,
+    RecurrenceAnchor anchor = RecurrenceAnchor.schedule,
+  }) {
+    return Recurrence.validated(
+      interval: interval,
+      unit: RecurrenceUnit.month,
+      anchor: anchor,
+    );
+  }
+
+  /// Creates a month-unit rule pinned to the [ordinal]-th [weekday] of the
+  /// month (`-1` for "last"). Schedule-anchored only.
+  factory Recurrence.monthlyOnNthWeekday(
+    int ordinal,
+    int weekday, {
+    int interval = 1,
+  }) {
+    return Recurrence.validated(
+      interval: interval,
+      unit: RecurrenceUnit.month,
+      anchor: RecurrenceAnchor.schedule,
+      monthlyMode: MonthlyMode.nthWeekday,
+      monthlyOrdinal: ordinal,
+      monthlyWeekday: weekday,
+    );
+  }
+
+  /// Deserializes a rule produced by [toJson].
+  ///
+  /// Throws [FormatException] if a field is missing, has the wrong type, or
+  /// (for enum fields) an unrecognized name. Field combinations are then
+  /// checked via [Recurrence.validated], which throws [ArgumentError] for an
+  /// inconsistent combination of otherwise well-typed fields.
+  factory Recurrence.fromJson(Map<String, Object?> json) {
+    final intervalRaw = json['interval'];
+    if (intervalRaw is! int) {
+      throw FormatException('"interval" must be an int', json);
+    }
+
+    final unit = _enumFromJson(RecurrenceUnit.values, json['unit'], 'unit');
+    final anchor = _enumFromJson(
+      RecurrenceAnchor.values,
+      json['anchor'],
+      'anchor',
+    );
+    final monthlyMode = _enumFromJson(
+      MonthlyMode.values,
+      json['monthly_mode'],
+      'monthly_mode',
+    );
+
+    final weekdaysRaw = json['weekdays'];
+    if (weekdaysRaw is! List<Object?>) {
+      throw FormatException('"weekdays" must be a list', json);
+    }
+    final weekdays = <int>{};
+    for (final entry in weekdaysRaw) {
+      if (entry is! int) {
+        throw FormatException('"weekdays" entries must be ints', json);
+      }
+      weekdays.add(entry);
+    }
+
+    final monthlyOrdinalRaw = json['monthly_ordinal'];
+    if (monthlyOrdinalRaw is! int?) {
+      throw FormatException('"monthly_ordinal" must be an int or null', json);
+    }
+    final monthlyWeekdayRaw = json['monthly_weekday'];
+    if (monthlyWeekdayRaw is! int?) {
+      throw FormatException('"monthly_weekday" must be an int or null', json);
+    }
+
+    return Recurrence.validated(
+      interval: intervalRaw,
+      unit: unit,
+      anchor: anchor,
+      weekdays: weekdays,
+      monthlyMode: monthlyMode,
+      monthlyOrdinal: monthlyOrdinalRaw,
+      monthlyWeekday: monthlyWeekdayRaw,
+    );
+  }
+
+  static T _enumFromJson<T extends Enum>(
+    List<T> values,
+    Object? raw,
+    String field,
+  ) {
+    if (raw is! String) {
+      throw FormatException('"$field" must be a string', raw);
+    }
+    for (final value in values) {
+      if (value.name == raw) {
+        return value;
+      }
+    }
+    throw FormatException('Unknown "$field" value', raw);
+  }
+
+  /// Recur every N units. Must be >= 1.
+  final int interval;
+
+  /// The unit of time this rule repeats on.
+  final RecurrenceUnit unit;
+
+  /// Whether this rule is a fixed calendar series or anchored to
+  /// completions.
+  final RecurrenceAnchor anchor;
+
+  /// ISO weekdays (1 = Monday .. 7 = Sunday) this rule applies to.
+  /// [RecurrenceUnit.week] only. Empty means "derive from the chore's start
+  /// date weekday".
+  final Set<int> weekdays;
+
+  /// How the target day of month is picked. [RecurrenceUnit.month] only.
+  final MonthlyMode monthlyMode;
+
+  /// [MonthlyMode.nthWeekday] only: which occurrence of [monthlyWeekday] in
+  /// the month, 1..4, or -1 for "last".
+  final int? monthlyOrdinal;
+
+  /// [MonthlyMode.nthWeekday] only: the ISO weekday (1..7) to target.
+  final int? monthlyWeekday;
+
+  /// Serializes this rule to a JSON-compatible map with snake_case keys.
+  /// Enums are serialized as their `name` (e.g. `RecurrenceUnit.week` ->
+  /// `"week"`).
+  Map<String, Object?> toJson() {
+    return {
+      'interval': interval,
+      'unit': unit.name,
+      'anchor': anchor.name,
+      'weekdays': weekdays.toList()..sort(),
+      'monthly_mode': monthlyMode.name,
+      'monthly_ordinal': monthlyOrdinal,
+      'monthly_weekday': monthlyWeekday,
+    };
+  }
+}
