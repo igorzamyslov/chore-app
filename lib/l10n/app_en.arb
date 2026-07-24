@@ -1,0 +1,7 @@
+{
+  "@@locale": "en",
+  "appTitle": "Chores",
+  "@appTitle": {
+    "description": "The application title shown in the task switcher."
+  }
+}
