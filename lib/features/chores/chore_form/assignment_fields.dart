@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The assignment mode segmented row plus its dependent assignee chips.
@@ -55,7 +56,7 @@ class AssignmentFields extends StatelessWidget {
               semantic(
                 'chore_form.assignment.${entry.name}',
                 child: ChoiceChip(
-                  label: Text(_modeLabel(entry)),
+                  label: Text(_modeLabel(context, entry)),
                   selected: mode == entry,
                   onSelected: (_) => onModeChanged(entry),
                 ),
@@ -72,7 +73,7 @@ class AssignmentFields extends StatelessWidget {
                 semantic(
                   'chore_form.assignee.${member.id}',
                   child: FilterChip(
-                    label: Text(_chipLabel(member)),
+                    label: Text(_chipLabel(context, member)),
                     selected: selectedMemberIds.contains(member.id),
                     onSelected: (_) => onMemberTap(member.id),
                   ),
@@ -91,22 +92,28 @@ class AssignmentFields extends StatelessWidget {
     );
   }
 
-  String _chipLabel(Member member) {
+  String _chipLabel(BuildContext context, Member member) {
     if (mode != AssignmentMode.rotation) {
       return member.name;
     }
     final order = selectedMemberIds.indexOf(member.id);
-    return order == -1 ? member.name : '${order + 1}. ${member.name}';
+    if (order == -1) {
+      return member.name;
+    }
+    return AppLocalizations.of(
+      context,
+    ).choreFormAssigneeOrderLabel(order + 1, member.name);
   }
 
-  String _modeLabel(AssignmentMode mode) {
+  String _modeLabel(BuildContext context, AssignmentMode mode) {
+    final l10n = AppLocalizations.of(context);
     switch (mode) {
       case AssignmentMode.fixed:
-        return 'Fixed';
+        return l10n.choreFormAssignmentFixed;
       case AssignmentMode.rotation:
-        return 'Rotation';
+        return l10n.choreFormAssignmentRotation;
       case AssignmentMode.anyone:
-        return 'Anyone';
+        return l10n.choreFormAssignmentAnyone;
     }
   }
 }

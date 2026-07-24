@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 
 /// A section of the chores list, in display order.
 enum ChoreSection {
@@ -21,21 +22,21 @@ enum ChoreSection {
   later,
 }
 
-/// This section's plain-text header, as shown in the chores list.
+/// This section's localized header, as shown in the chores list.
 extension ChoreSectionLabel on ChoreSection {
   /// The header text shown above this section's tiles.
-  String get label {
+  String label(AppLocalizations l10n) {
     switch (this) {
       case ChoreSection.overdue:
-        return 'Overdue';
+        return l10n.choresSectionOverdue;
       case ChoreSection.today:
-        return 'Today';
+        return l10n.choresSectionToday;
       case ChoreSection.tomorrow:
-        return 'Tomorrow';
+        return l10n.choresSectionTomorrow;
       case ChoreSection.thisWeek:
-        return 'This week';
+        return l10n.choresSectionThisWeek;
       case ChoreSection.later:
-        return 'Later';
+        return l10n.choresSectionLater;
     }
   }
 }

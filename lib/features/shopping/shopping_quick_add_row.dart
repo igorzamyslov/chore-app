@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,6 +36,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
@@ -46,7 +48,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
                 controller: _controller,
                 focusNode: _focusNode,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(hintText: 'Add item…'),
+                decoration: InputDecoration(hintText: l10n.shoppingAddHint),
                 onSubmitted: (_) => _submit(),
               ),
             ),
@@ -56,7 +58,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
             'shopping.add.submit',
             child: IconButton(
               icon: const Icon(Icons.add),
-              tooltip: 'Add item',
+              tooltip: l10n.shoppingAddTooltip,
               onPressed: _submit,
             ),
           ),

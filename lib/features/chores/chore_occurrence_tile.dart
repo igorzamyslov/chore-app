@@ -5,26 +5,16 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-const List<String> _monthAbbreviations = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-/// Formats [date] as e.g. `'Jul 20'`, without pulling in `package:intl`.
-String formatShortDate(PlainDate date) {
-  return '${_monthAbbreviations[date.month - 1]} ${date.day}';
+/// Formats [date] as e.g. `'Jul 20'` in [localeName], via `package:intl`'s
+/// locale-aware month abbreviations — never a hardcoded month name list.
+String formatShortDate(PlainDate date, String localeName) {
+  return DateFormat.MMMd(
+    localeName,
+  ).format(DateTime.utc(date.year, date.month, date.day));
 }
 
 /// A tile for one pending [OccurrenceWithChore].
@@ -60,6 +50,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chore = occurrence.chore;
+    final l10n = AppLocalizations.of(context);
     return semantic(
       'chores.occurrence.${chore.id}',
       child: ListTile(
@@ -68,7 +59,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
           'chores.occurrence.${chore.id}.complete',
           child: IconButton(
             icon: const Icon(Icons.circle_outlined),
-            tooltip: 'Complete',
+            tooltip: l10n.choresOccurrenceCompleteTooltip,
             onPressed: onComplete,
           ),
         ),
@@ -78,7 +69,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
           'chores.occurrence.${chore.id}.menu',
           child: IconButton(
             icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
+            tooltip: l10n.choresOccurrenceMoreActionsTooltip,
             onPressed: onOpenMenu,
           ),
         ),
@@ -97,12 +88,15 @@ class _Subtitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final category = occurrence.category;
     final assignee = occurrence.assignedMember;
+    final localeName = Localizations.localeOf(context).toString();
     final parts = <Widget>[
       if (category != null) CategoryBadge(category: category),
       if (assignee != null) Text(assignee.name),
       if (isOverdue)
         Text(
-          'Due ${formatShortDate(occurrence.occurrence.dueDate)}',
+          AppLocalizations.of(context).choresOccurrenceDueLabel(
+            formatShortDate(occurrence.occurrence.dueDate, localeName),
+          ),
           style: TextStyle(color: Theme.of(context).colorScheme.error),
         ),
     ];

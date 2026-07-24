@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The repeat on/off switch.
@@ -22,7 +23,7 @@ class RepeatToggle extends StatelessWidget {
       'chore_form.repeat.toggle',
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('Repeat'),
+        title: Text(AppLocalizations.of(context).choreFormRepeatToggleLabel),
         value: value,
         onChanged: onChanged,
       ),
@@ -49,7 +50,7 @@ class IntervalField extends StatelessWidget {
         controller: controller,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
-          labelText: 'Repeat every',
+          labelText: AppLocalizations.of(context).choreFormRepeatEveryLabel,
           errorText: errorText,
         ),
       ),
@@ -77,7 +78,7 @@ class UnitRow extends StatelessWidget {
           semantic(
             'chore_form.repeat.unit.${unit.name}',
             child: ChoiceChip(
-              label: Text(_label(unit)),
+              label: Text(_label(context, unit)),
               selected: value == unit,
               onSelected: (_) => onChanged(unit),
             ),
@@ -86,14 +87,15 @@ class UnitRow extends StatelessWidget {
     );
   }
 
-  String _label(RecurrenceUnit unit) {
+  String _label(BuildContext context, RecurrenceUnit unit) {
+    final l10n = AppLocalizations.of(context);
     switch (unit) {
       case RecurrenceUnit.day:
-        return 'Day';
+        return l10n.choreFormUnitDay;
       case RecurrenceUnit.week:
-        return 'Week';
+        return l10n.choreFormUnitWeek;
       case RecurrenceUnit.month:
-        return 'Month';
+        return l10n.choreFormUnitMonth;
     }
   }
 }
@@ -123,8 +125,8 @@ class AnchorRow extends StatelessWidget {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
               ),
-              title: Text(_title(anchor)),
-              subtitle: Text(_subtitle(anchor)),
+              title: Text(_title(context, anchor)),
+              subtitle: Text(_subtitle(context, anchor)),
               onTap: () => onChanged(anchor),
             ),
           ),
@@ -132,15 +134,17 @@ class AnchorRow extends StatelessWidget {
     );
   }
 
-  String _title(RecurrenceAnchor anchor) {
+  String _title(BuildContext context, RecurrenceAnchor anchor) {
+    final l10n = AppLocalizations.of(context);
     return anchor == RecurrenceAnchor.schedule
-        ? 'On a fixed schedule'
-        : 'After last completion';
+        ? l10n.choreFormAnchorScheduleTitle
+        : l10n.choreFormAnchorCompletionTitle;
   }
 
-  String _subtitle(RecurrenceAnchor anchor) {
+  String _subtitle(BuildContext context, RecurrenceAnchor anchor) {
+    final l10n = AppLocalizations.of(context);
     return anchor == RecurrenceAnchor.schedule
-        ? 'e.g. every Tuesday'
-        : 'e.g. 4 days after last done';
+        ? l10n.choreFormAnchorScheduleSubtitle
+        : l10n.choreFormAnchorCompletionSubtitle;
   }
 }

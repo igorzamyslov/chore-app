@@ -4,6 +4,7 @@ library;
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// A horizontally-scrollable row of [ChoiceChip]s: one 'None' chip plus one
@@ -47,7 +48,7 @@ class CategoryPicker extends StatelessWidget {
           semantic(
             '$idPrefix.none',
             child: ChoiceChip(
-              label: const Text('None'),
+              label: Text(AppLocalizations.of(context).categoryPickerNone),
               selected: selectedCategoryId == null,
               onSelected: (_) => onChanged(null),
             ),

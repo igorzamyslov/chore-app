@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Shows a confirmation dialog for clearing [count] checked items, resolving
@@ -13,25 +14,23 @@ Future<bool> showClearCheckedDialog(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) {
+      final l10n = AppLocalizations.of(dialogContext);
       return AlertDialog(
-        title: const Text('Clear checked items?'),
-        content: Text(
-          'This removes $count checked item${count == 1 ? '' : 's'} from '
-          'the list.',
-        ),
+        title: Text(l10n.shoppingClearDialogTitle),
+        content: Text(l10n.shoppingClearDialogBody(count)),
         actions: [
           semantic(
             'shopping.clear.cancel',
             child: TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(l10n.commonCancel),
             ),
           ),
           semantic(
             'shopping.clear.confirm',
             child: TextButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Clear'),
+              child: Text(l10n.shoppingClearConfirm),
             ),
           ),
         ],

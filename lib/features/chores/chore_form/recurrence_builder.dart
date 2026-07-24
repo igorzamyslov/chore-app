@@ -1,32 +1,15 @@
 /// Pure helpers turning chore-form recurrence state into a [Recurrence], and
-/// generating the monthly-mode chips' descriptive labels.
+/// computing the data behind the monthly-mode chips' descriptive labels.
+///
+/// The labels themselves are ARB messages (see `MonthlyModeRow`); this file
+/// only supplies their already-localized ingredients — weekday names via
+/// `package:intl` (never a hardcoded weekday list) and ordinal text via
+/// [localizedOrdinal].
 library;
 
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
-
-/// Full weekday names, Monday (index 0) .. Sunday (index 6).
-const List<String> weekdayNames = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-
-/// Short weekday labels, Monday (index 0) .. Sunday (index 6), for the
-/// weekday chip row.
-const List<String> weekdayShortNames = [
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat',
-  'Sun',
-];
+import 'package:intl/intl.dart';
 
 /// Builds the [Recurrence] described by the chore form's current repeat
 /// field values. Only call this when the repeat toggle is on; a one-off
@@ -83,22 +66,47 @@ String monthlyModeId(MonthlyMode mode) {
   return mode == MonthlyMode.dayOfMonth ? 'day_of_month' : 'nth_weekday';
 }
 
-/// The monthly day-of-month chip's label, e.g. `'On the 15th'`.
-String monthlyDayOfMonthLabel(PlainDate date) {
-  return 'On the ${_ordinal(date.day)}';
+// An arbitrary Monday (2024-01-01), used purely as an anchor so an ISO
+// weekday number can be resolved to a real [DateTime] for
+// `package:intl`'s locale-aware weekday formatting below.
+final DateTime _referenceMonday = DateTime.utc(2024);
+
+/// The full display name of ISO [weekday] (1 = Monday .. 7 = Sunday) in
+/// [localeName], e.g. `'Tuesday'` (en) or `'Dienstag'` (de) — sourced from
+/// `package:intl`, never a hardcoded weekday list.
+String weekdayName(int weekday, String localeName) {
+  return DateFormat.EEEE(
+    localeName,
+  ).format(_referenceMonday.add(Duration(days: weekday - 1)));
 }
 
-/// The monthly nth-weekday chip's label, e.g. `'On the 3rd Tuesday'` or
-/// `'On the last Tuesday'`.
-String monthlyNthWeekdayLabel(PlainDate date) {
-  final ordinal = nthWeekdayOrdinalOf(date);
-  final weekdayName = weekdayNames[date.weekday - 1];
-  final ordinalText = ordinal == -1 ? 'last' : _ordinal(ordinal);
-  return 'On the $ordinalText $weekdayName';
+/// The abbreviated display name of ISO [weekday] (1 = Monday .. 7 = Sunday)
+/// in [localeName], e.g. `'Tue'` (en) or `'Di'` (de), for the weekday chip
+/// row — sourced from `package:intl`, never a hardcoded weekday list.
+String weekdayShortName(int weekday, String localeName) {
+  return DateFormat.E(
+    localeName,
+  ).format(_referenceMonday.add(Duration(days: weekday - 1)));
+}
+
+/// The already-localized ordinal text for [n] (e.g. `'15th'` in en,
+/// `'15.'` in de), used by the monthly-mode chip labels.
+///
+/// English's irregular 1st/2nd/3rd/4th…/11th/12th/13th suffixes can't be
+/// expressed as an ICU `plural`/`select` ARB message (`flutter gen-l10n`
+/// doesn't support ICU's `selectordinal`), so this computes the
+/// already-localized ordinal text here, gated on locale, and the ARB
+/// templates just interpolate the result — the English suffix rule itself
+/// never appears in (or leaks into) another locale's output.
+String localizedOrdinal(int n, String localeName) {
+  if (localeName.startsWith('de')) {
+    return '$n.';
+  }
+  return _englishOrdinal(n);
 }
 
 /// Renders [n] with its English ordinal suffix, e.g. `'1st'`, `'22nd'`.
-String _ordinal(int n) {
+String _englishOrdinal(int n) {
   if (n % 100 >= 11 && n % 100 <= 13) {
     return '${n}th';
   }

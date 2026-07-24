@@ -5,6 +5,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The day-of-month vs. nth-weekday choice, labeled from [startDate].
@@ -43,7 +44,7 @@ class MonthlyModeRow extends StatelessWidget {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
               ),
-              title: Text(_label(mode)),
+              title: Text(_label(context, mode)),
               onTap: () => onChanged(mode),
             ),
           ),
@@ -51,9 +52,21 @@ class MonthlyModeRow extends StatelessWidget {
     );
   }
 
-  String _label(MonthlyMode mode) {
-    return mode == MonthlyMode.dayOfMonth
-        ? monthlyDayOfMonthLabel(startDate)
-        : monthlyNthWeekdayLabel(startDate);
+  String _label(BuildContext context, MonthlyMode mode) {
+    final l10n = AppLocalizations.of(context);
+    final localeName = Localizations.localeOf(context).toString();
+    if (mode == MonthlyMode.dayOfMonth) {
+      return l10n.monthlyDayOfMonthLabel(
+        localizedOrdinal(startDate.day, localeName),
+      );
+    }
+    final ordinal = nthWeekdayOrdinalOf(startDate);
+    final weekday = weekdayName(startDate.weekday, localeName);
+    return ordinal == -1
+        ? l10n.monthlyLastWeekdayLabel(weekday)
+        : l10n.monthlyNthWeekdayLabel(
+            localizedOrdinal(ordinal, localeName),
+            weekday,
+          );
   }
 }

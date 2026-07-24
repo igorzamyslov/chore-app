@@ -3,8 +3,9 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
-import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// A tappable field showing [value], opening a date picker on tap.
 ///
@@ -32,12 +33,14 @@ class StartDateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeName = Localizations.localeOf(context).toString();
+    final dateTime = DateTime.utc(value.year, value.month, value.day);
     return semantic(
       'chore_form.start_date',
       child: ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('Start date'),
-        subtitle: Text('${formatShortDate(value)}, ${value.year}'),
+        title: Text(AppLocalizations.of(context).choreFormStartDateLabel),
+        subtitle: Text(DateFormat.yMMMd(localeName).format(dateTime)),
         trailing: const Icon(Icons.calendar_today_outlined),
         onTap: () => _pick(context),
       ),

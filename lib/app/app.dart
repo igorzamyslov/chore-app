@@ -33,10 +33,20 @@ class ChoreApp extends ConsumerWidget {
           body: Center(child: CircularProgressIndicator()),
         ),
         error: (error, stackTrace) => Scaffold(
-          body: Center(
-            child: semantic(
-              'app.bootstrap_error',
-              child: Text('Something went wrong starting up: $error'),
+          // A `Builder` is required here (rather than reusing `ChoreApp`'s
+          // own `context`): `home` is built as part of constructing
+          // `MaterialApp` itself, so `ChoreApp`'s `context` sits *above*
+          // the `Localizations` widget `MaterialApp` establishes for its
+          // subtree — `AppLocalizations.of` needs a `context` from inside
+          // that subtree instead.
+          body: Builder(
+            builder: (context) => Center(
+              child: semantic(
+                'app.bootstrap_error',
+                child: Text(
+                  AppLocalizations.of(context).appBootstrapError(error),
+                ),
+              ),
             ),
           ),
         ),

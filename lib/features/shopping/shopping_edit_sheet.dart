@@ -6,6 +6,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/categories/category_picker.dart';
 import 'package:chore_app/features/shopping/shopping_edit_validation.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,7 +38,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _quantityController;
   late String? _categoryId;
-  String? _nameError;
+  ItemNameError? _nameError;
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
   Widget build(BuildContext context) {
     final categories = ref.watch(shoppingCategoriesProvider).value ?? const [];
     final viewInsets = MediaQuery.viewInsetsOf(context);
+    final l10n = AppLocalizations.of(context);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
@@ -70,8 +72,10 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
             child: TextField(
               controller: _nameController,
               decoration: InputDecoration(
-                labelText: 'Name',
-                errorText: _nameError,
+                labelText: l10n.shoppingEditNameLabel,
+                errorText: _nameError == null
+                    ? null
+                    : l10n.shoppingEditNameRequiredError,
               ),
             ),
           ),
@@ -80,7 +84,9 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
             'shopping.edit.quantity',
             child: TextField(
               controller: _quantityController,
-              decoration: const InputDecoration(labelText: 'Quantity / note'),
+              decoration: InputDecoration(
+                labelText: l10n.shoppingEditQuantityLabel,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -103,7 +109,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
                   style: TextButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.error,
                   ),
-                  child: const Text('Delete'),
+                  child: Text(l10n.commonDelete),
                 ),
               ),
               const Spacer(),
@@ -111,7 +117,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
                 'shopping.edit.save',
                 child: FilledButton(
                   onPressed: _save,
-                  child: const Text('Save'),
+                  child: Text(l10n.commonSave),
                 ),
               ),
             ],

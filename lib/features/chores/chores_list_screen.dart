@@ -11,6 +11,7 @@ import 'package:chore_app/features/chores/chore_form_screen.dart';
 import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,7 +36,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chores'),
+        title: Text(AppLocalizations.of(context).choresTabLabel),
         actions: [
           MemberFilterButton(
             selected: _memberFilter,
@@ -151,7 +152,7 @@ class _Body extends StatelessWidget {
       return Center(
         child: semantic(
           'chores.empty',
-          child: const Text('No chores pending — nice work!'),
+          child: Text(AppLocalizations.of(context).choresEmptyState),
         ),
       );
     }
@@ -172,7 +173,7 @@ class _Body extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Text(
-                section.label,
+                section.label(AppLocalizations.of(context)),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
@@ -196,17 +197,18 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Could not load your chores.'),
+          Text(l10n.choresErrorMessage),
           const SizedBox(height: 8),
           semantic(
             'chores.error.retry',
             child: OutlinedButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ),
         ],

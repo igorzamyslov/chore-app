@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The required chore title field, with an inline validation error.
@@ -21,7 +22,10 @@ class TitleField extends StatelessWidget {
       'chore_form.title',
       child: TextField(
         controller: controller,
-        decoration: InputDecoration(labelText: 'Title', errorText: errorText),
+        decoration: InputDecoration(
+          labelText: AppLocalizations.of(context).choreFormTitleLabel,
+          errorText: errorText,
+        ),
       ),
     );
   }
@@ -41,7 +45,9 @@ class NotesField extends StatelessWidget {
       'chore_form.notes',
       child: TextField(
         controller: controller,
-        decoration: const InputDecoration(labelText: 'Notes'),
+        decoration: InputDecoration(
+          labelText: AppLocalizations.of(context).choreFormNotesLabel,
+        ),
         maxLines: 3,
         minLines: 3,
       ),

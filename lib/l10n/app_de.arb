@@ -1,4 +1,89 @@
 {
   "@@locale": "de",
-  "appTitle": "Aufgaben"
+  "appTitle": "Aufgaben",
+  "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
+
+  "commonCancel": "Abbrechen",
+  "commonDelete": "Löschen",
+  "commonSave": "Speichern",
+  "commonRetry": "Erneut versuchen",
+
+  "choresTabLabel": "Aufgaben",
+  "shoppingTabLabel": "Einkaufsliste",
+  "settingsTabLabel": "Einstellungen",
+  "settingsComingSoon": "{title} — kommt bald",
+
+  "categoryPickerNone": "Keine",
+
+  "choresMenuSkip": "Überspringen",
+  "choresMenuEdit": "Bearbeiten",
+  "choresMenuPause": "Pausieren",
+
+  "choresDeleteDialogTitle": "Aufgabe löschen?",
+  "choresDeleteDialogBody": "Damit löschst du '{choreTitle}'. Der Verlauf bleibt erhalten, aber die anstehende Erledigung wird entfernt.",
+
+  "choresOccurrenceCompleteTooltip": "Erledigen",
+  "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",
+  "choresOccurrenceDueLabel": "Fällig am {date}",
+
+  "choresSectionOverdue": "Überfällig",
+  "choresSectionToday": "Heute",
+  "choresSectionTomorrow": "Morgen",
+  "choresSectionThisWeek": "Diese Woche",
+  "choresSectionLater": "Später",
+
+  "choresFilterMemberTooltip": "Nach Mitglied filtern",
+  "choresFilterMemberAll": "Alle Mitglieder",
+  "choresFilterCategoryTooltip": "Nach Kategorie filtern",
+  "choresFilterCategoryAll": "Alle Kategorien",
+
+  "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
+  "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
+
+  "choreFormEditTitle": "Aufgabe bearbeiten",
+  "choreFormNewTitle": "Neue Aufgabe",
+  "choreFormTitleLabel": "Titel",
+  "choreFormNotesLabel": "Notizen",
+  "choreFormTitleRequiredError": "Titel ist erforderlich",
+  "choreFormRepeatToggleLabel": "Wiederholen",
+  "choreFormRepeatEveryLabel": "Wiederholen alle",
+  "choreFormIntervalTooSmallError": "Muss mindestens 1 sein",
+  "choreFormUnitDay": "Tag",
+  "choreFormUnitWeek": "Woche",
+  "choreFormUnitMonth": "Monat",
+  "choreFormAnchorScheduleTitle": "Nach festem Zeitplan",
+  "choreFormAnchorCompletionTitle": "Nach letzter Erledigung",
+  "choreFormAnchorScheduleSubtitle": "z. B. jeden Dienstag",
+  "choreFormAnchorCompletionSubtitle": "z. B. 4 Tage nach der letzten Erledigung",
+
+  "monthlyDayOfMonthLabel": "Am {ordinalDay}",
+  "monthlyNthWeekdayLabel": "Am {ordinal} {weekday}",
+  "monthlyLastWeekdayLabel": "Am letzten {weekday}",
+
+  "choreFormAssignmentFixed": "Fest",
+  "choreFormAssignmentRotation": "Rotation",
+  "choreFormAssignmentAnyone": "Beliebig",
+  "choreFormAssigneeOrderLabel": "{order}. {name}",
+  "choreFormAssignmentNeedsOneError": "Wähle ein Mitglied aus",
+  "choreFormAssignmentNeedsTwoError": "Wähle mindestens zwei aus",
+
+  "choreFormStartDateLabel": "Startdatum",
+
+  "shoppingEmptyState": "Die Einkaufsliste ist leer",
+  "shoppingErrorMessage": "Deine Einkaufsliste konnte nicht geladen werden.",
+
+  "shoppingEditNameLabel": "Name",
+  "shoppingEditQuantityLabel": "Menge / Notiz",
+  "shoppingEditNameRequiredError": "Name ist erforderlich",
+
+  "shoppingUncategorized": "Ohne Kategorie",
+
+  "shoppingCartHeader": "{count, plural, one{Im Einkaufswagen (1)} other{Im Einkaufswagen ({count})}}",
+  "shoppingClearButton": "Erledigte leeren",
+  "shoppingClearDialogTitle": "Erledigte Artikel leeren?",
+  "shoppingClearDialogBody": "{count, plural, one{Damit entfernst du 1 erledigten Artikel aus der Liste.} other{Damit entfernst du {count} erledigte Artikel aus der Liste.}}",
+  "shoppingClearConfirm": "Leeren",
+
+  "shoppingAddHint": "Artikel hinzufügen…",
+  "shoppingAddTooltip": "Artikel hinzufügen"
 }

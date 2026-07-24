@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The header shown above a run of items sharing the same category:
@@ -26,7 +27,8 @@ class ShoppingCategoryHeader extends StatelessWidget {
     final icon = category != null
         ? categoryIcon(category.icon)
         : Icons.label_outlined;
-    final name = category?.name ?? 'Uncategorized';
+    final name =
+        category?.name ?? AppLocalizations.of(context).shoppingUncategorized;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),

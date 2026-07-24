@@ -4,45 +4,43 @@ library;
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
 import 'package:chore_app/features/shopping/shopping_list_screen.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The three top-level tabs, in display order.
 enum _AppTab {
   /// The chores list (this spec's feature).
-  chores(
-    label: 'Chores',
-    filled: Icons.checklist,
-    outlined: Icons.checklist_outlined,
-  ),
+  chores(filled: Icons.checklist, outlined: Icons.checklist_outlined),
 
   /// The shopping list (built in a separate spec; a placeholder here).
   shopping(
-    label: 'Shopping',
     filled: Icons.shopping_cart,
     outlined: Icons.shopping_cart_outlined,
   ),
 
   /// Household settings (built later; a placeholder here).
-  settings(
-    label: 'Settings',
-    filled: Icons.settings,
-    outlined: Icons.settings_outlined,
-  );
+  settings(filled: Icons.settings, outlined: Icons.settings_outlined);
 
-  const _AppTab({
-    required this.label,
-    required this.filled,
-    required this.outlined,
-  });
-
-  /// This tab's display label.
-  final String label;
+  const _AppTab({required this.filled, required this.outlined});
 
   /// This tab's icon when selected.
   final IconData filled;
 
   /// This tab's icon when unselected.
   final IconData outlined;
+}
+
+/// This tab's localized display label.
+String _tabLabel(BuildContext context, _AppTab tab) {
+  final l10n = AppLocalizations.of(context);
+  switch (tab) {
+    case _AppTab.chores:
+      return l10n.choresTabLabel;
+    case _AppTab.shopping:
+      return l10n.shoppingTabLabel;
+    case _AppTab.settings:
+      return l10n.settingsTabLabel;
+  }
 }
 
 /// Bottom-navigation shell holding the app's three top-level tabs.
@@ -71,10 +69,12 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selected.index,
-        children: const [
-          ChoresListScreen(),
-          ShoppingListScreen(),
-          _PlaceholderScreen(title: 'Settings'),
+        children: [
+          const ChoresListScreen(),
+          const ShoppingListScreen(),
+          _PlaceholderScreen(
+            title: AppLocalizations.of(context).settingsTabLabel,
+          ),
         ],
       ),
       bottomNavigationBar: _BottomTabBar(
@@ -149,7 +149,7 @@ class _TabContent extends StatelessWidget {
         Icon(isSelected ? tab.filled : tab.outlined, color: color),
         const SizedBox(height: 2),
         Text(
-          tab.label,
+          _tabLabel(context, tab),
           style: theme.textTheme.labelMedium?.copyWith(color: color),
         ),
       ],
@@ -168,7 +168,9 @@ class _PlaceholderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: Center(child: Text('$title — coming soon')),
+      body: Center(
+        child: Text(AppLocalizations.of(context).settingsComingSoon(title)),
+      ),
     );
   }
 }

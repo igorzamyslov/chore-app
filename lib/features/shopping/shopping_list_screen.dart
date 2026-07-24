@@ -9,6 +9,7 @@ import 'package:chore_app/features/shopping/shopping_checked_section.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,7 +25,9 @@ class ShoppingListScreen extends ConsumerWidget {
     final itemsAsync = ref.watch(shoppingItemsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Shopping')),
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).shoppingTabLabel),
+      ),
       body: Column(
         children: [
           const ShoppingQuickAddRow(),
@@ -155,7 +158,7 @@ class _EmptyMessage extends StatelessWidget {
         semantic(
           'shopping.empty',
           child: Text(
-            'Shopping list is empty',
+            AppLocalizations.of(context).shoppingEmptyState,
             style: theme.textTheme.bodyLarge,
           ),
         ),
@@ -171,17 +174,18 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Could not load your shopping list.'),
+          Text(l10n.shoppingErrorMessage),
           const SizedBox(height: 8),
           semantic(
             'shopping.error.retry',
             child: OutlinedButton(
               onPressed: onRetry,
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ),
         ],

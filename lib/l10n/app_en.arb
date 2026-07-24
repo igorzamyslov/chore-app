@@ -3,5 +3,359 @@
   "appTitle": "Chores",
   "@appTitle": {
     "description": "The application title shown in the task switcher."
+  },
+  "appBootstrapError": "Something went wrong starting up: {error}",
+  "@appBootstrapError": {
+    "description": "Shown full-screen when the app fails to bootstrap (e.g. the local database couldn't be opened).",
+    "placeholders": {
+      "error": {
+        "type": "Object",
+        "example": "Exception: could not open database"
+      }
+    }
+  },
+
+  "commonCancel": "Cancel",
+  "@commonCancel": {
+    "description": "Generic 'cancel' action, used by the chore delete and shopping clear-checked confirmation dialogs."
+  },
+  "commonDelete": "Delete",
+  "@commonDelete": {
+    "description": "Generic 'delete' action, used by the chore action sheet's delete entry, the chore delete confirmation dialog's destructive button, and the shopping item edit sheet's delete button."
+  },
+  "commonSave": "Save",
+  "@commonSave": {
+    "description": "Generic 'save' action, used by the chore form's and the shopping item edit sheet's primary buttons."
+  },
+  "commonRetry": "Retry",
+  "@commonRetry": {
+    "description": "Generic 'retry' action shown under a load-error message, on both the chores and shopping list screens."
+  },
+
+  "choresTabLabel": "Chores",
+  "@choresTabLabel": {
+    "description": "The chores bottom-navigation tab label, and the chores list screen's app bar title."
+  },
+  "shoppingTabLabel": "Shopping",
+  "@shoppingTabLabel": {
+    "description": "The shopping bottom-navigation tab label, and the shopping list screen's app bar title."
+  },
+  "settingsTabLabel": "Settings",
+  "@settingsTabLabel": {
+    "description": "The settings bottom-navigation tab label, and the (placeholder) settings screen's app bar title."
+  },
+  "settingsComingSoon": "{title} — coming soon",
+  "@settingsComingSoon": {
+    "description": "Body text of a not-yet-built tab's placeholder screen, e.g. 'Settings — coming soon'.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Settings"
+      }
+    }
+  },
+
+  "categoryPickerNone": "None",
+  "@categoryPickerNone": {
+    "description": "The category picker's chip for 'no category selected', shown in both the chore form and the shopping item edit sheet."
+  },
+
+  "choresMenuSkip": "Skip",
+  "@choresMenuSkip": {
+    "description": "Chore occurrence action-sheet entry: skip the pending occurrence."
+  },
+  "choresMenuEdit": "Edit",
+  "@choresMenuEdit": {
+    "description": "Chore occurrence action-sheet entry: open the chore in the edit form."
+  },
+  "choresMenuPause": "Pause",
+  "@choresMenuPause": {
+    "description": "Chore occurrence action-sheet entry: pause the chore."
+  },
+
+  "choresDeleteDialogTitle": "Delete chore?",
+  "@choresDeleteDialogTitle": {
+    "description": "Title of the chore delete-confirmation dialog."
+  },
+  "choresDeleteDialogBody": "This deletes '{choreTitle}'. Its history is kept, but its pending occurrence is removed.",
+  "@choresDeleteDialogBody": {
+    "description": "Body of the chore delete-confirmation dialog, explaining the consequence.",
+    "placeholders": {
+      "choreTitle": {
+        "type": "String",
+        "example": "Wash dishes"
+      }
+    }
+  },
+
+  "choresOccurrenceCompleteTooltip": "Complete",
+  "@choresOccurrenceCompleteTooltip": {
+    "description": "Tooltip for a chore occurrence tile's leading complete button."
+  },
+  "choresOccurrenceMoreActionsTooltip": "More actions",
+  "@choresOccurrenceMoreActionsTooltip": {
+    "description": "Tooltip for a chore occurrence tile's trailing overflow-menu button."
+  },
+  "choresOccurrenceDueLabel": "Due {date}",
+  "@choresOccurrenceDueLabel": {
+    "description": "Overdue chore occurrence's due-date label; {date} is already locale-formatted (e.g. 'Jul 20').",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Jul 20"
+      }
+    }
+  },
+
+  "choresSectionOverdue": "Overdue",
+  "@choresSectionOverdue": {
+    "description": "Chores list section header: occurrences due before today."
+  },
+  "choresSectionToday": "Today",
+  "@choresSectionToday": {
+    "description": "Chores list section header: occurrences due today."
+  },
+  "choresSectionTomorrow": "Tomorrow",
+  "@choresSectionTomorrow": {
+    "description": "Chores list section header: occurrences due tomorrow."
+  },
+  "choresSectionThisWeek": "This week",
+  "@choresSectionThisWeek": {
+    "description": "Chores list section header: occurrences due later this week."
+  },
+  "choresSectionLater": "Later",
+  "@choresSectionLater": {
+    "description": "Chores list section header: occurrences due after this week."
+  },
+
+  "choresFilterMemberTooltip": "Filter by member",
+  "@choresFilterMemberTooltip": {
+    "description": "Tooltip for the chores list's member-filter button."
+  },
+  "choresFilterMemberAll": "All members",
+  "@choresFilterMemberAll": {
+    "description": "Member-filter menu entry that resets the filter to show every member's chores."
+  },
+  "choresFilterCategoryTooltip": "Filter by category",
+  "@choresFilterCategoryTooltip": {
+    "description": "Tooltip for the chores list's category-filter button."
+  },
+  "choresFilterCategoryAll": "All categories",
+  "@choresFilterCategoryAll": {
+    "description": "Category-filter menu entry that resets the filter to show every category's chores."
+  },
+
+  "choresEmptyState": "No chores pending — nice work!",
+  "@choresEmptyState": {
+    "description": "Chores list empty-state message, shown when there are no pending occurrences to show."
+  },
+  "choresErrorMessage": "Could not load your chores.",
+  "@choresErrorMessage": {
+    "description": "Chores list load-error message."
+  },
+
+  "choreFormEditTitle": "Edit chore",
+  "@choreFormEditTitle": {
+    "description": "Chore form app bar title when editing an existing chore."
+  },
+  "choreFormNewTitle": "New chore",
+  "@choreFormNewTitle": {
+    "description": "Chore form app bar title when creating a new chore."
+  },
+  "choreFormTitleLabel": "Title",
+  "@choreFormTitleLabel": {
+    "description": "Label of the chore form's required title text field."
+  },
+  "choreFormNotesLabel": "Notes",
+  "@choreFormNotesLabel": {
+    "description": "Label of the chore form's optional notes text field."
+  },
+  "choreFormTitleRequiredError": "Title is required",
+  "@choreFormTitleRequiredError": {
+    "description": "Inline validation error shown under the chore title field when it's left empty."
+  },
+  "choreFormRepeatToggleLabel": "Repeat",
+  "@choreFormRepeatToggleLabel": {
+    "description": "Label of the chore form's repeat on/off switch."
+  },
+  "choreFormRepeatEveryLabel": "Repeat every",
+  "@choreFormRepeatEveryLabel": {
+    "description": "Label of the chore form's repeat-interval number field, e.g. 'Repeat every' [2] weeks."
+  },
+  "choreFormIntervalTooSmallError": "Must be at least 1",
+  "@choreFormIntervalTooSmallError": {
+    "description": "Inline validation error shown under the repeat-interval field when it's not a positive integer."
+  },
+  "choreFormUnitDay": "Day",
+  "@choreFormUnitDay": {
+    "description": "Chore form repeat-unit chip: day."
+  },
+  "choreFormUnitWeek": "Week",
+  "@choreFormUnitWeek": {
+    "description": "Chore form repeat-unit chip: week."
+  },
+  "choreFormUnitMonth": "Month",
+  "@choreFormUnitMonth": {
+    "description": "Chore form repeat-unit chip: month."
+  },
+  "choreFormAnchorScheduleTitle": "On a fixed schedule",
+  "@choreFormAnchorScheduleTitle": {
+    "description": "Chore form recurrence-anchor option: due dates follow a fixed calendar schedule."
+  },
+  "choreFormAnchorCompletionTitle": "After last completion",
+  "@choreFormAnchorCompletionTitle": {
+    "description": "Chore form recurrence-anchor option: due dates are relative to the last completion."
+  },
+  "choreFormAnchorScheduleSubtitle": "e.g. every Tuesday",
+  "@choreFormAnchorScheduleSubtitle": {
+    "description": "Example hint under the fixed-schedule anchor option."
+  },
+  "choreFormAnchorCompletionSubtitle": "e.g. 4 days after last done",
+  "@choreFormAnchorCompletionSubtitle": {
+    "description": "Example hint under the after-last-completion anchor option."
+  },
+
+  "monthlyDayOfMonthLabel": "On the {ordinalDay}",
+  "@monthlyDayOfMonthLabel": {
+    "description": "Monthly repeat chip label for 'day of month' mode; {ordinalDay} is the already locale-formatted ordinal day (e.g. '15th').",
+    "placeholders": {
+      "ordinalDay": {
+        "type": "String",
+        "example": "15th"
+      }
+    }
+  },
+  "monthlyNthWeekdayLabel": "On the {ordinal} {weekday}",
+  "@monthlyNthWeekdayLabel": {
+    "description": "Monthly repeat chip label for 'nth weekday of month' mode, e.g. 'On the 3rd Tuesday'. {ordinal} is already locale-formatted (e.g. '3rd'); {weekday} comes from intl's date formatting (e.g. 'Tuesday'), never hardcoded.",
+    "placeholders": {
+      "ordinal": {
+        "type": "String",
+        "example": "3rd"
+      },
+      "weekday": {
+        "type": "String",
+        "example": "Tuesday"
+      }
+    }
+  },
+  "monthlyLastWeekdayLabel": "On the last {weekday}",
+  "@monthlyLastWeekdayLabel": {
+    "description": "Monthly repeat chip label for the last occurrence of a weekday in the month, e.g. 'On the last Tuesday'. {weekday} comes from intl's date formatting, never hardcoded.",
+    "placeholders": {
+      "weekday": {
+        "type": "String",
+        "example": "Tuesday"
+      }
+    }
+  },
+
+  "choreFormAssignmentFixed": "Fixed",
+  "@choreFormAssignmentFixed": {
+    "description": "Chore form assignment-mode chip: a fixed single assignee."
+  },
+  "choreFormAssignmentRotation": "Rotation",
+  "@choreFormAssignmentRotation": {
+    "description": "Chore form assignment-mode chip: rotates between several assignees."
+  },
+  "choreFormAssignmentAnyone": "Anyone",
+  "@choreFormAssignmentAnyone": {
+    "description": "Chore form assignment-mode chip: no specific assignee."
+  },
+  "choreFormAssigneeOrderLabel": "{order}. {name}",
+  "@choreFormAssigneeOrderLabel": {
+    "description": "Rotation-mode assignee chip label showing the member's tap order before their name, e.g. '1. Alex'.",
+    "placeholders": {
+      "order": {
+        "type": "int",
+        "example": "1"
+      },
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "choreFormAssignmentNeedsOneError": "Pick one member",
+  "@choreFormAssignmentNeedsOneError": {
+    "description": "Inline validation error shown when 'fixed' assignment mode has no member picked."
+  },
+  "choreFormAssignmentNeedsTwoError": "Pick at least two",
+  "@choreFormAssignmentNeedsTwoError": {
+    "description": "Inline validation error shown when 'rotation' assignment mode has fewer than two members picked."
+  },
+
+  "choreFormStartDateLabel": "Start date",
+  "@choreFormStartDateLabel": {
+    "description": "Label of the chore form's start-date field."
+  },
+
+  "shoppingEmptyState": "Shopping list is empty",
+  "@shoppingEmptyState": {
+    "description": "Shopping list empty-state message, shown when there are no items at all."
+  },
+  "shoppingErrorMessage": "Could not load your shopping list.",
+  "@shoppingErrorMessage": {
+    "description": "Shopping list load-error message."
+  },
+
+  "shoppingEditNameLabel": "Name",
+  "@shoppingEditNameLabel": {
+    "description": "Label of the shopping item edit sheet's required name text field."
+  },
+  "shoppingEditQuantityLabel": "Quantity / note",
+  "@shoppingEditQuantityLabel": {
+    "description": "Label of the shopping item edit sheet's optional quantity/note text field."
+  },
+  "shoppingEditNameRequiredError": "Name is required",
+  "@shoppingEditNameRequiredError": {
+    "description": "Inline validation error shown under the shopping item name field when it's left empty."
+  },
+
+  "shoppingUncategorized": "Uncategorized",
+  "@shoppingUncategorized": {
+    "description": "Shopping list category-run header shown above items that have no category."
+  },
+
+  "shoppingCartHeader": "{count, plural, one{In the cart (1)} other{In the cart ({count})}}",
+  "@shoppingCartHeader": {
+    "description": "Header of the collapsed-by-default checked-items section, showing how many items are checked.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "shoppingClearButton": "Clear checked",
+  "@shoppingClearButton": {
+    "description": "Button that clears every checked item, shown in the checked-items section header."
+  },
+  "shoppingClearDialogTitle": "Clear checked items?",
+  "@shoppingClearDialogTitle": {
+    "description": "Title of the clear-checked-items confirmation dialog."
+  },
+  "shoppingClearDialogBody": "{count, plural, one{This removes 1 checked item from the list.} other{This removes {count} checked items from the list.}}",
+  "@shoppingClearDialogBody": {
+    "description": "Body of the clear-checked-items confirmation dialog, explaining the consequence.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "shoppingClearConfirm": "Clear",
+  "@shoppingClearConfirm": {
+    "description": "Destructive confirm button of the clear-checked-items dialog."
+  },
+
+  "shoppingAddHint": "Add item…",
+  "@shoppingAddHint": {
+    "description": "Placeholder hint text of the shopping list's quick-add text field."
+  },
+  "shoppingAddTooltip": "Add item",
+  "@shoppingAddTooltip": {
+    "description": "Tooltip of the shopping list's quick-add submit button."
   }
 }

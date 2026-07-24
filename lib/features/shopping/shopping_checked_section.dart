@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/shopping/shopping_clear_dialog.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The checked-items section: a collapsed-by-default [ExpansionTile] headed
@@ -33,20 +34,21 @@ class ShoppingCheckedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return ExpansionTile(
       title: Row(
         children: [
           Expanded(
             child: semantic(
               'shopping.checked.header',
-              child: Text('In the cart ($count)'),
+              child: Text(l10n.shoppingCartHeader(count)),
             ),
           ),
           semantic(
             'shopping.clear',
             child: TextButton(
               onPressed: () => _confirmClear(context),
-              child: const Text('Clear checked'),
+              child: Text(l10n.shoppingClearButton),
             ),
           ),
         ],

@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The action a user picked from [showChoreActionSheet], or `null` if they
@@ -27,6 +28,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
     context: context,
     builder: (sheetContext) {
       final errorColor = Theme.of(sheetContext).colorScheme.error;
+      final l10n = AppLocalizations.of(sheetContext);
       return SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -35,7 +37,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
               'chores.menu.skip',
               child: ListTile(
                 leading: const Icon(Icons.skip_next_outlined),
-                title: const Text('Skip'),
+                title: Text(l10n.choresMenuSkip),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.skip);
                 },
@@ -45,7 +47,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
               'chores.menu.edit',
               child: ListTile(
                 leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit'),
+                title: Text(l10n.choresMenuEdit),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.edit);
                 },
@@ -55,7 +57,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
               'chores.menu.pause',
               child: ListTile(
                 leading: const Icon(Icons.pause_circle_outlined),
-                title: const Text('Pause'),
+                title: Text(l10n.choresMenuPause),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.pause);
                 },
@@ -65,7 +67,10 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
               'chores.menu.delete',
               child: ListTile(
                 leading: Icon(Icons.delete_outline, color: errorColor),
-                title: Text('Delete', style: TextStyle(color: errorColor)),
+                title: Text(
+                  l10n.commonDelete,
+                  style: TextStyle(color: errorColor),
+                ),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.delete);
                 },

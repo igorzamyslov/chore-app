@@ -26,6 +26,7 @@ class WeekdayChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeName = Localizations.localeOf(context).toString();
     return Wrap(
       spacing: 8,
       children: [
@@ -33,7 +34,7 @@ class WeekdayChips extends StatelessWidget {
           semantic(
             'chore_form.repeat.weekday.$weekday',
             child: FilterChip(
-              label: Text(weekdayShortNames[weekday - 1]),
+              label: Text(weekdayShortName(weekday, localeName)),
               selected: selected.contains(weekday),
               onSelected: (_) => onToggle(weekday),
             ),

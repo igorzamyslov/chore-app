@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,11 +26,12 @@ class MemberFilterButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(membersProvider).value ?? const [];
+    final l10n = AppLocalizations.of(context);
     return semantic(
       'chores.filter.member',
       child: PopupMenuButton<String?>(
         icon: const Icon(Icons.person_outline),
-        tooltip: 'Filter by member',
+        tooltip: l10n.choresFilterMemberTooltip,
         onSelected: onChanged,
         itemBuilder: (context) => [
           // A PopupMenuItem without a value pops `null`, which
@@ -39,7 +41,10 @@ class MemberFilterButton extends ConsumerWidget {
             onTap: () => onChanged(null),
             child: semantic(
               'chores.filter.member.all',
-              child: _entryLabel('All members', isSelected: selected == null),
+              child: _entryLabel(
+                l10n.choresFilterMemberAll,
+                isSelected: selected == null,
+              ),
             ),
           ),
           for (final member in members)
@@ -79,11 +84,12 @@ class CategoryFilterButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categories = ref.watch(choreCategoriesProvider).value ?? const [];
+    final l10n = AppLocalizations.of(context);
     return semantic(
       'chores.filter.category',
       child: PopupMenuButton<String?>(
         icon: const Icon(Icons.label_outline),
-        tooltip: 'Filter by category',
+        tooltip: l10n.choresFilterCategoryTooltip,
         onSelected: onChanged,
         itemBuilder: (context) => [
           // Same null-value gotcha as the member button above: the reset
@@ -93,7 +99,7 @@ class CategoryFilterButton extends ConsumerWidget {
             child: semantic(
               'chores.filter.category.all',
               child: _entryLabel(
-                'All categories',
+                l10n.choresFilterCategoryAll,
                 isSelected: selected == null,
               ),
             ),

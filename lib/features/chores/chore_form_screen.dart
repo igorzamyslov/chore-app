@@ -17,6 +17,7 @@ import 'package:chore_app/features/chores/chore_form/repeat_section.dart'
     show RepeatToggle;
 import 'package:chore_app/features/chores/chore_form/start_date_field.dart';
 import 'package:chore_app/features/chores/chore_form/title_notes_fields.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,9 +57,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   AssignmentMode _assignmentMode = AssignmentMode.anyone;
   List<String> _selectedMemberIds = [];
 
-  String? _titleError;
-  String? _intervalError;
-  String? _assignmentError;
+  TitleError? _titleError;
+  IntervalError? _intervalError;
+  AssignmentError? _assignmentError;
 
   bool get _isEditing => widget.choreId != null;
 
@@ -113,9 +114,13 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final formTitle = _isEditing
+        ? l10n.choreFormEditTitle
+        : l10n.choreFormNewTitle;
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(_isEditing ? 'Edit chore' : 'New chore')),
+        appBar: AppBar(title: Text(formTitle)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -124,11 +129,16 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit chore' : 'New chore')),
+      appBar: AppBar(title: Text(formTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TitleField(controller: _titleController, errorText: _titleError),
+          TitleField(
+            controller: _titleController,
+            errorText: _titleError == null
+                ? null
+                : l10n.choreFormTitleRequiredError,
+          ),
           const SizedBox(height: 16),
           NotesField(controller: _notesController),
           const SizedBox(height: 16),
@@ -149,7 +159,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
           if (_repeatEnabled)
             RepeatControls(
               intervalController: _intervalController,
-              intervalError: _intervalError,
+              intervalError: _intervalError == null
+                  ? null
+                  : l10n.choreFormIntervalTooSmallError,
               unit: _unit,
               onUnitChanged: _onUnitChanged,
               anchor: _anchor,
@@ -175,7 +187,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             members: members,
             selectedMemberIds: _selectedMemberIds,
             onMemberTap: _onMemberTap,
-            errorText: _assignmentError,
+            errorText: _assignmentErrorText(l10n, _assignmentError),
           ),
         ],
       ),
@@ -187,13 +199,23 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: semantic(
           'chore_form.save',
-          child: FilledButton(
-            onPressed: _save,
-            child: const Text('Save'),
-          ),
+          child: FilledButton(onPressed: _save, child: Text(l10n.commonSave)),
         ),
       ),
     );
+  }
+
+  /// Maps an [AssignmentError] to its localized message, or `null` if
+  /// [error] is `null`.
+  String? _assignmentErrorText(AppLocalizations l10n, AssignmentError? error) {
+    switch (error) {
+      case null:
+        return null;
+      case AssignmentError.needsOneMember:
+        return l10n.choreFormAssignmentNeedsOneError;
+      case AssignmentError.needsTwoMembers:
+        return l10n.choreFormAssignmentNeedsTwoError;
+    }
   }
 
   void _onUnitChanged(RecurrenceUnit unit) {
