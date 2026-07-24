@@ -9,6 +9,11 @@
 include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
+  exclude:
+    # Generated code (drift/build_runner output, committed to the repo) is
+    # not held to hand-written standards.
+    - "**/*.g.dart"
+    - "**/*.drift.dart"
   language:
     strict-casts: true
     strict-inference: true
