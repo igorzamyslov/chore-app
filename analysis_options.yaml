@@ -1,0 +1,15 @@
+# Strictest practical analyzer setup.
+#
+# - very_good_analysis: the most opinionated widely-used ruleset
+#   (includes public_member_api_docs — yes, on purpose).
+# - strict language modes: no implicit dynamic, no implicit downcasts.
+# - Nothing is downgraded here; hooks and CI run `flutter analyze
+#   --fatal-infos --fatal-warnings`, so every hint blocks a commit.
+
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true

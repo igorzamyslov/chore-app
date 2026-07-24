@@ -1,0 +1,32 @@
+# Git hooks via lefthook (https://lefthook.dev)
+# Install once per clone: `lefthook install`
+#
+# Philosophy: maximum strictness, fail fast. Formatting, analysis (infos are
+# fatal), and the full test suite all run before a commit is accepted.
+# If the test suite ever grows slow enough to hurt, move the `test` job to
+# pre-push — don't loosen it.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: "*.dart"
+      # Formats staged files in place and re-stages them; fails the commit
+      # only if formatting produced changes that couldn't be auto-applied.
+      run: dart format --set-exit-if-changed {staged_files}
+      stage_fixed: true
+
+    - name: analyze
+      run: flutter analyze --fatal-infos --fatal-warnings
+
+    - name: test
+      run: flutter test
+
+    - name: pubspec-lock-in-sync
+      # Catches "edited pubspec.yaml but forgot pub get" drift.
+      run: dart pub get --enforce-lockfile --offline
+
+pre-push:
+  jobs:
+    - name: full-test-suite
+      run: flutter test
