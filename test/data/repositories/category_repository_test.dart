@@ -163,4 +163,94 @@ void main() {
       },
     );
   });
+
+  group('reorderCategories', () {
+    test('persists the given order as 0-based sort_order', () async {
+      await repo.seedDefaults(householdId);
+      final before = await repo
+          .watchCategories(householdId, CategoryKind.chore)
+          .first;
+      final reversed = before.reversed.map((c) => c.id).toList();
+
+      await repo.reorderCategories(householdId, CategoryKind.chore, reversed);
+
+      final after = await repo
+          .watchCategories(householdId, CategoryKind.chore)
+          .first;
+      expect(after.map((c) => c.id).toList(), reversed);
+      for (var i = 0; i < after.length; i++) {
+        expect(after[i].sortOrder, i);
+      }
+    });
+
+    test('throws ArgumentError and writes nothing for an unknown id', () async {
+      await repo.seedDefaults(householdId);
+      final before = await repo
+          .watchCategories(householdId, CategoryKind.chore)
+          .first;
+      final ids = [...before.map((c) => c.id), 'does-not-exist'];
+
+      await expectLater(
+        () => repo.reorderCategories(householdId, CategoryKind.chore, ids),
+        throwsArgumentError,
+      );
+
+      final after = await repo
+          .watchCategories(householdId, CategoryKind.chore)
+          .first;
+      expect(after.map((c) => c.sortOrder), before.map((c) => c.sortOrder));
+    });
+
+    test(
+      'throws ArgumentError for a category belonging to a different '
+      'household',
+      () async {
+        await repo.seedDefaults(householdId);
+        final otherHouseholdId = await _insertHousehold(db, 'h2');
+        await repo.seedDefaults(otherHouseholdId);
+        final otherChoreCats = await repo
+            .watchCategories(otherHouseholdId, CategoryKind.chore)
+            .first;
+
+        await expectLater(
+          () => repo.reorderCategories(householdId, CategoryKind.chore, [
+            otherChoreCats.first.id,
+          ]),
+          throwsArgumentError,
+        );
+      },
+    );
+
+    test(
+      'throws ArgumentError for a category of the wrong kind',
+      () async {
+        await repo.seedDefaults(householdId);
+        final shoppingCats = await repo
+            .watchCategories(householdId, CategoryKind.shopping)
+            .first;
+
+        await expectLater(
+          () => repo.reorderCategories(householdId, CategoryKind.chore, [
+            shoppingCats.first.id,
+          ]),
+          throwsArgumentError,
+        );
+      },
+    );
+
+    test('throws ArgumentError for a soft-deleted category', () async {
+      await repo.seedDefaults(householdId);
+      final before = await repo
+          .watchCategories(householdId, CategoryKind.chore)
+          .first;
+      await repo.softDeleteCategory(before.first.id);
+
+      await expectLater(
+        () => repo.reorderCategories(householdId, CategoryKind.chore, [
+          before.first.id,
+        ]),
+        throwsArgumentError,
+      );
+    });
+  });
 }

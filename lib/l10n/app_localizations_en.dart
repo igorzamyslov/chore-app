@@ -38,11 +38,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTabLabel => 'Settings';
 
   @override
-  String settingsComingSoon(String title) {
-    return '$title — coming soon';
-  }
-
-  @override
   String get categoryPickerNone => 'None';
 
   @override
@@ -319,4 +314,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shoppingAddMovedBack => 'Moved back to the list';
+
+  @override
+  String get settingsCategoriesEntry => 'Categories';
+
+  @override
+  String get manageCategoriesTitle => 'Manage categories';
+
+  @override
+  String get manageCategoriesKindChore => 'Chores';
+
+  @override
+  String get manageCategoriesKindShopping => 'Shopping';
+
+  @override
+  String get manageCategoriesEmptyState => 'No categories yet';
+
+  @override
+  String get manageCategoriesErrorMessage => 'Could not load your categories.';
+
+  @override
+  String get categoryEditNewTitle => 'New category';
+
+  @override
+  String get categoryEditEditTitle => 'Edit category';
+
+  @override
+  String get categoryEditNameLabel => 'Name';
+
+  @override
+  String get categoryEditNameRequiredError => 'Name is required';
+
+  @override
+  String get categoryEditIconLabel => 'Icon';
+
+  @override
+  String get categoryEditColorLabel => 'Color';
+
+  @override
+  String get categoryDeleteDialogTitle => 'Delete category?';
+
+  @override
+  String categoryDeleteDialogBody(String categoryName) {
+    return 'This deletes \'$categoryName\'. Chores and items using it become uncategorized.';
+  }
 }

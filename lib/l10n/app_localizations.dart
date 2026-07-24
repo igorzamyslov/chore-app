@@ -146,17 +146,11 @@ abstract class AppLocalizations {
   /// **'Shopping'**
   String get shoppingTabLabel;
 
-  /// The settings bottom-navigation tab label, and the (placeholder) settings screen's app bar title.
+  /// The settings bottom-navigation tab label, and the settings screen's app bar title.
   ///
   /// In en, this message translates to:
   /// **'Settings'**
   String get settingsTabLabel;
-
-  /// Body text of a not-yet-built tab's placeholder screen, e.g. 'Settings — coming soon'.
-  ///
-  /// In en, this message translates to:
-  /// **'{title} — coming soon'**
-  String settingsComingSoon(String title);
 
   /// The category picker's chip for 'no category selected', shown in both the chore form and the shopping item edit sheet.
   ///
@@ -601,6 +595,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Moved back to the list'**
   String get shoppingAddMovedBack;
+
+  /// Settings screen list entry that opens category management (spec ux-round-2 B1).
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get settingsCategoriesEntry;
+
+  /// App bar title of the manage-categories screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage categories'**
+  String get manageCategoriesTitle;
+
+  /// Manage-categories screen's kind-switcher segment label for chore categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Chores'**
+  String get manageCategoriesKindChore;
+
+  /// Manage-categories screen's kind-switcher segment label for shopping categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping'**
+  String get manageCategoriesKindShopping;
+
+  /// Manage-categories screen empty-state message, shown when the selected kind has no active categories left.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories yet'**
+  String get manageCategoriesEmptyState;
+
+  /// Manage-categories screen load-error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your categories.'**
+  String get manageCategoriesErrorMessage;
+
+  /// Category edit sheet heading when adding a new category.
+  ///
+  /// In en, this message translates to:
+  /// **'New category'**
+  String get categoryEditNewTitle;
+
+  /// Category edit sheet heading when editing an existing category.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit category'**
+  String get categoryEditEditTitle;
+
+  /// Label of the category edit sheet's required name text field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get categoryEditNameLabel;
+
+  /// Inline validation error shown under the category name field when it's left empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required'**
+  String get categoryEditNameRequiredError;
+
+  /// Section label above the category edit sheet's icon picker grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get categoryEditIconLabel;
+
+  /// Section label above the category edit sheet's color swatch picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get categoryEditColorLabel;
+
+  /// Title of the category delete-confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete category?'**
+  String get categoryDeleteDialogTitle;
+
+  /// Body of the category delete-confirmation dialog, explaining the consequence.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
+  String categoryDeleteDialogBody(String categoryName);
 }
 
 class _AppLocalizationsDelegate

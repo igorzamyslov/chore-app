@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
+import 'package:chore_app/features/settings/settings_screen.dart';
 import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -12,13 +13,13 @@ enum _AppTab {
   /// The chores list (this spec's feature).
   chores(filled: Icons.checklist, outlined: Icons.checklist_outlined),
 
-  /// The shopping list (built in a separate spec; a placeholder here).
+  /// The shopping list.
   shopping(
     filled: Icons.shopping_cart,
     outlined: Icons.shopping_cart_outlined,
   ),
 
-  /// Household settings (built later; a placeholder here).
+  /// Household settings.
   settings(filled: Icons.settings, outlined: Icons.settings_outlined);
 
   const _AppTab({required this.filled, required this.outlined});
@@ -69,12 +70,10 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selected.index,
-        children: [
-          const ChoresListScreen(),
-          const ShoppingListScreen(),
-          _PlaceholderScreen(
-            title: AppLocalizations.of(context).settingsTabLabel,
-          ),
+        children: const [
+          ChoresListScreen(),
+          ShoppingListScreen(),
+          SettingsScreen(),
         ],
       ),
       bottomNavigationBar: _BottomTabBar(
@@ -153,24 +152,6 @@ class _TabContent extends StatelessWidget {
           style: theme.textTheme.labelMedium?.copyWith(color: color),
         ),
       ],
-    );
-  }
-}
-
-/// A minimal placeholder tab body for a feature built in a later spec.
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.title});
-
-  /// The tab's display title.
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(AppLocalizations.of(context).settingsComingSoon(title)),
-      ),
     );
   }
 }

@@ -193,6 +193,52 @@ class CategoryRepository {
     });
   }
 
+  /// Persists a manual sort order for [orderedCategoryIds] in a single
+  /// transaction: category `orderedCategoryIds[i]` is written `sortOrder:
+  /// i` (0-based).
+  ///
+  /// Every id in [orderedCategoryIds] must be an active category of [kind]
+  /// in [householdId]; otherwise throws [ArgumentError] before writing
+  /// anything (validated first, inside the same transaction).
+  ///
+  /// The chore/shopping lists both already sort by `sort_order`, so this is
+  /// the only write manual drag-to-reorder needs (spec
+  /// `docs/specs/ux-round-2.md` B1).
+  Future<void> reorderCategories(
+    String householdId,
+    CategoryKind kind,
+    List<String> orderedCategoryIds,
+  ) async {
+    await db.transaction(() async {
+      final rows = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.isIn(orderedCategoryIds))).get();
+      final rowsById = {for (final row in rows) row.id: row};
+      for (final id in orderedCategoryIds) {
+        final row = rowsById[id];
+        if (row == null ||
+            row.householdId != householdId ||
+            row.kind != kind ||
+            row.deletedAt != null) {
+          throw ArgumentError.value(
+            orderedCategoryIds,
+            'orderedCategoryIds',
+            "'$id' is not an active $kind category of household "
+                "'$householdId'",
+          );
+        }
+      }
+      final now = _isoNow();
+      for (var i = 0; i < orderedCategoryIds.length; i++) {
+        await (db.update(
+          db.categories,
+        )..where((tbl) => tbl.id.equals(orderedCategoryIds[i]))).write(
+          CategoriesCompanion(sortOrder: Value(i), updatedAt: Value(now)),
+        );
+      }
+    });
+  }
+
   Future<void> _seedKind(
     String householdId,
     CategoryKind kind,

@@ -38,11 +38,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsTabLabel => 'Einstellungen';
 
   @override
-  String settingsComingSoon(String title) {
-    return '$title — kommt bald';
-  }
-
-  @override
   String get categoryPickerNone => 'Keine';
 
   @override
@@ -322,4 +317,49 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shoppingAddMovedBack => 'Zurück auf die Liste verschoben';
+
+  @override
+  String get settingsCategoriesEntry => 'Kategorien';
+
+  @override
+  String get manageCategoriesTitle => 'Kategorien verwalten';
+
+  @override
+  String get manageCategoriesKindChore => 'Aufgaben';
+
+  @override
+  String get manageCategoriesKindShopping => 'Einkaufsliste';
+
+  @override
+  String get manageCategoriesEmptyState => 'Noch keine Kategorien';
+
+  @override
+  String get manageCategoriesErrorMessage =>
+      'Deine Kategorien konnten nicht geladen werden.';
+
+  @override
+  String get categoryEditNewTitle => 'Neue Kategorie';
+
+  @override
+  String get categoryEditEditTitle => 'Kategorie bearbeiten';
+
+  @override
+  String get categoryEditNameLabel => 'Name';
+
+  @override
+  String get categoryEditNameRequiredError => 'Name ist erforderlich';
+
+  @override
+  String get categoryEditIconLabel => 'Symbol';
+
+  @override
+  String get categoryEditColorLabel => 'Farbe';
+
+  @override
+  String get categoryDeleteDialogTitle => 'Kategorie löschen?';
+
+  @override
+  String categoryDeleteDialogBody(String categoryName) {
+    return 'Damit löschst du \'$categoryName\'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.';
+  }
 }

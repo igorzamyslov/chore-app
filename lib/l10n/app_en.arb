@@ -42,17 +42,7 @@
   },
   "settingsTabLabel": "Settings",
   "@settingsTabLabel": {
-    "description": "The settings bottom-navigation tab label, and the (placeholder) settings screen's app bar title."
-  },
-  "settingsComingSoon": "{title} — coming soon",
-  "@settingsComingSoon": {
-    "description": "Body text of a not-yet-built tab's placeholder screen, e.g. 'Settings — coming soon'.",
-    "placeholders": {
-      "title": {
-        "type": "String",
-        "example": "Settings"
-      }
-    }
+    "description": "The settings bottom-navigation tab label, and the settings screen's app bar title."
   },
 
   "categoryPickerNone": "None",
@@ -455,5 +445,71 @@
   "shoppingAddMovedBack": "Moved back to the list",
   "@shoppingAddMovedBack": {
     "description": "Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row."
+  },
+
+  "settingsCategoriesEntry": "Categories",
+  "@settingsCategoriesEntry": {
+    "description": "Settings screen list entry that opens category management (spec ux-round-2 B1)."
+  },
+
+  "manageCategoriesTitle": "Manage categories",
+  "@manageCategoriesTitle": {
+    "description": "App bar title of the manage-categories screen."
+  },
+  "manageCategoriesKindChore": "Chores",
+  "@manageCategoriesKindChore": {
+    "description": "Manage-categories screen's kind-switcher segment label for chore categories."
+  },
+  "manageCategoriesKindShopping": "Shopping",
+  "@manageCategoriesKindShopping": {
+    "description": "Manage-categories screen's kind-switcher segment label for shopping categories."
+  },
+  "manageCategoriesEmptyState": "No categories yet",
+  "@manageCategoriesEmptyState": {
+    "description": "Manage-categories screen empty-state message, shown when the selected kind has no active categories left."
+  },
+  "manageCategoriesErrorMessage": "Could not load your categories.",
+  "@manageCategoriesErrorMessage": {
+    "description": "Manage-categories screen load-error message."
+  },
+
+  "categoryEditNewTitle": "New category",
+  "@categoryEditNewTitle": {
+    "description": "Category edit sheet heading when adding a new category."
+  },
+  "categoryEditEditTitle": "Edit category",
+  "@categoryEditEditTitle": {
+    "description": "Category edit sheet heading when editing an existing category."
+  },
+  "categoryEditNameLabel": "Name",
+  "@categoryEditNameLabel": {
+    "description": "Label of the category edit sheet's required name text field."
+  },
+  "categoryEditNameRequiredError": "Name is required",
+  "@categoryEditNameRequiredError": {
+    "description": "Inline validation error shown under the category name field when it's left empty."
+  },
+  "categoryEditIconLabel": "Icon",
+  "@categoryEditIconLabel": {
+    "description": "Section label above the category edit sheet's icon picker grid."
+  },
+  "categoryEditColorLabel": "Color",
+  "@categoryEditColorLabel": {
+    "description": "Section label above the category edit sheet's color swatch picker."
+  },
+
+  "categoryDeleteDialogTitle": "Delete category?",
+  "@categoryDeleteDialogTitle": {
+    "description": "Title of the category delete-confirmation dialog."
+  },
+  "categoryDeleteDialogBody": "This deletes '{categoryName}'. Chores and items using it become uncategorized.",
+  "@categoryDeleteDialogBody": {
+    "description": "Body of the category delete-confirmation dialog, explaining the consequence.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Produce"
+      }
+    }
   }
 }

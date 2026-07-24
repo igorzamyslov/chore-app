@@ -37,14 +37,18 @@ class ShoppingCheckedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // Wrap, not Row: at accessibility text sizes the header text and the
+    // Clear button don't fit side by side — the button flows to its own
+    // line instead of squeezing the title into an awkward two-line wrap
+    // (visual QA finding at AX2).
     return ExpansionTile(
-      title: Row(
+      title: Wrap(
+        spacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Expanded(
-            child: semantic(
-              'shopping.checked.header',
-              child: Text(l10n.shoppingCartHeader(count)),
-            ),
+          semantic(
+            'shopping.checked.header',
+            child: Text(l10n.shoppingCartHeader(count)),
           ),
           semantic(
             'shopping.clear',

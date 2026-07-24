@@ -16,8 +16,7 @@ void main() {
       expect(find.bySemanticsIdentifier('shell.tab.settings'), findsOneWidget);
 
       // Chores is the default tab; the other two aren't shown yet.
-      expect(find.text('Shopping — coming soon'), findsNothing);
-      expect(find.text('Settings — coming soon'), findsNothing);
+      expect(find.bySemanticsIdentifier('settings.categories'), findsNothing);
 
       // IndexedStack keeps every tab's widget subtree alive at all times
       // (rather than rebuilding it on selection), so it should already be
@@ -37,8 +36,15 @@ void main() {
 
       await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
       await tester.pumpAndSettle();
-      expect(find.text('Settings — coming soon'), findsOneWidget);
-      expect(find.text('Shopping — coming soon'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Settings'),
+        ),
+        findsOneWidget,
+      );
+      // The real settings screen (spec ux-round-2 B1), not a placeholder.
+      expect(find.bySemanticsIdentifier('settings.categories'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
       await tester.pumpAndSettle();

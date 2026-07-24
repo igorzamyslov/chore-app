@@ -9,6 +9,7 @@ const Color _seedColor = Color(0xFF26A69A);
 /// The app's light theme.
 final ThemeData appLightTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
+  appBarTheme: _appBarTheme,
 );
 
 /// The app's dark theme.
@@ -17,7 +18,15 @@ final ThemeData appDarkTheme = ThemeData(
     seedColor: _seedColor,
     brightness: Brightness.dark,
   ),
+  appBarTheme: _appBarTheme,
 );
+
+/// App bars left-align their titles on every screen and platform.
+///
+/// Without this, iOS centers the title on action-less app bars (Shopping)
+/// while action-bearing ones (Chores) left-align — visual QA caught the
+/// tabs disagreeing with each other.
+const AppBarTheme _appBarTheme = AppBarTheme(centerTitle: false);
 
 /// Maps a Material Symbols icon identifier (as used by
 /// `CategoryRepository`'s seeded categories, e.g. `cleaning_services`) to an

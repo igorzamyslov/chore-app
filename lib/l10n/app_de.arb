@@ -11,7 +11,6 @@
   "choresTabLabel": "Aufgaben",
   "shoppingTabLabel": "Einkaufsliste",
   "settingsTabLabel": "Einstellungen",
-  "settingsComingSoon": "{title} — kommt bald",
 
   "categoryPickerNone": "Keine",
 
@@ -105,5 +104,23 @@
   "shoppingAddHint": "Artikel hinzufügen…",
   "shoppingAddTooltip": "Artikel hinzufügen",
   "shoppingAddAlreadyOnList": "Schon auf der Liste",
-  "shoppingAddMovedBack": "Zurück auf die Liste verschoben"
+  "shoppingAddMovedBack": "Zurück auf die Liste verschoben",
+
+  "settingsCategoriesEntry": "Kategorien",
+
+  "manageCategoriesTitle": "Kategorien verwalten",
+  "manageCategoriesKindChore": "Aufgaben",
+  "manageCategoriesKindShopping": "Einkaufsliste",
+  "manageCategoriesEmptyState": "Noch keine Kategorien",
+  "manageCategoriesErrorMessage": "Deine Kategorien konnten nicht geladen werden.",
+
+  "categoryEditNewTitle": "Neue Kategorie",
+  "categoryEditEditTitle": "Kategorie bearbeiten",
+  "categoryEditNameLabel": "Name",
+  "categoryEditNameRequiredError": "Name ist erforderlich",
+  "categoryEditIconLabel": "Symbol",
+  "categoryEditColorLabel": "Farbe",
+
+  "categoryDeleteDialogTitle": "Kategorie löschen?",
+  "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie."
 }

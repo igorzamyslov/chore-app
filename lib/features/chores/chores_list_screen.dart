@@ -290,6 +290,9 @@ class _Body extends StatelessWidget {
     }
 
     return ListView(
+      // Clears the FAB: at large text sizes the FAB otherwise covers the
+      // last section header (visual QA finding at AX2).
+      padding: const EdgeInsets.only(bottom: 96),
       children: [
         if (filtered.isEmpty)
           Padding(
