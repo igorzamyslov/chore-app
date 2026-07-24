@@ -1,0 +1,59 @@
+/// The chore form's month-unit monthly-mode choice.
+library;
+
+import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/domain/recurrence/recurrence.dart';
+import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
+import 'package:flutter/material.dart';
+
+/// The day-of-month vs. nth-weekday choice, labeled from [startDate].
+///
+/// Only shown for a month-unit, schedule-anchored recurrence.
+class MonthlyModeRow extends StatelessWidget {
+  /// Creates the monthly mode row.
+  const MonthlyModeRow({
+    required this.value,
+    required this.startDate,
+    required this.onChanged,
+    super.key,
+  });
+
+  /// The currently-selected monthly mode.
+  final MonthlyMode value;
+
+  /// The chore's start date, which the chip labels and the eventual
+  /// nth-weekday recurrence are computed from.
+  final PlainDate startDate;
+
+  /// Called when a different monthly mode is picked.
+  final ValueChanged<MonthlyMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final mode in MonthlyMode.values)
+          semantic(
+            'chore_form.repeat.monthly_mode.${monthlyModeId(mode)}',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                value == mode
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+              ),
+              title: Text(_label(mode)),
+              onTap: () => onChanged(mode),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _label(MonthlyMode mode) {
+    return mode == MonthlyMode.dayOfMonth
+        ? monthlyDayOfMonthLabel(startDate)
+        : monthlyNthWeekdayLabel(startDate);
+  }
+}
