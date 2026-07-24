@@ -2,14 +2,15 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
-import 'package:chore_app/features/shopping/shopping_clear_dialog.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// The checked-items section: a collapsed-by-default [ExpansionTile] headed
 /// 'In the cart (N)', holding [tiles] (already-built tile widgets for every
-/// checked item), with a 'Clear checked' button that confirms via
-/// [showClearCheckedDialog] before calling [onClear].
+/// checked item), with a 'Clear checked' button that calls [onClear]
+/// immediately — no confirmation dialog (spec `docs/specs/ux-round-2.md`
+/// B4: items are soft-deleted and suggestions make recovery one keystroke
+/// away, so a confirm here would fail design-language rule 3).
 ///
 /// The caller only mounts this widget while there's at least one checked
 /// item (see `docs/specs/ui-shopping.md`), so 'Clear checked' is always
@@ -29,7 +30,8 @@ class ShoppingCheckedSection extends StatelessWidget {
   /// The already-built tile widgets for each checked item.
   final List<Widget> tiles;
 
-  /// Called after the user confirms clearing all checked items.
+  /// Called when the user taps 'Clear checked', to clear all checked items
+  /// immediately.
   final VoidCallback onClear;
 
   @override
@@ -47,7 +49,7 @@ class ShoppingCheckedSection extends StatelessWidget {
           semantic(
             'shopping.clear',
             child: TextButton(
-              onPressed: () => _confirmClear(context),
+              onPressed: onClear,
               child: Text(l10n.shoppingClearButton),
             ),
           ),
@@ -55,12 +57,5 @@ class ShoppingCheckedSection extends StatelessWidget {
       ),
       children: tiles,
     );
-  }
-
-  Future<void> _confirmClear(BuildContext context) async {
-    final confirmed = await showClearCheckedDialog(context, count: count);
-    if (confirmed) {
-      onClear();
-    }
   }
 }

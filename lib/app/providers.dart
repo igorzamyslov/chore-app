@@ -84,8 +84,12 @@ final choreServiceProvider = Provider<ChoreService>((ref) {
 });
 
 /// Runs once at startup: ensures the local household exists, seeds its
-/// default categories, catches up any missed recurring occurrences, and
-/// resolves to that household's id.
+/// default categories, catches up any missed recurring occurrences,
+/// auto-clears shopping items checked more than 24h ago, and resolves to
+/// that household's id.
+///
+/// The 24h shopping auto-clear (spec `docs/specs/ux-round-2.md` B4) uses
+/// [clockProvider] so it stays deterministic under a fixed test/E2E clock.
 ///
 /// Every screen that needs the household id (directly, or transitively via
 /// [pendingOccurrencesProvider] / [membersProvider] /
@@ -96,6 +100,14 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
       .ensureLocalHousehold();
   await ref.watch(categoryRepositoryProvider).seedDefaults(household.id);
   await ref.watch(choreServiceProvider).catchUpOverdue(household.id);
+  final cutoffUtc = ref
+      .watch(clockProvider)
+      .now()
+      .toUtc()
+      .subtract(const Duration(hours: 24));
+  await ref
+      .watch(shoppingRepositoryProvider)
+      .clearCheckedOlderThan(household.id, cutoffUtc: cutoffUtc);
   return household.id;
 });
 

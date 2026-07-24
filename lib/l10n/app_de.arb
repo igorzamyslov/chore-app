@@ -101,10 +101,9 @@
 
   "shoppingCartHeader": "{count, plural, one{Im Einkaufswagen (1)} other{Im Einkaufswagen ({count})}}",
   "shoppingClearButton": "Erledigte leeren",
-  "shoppingClearDialogTitle": "Erledigte Artikel leeren?",
-  "shoppingClearDialogBody": "{count, plural, one{Damit entfernst du 1 erledigten Artikel aus der Liste.} other{Damit entfernst du {count} erledigte Artikel aus der Liste.}}",
-  "shoppingClearConfirm": "Leeren",
 
   "shoppingAddHint": "Artikel hinzufügen…",
-  "shoppingAddTooltip": "Artikel hinzufügen"
+  "shoppingAddTooltip": "Artikel hinzufügen",
+  "shoppingAddAlreadyOnList": "Schon auf der Liste",
+  "shoppingAddMovedBack": "Zurück auf die Liste verschoben"
 }

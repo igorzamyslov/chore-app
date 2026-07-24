@@ -17,7 +17,7 @@
 
   "commonCancel": "Cancel",
   "@commonCancel": {
-    "description": "Generic 'cancel' action, used by the chore delete and shopping clear-checked confirmation dialogs."
+    "description": "Generic 'cancel' action, used by the chore delete confirmation dialog."
   },
   "commonDelete": "Delete",
   "@commonDelete": {
@@ -437,25 +437,7 @@
   },
   "shoppingClearButton": "Clear checked",
   "@shoppingClearButton": {
-    "description": "Button that clears every checked item, shown in the checked-items section header."
-  },
-  "shoppingClearDialogTitle": "Clear checked items?",
-  "@shoppingClearDialogTitle": {
-    "description": "Title of the clear-checked-items confirmation dialog."
-  },
-  "shoppingClearDialogBody": "{count, plural, one{This removes 1 checked item from the list.} other{This removes {count} checked items from the list.}}",
-  "@shoppingClearDialogBody": {
-    "description": "Body of the clear-checked-items confirmation dialog, explaining the consequence.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "example": "3"
-      }
-    }
-  },
-  "shoppingClearConfirm": "Clear",
-  "@shoppingClearConfirm": {
-    "description": "Destructive confirm button of the clear-checked-items dialog."
+    "description": "Button that clears every checked item immediately (no confirmation), shown in the checked-items section header."
   },
 
   "shoppingAddHint": "Add item…",
@@ -465,5 +447,13 @@
   "shoppingAddTooltip": "Add item",
   "@shoppingAddTooltip": {
     "description": "Tooltip of the shopping list's quick-add submit button."
+  },
+  "shoppingAddAlreadyOnList": "Already on the list",
+  "@shoppingAddAlreadyOnList": {
+    "description": "Snackbar shown on quick-add submit or suggestion tap when an unchecked active item with the same normalized name already exists; no new row is added."
+  },
+  "shoppingAddMovedBack": "Moved back to the list",
+  "@shoppingAddMovedBack": {
+    "description": "Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row."
   }
 }

@@ -27,15 +27,8 @@ tags:
 - tapOn:
     id: 'shopping\.item\..*\.check'
 - assertVisible: "In the cart (1)"
-# Clear the cart: cancel keeps, confirm empties.
+# Clear the cart: acts immediately, no confirmation.
 - tapOn:
     id: "shopping.clear"
-- tapOn:
-    id: "shopping.clear.cancel"
-- assertVisible: "In the cart (1)"
-- tapOn:
-    id: "shopping.clear"
-- tapOn:
-    id: "shopping.clear.confirm"
 - assertVisible:
     id: "shopping.empty"

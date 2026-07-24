@@ -312,25 +312,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingClearButton => 'Erledigte leeren';
 
   @override
-  String get shoppingClearDialogTitle => 'Erledigte Artikel leeren?';
-
-  @override
-  String shoppingClearDialogBody(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Damit entfernst du $count erledigte Artikel aus der Liste.',
-      one: 'Damit entfernst du 1 erledigten Artikel aus der Liste.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get shoppingClearConfirm => 'Leeren';
-
-  @override
   String get shoppingAddHint => 'Artikel hinzufügen…';
 
   @override
   String get shoppingAddTooltip => 'Artikel hinzufügen';
+
+  @override
+  String get shoppingAddAlreadyOnList => 'Schon auf der Liste';
+
+  @override
+  String get shoppingAddMovedBack => 'Zurück auf die Liste verschoben';
 }

@@ -110,7 +110,7 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
-  /// Generic 'cancel' action, used by the chore delete and shopping clear-checked confirmation dialogs.
+  /// Generic 'cancel' action, used by the chore delete confirmation dialog.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
@@ -572,29 +572,11 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{In the cart (1)} other{In the cart ({count})}}'**
   String shoppingCartHeader(int count);
 
-  /// Button that clears every checked item, shown in the checked-items section header.
+  /// Button that clears every checked item immediately (no confirmation), shown in the checked-items section header.
   ///
   /// In en, this message translates to:
   /// **'Clear checked'**
   String get shoppingClearButton;
-
-  /// Title of the clear-checked-items confirmation dialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear checked items?'**
-  String get shoppingClearDialogTitle;
-
-  /// Body of the clear-checked-items confirmation dialog, explaining the consequence.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, one{This removes 1 checked item from the list.} other{This removes {count} checked items from the list.}}'**
-  String shoppingClearDialogBody(int count);
-
-  /// Destructive confirm button of the clear-checked-items dialog.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear'**
-  String get shoppingClearConfirm;
 
   /// Placeholder hint text of the shopping list's quick-add text field.
   ///
@@ -607,6 +589,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add item'**
   String get shoppingAddTooltip;
+
+  /// Snackbar shown on quick-add submit or suggestion tap when an unchecked active item with the same normalized name already exists; no new row is added.
+  ///
+  /// In en, this message translates to:
+  /// **'Already on the list'**
+  String get shoppingAddAlreadyOnList;
+
+  /// Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved back to the list'**
+  String get shoppingAddMovedBack;
 }
 
 class _AppLocalizationsDelegate

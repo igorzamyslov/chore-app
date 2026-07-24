@@ -17,6 +17,52 @@ class ShoppingItemWithCategory {
   final Category? category;
 }
 
+/// A ranked type-ahead suggestion for the shopping quick-add field: one
+/// distinct normalized name from the household's full add history
+/// (including soft-deleted items), paired with the most recent non-null
+/// category ever used for it.
+///
+/// Returned by [ShoppingRepository.suggestions]; see
+/// `docs/specs/ux-round-2.md` B2.
+class ShoppingSuggestion {
+  /// Creates a suggestion.
+  const ShoppingSuggestion({
+    required this.name,
+    this.categoryId,
+    this.category,
+  });
+
+  /// The most recently used casing of this normalized name.
+  final String name;
+
+  /// The most recent non-null category id ever used for this normalized
+  /// name, or `null` if no history row for it ever set one.
+  final String? categoryId;
+
+  /// [categoryId] resolved to a [Category], or `null` if [categoryId] is
+  /// `null`.
+  final Category? category;
+}
+
+/// One shopping item row paired with its resolved category, as read
+/// directly off a join — the shared shape [ShoppingRepository.suggestions],
+/// [ShoppingRepository.findActiveByNormalizedName], and
+/// [ShoppingRepository.mostRecentCategoryIdForNormalizedName] all group and
+/// filter in Dart.
+typedef _HistoryRow = ({ShoppingItem item, Category? category});
+
+/// Normalizes a shopping item name for matching and deduplication: trims
+/// leading/trailing whitespace, lowercases, and collapses runs of inner
+/// whitespace to a single space.
+///
+/// Shared by [ShoppingRepository.suggestions] (prefix matching),
+/// [ShoppingRepository.findActiveByNormalizedName] (B3 duplicate
+/// detection), and the quick-add row (to normalize its own input before
+/// calling either). See `docs/specs/ux-round-2.md` B2/B3.
+String normalizeShoppingItemName(String name) {
+  return name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+}
+
 /// Repository for the household's shared shopping list.
 class ShoppingRepository {
   /// Creates a repository backed by [db].
@@ -74,6 +120,144 @@ class ShoppingRepository {
           ),
       ];
     });
+  }
+
+  /// Returns up to [limit] type-ahead suggestions for [prefix]: distinct
+  /// normalized names (from ALL items ever added in [householdId],
+  /// including soft-deleted ones) whose normalized form starts with
+  /// [prefix]'s normalized form, ranked by frequency (row count for that
+  /// normalized name) then recency (latest `created_at`).
+  ///
+  /// Each suggestion carries the most recent casing seen for its normalized
+  /// name, plus the most recent non-null category used for it (which may
+  /// come from an earlier row than the most recent one, if the most recent
+  /// row itself had no category). Returns an empty list if [prefix]
+  /// normalizes to the empty string (e.g. it's blank/whitespace-only).
+  ///
+  /// See `docs/specs/ux-round-2.md` B2.
+  Future<List<ShoppingSuggestion>> suggestions(
+    String householdId,
+    String prefix, {
+    int limit = 8,
+  }) async {
+    final normalizedPrefix = normalizeShoppingItemName(prefix);
+    if (normalizedPrefix.isEmpty) {
+      return const [];
+    }
+
+    final rows = await _historyRows(householdId);
+    final groups = <String, List<_HistoryRow>>{};
+    for (final row in rows) {
+      final normalized = normalizeShoppingItemName(row.item.name);
+      if (!normalized.startsWith(normalizedPrefix)) {
+        continue;
+      }
+      groups.putIfAbsent(normalized, () => []).add(row);
+    }
+
+    final ranked =
+        <({ShoppingSuggestion suggestion, int frequency, DateTime recency})>[];
+    for (final group in groups.values) {
+      group.sort(
+        (a, b) => DateTime.parse(
+          b.item.createdAt,
+        ).compareTo(DateTime.parse(a.item.createdAt)),
+      );
+      final mostRecent = group.first;
+      final mostRecentWithCategory = group.firstWhere(
+        (row) => row.item.categoryId != null,
+        orElse: () => mostRecent,
+      );
+      ranked.add((
+        suggestion: ShoppingSuggestion(
+          name: mostRecent.item.name,
+          categoryId: mostRecentWithCategory.item.categoryId,
+          category: mostRecentWithCategory.category,
+        ),
+        frequency: group.length,
+        recency: DateTime.parse(mostRecent.item.createdAt),
+      ));
+    }
+
+    ranked.sort((a, b) {
+      final byFrequency = b.frequency.compareTo(a.frequency);
+      return byFrequency != 0 ? byFrequency : b.recency.compareTo(a.recency);
+    });
+
+    return [for (final entry in ranked.take(limit)) entry.suggestion];
+  }
+
+  /// Finds the ACTIVE (non-deleted) item in [householdId] whose normalized
+  /// name equals [normalizedName], if any — regardless of checked state.
+  ///
+  /// Used to enforce B3 duplicate prevention on quick-add submit and
+  /// suggestion tap (spec `docs/specs/ux-round-2.md` B3): soft-deleted
+  /// items never count as a duplicate.
+  Future<ShoppingItemWithCategory?> findActiveByNormalizedName(
+    String householdId,
+    String normalizedName,
+  ) async {
+    final rows = await _historyRows(householdId);
+    for (final row in rows) {
+      if (row.item.deletedAt == null &&
+          normalizeShoppingItemName(row.item.name) == normalizedName) {
+        return ShoppingItemWithCategory(item: row.item, category: row.category);
+      }
+    }
+    return null;
+  }
+
+  /// Returns the most recent non-null category id ever used for
+  /// [normalizedName] in [householdId]'s full history (including
+  /// soft-deleted items), or `null` if no history row for it ever set one.
+  ///
+  /// Used by B3 duplicate prevention so a fresh insert from a plain-text
+  /// submit (as opposed to a suggestion tap, which already carries its own
+  /// category) inherits the right category. See `docs/specs/ux-round-2.md`
+  /// B3.
+  Future<String?> mostRecentCategoryIdForNormalizedName(
+    String householdId,
+    String normalizedName,
+  ) async {
+    final rows = await _historyRows(householdId);
+    final matches =
+        [
+          for (final row in rows)
+            if (normalizeShoppingItemName(row.item.name) == normalizedName) row,
+        ]..sort(
+          (a, b) => DateTime.parse(
+            b.item.createdAt,
+          ).compareTo(DateTime.parse(a.item.createdAt)),
+        );
+    for (final row in matches) {
+      final categoryId = row.item.categoryId;
+      if (categoryId != null) {
+        return categoryId;
+      }
+    }
+    return null;
+  }
+
+  /// Every item ever added to [householdId] (active or soft-deleted),
+  /// joined with its resolved category — the shared raw fetch behind
+  /// [suggestions], [findActiveByNormalizedName], and
+  /// [mostRecentCategoryIdForNormalizedName].
+  Future<List<_HistoryRow>> _historyRows(String householdId) async {
+    final query = db.select(db.shoppingItems).join([
+      leftOuterJoin(
+        db.categories,
+        db.categories.id.equalsExp(db.shoppingItems.categoryId),
+      ),
+    ])..where(db.shoppingItems.householdId.equals(householdId));
+
+    final rows = await query.get();
+    return [
+      for (final row in rows)
+        (
+          item: row.readTable(db.shoppingItems),
+          category: row.readTableOrNull(db.categories),
+        ),
+    ];
   }
 
   /// Adds a new item to [householdId]'s shopping list.
@@ -177,6 +361,44 @@ class ShoppingRepository {
         .write(
           ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
         );
+  }
+
+  /// Soft-deletes active, checked items in [householdId] whose `checked_at`
+  /// is strictly older than [cutoffUtc].
+  ///
+  /// This is the 24h auto-clear called from `bootstrapProvider` (spec
+  /// `docs/specs/ux-round-2.md` B4): the list self-cleans between shopping
+  /// trips, restoring the original DESIGN.md §1 behavior. [cutoffUtc] is
+  /// the caller's responsibility (typically the injected clock's `now()`
+  /// minus 24 hours) so this stays testable with directly-manipulated
+  /// `checked_at` timestamps.
+  Future<void> clearCheckedOlderThan(
+    String householdId, {
+    required DateTime cutoffUtc,
+  }) async {
+    final rows =
+        await (db.select(db.shoppingItems)..where(
+              (tbl) =>
+                  tbl.householdId.equals(householdId) &
+                  tbl.deletedAt.isNull() &
+                  tbl.checkedAt.isNotNull(),
+            ))
+            .get();
+
+    final staleIds = [
+      for (final row in rows)
+        if (DateTime.parse(row.checkedAt!).isBefore(cutoffUtc)) row.id,
+    ];
+    if (staleIds.isEmpty) {
+      return;
+    }
+
+    final now = _isoNow();
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.isIn(staleIds))).write(
+      ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+    );
   }
 
   String _isoNow() => nowUtc().toIso8601String();

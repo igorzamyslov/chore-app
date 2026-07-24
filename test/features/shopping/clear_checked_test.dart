@@ -8,8 +8,8 @@ void main() {
   final today = DateTime(2026, 7, 24, 9);
 
   testChoreApp(
-    'clear checked: button hidden at N=0; confirm removes checked items '
-    'only; cancel keeps them',
+    'clear checked: button hidden at N=0; tapping it clears checked items '
+    'immediately, with no confirmation dialog (spec ux-round-2.md B4)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -30,23 +30,14 @@ void main() {
 
       expect(find.bySemanticsIdentifier('shopping.clear'), findsOneWidget);
 
-      // Cancel: the checked item stays.
+      // Tapping clears immediately: no confirm/cancel step of any kind.
       await tester.tap(find.bySemanticsIdentifier('shopping.clear'));
       await tester.pumpAndSettle();
+
       expect(
         find.bySemanticsIdentifier('shopping.clear.confirm'),
-        findsOneWidget,
+        findsNothing,
       );
-      await tester.tap(find.bySemanticsIdentifier('shopping.clear.cancel'));
-      await tester.pumpAndSettle();
-      expect(find.text('In the cart (1)'), findsOneWidget);
-
-      // Confirm: the checked item is removed; the unchecked item stays.
-      await tester.tap(find.bySemanticsIdentifier('shopping.clear'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('shopping.clear.confirm'));
-      await tester.pumpAndSettle();
-
       expect(
         find.bySemanticsIdentifier('shopping.checked.header'),
         findsNothing,

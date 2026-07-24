@@ -309,25 +309,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingClearButton => 'Clear checked';
 
   @override
-  String get shoppingClearDialogTitle => 'Clear checked items?';
-
-  @override
-  String shoppingClearDialogBody(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'This removes $count checked items from the list.',
-      one: 'This removes 1 checked item from the list.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get shoppingClearConfirm => 'Clear';
-
-  @override
   String get shoppingAddHint => 'Add item…';
 
   @override
   String get shoppingAddTooltip => 'Add item';
+
+  @override
+  String get shoppingAddAlreadyOnList => 'Already on the list';
+
+  @override
+  String get shoppingAddMovedBack => 'Moved back to the list';
 }
