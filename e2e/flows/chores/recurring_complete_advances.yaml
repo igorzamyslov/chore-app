@@ -11,15 +11,18 @@ tags:
 - tapOn:
     id: "chore_form.title"
 - inputText: "Feed the cat"
+- pressKey: Enter
 - tapOn:
     id: "chore_form.repeat.toggle"
-- assertVisible:
+# The form's smart default is weekly-on-today's-weekday; this journey
+# needs a DAILY rule so completion moves the chore to Tomorrow.
+- tapOn:
     id: "chore_form.repeat.unit.day"
 - tapOn:
     id: "chore_form.save"
 - assertVisible: "Today"
 - tapOn:
-    id: "chores\.occurrence\..*\.complete"
+    id: 'chores\.occurrence\..*\.complete'
 # Not gone — moved to Tomorrow.
 - assertVisible: "Tomorrow"
 - assertVisible: "Feed the cat"

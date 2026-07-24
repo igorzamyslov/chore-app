@@ -1,0 +1,3 @@
+# Maestro workspace config: include flows from all feature subdirectories.
+flows:
+  - "**"

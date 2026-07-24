@@ -1,0 +1,41 @@
+# Shopping journey: add via quick-add, check off, clear the cart.
+# Also covers: empty submit does nothing, empty states before/after.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "shell.tab.shopping"
+- assertVisible:
+    id: "shopping.empty"
+# Empty submit: nothing appears.
+- tapOn:
+    id: "shopping.add.submit"
+- assertVisible:
+    id: "shopping.empty"
+# Add one item.
+- tapOn:
+    id: "shopping.add.input"
+- inputText: "Milk"
+- tapOn:
+    id: "shopping.add.submit"
+- assertVisible: "Milk"
+- assertVisible: "Uncategorized"
+# Check it off — moves to the cart section.
+- tapOn:
+    id: 'shopping\.item\..*\.check'
+- assertVisible: "In the cart (1)"
+# Clear the cart: cancel keeps, confirm empties.
+- tapOn:
+    id: "shopping.clear"
+- tapOn:
+    id: "shopping.clear.cancel"
+- assertVisible: "In the cart (1)"
+- tapOn:
+    id: "shopping.clear"
+- tapOn:
+    id: "shopping.clear.confirm"
+- assertVisible:
+    id: "shopping.empty"

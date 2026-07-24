@@ -14,6 +14,12 @@ tags:
 - tapOn:
     id: "chore_form.title"
 - inputText: "Take out trash"
+- pressKey: Enter
 - tapOn:
     id: "chore_form.save"
+# Assert we actually LEFT the form: the FAB only exists on the list
+# screen. (A bare text assert can spuriously match the form's own text
+# field content — that exact false-positive happened once.)
+- assertVisible:
+    id: "chores.add"
 - assertVisible: "Take out trash"

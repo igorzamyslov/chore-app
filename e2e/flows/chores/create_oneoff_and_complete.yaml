@@ -10,11 +10,12 @@ tags:
 - tapOn:
     id: "chore_form.title"
 - inputText: "Water plants"
+- pressKey: Enter
 - tapOn:
     id: "chore_form.save"
 - assertVisible: "Water plants"
 - assertVisible: "Today"
 - tapOn:
-    id: "chores\.occurrence\..*\.complete"
+    id: 'chores\.occurrence\..*\.complete'
 - assertVisible:
     id: "chores.empty"

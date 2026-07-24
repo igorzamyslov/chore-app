@@ -177,15 +177,21 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             onMemberTap: _onMemberTap,
             errorText: _assignmentError,
           ),
-          const SizedBox(height: 24),
-          semantic(
-            'chore_form.save',
-            child: FilledButton(
-              onPressed: _save,
-              child: const Text('Save'),
-            ),
-          ),
         ],
+      ),
+      // Pinned, not the last ListView row: the primary action must stay
+      // reachable no matter how long the form grows (design-language rule
+      // 1) — and on a real phone the bottom of this form is below the
+      // fold, which E2E caught as an unreachable save button.
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: semantic(
+          'chore_form.save',
+          child: FilledButton(
+            onPressed: _save,
+            child: const Text('Save'),
+          ),
+        ),
       ),
     );
   }

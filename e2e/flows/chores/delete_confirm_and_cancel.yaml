@@ -11,12 +11,13 @@ tags:
 - tapOn:
     id: "chore_form.title"
 - inputText: "Clean windows"
+- pressKey: Enter
 - tapOn:
     id: "chore_form.save"
 - assertVisible: "Clean windows"
 # Cancel path.
 - tapOn:
-    id: "chores\.occurrence\..*\.menu"
+    id: 'chores\.occurrence\..*\.menu'
 - tapOn:
     id: "chores.menu.delete"
 - tapOn:
@@ -24,7 +25,7 @@ tags:
 - assertVisible: "Clean windows"
 # Confirm path.
 - tapOn:
-    id: "chores\.occurrence\..*\.menu"
+    id: 'chores\.occurrence\..*\.menu'
 - tapOn:
     id: "chores.menu.delete"
 - tapOn:
