@@ -7,7 +7,10 @@
 # pre-push — don't loosen it.
 
 pre-commit:
-  parallel: true
+  # NOT parallel: analyze/test/pub-get all contend for Flutter's global
+  # startup lock, and parallel runs failed flakily on it (a job dies
+  # instead of waiting). Sequential costs ~10s and never flakes.
+  parallel: false
   jobs:
     - name: format
       glob: "*.dart"
