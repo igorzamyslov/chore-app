@@ -25,5 +25,5 @@ tags:
     id: 'chores\.occurrence\..*\.complete'
 # Not gone — moved to Tomorrow.
 - assertVisible: "Tomorrow"
-- assertVisible: "Feed the cat"
+- assertVisible: "(?s).*Feed the cat.*"
 - assertNotVisible: "Today"

@@ -1,0 +1,35 @@
+# Skip → snackbar tells where it went → Undo brings it back (ux-round-2 A4).
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Mop kitchen"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.repeat.toggle"
+- tapOn:
+    id: "chore_form.repeat.unit.day"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible:
+    id: "chores.add"
+# Skip via the tile menu.
+- tapOn:
+    id: 'chores\.occurrence\..*\.menu'
+- tapOn:
+    id: "chores.menu.skip"
+# The snackbar explains where the chore went...
+- assertVisible: "Skipped — next due tomorrow"
+# ...and Undo restores it to Today.
+- tapOn: "Undo"
+- assertVisible: "Today"
+- assertVisible: "(?s).*Mop kitchen.*"
+# The Done-today section is gone again (the skip was undone).
+- assertNotVisible:
+    id: "chores.done.header"

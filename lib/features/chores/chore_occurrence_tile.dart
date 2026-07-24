@@ -6,6 +6,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
+import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -65,7 +66,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
   const ChoreOccurrenceTile({
     required this.occurrence,
     required this.today,
-    required this.isOverdue,
+    required this.section,
     required this.onComplete,
     required this.onOpenMenu,
     super.key,
@@ -78,8 +79,11 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// compute the tile's relative due text.
   final PlainDate today;
 
-  /// Whether this occurrence's due date is before today.
-  final bool isOverdue;
+  /// The list section this tile is rendered under. Drives overdue styling
+  /// and whether the due text is shown at all: under Today/Tomorrow the
+  /// header already states the due day, so repeating it on the tile is
+  /// noise (user feedback, see ux-round-2.md A1).
+  final ChoreSection section;
 
   /// Called when the leading complete button is tapped.
   final VoidCallback onComplete;
@@ -122,7 +126,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
                       _MetadataRow(
                         occurrence: occurrence,
                         today: today,
-                        isOverdue: isOverdue,
+                        section: section,
                       ),
                       if (notes != null && notes.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -149,17 +153,27 @@ class ChoreOccurrenceTile extends StatelessWidget {
 }
 
 /// The metadata row: assignee avatar + first name (if assigned), category
-/// chip (if categorized), and the due text (always).
+/// chip (if categorized), and the due text — only under sections where it
+/// adds information beyond the section header (Overdue/This week/This
+/// month/Later; hidden under Today/Tomorrow).
 class _MetadataRow extends StatelessWidget {
   const _MetadataRow({
     required this.occurrence,
     required this.today,
-    required this.isOverdue,
+    required this.section,
   });
 
   final OccurrenceWithChore occurrence;
   final PlainDate today;
-  final bool isOverdue;
+  final ChoreSection section;
+
+  bool get _showsDueText => switch (section) {
+    ChoreSection.today || ChoreSection.tomorrow => false,
+    ChoreSection.overdue ||
+    ChoreSection.thisWeek ||
+    ChoreSection.thisMonth ||
+    ChoreSection.later => true,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +183,7 @@ class _MetadataRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final localeName = Localizations.localeOf(context).toString();
     final dueDate = occurrence.occurrence.dueDate;
+    final isOverdue = section == ChoreSection.overdue;
 
     return DefaultTextStyle.merge(
       style: theme.textTheme.bodySmall?.copyWith(
@@ -181,17 +196,20 @@ class _MetadataRow extends StatelessWidget {
         children: [
           if (assignee != null) _MemberAvatarName(member: assignee),
           if (category != null) CategoryBadge(category: category),
-          Text(
-            isOverdue
-                ? overdueDueText(l10n, today: today, dueDate: dueDate)
-                : futureDueText(
-                    l10n,
-                    localeName,
-                    today: today,
-                    dueDate: dueDate,
-                  ),
-            style: isOverdue ? TextStyle(color: theme.colorScheme.error) : null,
-          ),
+          if (_showsDueText)
+            Text(
+              isOverdue
+                  ? overdueDueText(l10n, today: today, dueDate: dueDate)
+                  : futureDueText(
+                      l10n,
+                      localeName,
+                      today: today,
+                      dueDate: dueDate,
+                    ),
+              style: isOverdue
+                  ? TextStyle(color: theme.colorScheme.error)
+                  : null,
+            ),
         ],
       ),
     );

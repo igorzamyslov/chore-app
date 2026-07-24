@@ -52,7 +52,9 @@ void main() {
       // sections it briefly created/populated are gone.
       expect(find.bySemanticsIdentifier('chores.done.header'), findsNothing);
       expect(find.text('This month'), findsNothing);
-      expect(find.text('Today'), findsNWidgets(2));
+      // Refined A1: tiles under Today show no due text, so 'Today' appears
+      // exactly once — as the section header.
+      expect(find.text('Today'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
         findsOneWidget,

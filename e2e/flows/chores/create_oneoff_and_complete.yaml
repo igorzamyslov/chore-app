@@ -13,7 +13,7 @@ tags:
 - pressKey: Enter
 - tapOn:
     id: "chore_form.save"
-- assertVisible: "Water plants"
+- assertVisible: "(?s).*Water plants.*"
 - assertVisible: "Today"
 - tapOn:
     id: 'chores\.occurrence\..*\.complete'

@@ -22,4 +22,4 @@ tags:
 # field content — that exact false-positive happened once.)
 - assertVisible:
     id: "chores.add"
-- assertVisible: "Take out trash"
+- assertVisible: "(?s).*Take out trash.*"

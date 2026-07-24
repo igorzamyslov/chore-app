@@ -1,0 +1,30 @@
+# Complete → appears under 'Done today' → Reopen restores it (ux-round-2 A3).
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Dust shelves"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.save"
+- assertVisible:
+    id: "chores.add"
+- tapOn:
+    id: 'chores\.occurrence\..*\.complete'
+# One-off chore completed: list empty, but it lives in Done today.
+- tapOn:
+    id: "chores.done.header"
+- assertVisible: "(?s).*Dust shelves.*"
+# Reopen it from the section.
+- tapOn:
+    id: 'chores\.done\..*\.reopen'
+- assertVisible: "Today"
+- assertVisible: "(?s).*Dust shelves.*"
+- assertNotVisible:
+    id: "chores.done.header"

@@ -239,7 +239,37 @@ class _Body extends StatelessWidget {
       return true;
     }).toList();
 
-    final hasCollapsedSections = paused.isNotEmpty || closedToday.isNotEmpty;
+    // Active filters apply to the auxiliary sections too (ux-round-2 C2):
+    // a filtered view is a filtered view of EVERYTHING, or the sections
+    // contradict each other. Member semantics per section: done rows match
+    // the person they display (completer for done, assignee for skipped);
+    // paused chores match "member is among the assignees".
+    final filteredClosedToday = closedToday.where((row) {
+      if (categoryFilter != null && row.category?.id != categoryFilter) {
+        return false;
+      }
+      if (memberFilter != null) {
+        final displayedMemberId =
+            row.occurrence.completedBy ?? row.assignedMember?.id;
+        if (displayedMemberId != memberFilter) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+    final filteredPaused = paused.where((details) {
+      if (categoryFilter != null && details.category?.id != categoryFilter) {
+        return false;
+      }
+      if (memberFilter != null &&
+          !details.assigneeMemberIds.contains(memberFilter)) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    final hasCollapsedSections =
+        filteredPaused.isNotEmpty || filteredClosedToday.isNotEmpty;
 
     if (filtered.isEmpty && !hasCollapsedSections) {
       return Center(
@@ -285,15 +315,18 @@ class _Body extends StatelessWidget {
                 ChoreOccurrenceTile(
                   occurrence: occurrence,
                   today: today,
-                  isOverdue: section == ChoreSection.overdue,
+                  section: section,
                   onComplete: () => onComplete(occurrence),
                   onOpenMenu: () => onOpenMenu(occurrence),
                 ),
             ],
-        if (paused.isNotEmpty)
-          ChorePausedSection(chores: paused, onResume: onResume),
-        if (closedToday.isNotEmpty)
-          ChoreDoneSection(occurrences: closedToday, onReopen: onReopen),
+        if (filteredPaused.isNotEmpty)
+          ChorePausedSection(chores: filteredPaused, onResume: onResume),
+        if (filteredClosedToday.isNotEmpty)
+          ChoreDoneSection(
+            occurrences: filteredClosedToday,
+            onReopen: onReopen,
+          ),
       ],
     );
   }

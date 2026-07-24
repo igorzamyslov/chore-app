@@ -17,11 +17,12 @@ Tile layout becomes:
 - **Avatar**: 20dp circle in the member's color with their initial,
   followed by the first name, shown when the occurrence is assigned.
   Unassigned ('anyone') shows nothing (no "Anyone" noise).
-- **Due text on every tile** (kills the "which section am I in again?"
-  ambiguity and softens the section-granularity question): relative for
-  near dates ('today', 'tomorrow', 'in N days' up to 7), locale-formatted
-  date beyond ('Fri, Jul 31'). Overdue: 'overdue · N days' in error color.
-  All localized (plural rules).
+- **Due text on tiles where it adds information** (refined 2026-07-24
+  after user feedback): HIDDEN in the Today and Tomorrow sections (the
+  header already says it — repeating it is noise); SHOWN in Overdue
+  ('overdue · N days' in error color — the count adds info), This week,
+  This month, and Later ('in N days' up to 7 days out, locale-formatted
+  date beyond, e.g. 'Fri, Jul 31'). All localized (plural rules).
 - **Note line** appears only when the chore has a note.
 - Fix vertical alignment: title + metadata block vertically centered
   against the leading circle (user: current top-alignment "offputting").
@@ -89,6 +90,47 @@ ACTIVE items:
   list'. (Adding something you already bought = you need it again.)
 - otherwise → insert, inheriting the most recent category for that
   normalized name from history when the user didn't pick one.
+
+### B4. Cart friction removal (decided 2026-07-24, user-approved)
+The "In the cart" section stays (trip overview + uncheck-to-restore +
+future multi-user semantics), but its friction goes:
+- **'Clear checked' acts immediately — no confirmation dialog.** Items are
+  soft-deleted and suggestions (B2) make recovery one keystroke away, so
+  the confirm fails design-language rule 3 (confirm only what's costly).
+  The `shopping.clear.confirm`/`shopping.clear.cancel` ids and dialog are
+  removed; `shopping.clear` keeps its id.
+- **24h auto-clear** (restores the original DESIGN.md §1 behavior that was
+  lost in spec translation): during bootstrap, active checked items whose
+  `checked_at` is older than 24 hours are soft-deleted. New
+  `ShoppingRepository.clearCheckedOlderThan(householdId, {required
+  DateTime cutoffUtc})`; called from `bootstrapProvider` with
+  `clock.now() - 24h`. The list self-cleans between shopping trips; the
+  Clear button becomes optional tidying.
+- Tests: clear-without-dialog (update existing); auto-clear boundary
+  (checked 23h ago survives bootstrap, 25h ago doesn't) with fixed clock;
+  E2E clear step loses its confirm tap.
+
+## C. Chores filters (feedback round 3, 2026-07-24)
+
+### C1. Active-filter visibility
+When a member or category filter is active, its app-bar icon button shows
+a Material `Badge` dot and is tinted `colorScheme.primary` (inactive:
+default `onSurfaceVariant`). Both signals, not color alone
+(design-language: color never the sole carrier).
+
+### C2. Filters apply to ALL sections
+The member/category filters also filter the Paused and Done-today
+sections (previously always-full — implementing agent flagged the
+ambiguity, user confirmed sections must follow the filter):
+- Pending occurrences: existing behavior (assigned member / chore
+  category).
+- Done today: match on the chore's category; member matches the person
+  the row displays (completed_by for done, assigned member for skipped).
+- Paused: match on the chore's category; member matches "member is among
+  the chore's assignees".
+- Section headers/counts reflect the filtered numbers; an aux section
+  with zero matching rows disappears entirely (same rule as main
+  sections).
 
 ## Test requirements
 Every behavior above gets widget-test coverage (happy + edge: reopen after

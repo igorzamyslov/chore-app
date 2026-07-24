@@ -15,8 +15,11 @@ PLATFORM="${1:?usage: tool/e2e.sh <ios|android> [flows...]}"
 shift || true
 E2E_TODAY="${E2E_TODAY:-2026-07-24}"
 
-# Maestro is a JVM app; Homebrew's keg-only OpenJDK isn't on PATH by default.
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home}"
+# Maestro and Gradle are JVM apps; Homebrew's keg-only JDK isn't on PATH by
+# default. Use the LTS JDK 21: the plain `openjdk` formula tracks the
+# newest JDK, which Gradle/AGP lag behind (this exact mismatch broke the
+# first Android E2E run).
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
 export PATH="$HOME/.maestro/bin:$JAVA_HOME/bin:$PATH"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

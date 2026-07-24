@@ -14,7 +14,7 @@ tags:
 - pressKey: Enter
 - tapOn:
     id: "chore_form.save"
-- assertVisible: "Clean windows"
+- assertVisible: "(?s).*Clean windows.*"
 # Cancel path.
 - tapOn:
     id: 'chores\.occurrence\..*\.menu'
@@ -22,7 +22,7 @@ tags:
     id: "chores.menu.delete"
 - tapOn:
     id: "chores.delete.cancel"
-- assertVisible: "Clean windows"
+- assertVisible: "(?s).*Clean windows.*"
 # Confirm path.
 - tapOn:
     id: 'chores\.occurrence\..*\.menu'

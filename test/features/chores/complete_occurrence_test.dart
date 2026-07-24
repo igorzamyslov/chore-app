@@ -38,7 +38,9 @@ void main() {
       // Due today: shows under the "Today" section header, and the tile's
       // own due text also reads "Today" (A1: due text on every tile) — two
       // matches, not "Later".
-      expect(find.text('Today'), findsNWidgets(2));
+      // Refined A1: tiles under Today show no due text, so 'Today' appears
+      // exactly once — as the section header.
+      expect(find.text('Today'), findsOneWidget);
       expect(find.text('Later'), findsNothing);
 
       await tester.tap(

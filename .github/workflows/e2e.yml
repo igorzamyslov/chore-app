@@ -1,0 +1,68 @@
+# E2E flows via Maestro. Android runs on every push (Linux + KVM);
+# iOS runs on main only (macOS runners cost ~10x Linux).
+#
+# NOTE: authored before the repo had a remote — expect first-run
+# adjustments (runner image names, KVM availability) when CI goes live.
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build APK (pinned E2E clock)
+        run: flutter build apk --debug --dart-define=E2E_TODAY=2026-07-24
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+      - name: Run flows on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            $HOME/.maestro/bin/maestro test \
+              --env APP_ID=com.example.chore_app e2e/flows
+
+  ios:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build simulator app (pinned E2E clock)
+        run: flutter build ios --simulator --debug --dart-define=E2E_TODAY=2026-07-24
+      - name: Boot simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available \
+            | grep -oE "iPhone [^(]+\(([0-9A-F-]{36})\)" \
+            | grep -oE "[0-9A-F-]{36}" | head -1)
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install booted build/ios/iphonesimulator/Runner.app
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+      - name: Run flows on simulator
+        run: |
+          $HOME/.maestro/bin/maestro test \
+            --env APP_ID=com.example.choreApp e2e/flows

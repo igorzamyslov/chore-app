@@ -33,7 +33,9 @@ void main() {
       await tester.pumpAndSettle();
       // The "Today" section header, plus the tile's own due text (A1: due
       // text on every tile) — two matches.
-      expect(find.text('Today'), findsNWidgets(2));
+      // Refined A1: tiles under Today show no due text, so 'Today' appears
+      // exactly once — as the section header.
+      expect(find.text('Today'), findsOneWidget);
 
       await tester.tap(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),

@@ -30,7 +30,10 @@ class MemberFilterButton extends ConsumerWidget {
     return semantic(
       'chores.filter.member',
       child: PopupMenuButton<String?>(
-        icon: const Icon(Icons.person_outline),
+        icon: _FilterIcon(
+          icon: Icons.person_outline,
+          isActive: selected != null,
+        ),
         tooltip: l10n.choresFilterMemberTooltip,
         onSelected: onChanged,
         itemBuilder: (context) => [
@@ -88,7 +91,10 @@ class CategoryFilterButton extends ConsumerWidget {
     return semantic(
       'chores.filter.category',
       child: PopupMenuButton<String?>(
-        icon: const Icon(Icons.label_outline),
+        icon: _FilterIcon(
+          icon: Icons.label_outline,
+          isActive: selected != null,
+        ),
         tooltip: l10n.choresFilterCategoryTooltip,
         onSelected: onChanged,
         itemBuilder: (context) => [
@@ -117,6 +123,29 @@ class CategoryFilterButton extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// A filter button's icon: badge-dotted and primary-tinted while its
+/// filter is active (ux-round-2 C1 — two signals, never color alone), the
+/// plain outlined icon otherwise.
+class _FilterIcon extends StatelessWidget {
+  const _FilterIcon({required this.icon, required this.isActive});
+
+  final IconData icon;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (!isActive) {
+      return Icon(icon);
+    }
+    return Badge(
+      smallSize: 8,
+      backgroundColor: colorScheme.primary,
+      child: Icon(icon, color: colorScheme.primary),
     );
   }
 }

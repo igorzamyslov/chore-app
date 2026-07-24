@@ -45,20 +45,17 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // The lone extra 'Today'/'Tomorrow' entries below aren't a mistake:
-      // A1 puts due text on every tile, and for a chore due today (or
-      // tomorrow) that due text reads exactly 'Today' (or 'Tomorrow') too
-      // — same string as the section header, appearing a second time right
-      // after the tile's title.
+      // Tiles under Today/Tomorrow show NO due text (refined A1: the
+      // header already says it), so each header string appears exactly
+      // once. Other sections' tiles carry due text, but those strings
+      // ('in 3 days', 'Mon, Aug 3', …) aren't in this filter list.
       const expectedOrder = [
         'Overdue',
         'Overdue chore',
         'Today',
         'Today chore',
-        'Today',
         'Tomorrow',
         'Tomorrow chore',
-        'Tomorrow',
         'This week',
         'This week chore',
         'This month',
