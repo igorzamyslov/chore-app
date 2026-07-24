@@ -32,7 +32,11 @@ class MemberFilterButton extends ConsumerWidget {
         tooltip: 'Filter by member',
         onSelected: onChanged,
         itemBuilder: (context) => [
+          // A PopupMenuItem without a value pops `null`, which
+          // PopupMenuButton treats as "menu dismissed" and never forwards
+          // to onSelected — so the reset entry must fire via onTap instead.
           PopupMenuItem(
+            onTap: () => onChanged(null),
             child: semantic(
               'chores.filter.member.all',
               child: _entryLabel('All members', isSelected: selected == null),
@@ -82,7 +86,10 @@ class CategoryFilterButton extends ConsumerWidget {
         tooltip: 'Filter by category',
         onSelected: onChanged,
         itemBuilder: (context) => [
+          // Same null-value gotcha as the member button above: the reset
+          // entry must use onTap, or selecting it is a silent no-op.
           PopupMenuItem(
+            onTap: () => onChanged(null),
             child: semantic(
               'chores.filter.category.all',
               child: _entryLabel(
