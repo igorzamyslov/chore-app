@@ -1,17 +1,26 @@
 /// Riverpod wiring: database, repositories, service, clock, and bootstrap.
 ///
-/// `appDatabaseProvider` and `clockProvider` are the only two providers ever
-/// overridden by a test or E2E run; every other provider is built on top of
-/// them, so overriding just those two is enough to make the whole app
-/// deterministic and hermetic (in-memory database, fixed clock).
+/// `appDatabaseProvider` and `clockProvider` are the only two providers a
+/// *widget* test or E2E run ever needs to override; every screen-facing
+/// provider is built on top of them, so overriding just those two is enough
+/// to make the whole app deterministic and hermetic (in-memory database,
+/// fixed clock). [digestNotificationPluginProvider] is a third override
+/// point used only by scheduler/reschedule tests (spec
+/// `docs/specs/notifications.md`), swapping the real OS-level plugin for a
+/// fake; see that provider's doc comment.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,6 +81,55 @@ final householdRepositoryProvider = Provider<HouseholdRepository>((ref) {
 final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
   return ShoppingRepository(ref.watch(appDatabaseProvider));
 });
+
+/// The settings repository, built on [appDatabaseProvider].
+final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
+  return SettingsRepository(ref.watch(appDatabaseProvider));
+});
+
+/// The device settings singleton row, kept in sync with the database.
+///
+/// Watched by the settings screen (toggle/time rows) and by
+/// [DigestRescheduleController] (to recompute the digest plan whenever the
+/// digest is enabled/disabled or its time changes).
+final settingsProvider = StreamProvider<DeviceSettings>((ref) {
+  return ref.watch(settingsRepositoryProvider).watchSettings();
+});
+
+/// The OS-level notification plugin (or fake), wrapped by
+/// [notificationSchedulerProvider].
+///
+/// Defaults to the real [FlutterLocalNotificationsAdapter]. Scheduler and
+/// reschedule-on-mutation tests override this with a fake implementing
+/// [DigestNotificationPlugin] so no real notification channel is ever
+/// touched; see `test/application/fake_digest_notification_plugin.dart`.
+final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
+  ref,
+) {
+  return FlutterLocalNotificationsAdapter();
+});
+
+/// The digest notification scheduler, built on
+/// [digestNotificationPluginProvider].
+final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
+  return NotificationScheduler(
+    plugin: ref.watch(digestNotificationPluginProvider),
+  );
+});
+
+/// Whether the OS notification permission is currently granted, per the
+/// last check performed by [DigestRescheduleController] (at bootstrap and
+/// on app resume).
+///
+/// Defaults to `true` so the settings screen's permission-denied hint
+/// doesn't flash on the very first frame, before that first check
+/// resolves. Backed by a plain [StateProvider] (rather than a
+/// [FutureProvider] re-read each time) specifically so widget tests can
+/// override it directly to exercise the hint's visible/hidden states
+/// without needing a real plugin call.
+final notificationPermissionGrantedProvider = StateProvider<bool>(
+  (ref) => true,
+);
 
 /// The chore lifecycle service, built on [appDatabaseProvider],
 /// [choreRepositoryProvider], and [clockProvider].
@@ -210,3 +268,133 @@ final actingMemberProvider = Provider<Member?>((ref) {
     orElse: () => members.first,
   );
 });
+
+/// Debounce delay collapsing bursts of digest-affecting mutations into a
+/// single reschedule (spec `docs/specs/notifications.md` architecture #2).
+const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
+
+/// Owns the digest notification's "reschedule on mutation" wiring (spec
+/// `docs/specs/notifications.md` architecture #2).
+///
+/// Listens to [pendingOccurrencesProvider] and [settingsProvider] (any
+/// occurrence/chore/settings mutation shows up through one of those two),
+/// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
+/// after the last relevant change, recomputes the [DigestPlan] for the
+/// current [clockProvider] time and pushes it to
+/// [notificationSchedulerProvider] — scheduling or cancelling the digest
+/// notification as appropriate.
+///
+/// [triggerRecompute] is also called directly by `main.dart`'s app-resume
+/// observer: an OS lifecycle transition isn't itself a Riverpod-watchable
+/// value, so that trigger can't be wired via [Ref.listen] like the other
+/// two and needs an explicit external call instead.
+///
+/// Deliberately NOT read anywhere in the `lib/app`/`lib/features` widget
+/// tree (`ChoreApp`, `AppShell`, screens): every widget test builds
+/// `ChoreApp` directly, never through `main()`, and eagerly starting a real
+/// debounced [Timer] as a side effect of building that tree would leave a
+/// "Timer still pending" failure in every widget test that never touches
+/// notifications at all. Production code activates this exclusively from
+/// `main.dart`, before `runApp` — see that file.
+class DigestRescheduleController {
+  /// Starts listening immediately. The `ref` is retained for the lifetime
+  /// of this controller (i.e. of the [ProviderContainer] that created it
+  /// via [digestRescheduleControllerProvider]).
+  DigestRescheduleController(this._ref) {
+    _ref
+      ..listen(bootstrapProvider, (previous, next) {
+        if (next.hasValue) {
+          unawaited(refreshPermissionState());
+          triggerRecompute();
+        }
+      })
+      ..listen(pendingOccurrencesProvider, (previous, next) {
+        triggerRecompute();
+      })
+      ..listen(settingsProvider, (previous, next) {
+        triggerRecompute();
+      });
+  }
+
+  final Ref _ref;
+  Timer? _debounceTimer;
+
+  /// Cancels any pending debounce timer. Called via `ref.onDispose` when
+  /// the owning [ProviderContainer] is torn down.
+  void dispose() => _debounceTimer?.cancel();
+
+  /// (Re)starts the [digestRescheduleDebounce] timer; when it fires,
+  /// recomputes the digest plan and (re)schedules or cancels it. Called by
+  /// this controller's own listeners above, and externally on app resume.
+  void triggerRecompute() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(digestRescheduleDebounce, _recompute);
+  }
+
+  /// Re-checks the OS notification permission immediately (no debounce:
+  /// it's a cheap read with no OS side effect), updating
+  /// [notificationPermissionGrantedProvider]. Called at bootstrap and
+  /// externally on app resume — the two moments the spec calls out for
+  /// re-checking the OS permission state.
+  Future<void> refreshPermissionState() async {
+    final granted = await _ref
+        .read(digestNotificationPluginProvider)
+        .isPermissionGranted();
+    _ref.read(notificationPermissionGrantedProvider.notifier).state = granted;
+  }
+
+  Future<void> _recompute() async {
+    final scheduler = _ref.read(notificationSchedulerProvider);
+    await scheduler.ensureInitialized();
+
+    final settings = _ref.read(settingsProvider).value;
+    final pending = _ref.read(pendingOccurrencesProvider).value;
+    if (settings == null || pending == null) {
+      // Either stream hasn't emitted its first value yet; the `ref.listen`
+      // callback that eventually delivers it calls [triggerRecompute]
+      // again, so nothing is lost by bailing out here.
+      return;
+    }
+
+    final now = _ref.read(clockProvider).now();
+    final slotDate = PlainDate.fromDateTime(
+      nextDigestSlot(now: now, digestMinutes: settings.digestMinutes),
+    );
+    var dueTodayCount = 0;
+    var overdueCount = 0;
+    for (final occurrence in pending) {
+      final dueDate = occurrence.occurrence.dueDate;
+      if (dueDate == slotDate) {
+        dueTodayCount++;
+      } else if (dueDate.isBefore(slotDate)) {
+        overdueCount++;
+      }
+    }
+
+    final plan = planDigest(
+      now: now,
+      digestMinutes: settings.digestMinutes,
+      enabled: settings.digestEnabled,
+      dueTodayCount: dueTodayCount,
+      overdueCount: overdueCount,
+    );
+    if (plan == null) {
+      await scheduler.cancelDigest();
+    } else {
+      await scheduler.scheduleDigest(plan);
+    }
+  }
+}
+
+/// Activates [DigestRescheduleController] the moment it's first read.
+///
+/// Read exactly once, from `main.dart`, before `runApp` — see the
+/// controller's own doc comment for why it must never be read from inside
+/// the widget tree.
+final digestRescheduleControllerProvider = Provider<DigestRescheduleController>(
+  (ref) {
+    final controller = DigestRescheduleController(ref);
+    ref.onDispose(controller.dispose);
+    return controller;
+  },
+);

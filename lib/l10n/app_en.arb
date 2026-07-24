@@ -15,6 +15,41 @@
     }
   },
 
+  "notificationDigestDueOnly": "{count, plural, one{1 chore today} other{{count} chores today}}",
+  "@notificationDigestDueOnly": {
+    "description": "Daily digest notification body when there are due-today occurrences but nothing overdue.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "notificationDigestOverdueOnly": "{count, plural, one{1 overdue chore} other{{count} overdue chores}}",
+  "@notificationDigestOverdueOnly": {
+    "description": "Daily digest notification body when there are overdue occurrences but nothing due today (an overdue-only day still notifies).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "notificationDigestBoth": "{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}",
+  "@notificationDigestBoth": {
+    "description": "Daily digest notification body when there are both due-today and overdue occurrences, e.g. '2 chores today · 1 overdue'.",
+    "placeholders": {
+      "dueCount": {
+        "type": "int",
+        "example": "2"
+      },
+      "overdueCount": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+
   "commonCancel": "Cancel",
   "@commonCancel": {
     "description": "Generic 'cancel' action, used by the chore delete confirmation dialog."
@@ -445,6 +480,27 @@
   "shoppingAddMovedBack": "Moved back to the list",
   "@shoppingAddMovedBack": {
     "description": "Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row."
+  },
+
+  "settingsDigestSectionTitle": "Daily summary",
+  "@settingsDigestSectionTitle": {
+    "description": "Settings screen section header above the digest toggle/time rows (spec notifications.md)."
+  },
+  "settingsDigestToggleTitle": "Daily summary",
+  "@settingsDigestToggleTitle": {
+    "description": "Title of the settings screen's digest on/off switch row."
+  },
+  "settingsDigestTimeLabel": "Notification time",
+  "@settingsDigestTimeLabel": {
+    "description": "Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap."
+  },
+  "settingsDigestPermissionHint": "Notifications are turned off in system settings.",
+  "@settingsDigestPermissionHint": {
+    "description": "Inline hint shown on the settings screen when the digest is enabled but the OS notification permission is denied."
+  },
+  "settingsDigestPermissionAction": "Open settings",
+  "@settingsDigestPermissionAction": {
+    "description": "Button label in the digest permission hint row; opens the OS app settings screen."
   },
 
   "settingsCategoriesEntry": "Categories",

@@ -1,0 +1,37 @@
+# Edit a category in Settings, restart WITHOUT clearing state, verify the
+# change survived (ux-round-2 B1 persistence through the real DB).
+# Drag-reorder mechanics are widget-tested; Maestro can't drive
+# ReorderableListView reliably, so E2E covers the edit+persistence path.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.categories"
+- tapOn:
+    id: "settings.categories.kind.shopping"
+# Rename 'Produce' to 'Veggies' via the edit sheet.
+- tapOn: "Produce"
+- tapOn:
+    id: "settings.categories.name"
+- eraseText
+- inputText: "Veggies"
+- pressKey: Enter
+- tapOn:
+    id: "settings.categories.save"
+- assertVisible: "Veggies"
+- assertNotVisible: "Produce"
+# Restart WITHOUT clearState: the rename must survive.
+- launchApp
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.categories"
+- tapOn:
+    id: "settings.categories.kind.shopping"
+- assertVisible: "Veggies"
+- assertNotVisible: "Produce"

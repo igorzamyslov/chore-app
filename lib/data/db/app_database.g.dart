@@ -3823,6 +3823,388 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
   }
 }
 
+class $SettingsTable extends Settings
+    with TableInfo<$SettingsTable, DeviceSettings> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _digestEnabledMeta = const VerificationMeta(
+    'digestEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> digestEnabled = GeneratedColumn<bool>(
+    'digest_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("digest_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _digestMinutesMeta = const VerificationMeta(
+    'digestMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> digestMinutes = GeneratedColumn<int>(
+    'digest_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(480),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    digestEnabled,
+    digestMinutes,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeviceSettings> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('digest_enabled')) {
+      context.handle(
+        _digestEnabledMeta,
+        digestEnabled.isAcceptableOrUnknown(
+          data['digest_enabled']!,
+          _digestEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('digest_minutes')) {
+      context.handle(
+        _digestMinutesMeta,
+        digestMinutes.isAcceptableOrUnknown(
+          data['digest_minutes']!,
+          _digestMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DeviceSettings map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeviceSettings(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      digestEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}digest_enabled'],
+      )!,
+      digestMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}digest_minutes'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SettingsTable createAlias(String alias) {
+    return $SettingsTable(attachedDatabase, alias);
+  }
+}
+
+class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
+  /// Constant primary key `'device'`; exactly one row ever exists.
+  final String id;
+
+  /// Whether the daily digest notification is enabled.
+  final bool digestEnabled;
+
+  /// The digest's fire time, as minutes since local midnight (default `480`
+  /// = 08:00).
+  final int digestMinutes;
+
+  /// ISO-8601 UTC creation timestamp.
+  final String createdAt;
+
+  /// ISO-8601 UTC timestamp of the last update.
+  final String updatedAt;
+  const DeviceSettings({
+    required this.id,
+    required this.digestEnabled,
+    required this.digestMinutes,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['digest_enabled'] = Variable<bool>(digestEnabled);
+    map['digest_minutes'] = Variable<int>(digestMinutes);
+    map['created_at'] = Variable<String>(createdAt);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  SettingsCompanion toCompanion(bool nullToAbsent) {
+    return SettingsCompanion(
+      id: Value(id),
+      digestEnabled: Value(digestEnabled),
+      digestMinutes: Value(digestMinutes),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory DeviceSettings.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeviceSettings(
+      id: serializer.fromJson<String>(json['id']),
+      digestEnabled: serializer.fromJson<bool>(json['digestEnabled']),
+      digestMinutes: serializer.fromJson<int>(json['digestMinutes']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'digestEnabled': serializer.toJson<bool>(digestEnabled),
+      'digestMinutes': serializer.toJson<int>(digestMinutes),
+      'createdAt': serializer.toJson<String>(createdAt),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  DeviceSettings copyWith({
+    String? id,
+    bool? digestEnabled,
+    int? digestMinutes,
+    String? createdAt,
+    String? updatedAt,
+  }) => DeviceSettings(
+    id: id ?? this.id,
+    digestEnabled: digestEnabled ?? this.digestEnabled,
+    digestMinutes: digestMinutes ?? this.digestMinutes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  DeviceSettings copyWithCompanion(SettingsCompanion data) {
+    return DeviceSettings(
+      id: data.id.present ? data.id.value : this.id,
+      digestEnabled: data.digestEnabled.present
+          ? data.digestEnabled.value
+          : this.digestEnabled,
+      digestMinutes: data.digestMinutes.present
+          ? data.digestMinutes.value
+          : this.digestMinutes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeviceSettings(')
+          ..write('id: $id, ')
+          ..write('digestEnabled: $digestEnabled, ')
+          ..write('digestMinutes: $digestMinutes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, digestEnabled, digestMinutes, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeviceSettings &&
+          other.id == this.id &&
+          other.digestEnabled == this.digestEnabled &&
+          other.digestMinutes == this.digestMinutes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
+  final Value<String> id;
+  final Value<bool> digestEnabled;
+  final Value<int> digestMinutes;
+  final Value<String> createdAt;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const SettingsCompanion({
+    this.id = const Value.absent(),
+    this.digestEnabled = const Value.absent(),
+    this.digestMinutes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SettingsCompanion.insert({
+    required String id,
+    this.digestEnabled = const Value.absent(),
+    this.digestMinutes = const Value.absent(),
+    required String createdAt,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<DeviceSettings> custom({
+    Expression<String>? id,
+    Expression<bool>? digestEnabled,
+    Expression<int>? digestMinutes,
+    Expression<String>? createdAt,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (digestEnabled != null) 'digest_enabled': digestEnabled,
+      if (digestMinutes != null) 'digest_minutes': digestMinutes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SettingsCompanion copyWith({
+    Value<String>? id,
+    Value<bool>? digestEnabled,
+    Value<int>? digestMinutes,
+    Value<String>? createdAt,
+    Value<String>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SettingsCompanion(
+      id: id ?? this.id,
+      digestEnabled: digestEnabled ?? this.digestEnabled,
+      digestMinutes: digestMinutes ?? this.digestMinutes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (digestEnabled.present) {
+      map['digest_enabled'] = Variable<bool>(digestEnabled.value);
+    }
+    if (digestMinutes.present) {
+      map['digest_minutes'] = Variable<int>(digestMinutes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('digestEnabled: $digestEnabled, ')
+          ..write('digestMinutes: $digestMinutes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3835,6 +4217,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $ShoppingItemsTable shoppingItems = $ShoppingItemsTable(this);
+  late final $SettingsTable settings = $SettingsTable(this);
   late final Index choreOccurrencesChoreStatusIdx = Index(
     'chore_occurrences_chore_status_idx',
     'CREATE INDEX chore_occurrences_chore_status_idx ON chore_occurrences (chore_id, status)',
@@ -3855,6 +4238,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     choreAssignees,
     choreOccurrences,
     shoppingItems,
+    settings,
     choreOccurrencesChoreStatusIdx,
     choreOccurrencesStatusDueDateIdx,
   ];
@@ -8123,6 +8507,210 @@ typedef $$ShoppingItemsTableProcessedTableManager =
       ShoppingItem,
       PrefetchHooks Function({bool householdId, bool categoryId, bool addedBy})
     >;
+typedef $$SettingsTableCreateCompanionBuilder =
+    SettingsCompanion Function({
+      required String id,
+      Value<bool> digestEnabled,
+      Value<int> digestMinutes,
+      required String createdAt,
+      required String updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SettingsTableUpdateCompanionBuilder =
+    SettingsCompanion Function({
+      Value<String> id,
+      Value<bool> digestEnabled,
+      Value<int> digestMinutes,
+      Value<String> createdAt,
+      Value<String> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$SettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $SettingsTable> {
+  $$SettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get digestEnabled => $composableBuilder(
+    column: $table.digestEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get digestMinutes => $composableBuilder(
+    column: $table.digestMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SettingsTable> {
+  $$SettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get digestEnabled => $composableBuilder(
+    column: $table.digestEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get digestMinutes => $composableBuilder(
+    column: $table.digestMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SettingsTable> {
+  $$SettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<bool> get digestEnabled => $composableBuilder(
+    column: $table.digestEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get digestMinutes => $composableBuilder(
+    column: $table.digestMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$SettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SettingsTable,
+          DeviceSettings,
+          $$SettingsTableFilterComposer,
+          $$SettingsTableOrderingComposer,
+          $$SettingsTableAnnotationComposer,
+          $$SettingsTableCreateCompanionBuilder,
+          $$SettingsTableUpdateCompanionBuilder,
+          (
+            DeviceSettings,
+            BaseReferences<_$AppDatabase, $SettingsTable, DeviceSettings>,
+          ),
+          DeviceSettings,
+          PrefetchHooks Function()
+        > {
+  $$SettingsTableTableManager(_$AppDatabase db, $SettingsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<bool> digestEnabled = const Value.absent(),
+                Value<int> digestMinutes = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+                Value<String> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SettingsCompanion(
+                id: id,
+                digestEnabled: digestEnabled,
+                digestMinutes: digestMinutes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<bool> digestEnabled = const Value.absent(),
+                Value<int> digestMinutes = const Value.absent(),
+                required String createdAt,
+                required String updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => SettingsCompanion.insert(
+                id: id,
+                digestEnabled: digestEnabled,
+                digestMinutes: digestMinutes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SettingsTable,
+      DeviceSettings,
+      $$SettingsTableFilterComposer,
+      $$SettingsTableOrderingComposer,
+      $$SettingsTableAnnotationComposer,
+      $$SettingsTableCreateCompanionBuilder,
+      $$SettingsTableUpdateCompanionBuilder,
+      (
+        DeviceSettings,
+        BaseReferences<_$AppDatabase, $SettingsTable, DeviceSettings>,
+      ),
+      DeviceSettings,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8141,4 +8729,6 @@ class $AppDatabaseManager {
       $$ChoreOccurrencesTableTableManager(_db, _db.choreOccurrences);
   $$ShoppingItemsTableTableManager get shoppingItems =>
       $$ShoppingItemsTableTableManager(_db, _db.shoppingItems);
+  $$SettingsTableTableManager get settings =>
+      $$SettingsTableTableManager(_db, _db.settings);
 }

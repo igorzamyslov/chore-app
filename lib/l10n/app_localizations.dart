@@ -110,6 +110,24 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
+  /// Daily digest notification body when there are due-today occurrences but nothing overdue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore today} other{{count} chores today}}'**
+  String notificationDigestDueOnly(int count);
+
+  /// Daily digest notification body when there are overdue occurrences but nothing due today (an overdue-only day still notifies).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 overdue chore} other{{count} overdue chores}}'**
+  String notificationDigestOverdueOnly(int count);
+
+  /// Daily digest notification body when there are both due-today and overdue occurrences, e.g. '2 chores today · 1 overdue'.
+  ///
+  /// In en, this message translates to:
+  /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
+  String notificationDigestBoth(int dueCount, int overdueCount);
+
   /// Generic 'cancel' action, used by the chore delete confirmation dialog.
   ///
   /// In en, this message translates to:
@@ -595,6 +613,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Moved back to the list'**
   String get shoppingAddMovedBack;
+
+  /// Settings screen section header above the digest toggle/time rows (spec notifications.md).
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get settingsDigestSectionTitle;
+
+  /// Title of the settings screen's digest on/off switch row.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get settingsDigestToggleTitle;
+
+  /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification time'**
+  String get settingsDigestTimeLabel;
+
+  /// Inline hint shown on the settings screen when the digest is enabled but the OS notification permission is denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are turned off in system settings.'**
+  String get settingsDigestPermissionHint;
+
+  /// Button label in the digest permission hint row; opens the OS app settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get settingsDigestPermissionAction;
 
   /// Settings screen list entry that opens category management (spec ux-round-2 B1).
   ///

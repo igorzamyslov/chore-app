@@ -1,0 +1,115 @@
+import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+class _FixedClock {
+  _FixedClock(this._now);
+  DateTime _now;
+  DateTime call() => _now;
+  void advance(Duration duration) => _now = _now.add(duration);
+}
+
+void main() {
+  late AppDatabase db;
+  late SettingsRepository repo;
+  late _FixedClock clock;
+
+  setUp(() {
+    db = AppDatabase(NativeDatabase.memory());
+    clock = _FixedClock(DateTime.utc(2026));
+    repo = SettingsRepository(db, nowUtc: clock.call);
+  });
+
+  tearDown(() => db.close());
+
+  test(
+    'ensureSettings creates the singleton row with schema defaults',
+    () async {
+      final settings = await repo.ensureSettings();
+      expect(settings.id, SettingsRepository.deviceId);
+      expect(settings.digestEnabled, isTrue);
+      expect(settings.digestMinutes, 480);
+
+      final rows = await db.select(db.settings).get();
+      expect(rows, hasLength(1));
+    },
+  );
+
+  test('ensureSettings is idempotent', () async {
+    final first = await repo.ensureSettings();
+    final second = await repo.ensureSettings();
+    expect(first.id, second.id);
+    expect(first.createdAt, second.createdAt);
+
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+  });
+
+  test('watchSettings emits the row, creating it if necessary', () async {
+    final emissions = <DeviceSettings>[];
+    final sub = repo.watchSettings().listen(emissions.add);
+    addTearDown(sub.cancel);
+
+    await pumpEventQueue();
+    expect(emissions, hasLength(1));
+    expect(emissions.single.digestEnabled, isTrue);
+    expect(emissions.single.digestMinutes, 480);
+  });
+
+  test('setDigestEnabled updates the flag and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setDigestEnabled(enabled: false);
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.digestEnabled, isFalse);
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setDigestEnabled implicitly creates the row if missing', () async {
+    await repo.setDigestEnabled(enabled: false);
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.digestEnabled, isFalse);
+  });
+
+  test('setDigestTime updates the minutes and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setDigestTime(90);
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.digestMinutes, 90);
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setDigestTime rejects out-of-range values', () async {
+    await expectLater(() => repo.setDigestTime(-1), throwsArgumentError);
+    await expectLater(() => repo.setDigestTime(1440), throwsArgumentError);
+
+    // Neither rejected call created the row as a side effect.
+    final rows = await db.select(db.settings).get();
+    expect(rows, isEmpty);
+  });
+
+  test('setDigestTime accepts the boundary values 0 and 1439', () async {
+    await repo.setDigestTime(0);
+    var row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.digestMinutes, 0);
+
+    await repo.setDigestTime(1439);
+    row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.digestMinutes, 1439);
+  });
+}

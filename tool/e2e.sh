@@ -59,4 +59,16 @@ case "$PLATFORM" in
     ;;
 esac
 
-maestro test --env APP_ID="$APP_ID" "${@:-e2e/flows}"
+# Pin the target device: with an Android emulator AND an iOS simulator
+# both alive, an unpinned maestro picks one arbitrarily (flows then fail
+# instantly with "Package not installed" on the wrong platform).
+case "$PLATFORM" in
+  ios)
+    DEVICE="$(xcrun simctl list devices booted | grep -oE "[0-9A-F-]{36}" | head -1)"
+    ;;
+  android)
+    DEVICE="$("$ANDROID_SDK/platform-tools/adb" devices | grep -oE "^emulator-[0-9]+" | head -1)"
+    ;;
+esac
+
+maestro --device "$DEVICE" test --env APP_ID="$APP_ID" "${@:-e2e/flows}"

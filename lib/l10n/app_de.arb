@@ -3,6 +3,10 @@
   "appTitle": "Aufgaben",
   "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
 
+  "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
+  "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
+  "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
+
   "commonCancel": "Abbrechen",
   "commonDelete": "Löschen",
   "commonSave": "Speichern",
@@ -105,6 +109,12 @@
   "shoppingAddTooltip": "Artikel hinzufügen",
   "shoppingAddAlreadyOnList": "Schon auf der Liste",
   "shoppingAddMovedBack": "Zurück auf die Liste verschoben",
+
+  "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
+  "settingsDigestToggleTitle": "Tägliche Zusammenfassung",
+  "settingsDigestTimeLabel": "Benachrichtigungszeit",
+  "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
+  "settingsDigestPermissionAction": "Einstellungen öffnen",
 
   "settingsCategoriesEntry": "Kategorien",
 

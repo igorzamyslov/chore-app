@@ -40,6 +40,7 @@ part 'app_database.g.dart';
     ChoreAssignees,
     ChoreOccurrences,
     ShoppingItems,
+    Settings,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -52,10 +53,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (migrator, from, to) async {
+      // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
+      // table. This is the first real migration this app has ever needed,
+      // so there's only a single `if`; a later migration would add another
+      // `if (from < 3) { ... }` alongside it, each guard independently
+      // idempotent so upgrading straight from an old version to the latest
+      // runs every intermediate step in order.
+      if (from < 2) {
+        await migrator.createTable(settings);
+      }
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },

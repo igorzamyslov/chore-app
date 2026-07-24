@@ -154,6 +154,37 @@ class Categories extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// Device-level app settings (spec `docs/specs/notifications.md`): a single
+/// row (`id` is always `'device'`) holding the daily digest notification
+/// preferences.
+///
+/// v1 note: settings are per-device, not per-household or per-member (there
+/// is no notion of "per-member notification preferences" until accounts
+/// exist) — this is why, unlike every other table in this file, this one
+/// has no `householdId` foreign key. Added in schemaVersion 2; see
+/// `AppDatabase.migration`.
+@DataClassName('DeviceSettings')
+class Settings extends Table {
+  /// Constant primary key `'device'`; exactly one row ever exists.
+  TextColumn get id => text()();
+
+  /// Whether the daily digest notification is enabled.
+  BoolColumn get digestEnabled => boolean().withDefault(const Constant(true))();
+
+  /// The digest's fire time, as minutes since local midnight (default `480`
+  /// = 08:00).
+  IntColumn get digestMinutes => integer().withDefault(const Constant(480))();
+
+  /// ISO-8601 UTC creation timestamp.
+  TextColumn get createdAt => text()();
+
+  /// ISO-8601 UTC timestamp of the last update.
+  TextColumn get updatedAt => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// A (possibly recurring) task assigned within a household.
 @DataClassName('Chore')
 class Chores extends Table {

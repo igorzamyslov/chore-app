@@ -17,6 +17,45 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String notificationDigestDueOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Aufgaben heute',
+      one: '1 Aufgabe heute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notificationDigestOverdueOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count überfällige Aufgaben',
+      one: '1 überfällige Aufgabe',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String notificationDigestBoth(int dueCount, int overdueCount) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dueCount,
+      locale: localeName,
+      other: '$dueCount Aufgaben heute',
+      one: '1 Aufgabe heute',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      overdueCount,
+      locale: localeName,
+      other: '$overdueCount überfällig',
+      one: '1 überfällig',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
   String get commonCancel => 'Abbrechen';
 
   @override
@@ -317,6 +356,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shoppingAddMovedBack => 'Zurück auf die Liste verschoben';
+
+  @override
+  String get settingsDigestSectionTitle => 'Tägliche Zusammenfassung';
+
+  @override
+  String get settingsDigestToggleTitle => 'Tägliche Zusammenfassung';
+
+  @override
+  String get settingsDigestTimeLabel => 'Benachrichtigungszeit';
+
+  @override
+  String get settingsDigestPermissionHint =>
+      'Erlaube Benachrichtigungen in den Systemeinstellungen.';
+
+  @override
+  String get settingsDigestPermissionAction => 'Einstellungen öffnen';
 
   @override
   String get settingsCategoriesEntry => 'Kategorien';
