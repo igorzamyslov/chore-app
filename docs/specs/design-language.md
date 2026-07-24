@@ -74,6 +74,11 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
 9. **Copy tone**: sentence case (M3), short, concrete, warm but not cutesy
    ('Shopping list is empty', not 'Oops! Nothing here! 🎉'). No jargon —
    'Repeats every 2 weeks on Sat', not 'RRULE'.
+   **All user-facing strings go through l10n (ARB keys; English template,
+   German first translation)** — no hardcoded copy in widgets, no
+   hardcoded weekday/month names (use intl date formatting). String
+   concatenation is forbidden where word order differs across languages;
+   use placeholders in the ARB template instead.
 10. **Density**: comfortable but information-forward — a tile is title +
     one metadata line, max. Anything more belongs behind the tap.
 

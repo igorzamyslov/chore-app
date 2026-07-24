@@ -1,0 +1,33 @@
+# Destructive action: delete asks for confirmation; cancel keeps the chore,
+# confirm removes it.
+appId: ${APP_ID}
+tags:
+  - error
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Clean windows"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "Clean windows"
+# Cancel path.
+- tapOn:
+    id: "chores\.occurrence\..*\.menu"
+- tapOn:
+    id: "chores.menu.delete"
+- tapOn:
+    id: "chores.delete.cancel"
+- assertVisible: "Clean windows"
+# Confirm path.
+- tapOn:
+    id: "chores\.occurrence\..*\.menu"
+- tapOn:
+    id: "chores.menu.delete"
+- tapOn:
+    id: "chores.delete.confirm"
+- assertVisible:
+    id: "chores.empty"

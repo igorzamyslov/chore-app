@@ -1,0 +1,19 @@
+# Error path + recovery: empty title is rejected inline; fixing it saves.
+appId: ${APP_ID}
+tags:
+  - error
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "Title is required"
+# Recovery: the same form session must succeed after fixing the input.
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Take out trash"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "Take out trash"

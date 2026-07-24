@@ -1,0 +1,20 @@
+# Happy path: create a one-off chore due today, complete it, list empties.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Water plants"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "Water plants"
+- assertVisible: "Today"
+- tapOn:
+    id: "chores\.occurrence\..*\.complete"
+- assertVisible:
+    id: "chores.empty"
