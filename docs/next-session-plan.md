@@ -96,11 +96,66 @@ side-by-side, let the user pick (or reject both):
   E2E determinism (no animated backgrounds).
 Update design-language.md with whichever wins BEFORE rolling out.
 
-## Sequencing proposal
+## 7. GAP (found compiling this list): no UI to manage household members
 
-1. Bug #1 (unpause) + bug #2 (snackbar) with tests — small, high impact.
-2. Verifications #3 + #4 (tests first, then the duplicate-name hint).
-3. #5 language + About (schema v3).
-4. #6 design prototypes → user picks → rollout + visual QA pass.
-5. Then back to the roadmap checkpoint: backend/sync phase (needs the
-   user's Supabase account), N2 notifications, release prep.
+`HouseholdRepository.addMember/renameMember` exist and are tested, the
+chore form renders member chips — but nothing in the UI ever CREATES a
+member, so real users only have the bootstrap 'Me' and can never use
+rotation or fixed assignment (they only worked in dev because test data
+was seeded directly). Needs: Settings → Members screen (list, add with
+name + color picker, rename; deletion deferred — needs a
+reassignment story for chores referencing the member). High priority:
+unlocks the app's core family features.
+
+## Full pending backlog (everything else, small to large)
+
+**Small / hygiene**
+- Empty states: icon + action nudge (design-language requirement,
+  consciously deferred during visual QA; text-only today).
+- Shopping item delete: undo snackbar (design-language "undo over
+  confirm" note; currently deletes instantly with no recourse except
+  suggestions).
+- `catchUpOverdue` runs only at bootstrap — an app left open across
+  midnight doesn't catch up until restart. Wire it into the existing
+  app-resume observer + a day-change check.
+- `catchUpOverdue` internals: replace `watchActiveChores().first` inside
+  the transaction with a Future-based repository read (works today,
+  fragile pattern).
+- Editing a chore's recurrence/start date doesn't regenerate its pending
+  occurrence (documented v1 simplification in chore_form_screen.dart —
+  promote to real behavior).
+- `Recurrence` lacks ==/hashCode (fine so far; add when state comparisons
+  need it).
+
+**Infrastructure**
+- **The repo has no remote** — all work lives on this one machine. Push
+  to GitHub early next session (backup!), which also activates the two
+  dormant CI workflows (ci.yml checks + e2e.yml device suites; expect
+  first-run fixes on the untested CI runner config).
+
+**Roadmap phases (in intended order, from DESIGN.md)**
+1. Backend/sync: Supabase project (USER creates account), auth via magic
+   link, household invite codes, realtime sync, RLS tests, cross-user
+   push. Biggest remaining chunk; schema is sync-ready by design.
+2. Notifications N2: per-chore reminders, notification actions
+   (Done/Snooze), evening re-reminder.
+3. Monetization: tip-jar IAP (needs store accounts + Paid Apps
+   agreements + tax/banking — user-side checklist exists in chat).
+4. Release prep: real app name + bundle id (placeholder com.example must
+   die before first store upload), icon, store listings EN/DE, privacy
+   labels, Fastlane pipeline, Play closed-test requirement for new
+   personal accounts.
+5. Backlog features: stats screen ("who actually cleans"), saved filter
+   views, home-screen widgets, multiple shopping lists, Siri/Assistant
+   shortcuts.
+
+## Sequencing proposal (next session)
+
+1. Push repo to GitHub (5 min, backup + wakes CI) — before anything else.
+2. Bug #1 (unpause) + bug #2 (snackbar) with tests — small, high impact.
+3. #7 members management UI — unlocks rotation/fixed for real users.
+4. Verifications #3 + #4 (done-today cases; duplicate-name test matrix).
+5. #5 language override + About (schema v3).
+6. #6 design prototypes → user picks → rollout + visual QA pass.
+7. Roadmap checkpoint with the user: backend/sync next (their Supabase
+   account) vs N2 notifications vs release prep.
