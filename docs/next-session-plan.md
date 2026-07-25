@@ -49,13 +49,23 @@ appear there. Believed working by design; add explicit widget tests for
 both cases (overdue completed today; tomorrow-due completed today) and
 extend the done_today E2E journey with the overdue case.
 
-## 4. VERIFY + DECIDE: duplicate chore names
+## 4. Duplicate chore names: allowed by design, must be WELL TESTED
 
-Currently unrestricted (no uniqueness anywhere). Test actual behavior,
-then implement: non-blocking inline hint on the form ('You already have a
-chore named …') while still allowing save — duplicates are usually
-accidents but can be legitimate ("Water plants" bedroom vs balcony).
-No hard uniqueness constraint.
+User decision (2026-07-24): no prohibition, no warning hint — duplicates
+are legitimate ("Water plants" bedroom vs balcony). The requirement is
+confidence that nothing misbehaves when two chores share a title.
+
+Test matrix to add (all operations must target the right ROW, never
+match by title):
+- two same-named chores, different categories/assignees: complete one →
+  only that occurrence closes; the other stays pending; Done-today shows
+  exactly one entry with the right closer.
+- skip/pause/delete via the menu on one → the sibling untouched.
+- undo/reopen restores the correct one.
+- both visible under the same section, filters treat them independently.
+- edit one's title → sibling unchanged.
+- E2E journey with two same-named chores driven purely by occurrence-id
+  selectors (our id-first selector convention exists precisely for this).
 
 ## 5. Settings: language override + About section
 
