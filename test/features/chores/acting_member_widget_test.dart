@@ -85,9 +85,9 @@ void main() {
         chores: repo,
         clock: Clock.fixed(today),
       );
-      // "anyone" mode, no assignee: completion falls back to the current
-      // actingMemberProvider (chores_list_screen.dart), which is exactly
-      // the attribution path this test exercises.
+      // "anyone" mode, no assignee — the acting member is the completer
+      // for EVERY UI completion (assigned or not; see the fixed-assignee
+      // sibling test below), this test covers the unassigned path.
       final chore = await service.createChore(
         householdId: householdId,
         title: 'Water plants',
@@ -139,6 +139,65 @@ void main() {
 
       final closed = await repo.latestClosedOccurrence(chore.id);
       expect(closed!.completedBy, anna.id);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'completing a chore FIXED to another member still credits the acting '
+    'member — attribution records who actually did the work (user '
+    'decision 2026-07-31), while rotation keeps reading the assignee',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final repo = ChoreRepository(database);
+      final me = await soleBootstrapMember(database);
+      final anna = await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      final service = ChoreService(
+        database: database,
+        chores: repo,
+        clock: Clock.fixed(today),
+      );
+      // The chore is Me's on paper; Anna is the one acting.
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Water plants',
+        startDate: todayPlain,
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [me.id],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsIdentifier('chores.actingMember'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('actingMember.sheet.row.${anna.id}'),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(ExpansionTile),
+          matching: find.text('by Anna'),
+        ),
+        findsOneWidget,
+      );
+      final closed = await repo.latestClosedOccurrence(chore.id);
+      // Credit: Anna (who did it). Assignment record: still Me — rotation
+      // and the assignee field are untouched by who completed.
+      expect(closed!.completedBy, anna.id);
+      expect(closed.assignedMemberId, me.id);
 
       handle.dispose();
     },

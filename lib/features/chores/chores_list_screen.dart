@@ -89,8 +89,13 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 
   Future<void> _complete(OccurrenceWithChore occurrence) async {
+    // Credit goes to whoever ACTUALLY did it — the acting member — never
+    // the assignee (user decision 2026-07-31; spec members-management.md
+    // §4). Rotation is unaffected: it advances on assigned_member_id, not
+    // completed_by. The assignee is only a defensive fallback for the
+    // moment before actingMemberProvider has resolved.
     final completedBy =
-        occurrence.assignedMember?.id ?? ref.read(actingMemberProvider)?.id;
+        ref.read(actingMemberProvider)?.id ?? occurrence.assignedMember?.id;
     if (completedBy == null) {
       return;
     }

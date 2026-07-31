@@ -108,8 +108,10 @@ selectors):
 ## 7. Non-goals / invariants
 
 - Rotation semantics unchanged: rotation order remains the chore's
-  assignee list order; the acting member only affects `completedBy`
-  attribution (and, as today, whatever defaults read actingMember).
+  assignee list order and advances on `assigned_member_id`. The acting
+  member owns `completedBy` for EVERY UI completion — assigned or not
+  (user decision 2026-07-31: credit records who actually did the work;
+  see ui-foundation-chores.md tile contract).
 - Bootstrap unchanged: 'Me' is still created on first run (renaming it
   is exactly what this screen is for; the G2 name prompt stays a
   separate, later task).

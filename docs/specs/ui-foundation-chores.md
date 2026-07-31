@@ -81,10 +81,13 @@ error text `semantic('app.bootstrap_error')`.
   `.complete`), title, subtitle line with category chip (icon+name in
   category color) when categorized + assignee name when assigned; overdue
   tiles show the due date in error color.
-- Tapping `.complete` calls `completeOccurrence(completedBy: assigned
-  member ?? current single member)`; for v1 the "acting member" is the
-  bootstrap member (first admin) — a `actingMemberProvider` returns it;
-  proper member switching is out of scope.
+- Tapping `.complete` calls `completeOccurrence(completedBy: acting
+  member)` — ALWAYS the acting member (`actingMemberProvider`, switchable
+  via the app-bar avatar since members-management.md §4), never the
+  assignee: credit records who actually did the work (user decision
+  2026-07-31). The assignee is only a defensive fallback for the moment
+  before the provider resolves. Rotation is unaffected — it advances on
+  `assigned_member_id`, not `completed_by`.
 - Tile long-press or `.menu` button → bottom sheet: Skip, Edit, Pause,
   Delete (destructive style). Delete asks confirmation dialog
   (`chores.delete.confirm` / `.cancel`).
