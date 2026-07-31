@@ -97,14 +97,34 @@ Idempotent: a second call the same day changes nothing.
 `setPaused(true)` + delete pending occurrences. History untouched.
 
 ### unpauseChore(String choreId)
-`setPaused(false)` + insert a fresh pending occurrence:
+`setPaused(false)` + insert a fresh pending occurrence — except for a
+one-off whose only occurrence is already closed, which gets none (see
+below).
 
-- schedule anchor → `nextScheduledOnOrAfter(rule, startDate, today)`
-- completion anchor → `today`
-- one-off → `startDate` if ≥ today, else `today`
+Fetches `latestClosed = latestClosedOccurrence(choreId)` exactly once (the
+most recent occurrence that is done, skipped, or missed — pending doesn't
+count). This deliberately includes **skipped**: a skipped slot must not
+resurrect either, same "skip sticks" principle as `completeOccurrence`/
+`skipOccurrence`.
+
+- **one-off**: if `latestClosed != null`, unpause the chore but insert NO
+  occurrence at all — a completed/skipped one-off must never come back.
+  Otherwise unchanged: `startDate` if ≥ today, else `today`.
+- **schedule anchor**: `fromDate` = today if (`latestClosed == null` OR
+  `latestClosed.dueDate` is before today), else `latestClosed.dueDate + 1
+  day`; due = `nextScheduledOnOrAfter(rule, startDate, fromDate)`.
+  Rationale — pause is a vacation, so unpause floors at two points: never
+  *before* today (no instantly-overdue occurrence), and never *at or
+  before* the latest closed slot (no resurrecting a slot that's already
+  done/skipped/missed). The second floor is what fixes the bug where
+  completing today's occurrence, then pausing, then unpausing the same day
+  used to bring back a second pending occurrence at that same already-done
+  slot.
+- **completion anchor**: `today` if `latestClosed == null`; otherwise
+  `candidate = nextAfterCompletion(rule, latestClosed.closedOn)`, and due =
+  `candidate` if it's after today, else `today`.
 - assignee: `fixed` → the assignee; `anyone` → null; `rotation` → continue
-  from history: `nextRotationAssignee(order,
-  latestClosedOccurrence?.assignedMemberId)`.
+  from history: `nextRotationAssignee(order, latestClosed?.assignedMemberId)`.
 
 Both throw `StateError` if the chore doesn't exist or is soft-deleted;
 `pauseChore` on a paused chore (and unpause on unpaused) is a no-op.
@@ -156,7 +176,12 @@ ids. Cover at minimum:
    untouched; completion-anchored chore 10 days overdue untouched; paused
    chore untouched; second call same day is a no-op (assert row counts).
 6. pause/unpause round-trip per anchor mode incl. rotation continuity
-   (A done → paused → unpaused → next assignee is B).
+   (A done → paused → unpaused → next assignee is B); done/skip today →
+   paused → unpaused (same day) never resurrects a pending occurrence at
+   today's already-closed slot, for both schedule and completion anchors
+   (and pinned-weekday schedules), and never when the latest closed slot is
+   weeks in the past either; a closed one-off stays closed through a
+   pause/unpause round trip (unpaused, zero pending, history untouched).
 7. Every multi-write method leaves consistent state if re-read mid-test
    (assert via repository watches/gets, not raw SQL).
 

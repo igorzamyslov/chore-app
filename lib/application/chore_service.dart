@@ -178,14 +178,32 @@ class ChoreService {
     });
   }
 
-  /// Unpauses [choreId] and inserts a fresh pending occurrence. A no-op if
-  /// the chore is already unpaused.
+  /// Unpauses [choreId] and inserts a fresh pending occurrence — unless the
+  /// chore is a one-off whose only occurrence is already closed, in which
+  /// case no occurrence is inserted at all (see below). A no-op if the
+  /// chore is already unpaused.
   ///
-  /// Due date: schedule anchor -> `nextScheduledOnOrAfter(rule, startDate,
-  /// today)`; completion anchor -> today; one-off -> [Chore.startDate] if
-  /// it's on or after today, else today. Assignee: `fixed` -> the assignee;
-  /// `anyone` -> `null`; `rotation` -> continues from history via
-  /// [nextRotationAssignee].
+  /// Fetches `latestClosedOccurrence` (the most recent occurrence that is
+  /// done, skipped, or missed — deliberately including skipped: a skipped
+  /// slot must not resurrect either, "skip sticks") exactly once, and uses
+  /// it to pick the due date:
+  ///
+  /// - one-off: if a closed occurrence exists, unpause the chore but insert
+  ///   NO occurrence — a completed/skipped one-off must never come back.
+  ///   Otherwise unchanged: [Chore.startDate] if it's on or after today,
+  ///   else today.
+  /// - schedule anchor: `nextScheduledOnOrAfter(rule, startDate, fromDate)`,
+  ///   where `fromDate` is today if there's no closed occurrence or its due
+  ///   date is before today, else the day after its due date. See
+  ///   `docs/specs/occurrence-lifecycle.md` §2 for the two-floors
+  ///   rationale (this is what fixes the done/skip -> pause -> unpause
+  ///   "resurrected today's occurrence" bug).
+  /// - completion anchor: unchanged (today) if there's no closed
+  ///   occurrence; otherwise `nextAfterCompletion(rule, closed.closedOn)` if
+  ///   that's after today, else today.
+  ///
+  /// Assignee: `fixed` -> the assignee; `anyone` -> `null`; `rotation` ->
+  /// continues from history via [nextRotationAssignee].
   ///
   /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
   Future<void> unpauseChore(String choreId) async {
@@ -198,11 +216,19 @@ class ChoreService {
       }
       await chores.setPaused(choreId, paused: false);
 
-      final dueDate = _unpauseDueDate(chore: chore, today: today);
-      final assignedMemberId = await _unpauseAssignee(
-        choreId: choreId,
+      final latestClosed = await chores.latestClosedOccurrence(choreId);
+      final dueDate = _unpauseDueDate(
+        chore: chore,
+        today: today,
+        latestClosed: latestClosed,
+      );
+      if (dueDate == null) {
+        return;
+      }
+      final assignedMemberId = _unpauseAssignee(
         mode: chore.assignmentMode,
         orderedMemberIds: details.assigneeMemberIds,
+        latestClosed: latestClosed,
       );
       await chores.insertOccurrence(
         choreId: choreId,
@@ -352,31 +378,55 @@ class ChoreService {
     }
   }
 
-  /// The due date of the fresh occurrence inserted by [unpauseChore].
-  PlainDate _unpauseDueDate({required Chore chore, required PlainDate today}) {
+  /// The due date of the fresh occurrence [unpauseChore] should insert, or
+  /// `null` if it should insert none at all (a closed one-off must never
+  /// resurrect).
+  PlainDate? _unpauseDueDate({
+    required Chore chore,
+    required PlainDate today,
+    required ChoreOccurrence? latestClosed,
+  }) {
     final recurrence = chore.recurrence;
     if (recurrence == null) {
+      if (latestClosed != null) {
+        return null;
+      }
       return chore.startDate.isOnOrAfter(today) ? chore.startDate : today;
     }
     if (recurrence.anchor == RecurrenceAnchor.completion) {
-      return today;
+      if (latestClosed == null) {
+        return today;
+      }
+      // `closedOn` is always set once an occurrence is non-pending (see
+      // `ChoreRepository.closeOccurrence`), so a `latestClosedOccurrence`
+      // result never has a null one.
+      final candidate = nextAfterCompletion(recurrence, latestClosed.closedOn!);
+      return candidate.isAfter(today) ? candidate : today;
     }
-    return nextScheduledOnOrAfter(recurrence, chore.startDate, today);
+    // Schedule anchor. Pause is a vacation: unpause floors at two points —
+    // never before today (so it never creates an instantly-overdue
+    // occurrence) and never at or before the latest closed slot (so it never
+    // resurrects a slot that's already done/skipped — the fix for the
+    // done -> pause -> unpause bug this method used to have).
+    final fromDate =
+        (latestClosed == null || latestClosed.dueDate.isBefore(today))
+        ? today
+        : latestClosed.dueDate.addDays(1);
+    return nextScheduledOnOrAfter(recurrence, chore.startDate, fromDate);
   }
 
   /// The assignee of the fresh occurrence inserted by [unpauseChore].
-  Future<String?> _unpauseAssignee({
-    required String choreId,
+  String? _unpauseAssignee({
     required AssignmentMode mode,
     required List<String> orderedMemberIds,
-  }) async {
+    required ChoreOccurrence? latestClosed,
+  }) {
     switch (mode) {
       case AssignmentMode.fixed:
         return orderedMemberIds.single;
       case AssignmentMode.anyone:
         return null;
       case AssignmentMode.rotation:
-        final latestClosed = await chores.latestClosedOccurrence(choreId);
         return nextRotationAssignee(
           orderedMemberIds: orderedMemberIds,
           lastAssignedMemberId: latestClosed?.assignedMemberId,

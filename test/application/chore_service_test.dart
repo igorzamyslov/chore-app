@@ -647,6 +647,244 @@ void main() {
     );
   });
 
+  group('unpauseChore does not resurrect an already-closed slot', () {
+    test(
+      'regression: a weekly schedule-anchored chore due today, completed, '
+      'paused, then unpaused the same day gets no pending occurrence due '
+      'today; the pending occurrence sits at the next weekly slot, and the '
+      'completed occurrence is untouched',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        // 2026-01-05 is a Monday.
+        final chore = await serviceOn(PlainDate(2026, 1, 5)).createChore(
+          householdId: householdId,
+          title: 'Weekly',
+          startDate: PlainDate(2026, 1, 5),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.weekly(),
+        );
+        final today = await repo.pendingOccurrenceOf(chore.id);
+        expect(today!.dueDate, PlainDate(2026, 1, 5));
+
+        await serviceOn(
+          PlainDate(2026, 1, 5),
+        ).completeOccurrence(today.id, completedBy: m1);
+        await serviceOn(PlainDate(2026, 1, 5)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 12));
+
+        final closed = await repo.latestClosedOccurrence(chore.id);
+        expect(closed!.id, today.id);
+        expect(closed.status, OccurrenceStatus.done);
+        expect(closed.dueDate, PlainDate(2026, 1, 5));
+        expect(closed.closedOn, PlainDate(2026, 1, 5));
+      },
+    );
+
+    test(
+      'same as the completion regression, but with skipOccurrence: "skip '
+      'sticks" applies here too',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 5)).createChore(
+          householdId: householdId,
+          title: 'Weekly',
+          startDate: PlainDate(2026, 1, 5),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.weekly(),
+        );
+        final today = await repo.pendingOccurrenceOf(chore.id);
+
+        await serviceOn(PlainDate(2026, 1, 5)).skipOccurrence(today!.id);
+        await serviceOn(PlainDate(2026, 1, 5)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 12));
+
+        final closed = await repo.latestClosedOccurrence(chore.id);
+        expect(closed!.id, today.id);
+        expect(closed.status, OccurrenceStatus.skipped);
+      },
+    );
+
+    test(
+      'a weekly chore pinned to Monday, completed on that Monday, paused, '
+      'then unpaused the same day resumes at the next Monday',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        // 2026-01-01 is a Thursday; the first pinned Monday on/after it is
+        // 2026-01-05.
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Weekly, pinned Monday',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.weekly(weekdays: {DateTime.monday}),
+        );
+        final firstMonday = await repo.pendingOccurrenceOf(chore.id);
+        expect(firstMonday!.dueDate, PlainDate(2026, 1, 5));
+
+        await serviceOn(
+          PlainDate(2026, 1, 5),
+        ).completeOccurrence(firstMonday.id, completedBy: m1);
+        await serviceOn(PlainDate(2026, 1, 5)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 12));
+      },
+    );
+
+    test(
+      'schedule anchor whose latest closed slot is weeks in the past: '
+      'unpausing today lands on the first slot >= today, never an overdue '
+      'one',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Weekly-ish',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(7),
+        );
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        expect(first!.dueDate, PlainDate(2026, 1, 1));
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first.id, completedBy: m1);
+
+        // The chore is paused long after completion, then unpaused weeks
+        // later still; the closed slot (2026-01-01) is far in the past.
+        await serviceOn(PlainDate(2026, 1, 9)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 30)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        // Series from 2026-01-01 every 7 days: ...01-22, 01-29, 02-05... The
+        // first slot on/after 2026-01-30 is 2026-02-05 -- not an overdue
+        // slot before today.
+        expect(pending!.dueDate, PlainDate(2026, 2, 5));
+        expect(pending.dueDate.isOnOrAfter(PlainDate(2026, 1, 30)), isTrue);
+      },
+    );
+
+    test(
+      'completion anchor, every 3 days: completed today, paused, then '
+      'unpaused the same day resumes due today + 3',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Water plants',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(
+            3,
+            anchor: RecurrenceAnchor.completion,
+          ),
+        );
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: m1);
+        await serviceOn(PlainDate(2026, 1, 1)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 1)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 4));
+      },
+    );
+
+    test(
+      'completion anchor whose latest closedOn is 5 days ago (so the '
+      'completion-based candidate, 2 days ago, is itself in the past): '
+      'unpausing today resumes due today',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Water plants',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(
+            3,
+            anchor: RecurrenceAnchor.completion,
+          ),
+        );
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: m1);
+        await serviceOn(PlainDate(2026, 1, 1)).pauseChore(chore.id);
+
+        // closedOn was 2026-01-01; unpausing 5 days later on 2026-01-06
+        // makes the completion candidate (2026-01-04) 2 days in the past.
+        await serviceOn(PlainDate(2026, 1, 6)).unpauseChore(chore.id);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 6));
+      },
+    );
+
+    test(
+      'a one-off chore, completed then paused, stays closed through an '
+      'unpause: the chore itself is unpaused but no occurrence resurrects',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'One-off',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(pending!.id, completedBy: m1);
+        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(chore.id);
+
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(chore.id);
+
+        final details = await repo.getChore(chore.id);
+        expect(details!.chore.pausedAt, isNull);
+        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+        final closed = await repo.latestClosedOccurrence(chore.id);
+        expect(closed!.id, pending.id);
+        expect(closed.status, OccurrenceStatus.done);
+      },
+    );
+
+    test(
+      'a one-off chore never closed still resumes at startDate if still '
+      'ahead, else today',
+      () async {
+        final futureChore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Future one-off',
+          startDate: PlainDate(2026, 1, 10),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(futureChore.id);
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(futureChore.id);
+        final futurePending = await repo.pendingOccurrenceOf(futureChore.id);
+        expect(futurePending!.dueDate, PlainDate(2026, 1, 10));
+
+        final pastChore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Past one-off',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(pastChore.id);
+        await serviceOn(PlainDate(2026, 1, 20)).unpauseChore(pastChore.id);
+        final pastPending = await repo.pendingOccurrenceOf(pastChore.id);
+        expect(pastPending!.dueDate, PlainDate(2026, 1, 20));
+      },
+    );
+  });
+
   group('reopenOccurrence', () {
     test(
       'reopening a completed recurring occurrence the same day restores it '
