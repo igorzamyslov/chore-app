@@ -39,12 +39,16 @@ void main() {
       expect(plugin.initializeCallCount, 1);
     });
 
-    test('requests permission only on the first ever call', () async {
-      await scheduler.scheduleDigest(plan);
-      await scheduler.scheduleDigest(plan);
-      await scheduler.scheduleDigest(plan);
-      expect(plugin.requestPermissionCallCount, 1);
-    });
+    test(
+      'never requests permission itself (spec polish-round-1.md A3: the '
+      'OS dialog only ever fires from an explicit user tap)',
+      () async {
+        await scheduler.scheduleDigest(plan);
+        await scheduler.scheduleDigest(plan);
+        await scheduler.scheduleDigest(plan);
+        expect(plugin.requestPermissionCallCount, 0);
+      },
+    );
 
     test('schedules with the fixed digest notification id', () async {
       await scheduler.scheduleDigest(plan);

@@ -170,8 +170,30 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
 
   @override
+  String get choresEmptyFresh => 'Füge mit + deine erste Aufgabe hinzu';
+
+  @override
   String get choresErrorMessage =>
       'Deine Aufgaben konnten nicht geladen werden.';
+
+  @override
+  String get onboardingNameBannerMessage => 'Wer erledigt hier die Aufgaben?';
+
+  @override
+  String get onboardingNameBannerSetAction => 'Meinen Namen festlegen';
+
+  @override
+  String get onboardingNameBannerDismissTooltip => 'Schließen';
+
+  @override
+  String get digestPrepromptMessage =>
+      'Möchtest du eine tägliche Zusammenfassung deiner fälligen Aufgaben?';
+
+  @override
+  String get digestPrepromptEnableAction => 'Aktivieren';
+
+  @override
+  String get digestPrepromptDismissAction => 'Nicht jetzt';
 
   @override
   String get choresSnackbarDone => 'Erledigt';
@@ -324,6 +346,12 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get shoppingErrorMessage =>
       'Deine Einkaufsliste konnte nicht geladen werden.';
+
+  @override
+  String get shoppingDeletedSnackbar => 'Entfernt';
+
+  @override
+  String get shoppingDeletedUndo => 'Rückgängig';
 
   @override
   String get shoppingEditNameLabel => 'Name';

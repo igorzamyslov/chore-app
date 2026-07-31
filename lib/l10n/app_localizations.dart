@@ -314,17 +314,59 @@ abstract class AppLocalizations {
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
 
-  /// Chores list empty-state message, shown when there are no pending occurrences to show.
+  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done').
   ///
   /// In en, this message translates to:
   /// **'No chores pending — nice work!'**
   String get choresEmptyState;
+
+  /// Chores list empty-state message shown instead of choresEmptyState on a fresh install (zero non-deleted chores in the household yet) — spec docs/specs/polish-round-1.md A1.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first chore with +'**
+  String get choresEmptyFresh;
 
   /// Chores list load-error message.
   ///
   /// In en, this message translates to:
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
+
+  /// First-run name-prompt banner copy at the top of the chores list (spec docs/specs/polish-round-1.md A2), shown while the household still consists of just the bootstrap 'Me' member.
+  ///
+  /// In en, this message translates to:
+  /// **'Who\'s doing the chores here?'**
+  String get onboardingNameBannerMessage;
+
+  /// Action button on the name-prompt banner opening the member edit sheet, prefilled for the bootstrap member.
+  ///
+  /// In en, this message translates to:
+  /// **'Set my name'**
+  String get onboardingNameBannerSetAction;
+
+  /// Tooltip for the name-prompt banner's X dismiss button.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get onboardingNameBannerDismissTooltip;
+
+  /// Digest pre-prompt banner copy at the top of the chores list (spec docs/specs/polish-round-1.md A3), shown before the one-shot OS notification-permission dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Want a daily summary of what\'s due?'**
+  String get digestPrepromptMessage;
+
+  /// Digest pre-prompt banner's action that marks it shown, requests the OS notification permission, then triggers a digest recompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get digestPrepromptEnableAction;
+
+  /// Digest pre-prompt banner's dismiss action: marks it shown without requesting the OS permission (the digest stays enabled but silent until permission arrives via Settings).
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get digestPrepromptDismissAction;
 
   /// Undo snackbar message after completing a one-off occurrence (no next occurrence is created).
   ///
@@ -565,6 +607,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load your shopping list.'**
   String get shoppingErrorMessage;
+
+  /// Undo snackbar message shown after deleting a shopping item from its edit sheet (spec docs/specs/polish-round-1.md C3), mirroring the chores undo tone.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get shoppingDeletedSnackbar;
+
+  /// Action label of the shopping-delete undo snackbar; restores the item by clearing its deleted_at (soft delete).
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get shoppingDeletedUndo;
 
   /// Label of the shopping item edit sheet's required name text field.
   ///

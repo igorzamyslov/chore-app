@@ -49,7 +49,16 @@
   "actingMemberSheetTitle": "Wer ist gerade dran?",
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
+  "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
+
+  "onboardingNameBannerMessage": "Wer erledigt hier die Aufgaben?",
+  "onboardingNameBannerSetAction": "Meinen Namen festlegen",
+  "onboardingNameBannerDismissTooltip": "Schließen",
+
+  "digestPrepromptMessage": "Möchtest du eine tägliche Zusammenfassung deiner fälligen Aufgaben?",
+  "digestPrepromptEnableAction": "Aktivieren",
+  "digestPrepromptDismissAction": "Nicht jetzt",
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
@@ -98,6 +107,9 @@
 
   "shoppingEmptyState": "Die Einkaufsliste ist leer",
   "shoppingErrorMessage": "Deine Einkaufsliste konnte nicht geladen werden.",
+
+  "shoppingDeletedSnackbar": "Entfernt",
+  "shoppingDeletedUndo": "Rückgängig",
 
   "shoppingEditNameLabel": "Name",
   "shoppingEditQuantityLabel": "Menge / Notiz",

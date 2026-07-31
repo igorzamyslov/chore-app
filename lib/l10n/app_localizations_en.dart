@@ -170,7 +170,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresEmptyState => 'No chores pending — nice work!';
 
   @override
+  String get choresEmptyFresh => 'Add your first chore with +';
+
+  @override
   String get choresErrorMessage => 'Could not load your chores.';
+
+  @override
+  String get onboardingNameBannerMessage => 'Who\'s doing the chores here?';
+
+  @override
+  String get onboardingNameBannerSetAction => 'Set my name';
+
+  @override
+  String get onboardingNameBannerDismissTooltip => 'Dismiss';
+
+  @override
+  String get digestPrepromptMessage => 'Want a daily summary of what\'s due?';
+
+  @override
+  String get digestPrepromptEnableAction => 'Turn on';
+
+  @override
+  String get digestPrepromptDismissAction => 'Not now';
 
   @override
   String get choresSnackbarDone => 'Done';
@@ -321,6 +342,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shoppingErrorMessage => 'Could not load your shopping list.';
+
+  @override
+  String get shoppingDeletedSnackbar => 'Removed';
+
+  @override
+  String get shoppingDeletedUndo => 'Undo';
 
   @override
   String get shoppingEditNameLabel => 'Name';

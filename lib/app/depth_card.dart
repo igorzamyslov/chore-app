@@ -14,8 +14,11 @@ class DepthCard extends StatelessWidget {
   /// Creates a card wrapper around [child]. [margin] defaults to the
   /// symmetric 12/4 spacing the design calls for; pass a tighter value for
   /// rows nested inside an already-padded container (e.g. an
-  /// [ExpansionTile]'s children).
-  const DepthCard({required this.child, this.margin, super.key});
+  /// [ExpansionTile]'s children). [color] defaults to
+  /// `colorScheme.surfaceContainerLow`; the first-run banner cards (spec
+  /// `docs/specs/polish-round-1.md` A2/A3) pass `colorScheme.
+  /// secondaryContainer` instead so they read as banners, not chores.
+  const DepthCard({required this.child, this.margin, this.color, super.key});
 
   /// The content to render inside the card.
   final Widget child;
@@ -24,11 +27,14 @@ class DepthCard extends StatelessWidget {
   /// `EdgeInsets.symmetric(horizontal: 12, vertical: 4)`.
   final EdgeInsetsGeometry? margin;
 
+  /// The card's fill color. Defaults to `colorScheme.surfaceContainerLow`.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: color ?? Theme.of(context).colorScheme.surfaceContainerLow,
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(12)),
