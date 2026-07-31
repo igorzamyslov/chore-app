@@ -145,5 +145,17 @@
   "categoryEditColorLabel": "Farbe",
 
   "categoryDeleteDialogTitle": "Kategorie löschen?",
-  "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie."
+  "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.",
+
+  "settingsLanguageEntry": "Sprache",
+  "settingsLanguageSheetTitle": "Sprache wählen",
+  "settingsLanguageSystem": "Systemsprache",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageDeutsch": "Deutsch",
+
+  "settingsAboutSectionTitle": "Über die App",
+  "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
+  "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
+  "settingsAboutDonateTitle": "Unterstütze die App",
+  "settingsAboutDonateSubtitle": "Bald verfügbar"
 }

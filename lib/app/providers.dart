@@ -23,7 +23,9 @@ import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// The raw value of the `E2E_TODAY` dart-define, read at compile time.
 ///
@@ -94,6 +96,47 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 /// digest is enabled/disabled or its time changes).
 final settingsProvider = StreamProvider<DeviceSettings>((ref) {
   return ref.watch(settingsRepositoryProvider).watchSettings();
+});
+
+/// The language override chosen via Settings (spec
+/// `docs/next-session-plan.md` #5): the stored `settings.locale` mapped to
+/// a [Locale] for `MaterialApp.locale` (`lib/app/app.dart`), or `null` to
+/// follow the OS locale.
+///
+/// An unrecognized stored value (future-proofing against a value this
+/// build doesn't know) also maps to `null` rather than throwing, matching
+/// `actingMemberProvider`'s "read-time self-heal, nothing written back"
+/// approach to a stale/foreign stored value.
+///
+/// Watched unconditionally from `ChoreApp.build` (`lib/app/app.dart`) --
+/// including while `bootstrapProvider` is still loading or has errored --
+/// so this reads [settingsProvider] via `valueOrNull` rather than `value`:
+/// the latter rethrows the underlying error when the watched provider
+/// itself is in an `AsyncError` state (e.g. a broken database connection),
+/// which would otherwise crash the loading/error screens this locale also
+/// applies to.
+final localeOverrideProvider = Provider<Locale?>((ref) {
+  final stored = ref.watch(settingsProvider).valueOrNull?.locale;
+  switch (stored) {
+    case 'en':
+      return const Locale('en');
+    case 'de':
+      return const Locale('de');
+    default:
+      return null;
+  }
+});
+
+/// The running app's package metadata (name, version, build number),
+/// read once from the platform. Backs the Settings tab's About section
+/// (spec `docs/next-session-plan.md` #5: version row, and the app version
+/// passed to `showLicensePage`).
+///
+/// Widget tests never override this provider directly: `PackageInfo`
+/// exposes its own test hook, `PackageInfo.setMockInitialValues(...)`,
+/// which `PackageInfo.fromPlatform()` picks up automatically once called.
+final packageInfoProvider = FutureProvider<PackageInfo>((ref) {
+  return PackageInfo.fromPlatform();
 });
 
 /// The OS-level notification plugin (or fake), wrapped by

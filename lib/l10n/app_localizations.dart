@@ -781,6 +781,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
   String categoryDeleteDialogBody(String categoryName);
+
+  /// Settings screen list entry that opens the language picker sheet (spec docs/next-session-plan.md #5), shown below the Categories entry. Its subtitle shows the current choice (System default / English / Deutsch).
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsLanguageEntry;
+
+  /// Heading of the language picker bottom sheet opened from the settingsLanguageEntry row.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose language'**
+  String get settingsLanguageSheetTitle;
+
+  /// Language picker option (and settingsLanguageEntry subtitle) meaning 'follow the OS locale' -- a stored settings.locale of NULL.
+  ///
+  /// In en, this message translates to:
+  /// **'System default'**
+  String get settingsLanguageSystem;
+
+  /// Language picker option for English. A proper name: shown as 'English' regardless of the app's current UI locale, so this value is identical in every arb file.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// Language picker option for German. A proper name: shown as 'Deutsch' regardless of the app's current UI locale, so this value is identical in every arb file.
+  ///
+  /// In en, this message translates to:
+  /// **'Deutsch'**
+  String get settingsLanguageDeutsch;
+
+  /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAboutSectionTitle;
+
+  /// Subtitle of the About section's non-tappable version row, under the app's name. version/buildNumber are an em dash ('—') while packageInfoProvider is still loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} ({buildNumber})'**
+  String settingsAboutVersionLabel(String version, String buildNumber);
+
+  /// About section row that opens Flutter's built-in showLicensePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open source licenses'**
+  String get settingsAboutLicensesEntry;
+
+  /// Title of the About section's disabled donation/tip-jar placeholder row (no action wired yet).
+  ///
+  /// In en, this message translates to:
+  /// **'Support the app'**
+  String get settingsAboutDonateTitle;
+
+  /// Subtitle of the About section's disabled donation/tip-jar placeholder row.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get settingsAboutDonateSubtitle;
 }
 
 class _AppLocalizationsDelegate

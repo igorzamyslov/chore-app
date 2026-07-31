@@ -440,4 +440,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String categoryDeleteDialogBody(String categoryName) {
     return 'This deletes \'$categoryName\'. Chores and items using it become uncategorized.';
   }
+
+  @override
+  String get settingsLanguageEntry => 'Language';
+
+  @override
+  String get settingsLanguageSheetTitle => 'Choose language';
+
+  @override
+  String get settingsLanguageSystem => 'System default';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageDeutsch => 'Deutsch';
+
+  @override
+  String get settingsAboutSectionTitle => 'About';
+
+  @override
+  String settingsAboutVersionLabel(String version, String buildNumber) {
+    return 'Version $version ($buildNumber)';
+  }
+
+  @override
+  String get settingsAboutLicensesEntry => 'Open source licenses';
+
+  @override
+  String get settingsAboutDonateTitle => 'Support the app';
+
+  @override
+  String get settingsAboutDonateSubtitle => 'Coming soon';
 }

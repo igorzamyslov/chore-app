@@ -188,6 +188,14 @@ class Settings extends Table {
   /// `AppDatabase.migration`.
   TextColumn get actingMemberId => text().nullable()();
 
+  /// The user's language override: `'en'` or `'de'`, or `NULL` to follow
+  /// the OS locale — see `localeOverrideProvider` in
+  /// `lib/app/providers.dart`. An unrecognized stored value (future
+  /// installs storing a locale this build doesn't know) is treated the
+  /// same as `NULL` by that provider, rather than enforced at the schema
+  /// level. Added in schemaVersion 4; see `AppDatabase.migration`.
+  TextColumn get locale => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

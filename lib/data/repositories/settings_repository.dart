@@ -124,6 +124,21 @@ class SettingsRepository {
     );
   }
 
+  /// Sets the user's language override (spec `docs/next-session-plan.md`
+  /// #5): `'en'` or `'de'`, read by `localeOverrideProvider`
+  /// (`lib/app/providers.dart`) to drive `MaterialApp.locale`. Passing
+  /// `null` clears it back to following the OS locale — this is an
+  /// explicit `null` write, not "leave unchanged", so [Value] wraps it
+  /// unconditionally.
+  Future<void> setLocale(String? locale) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(locale: Value(locale), updatedAt: Value(_isoNow())),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,

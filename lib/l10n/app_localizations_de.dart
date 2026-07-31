@@ -445,4 +445,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String categoryDeleteDialogBody(String categoryName) {
     return 'Damit löschst du \'$categoryName\'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.';
   }
+
+  @override
+  String get settingsLanguageEntry => 'Sprache';
+
+  @override
+  String get settingsLanguageSheetTitle => 'Sprache wählen';
+
+  @override
+  String get settingsLanguageSystem => 'Systemsprache';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsLanguageDeutsch => 'Deutsch';
+
+  @override
+  String get settingsAboutSectionTitle => 'Über die App';
+
+  @override
+  String settingsAboutVersionLabel(String version, String buildNumber) {
+    return 'Version $version ($buildNumber)';
+  }
+
+  @override
+  String get settingsAboutLicensesEntry => 'Open-Source-Lizenzen';
+
+  @override
+  String get settingsAboutDonateTitle => 'Unterstütze die App';
+
+  @override
+  String get settingsAboutDonateSubtitle => 'Bald verfügbar';
 }

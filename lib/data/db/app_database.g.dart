@@ -3876,6 +3876,15 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _localeMeta = const VerificationMeta('locale');
+  @override
+  late final GeneratedColumn<String> locale = GeneratedColumn<String>(
+    'locale',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3904,6 +3913,7 @@ class $SettingsTable extends Settings
     digestEnabled,
     digestMinutes,
     actingMemberId,
+    locale,
     createdAt,
     updatedAt,
   ];
@@ -3951,6 +3961,12 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('locale')) {
+      context.handle(
+        _localeMeta,
+        locale.isAcceptableOrUnknown(data['locale']!, _localeMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3992,6 +4008,10 @@ class $SettingsTable extends Settings
         DriftSqlType.string,
         data['${effectivePrefix}acting_member_id'],
       ),
+      locale: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}locale'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -4032,6 +4052,14 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// `AppDatabase.migration`.
   final String? actingMemberId;
 
+  /// The user's language override: `'en'` or `'de'`, or `NULL` to follow
+  /// the OS locale — see `localeOverrideProvider` in
+  /// `lib/app/providers.dart`. An unrecognized stored value (future
+  /// installs storing a locale this build doesn't know) is treated the
+  /// same as `NULL` by that provider, rather than enforced at the schema
+  /// level. Added in schemaVersion 4; see `AppDatabase.migration`.
+  final String? locale;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4042,6 +4070,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     required this.digestEnabled,
     required this.digestMinutes,
     this.actingMemberId,
+    this.locale,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4053,6 +4082,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     map['digest_minutes'] = Variable<int>(digestMinutes);
     if (!nullToAbsent || actingMemberId != null) {
       map['acting_member_id'] = Variable<String>(actingMemberId);
+    }
+    if (!nullToAbsent || locale != null) {
+      map['locale'] = Variable<String>(locale);
     }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
@@ -4067,6 +4099,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       actingMemberId: actingMemberId == null && nullToAbsent
           ? const Value.absent()
           : Value(actingMemberId),
+      locale: locale == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locale),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4082,6 +4117,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestEnabled: serializer.fromJson<bool>(json['digestEnabled']),
       digestMinutes: serializer.fromJson<int>(json['digestMinutes']),
       actingMemberId: serializer.fromJson<String?>(json['actingMemberId']),
+      locale: serializer.fromJson<String?>(json['locale']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4094,6 +4130,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'digestEnabled': serializer.toJson<bool>(digestEnabled),
       'digestMinutes': serializer.toJson<int>(digestMinutes),
       'actingMemberId': serializer.toJson<String?>(actingMemberId),
+      'locale': serializer.toJson<String?>(locale),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4104,6 +4141,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     bool? digestEnabled,
     int? digestMinutes,
     Value<String?> actingMemberId = const Value.absent(),
+    Value<String?> locale = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4113,6 +4151,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     actingMemberId: actingMemberId.present
         ? actingMemberId.value
         : this.actingMemberId,
+    locale: locale.present ? locale.value : this.locale,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4128,6 +4167,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       actingMemberId: data.actingMemberId.present
           ? data.actingMemberId.value
           : this.actingMemberId,
+      locale: data.locale.present ? data.locale.value : this.locale,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4140,6 +4180,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('digestEnabled: $digestEnabled, ')
           ..write('digestMinutes: $digestMinutes, ')
           ..write('actingMemberId: $actingMemberId, ')
+          ..write('locale: $locale, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4152,6 +4193,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     digestEnabled,
     digestMinutes,
     actingMemberId,
+    locale,
     createdAt,
     updatedAt,
   );
@@ -4163,6 +4205,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.digestEnabled == this.digestEnabled &&
           other.digestMinutes == this.digestMinutes &&
           other.actingMemberId == this.actingMemberId &&
+          other.locale == this.locale &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4172,6 +4215,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<bool> digestEnabled;
   final Value<int> digestMinutes;
   final Value<String?> actingMemberId;
+  final Value<String?> locale;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4180,6 +4224,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestEnabled = const Value.absent(),
     this.digestMinutes = const Value.absent(),
     this.actingMemberId = const Value.absent(),
+    this.locale = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4189,6 +4234,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestEnabled = const Value.absent(),
     this.digestMinutes = const Value.absent(),
     this.actingMemberId = const Value.absent(),
+    this.locale = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4200,6 +4246,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<bool>? digestEnabled,
     Expression<int>? digestMinutes,
     Expression<String>? actingMemberId,
+    Expression<String>? locale,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4209,6 +4256,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (digestEnabled != null) 'digest_enabled': digestEnabled,
       if (digestMinutes != null) 'digest_minutes': digestMinutes,
       if (actingMemberId != null) 'acting_member_id': actingMemberId,
+      if (locale != null) 'locale': locale,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4220,6 +4268,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<bool>? digestEnabled,
     Value<int>? digestMinutes,
     Value<String?>? actingMemberId,
+    Value<String?>? locale,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4229,6 +4278,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       digestEnabled: digestEnabled ?? this.digestEnabled,
       digestMinutes: digestMinutes ?? this.digestMinutes,
       actingMemberId: actingMemberId ?? this.actingMemberId,
+      locale: locale ?? this.locale,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4250,6 +4300,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (actingMemberId.present) {
       map['acting_member_id'] = Variable<String>(actingMemberId.value);
     }
+    if (locale.present) {
+      map['locale'] = Variable<String>(locale.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -4269,6 +4322,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('digestEnabled: $digestEnabled, ')
           ..write('digestMinutes: $digestMinutes, ')
           ..write('actingMemberId: $actingMemberId, ')
+          ..write('locale: $locale, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8585,6 +8639,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<bool> digestEnabled,
       Value<int> digestMinutes,
       Value<String?> actingMemberId,
+      Value<String?> locale,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8595,6 +8650,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<bool> digestEnabled,
       Value<int> digestMinutes,
       Value<String?> actingMemberId,
+      Value<String?> locale,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -8626,6 +8682,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get actingMemberId => $composableBuilder(
     column: $table.actingMemberId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locale => $composableBuilder(
+    column: $table.locale,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8669,6 +8730,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get locale => $composableBuilder(
+    column: $table.locale,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8706,6 +8772,9 @@ class $$SettingsTableAnnotationComposer
     column: $table.actingMemberId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get locale =>
+      $composableBuilder(column: $table.locale, builder: (column) => column);
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -8749,6 +8818,7 @@ class $$SettingsTableTableManager
                 Value<bool> digestEnabled = const Value.absent(),
                 Value<int> digestMinutes = const Value.absent(),
                 Value<String?> actingMemberId = const Value.absent(),
+                Value<String?> locale = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8757,6 +8827,7 @@ class $$SettingsTableTableManager
                 digestEnabled: digestEnabled,
                 digestMinutes: digestMinutes,
                 actingMemberId: actingMemberId,
+                locale: locale,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -8767,6 +8838,7 @@ class $$SettingsTableTableManager
                 Value<bool> digestEnabled = const Value.absent(),
                 Value<int> digestMinutes = const Value.absent(),
                 Value<String?> actingMemberId = const Value.absent(),
+                Value<String?> locale = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -8775,6 +8847,7 @@ class $$SettingsTableTableManager
                 digestEnabled: digestEnabled,
                 digestMinutes: digestMinutes,
                 actingMemberId: actingMemberId,
+                locale: locale,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

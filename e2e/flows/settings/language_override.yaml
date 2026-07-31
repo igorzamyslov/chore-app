@@ -1,0 +1,39 @@
+# Language override persistence journey (spec docs/next-session-plan.md #5):
+# switch the UI language to Deutsch from Settings, confirm a visible UI
+# string flips to German in the same session, then relaunch WITHOUT
+# clearing state and confirm the choice survived. Every OTHER flow in this
+# suite starts with `launchApp: clearState: true`, so this flow's own
+# language choice can never leak into them -- the reverse direction is the
+# one that needs guarding, which is exactly what this journey checks.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.language"
+- assertVisible:
+    id: "settings.language.sheet"
+- tapOn:
+    id: "settings.language.sheet.de"
+# The sheet closed (destination-only assert, README convention 4: the
+# sheet's own id vanishing proves it, rather than a bare text lookup that
+# could match leftover scrim/backdrop).
+- assertNotVisible:
+    id: "settings.language.sheet"
+# The settings screen's own language row flips to German immediately:
+# settingsLanguageEntry ('Language' -> 'Sprache') is a distinctive string
+# that can't false-positive against the English UI. Android merges a
+# tappable row's descendants into one label (README convention 2), hence
+# the (?s).* wrapping rather than a bare text match.
+- assertVisible: "(?s).*Sprache.*"
+# Relaunch WITHOUT clearState -- unlike every other flow -- so the stored
+# `settings.locale` survives, and confirm the same German string is still
+# there after switching back to Settings.
+- launchApp
+- tapOn:
+    id: "shell.tab.settings"
+- assertVisible: "(?s).*Sprache.*"

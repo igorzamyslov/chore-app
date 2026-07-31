@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -73,12 +74,11 @@ void main() {
   });
 
   test(
-    'schemaVersion 2 -> 3 upgrade adds actingMemberId (NULL by default), '
-    'keeping the existing settings row (spec '
-    'docs/specs/members-management.md)',
+    'schemaVersion 3 -> 4 upgrade adds locale (NULL by default), keeping '
+    'the existing settings row (spec docs/next-session-plan.md #5)',
     () async {
       final dir = await Directory.systemTemp.createTemp(
-        'chore_app_migration_v3_test',
+        'chore_app_migration_v4_test',
       );
       addTearDown(() async {
         if (dir.existsSync()) {
@@ -87,14 +87,73 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v2 install without hand-copying v2's CREATE
-      // TABLE SQL: open the *current* (v3) schema once against a real file
-      // so `onCreate` materializes every table with its full v3 column
-      // set, insert a settings row (so the upgrade's "existing row
-      // survives" guarantee is actually exercised), then drop the v3-only
-      // `acting_member_id` column and roll `user_version` back to 2 —
-      // reproducing exactly what a real v2 database on a user's device
-      // looks like.
+      // Simulate a pre-existing v3 install without hand-copying v3's CREATE
+      // TABLE SQL: open the *current* (v4) schema once against a real file
+      // so `onCreate` materializes every table with its full v4 column
+      // set, insert a settings row with a non-NULL actingMemberId (so the
+      // upgrade's "existing row survives" guarantee is actually exercised
+      // for both pre-existing columns), then drop the v4-only `locale`
+      // column and roll `user_version` back to 3 — reproducing exactly
+      // what a real v3 database on a user's device looks like.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+            ),
+          );
+      await seed.customStatement('ALTER TABLE settings DROP COLUMN locale');
+      await seed.customStatement('PRAGMA user_version = 3');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 4)
+      // `AppDatabase` now sees `user_version == 3` on disk vs. a declared
+      // `schemaVersion` of 4, so drift runs `onUpgrade(migrator, 3, 4)` —
+      // exactly the real upgrade path a v3 user's device would go through.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final row = await upgraded.select(upgraded.settings).getSingle();
+      expect(row.id, 'device');
+      expect(row.locale, isNull);
+      // The pre-existing row's own data survived the upgrade untouched.
+      expect(row.createdAt, 't0');
+      expect(row.actingMemberId, 'member-1');
+      expect(row.digestEnabled, isTrue);
+      expect(row.digestMinutes, 480);
+    },
+  );
+
+  test(
+    'schemaVersion 2 -> 4 upgrade adds BOTH actingMemberId and locale, '
+    'keeping the existing settings row (specs '
+    'docs/specs/members-management.md, docs/next-session-plan.md #5) -- '
+    'this app never actually stops at v3 once schemaVersion is 4, so this '
+    'supersedes an earlier version of this file that isolated the v2 -> v3 '
+    'step alone',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v2_to_v4_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v2 install: open the *current* (v4) schema
+      // once so `onCreate` materializes every table with its full v4
+      // column set, insert a settings row, then drop BOTH the v3-only
+      // `acting_member_id` column and the v4-only `locale` column and roll
+      // `user_version` back to 2 — reproducing exactly what a real v2
+      // database on a user's device looks like, so the `from < 2` branch
+      // is never hit and both `if (from < 3)` / `if (from < 4)` backfills
+      // inside the `else` branch run in the same upgrade.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -108,19 +167,20 @@ void main() {
       await seed.customStatement(
         'ALTER TABLE settings DROP COLUMN acting_member_id',
       );
+      await seed.customStatement('ALTER TABLE settings DROP COLUMN locale');
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 3)
+      // Re-opening the same file with the real (schemaVersion: 4)
       // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
-      // `schemaVersion` of 3, so drift runs `onUpgrade(migrator, 2, 3)` —
-      // exactly the real upgrade path a v2 user's device would go through.
+      // `schemaVersion` of 4, so drift runs `onUpgrade(migrator, 2, 4)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
       final row = await upgraded.select(upgraded.settings).getSingle();
       expect(row.id, 'device');
       expect(row.actingMemberId, isNull);
+      expect(row.locale, isNull);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.digestEnabled, isTrue);

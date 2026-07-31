@@ -164,4 +164,53 @@ void main() {
       expect(emissions.last, 'member-1');
     },
   );
+
+  test('setLocale sets the value and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    expect(created.locale, isNull);
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setLocale('de');
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.locale, 'de');
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setLocale(null) clears a previously-set value', () async {
+    await repo.setLocale('en');
+    var row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.locale, 'en');
+
+    await repo.setLocale(null);
+    row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.locale, isNull);
+  });
+
+  test('setLocale implicitly creates the row if missing', () async {
+    await repo.setLocale('de');
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.locale, 'de');
+  });
+
+  test('watchSettings emits an updated value after setLocale', () async {
+    final emissions = <String?>[];
+    final sub = repo.watchSettings().listen(
+      (settings) => emissions.add(settings.locale),
+    );
+    addTearDown(sub.cancel);
+
+    await pumpEventQueue();
+    await repo.setLocale('de');
+    await pumpEventQueue();
+
+    expect(emissions.last, 'de');
+  });
 }

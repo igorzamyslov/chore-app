@@ -607,5 +607,57 @@
         "example": "Produce"
       }
     }
+  },
+
+  "settingsLanguageEntry": "Language",
+  "@settingsLanguageEntry": {
+    "description": "Settings screen list entry that opens the language picker sheet (spec docs/next-session-plan.md #5), shown below the Categories entry. Its subtitle shows the current choice (System default / English / Deutsch)."
+  },
+  "settingsLanguageSheetTitle": "Choose language",
+  "@settingsLanguageSheetTitle": {
+    "description": "Heading of the language picker bottom sheet opened from the settingsLanguageEntry row."
+  },
+  "settingsLanguageSystem": "System default",
+  "@settingsLanguageSystem": {
+    "description": "Language picker option (and settingsLanguageEntry subtitle) meaning 'follow the OS locale' -- a stored settings.locale of NULL."
+  },
+  "settingsLanguageEnglish": "English",
+  "@settingsLanguageEnglish": {
+    "description": "Language picker option for English. A proper name: shown as 'English' regardless of the app's current UI locale, so this value is identical in every arb file."
+  },
+  "settingsLanguageDeutsch": "Deutsch",
+  "@settingsLanguageDeutsch": {
+    "description": "Language picker option for German. A proper name: shown as 'Deutsch' regardless of the app's current UI locale, so this value is identical in every arb file."
+  },
+
+  "settingsAboutSectionTitle": "About",
+  "@settingsAboutSectionTitle": {
+    "description": "Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style."
+  },
+  "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
+  "@settingsAboutVersionLabel": {
+    "description": "Subtitle of the About section's non-tappable version row, under the app's name. version/buildNumber are an em dash ('—') while packageInfoProvider is still loading.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.0"
+      },
+      "buildNumber": {
+        "type": "String",
+        "example": "1"
+      }
+    }
+  },
+  "settingsAboutLicensesEntry": "Open source licenses",
+  "@settingsAboutLicensesEntry": {
+    "description": "About section row that opens Flutter's built-in showLicensePage."
+  },
+  "settingsAboutDonateTitle": "Support the app",
+  "@settingsAboutDonateTitle": {
+    "description": "Title of the About section's disabled donation/tip-jar placeholder row (no action wired yet)."
+  },
+  "settingsAboutDonateSubtitle": "Coming soon",
+  "@settingsAboutDonateSubtitle": {
+    "description": "Subtitle of the About section's disabled donation/tip-jar placeholder row."
   }
 }

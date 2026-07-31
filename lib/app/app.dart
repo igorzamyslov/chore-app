@@ -25,6 +25,7 @@ class ChoreApp extends ConsumerWidget {
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      locale: ref.watch(localeOverrideProvider),
       theme: appLightTheme,
       darkTheme: appDarkTheme,
       home: bootstrap.when(

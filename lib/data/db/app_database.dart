@@ -53,25 +53,34 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v3) column set, so a fresh v1 -> v3 jump already
-      // gets `actingMemberId` for free — the `else if` below only needs to
-      // backfill that column for an install that already has the v2-shaped
-      // `settings` table (a "create then immediately re-add the same
-      // column" pair would otherwise throw a duplicate-column error).
+      // *current* (here, v4) column set, so a fresh v1 -> v4 jump already
+      // gets `actingMemberId` and `locale` for free — the branches below
+      // only need to backfill whichever of those columns an install that
+      // already has an older-shaped `settings` table is still missing (a
+      // "create then immediately re-add the same column" pair would
+      // otherwise throw a duplicate-column error).
       if (from < 2) {
         await migrator.createTable(settings);
-      } else if (from < 3) {
-        // v2 -> v3 (spec `docs/specs/members-management.md`): adds the
-        // nullable `settings.actingMemberId` column, defaulting to `NULL`
-        // (the automatic acting-member fallback).
-        await migrator.addColumn(settings, settings.actingMemberId);
+      } else {
+        if (from < 3) {
+          // v2 -> v3 (spec `docs/specs/members-management.md`): adds the
+          // nullable `settings.actingMemberId` column, defaulting to
+          // `NULL` (the automatic acting-member fallback).
+          await migrator.addColumn(settings, settings.actingMemberId);
+        }
+        if (from < 4) {
+          // v3 -> v4 (spec `docs/next-session-plan.md` #5): adds the
+          // nullable `settings.locale` column, defaulting to `NULL`
+          // (follow the OS locale).
+          await migrator.addColumn(settings, settings.locale);
+        }
       }
     },
     beforeOpen: (details) async {
