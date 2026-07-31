@@ -26,6 +26,15 @@ Future<void> openManageCategories(WidgetTester tester) async {
   handle.dispose();
 }
 
+/// Opens the Settings tab, then the manage-members screen.
+Future<void> openManageMembers(WidgetTester tester) async {
+  await openSettingsTab(tester);
+  final handle = tester.ensureSemantics();
+  await tester.tap(find.bySemanticsIdentifier('settings.members'));
+  await tester.pumpAndSettle();
+  handle.dispose();
+}
+
 /// A one-shot (non-streaming) read of [kind]'s active categories in
 /// [householdId], in the same order `CategoryRepository.watchCategories`
 /// returns (`sort_order` then name).

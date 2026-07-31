@@ -1,0 +1,80 @@
+# Members management + acting-member switcher journey (spec
+# docs/specs/members-management.md): add a member from Settings, switch
+# who's acting from the chores app bar, and confirm a completed chore
+# attributes the new acting member. Built with
+# --dart-define=E2E_TODAY=2026-07-24 (see tool/e2e.sh), so a chore due
+# "today" is due on that fixed date.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+# Seed a chore due today, left unassigned ("anyone" mode, the form's
+# default) so its completion later falls back to whoever is currently
+# acting -- exactly the attribution path this journey exercises.
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Water plants"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.save"
+- assertVisible:
+    id: "chores.add"
+- assertVisible: "(?s).*Water plants.*"
+# Settings -> Members: the bootstrap 'Me' member is there; add 'Anna'.
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.members"
+# \b keeps this from vacuously matching the 'Members' app-bar title, while
+# (?s).* still tolerates Android's merged row label ('M\nMe').
+- assertVisible: '(?s).*\bMe\b.*'
+- tapOn:
+    id: "members.add"
+- tapOn:
+    id: "members.edit.name"
+- inputText: "Anna"
+- pressKey: Enter
+- tapOn:
+    id: "members.edit.save"
+# The FAB stays in the hierarchy under the modal sheet's scrim, so it can't
+# prove the sheet closed (README convention 4); the name field vanishing
+# can.
+- assertNotVisible:
+    id: "members.edit.name"
+- assertVisible: "(?s).*Anna.*"
+# Back out of the pushed members screen (it covers the bottom tab bar --
+# same note as test/features/settings/members_screen_test.dart) before
+# switching tabs. Tap the app bar's BackButton (semantics label 'Back' on
+# both platforms) -- Maestro's own `back` command is a left-edge swipe on
+# iOS and failed to pop this route on the simulator (README convention 7).
+- tapOn: "Back"
+- tapOn:
+    id: "shell.tab.chores"
+- assertVisible:
+    id: "chores.actingMember"
+# Switch the acting member to Anna. Her sheet row's semantic id embeds a
+# runtime member id (unknowable in a static flow), so per e2e/README.md's
+# id-first convention this is the one selection that falls back to her
+# visible name instead of an id.
+- tapOn:
+    id: "chores.actingMember"
+- assertVisible:
+    id: "actingMember.sheet"
+- assertVisible: "Who's doing chores right now?"
+- tapOn: "(?s).*Anna.*"
+# Complete the seeded chore -- only one pending occurrence exists, so the
+# id regex needs no `index:` disambiguation.
+- tapOn:
+    id: 'chores\.occurrence\..*\.complete'
+- assertVisible: "Done today (1)"
+- tapOn:
+    id: "chores.done.header"
+# choresDoneClosedByLabel = "by {name}" (lib/l10n/app_en.arb): asserts the
+# done row attributes Anna, not the bootstrap 'Me'. The done row's
+# descendants merge into one accessibility label on Android (README
+# convention 2), hence the (?s).* wrapping rather than a bare text match.
+- assertVisible: "(?s).*by Anna.*"

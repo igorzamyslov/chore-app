@@ -29,3 +29,8 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    row is still animating in right after save, and a tap during the
    animation misses — the first live CI run failed exactly this way in
    `skip_undo_journey` while locally everything was green.
+7. **Never use Maestro's bare `back` command.** On iOS it's a blind
+   left-edge swipe (same danger class as `hideKeyboard`, convention 3)
+   and it failed to pop a pushed route on the simulator. Pop screens by
+   tapping the app bar's BackButton instead — Flutter gives it the
+   semantics label `Back` (MaterialLocalizations) on both platforms.
