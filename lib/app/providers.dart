@@ -459,3 +459,117 @@ final digestRescheduleControllerProvider = Provider<DigestRescheduleController>(
     return controller;
   },
 );
+
+/// The next local-midnight moment strictly after [now], plus a 1-second
+/// buffer past the exact boundary so a caller never treats "the day
+/// changed" a fraction of a second before it actually has.
+///
+/// Built from calendar components — mirroring [nextDigestSlot]'s DST
+/// rationale — rather than `now.add(const Duration(days: 1))`: the local
+/// difference between two calendar days isn't always exactly 24 hours
+/// across a daylight-saving transition, and Dart's `DateTime` constructor
+/// already normalizes an out-of-range day into the correct following
+/// month/year. Exposed as a top-level function (rather than inlined in
+/// [CatchUpController]) so it's directly unit-testable, the same reason
+/// [nextDigestSlot] is.
+DateTime nextLocalMidnight(DateTime now) {
+  return DateTime(now.year, now.month, now.day + 1, 0, 0, 1);
+}
+
+/// Owns re-running [ChoreService.catchUpOverdue] on the two triggers spec
+/// `docs/specs/polish-round-1.md` C1 calls out that [bootstrapProvider]
+/// (which runs it once at startup) doesn't cover: the app resuming from
+/// the background, and the local calendar day changing while the app stays
+/// open.
+///
+/// Follows the same shape as [DigestRescheduleController], including why
+/// it's only ever activated from `main.dart`: it arms a real day-change
+/// [Timer] as a side effect of being read, and every widget test builds
+/// `ChoreApp` directly (never through `main()`), so activating this from
+/// inside the `lib/app`/`lib/features` widget tree would leave a "Timer
+/// still pending" failure in every widget test that never touches this
+/// controller at all.
+///
+/// A day-change timer is armed (via [nextLocalMidnight]) the moment
+/// [bootstrapProvider] resolves (so the household id is known); firing it
+/// re-runs catch-up and re-arms itself for the following midnight.
+/// [triggerOnResume] is called directly by `main.dart`'s app-resume
+/// observer — an OS lifecycle transition isn't itself a Riverpod-watchable
+/// value, mirroring [DigestRescheduleController.triggerRecompute]'s own
+/// external call site — and also re-arms the day-change timer from the
+/// current time, since a backgrounded app's timers don't reliably fire on
+/// schedule and could otherwise go stale.
+///
+/// Catch-up only triggers a digest recompute
+/// ([DigestRescheduleController.triggerRecompute]) when
+/// [ChoreService.catchUpOverdue] reports it actually changed something —
+/// the common case (nothing overdue) has nothing new for the digest to
+/// reflect.
+class CatchUpController {
+  /// Starts listening immediately; arms the first day-change timer once
+  /// [bootstrapProvider] resolves. The `ref` is retained for the lifetime
+  /// of this controller (i.e. of the [ProviderContainer] that created it
+  /// via [catchUpControllerProvider]).
+  CatchUpController(this._ref) {
+    _ref.listen(bootstrapProvider, (previous, next) {
+      final householdId = next.valueOrNull;
+      if (householdId != null) {
+        _householdId = householdId;
+        _armDayChangeTimer();
+      }
+    });
+  }
+
+  final Ref _ref;
+
+  /// The bootstrap household id, set once [bootstrapProvider] resolves.
+  String? _householdId;
+  Timer? _dayChangeTimer;
+
+  /// Cancels the day-change timer. Called via `ref.onDispose` when the
+  /// owning [ProviderContainer] is torn down.
+  void dispose() => _dayChangeTimer?.cancel();
+
+  /// Re-runs catch-up and re-arms the day-change timer from the current
+  /// time. Called externally on app resume.
+  void triggerOnResume() {
+    unawaited(_runCatchUp());
+    _armDayChangeTimer();
+  }
+
+  /// (Re)arms [_dayChangeTimer] to fire just past the next local midnight,
+  /// per [nextLocalMidnight], then re-fire and re-arm again from there —
+  /// this is what keeps catch-up running every day the app stays open.
+  void _armDayChangeTimer() {
+    _dayChangeTimer?.cancel();
+    final now = _ref.read(clockProvider).now();
+    _dayChangeTimer = Timer(nextLocalMidnight(now).difference(now), () {
+      unawaited(_runCatchUp());
+      _armDayChangeTimer();
+    });
+  }
+
+  Future<void> _runCatchUp() async {
+    final householdId = _householdId;
+    if (householdId == null) {
+      return;
+    }
+    final changed = await _ref
+        .read(choreServiceProvider)
+        .catchUpOverdue(householdId);
+    if (changed) {
+      _ref.read(digestRescheduleControllerProvider).triggerRecompute();
+    }
+  }
+}
+
+/// Activates [CatchUpController] the moment it's first read.
+///
+/// Read exactly once, from `main.dart`, before `runApp` — see the
+/// controller's own doc comment for why it must never be read from inside
+/// the widget tree.
+final catchUpControllerProvider = Provider<CatchUpController>((ref) {
+  final controller = CatchUpController(ref);
+  ref.onDispose(controller.dispose);
+  return controller;
+});

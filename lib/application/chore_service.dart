@@ -6,6 +6,8 @@
 /// authoritative semantics.
 library;
 
+import 'dart:convert';
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
@@ -115,7 +117,9 @@ class ChoreService {
     return _closeAndAdvance(occurrenceId, status: OccurrenceStatus.skipped);
   }
 
-  /// Runs on app start and on day change. For every active, unpaused,
+  /// Runs on app start, on app resume, and on local day change (spec
+  /// `docs/specs/polish-round-1.md` C1: see `CatchUpController` in
+  /// `lib/app/providers.dart`). For every active, unpaused,
   /// schedule-anchored recurring chore in [householdId] with a pending
   /// occurrence where at least one later series slot is <= today: closes the
   /// pending occurrence as `missed` and inserts a new pending occurrence at
@@ -124,10 +128,17 @@ class ChoreService {
   /// Completion-anchored and one-off chores are never touched; they simply
   /// stay overdue. Idempotent: calling this again the same day changes
   /// nothing.
-  Future<void> catchUpOverdue(String householdId) async {
+  ///
+  /// Returns whether it changed anything (closed at least one chore's
+  /// occurrence as missed and reinserted it) — `CatchUpController` uses this
+  /// to decide whether a digest recompute is warranted afterward, since the
+  /// common case (nothing overdue) has nothing new for the digest to
+  /// reflect.
+  Future<bool> catchUpOverdue(String householdId) async {
     final today = _today;
+    var changed = false;
     await database.transaction(() async {
-      final activeChores = await chores.watchActiveChores(householdId).first;
+      final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
         final chore = details.chore;
         final recurrence = chore.recurrence;
@@ -159,8 +170,10 @@ class ChoreService {
           dueDate: latestSlot,
           assignedMemberId: pending.assignedMemberId,
         );
+        changed = true;
       }
     });
+    return changed;
   }
 
   /// Pauses [choreId] and deletes its pending occurrence. History is
@@ -217,7 +230,7 @@ class ChoreService {
       await chores.setPaused(choreId, paused: false);
 
       final latestClosed = await chores.latestClosedOccurrence(choreId);
-      final dueDate = _unpauseDueDate(
+      final dueDate = _regeneratedDueDate(
         chore: chore,
         today: today,
         latestClosed: latestClosed,
@@ -225,9 +238,94 @@ class ChoreService {
       if (dueDate == null) {
         return;
       }
-      final assignedMemberId = _unpauseAssignee(
+      final assignedMemberId = _regeneratedAssignee(
         mode: chore.assignmentMode,
         orderedMemberIds: details.assigneeMemberIds,
+        latestClosed: latestClosed,
+      );
+      await chores.insertOccurrence(
+        choreId: choreId,
+        dueDate: dueDate,
+        assignedMemberId: assignedMemberId,
+      );
+    });
+  }
+
+  /// Updates [choreId] via [ChoreRepository.updateChore] (same parameters,
+  /// same "omit to leave unchanged" convention), then, if the edit changed
+  /// `recurrence` and/or `startDate` — compared by serialized value, since
+  /// [Recurrence] has no `==`; a bare `null` only ever equals `null` — in
+  /// the same transaction:
+  ///
+  /// - deletes the chore's current pending occurrence (if any);
+  /// - if the chore is paused, stops there: a paused chore has no pending
+  ///   occurrence by design (see [pauseChore]), and [unpauseChore] will
+  ///   compute the right one later, reading this now-updated row;
+  /// - otherwise inserts a fresh one using THE SAME two-floors due-date
+  ///   rule as [unpauseChore] (see [_regeneratedDueDate]: never before
+  ///   today; never at or before the latest closed slot; closed one-off ->
+  ///   nothing; completion anchor -> `max(today, nextAfterCompletion)`),
+  ///   with the assignee re-resolved the same way (see
+  ///   [_regeneratedAssignee]).
+  ///
+  /// An edit that changes NEITHER `recurrence` nor `startDate` leaves the
+  /// pending occurrence — and its assignee — completely untouched, no
+  /// matter what else changed (title, notes, category, assignment
+  /// mode/assignees).
+  ///
+  /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
+  Future<void> updateChore(
+    String choreId, {
+    String? title,
+    Value<String?> notes = const Value.absent(),
+    Value<String?> categoryId = const Value.absent(),
+    Value<Recurrence?> recurrence = const Value.absent(),
+    PlainDate? startDate,
+    AssignmentMode? assignmentMode,
+    List<String>? assigneeMemberIds,
+  }) async {
+    final today = _today;
+    await database.transaction(() async {
+      final before = await _requireActiveChore(choreId);
+      final recurrenceChanged =
+          recurrence.present &&
+          !_sameRecurrence(recurrence.value, before.chore.recurrence);
+      final startDateChanged =
+          startDate != null && startDate != before.chore.startDate;
+
+      await chores.updateChore(
+        choreId,
+        title: title,
+        notes: notes,
+        categoryId: categoryId,
+        recurrence: recurrence,
+        startDate: startDate,
+        assignmentMode: assignmentMode,
+        assigneeMemberIds: assigneeMemberIds,
+      );
+
+      if (!recurrenceChanged && !startDateChanged) {
+        return;
+      }
+
+      await chores.deletePendingOccurrences(choreId);
+      final after = await _requireChore(choreId);
+      if (after.chore.pausedAt != null) {
+        return;
+      }
+
+      final latestClosed = await chores.latestClosedOccurrence(choreId);
+      final dueDate = _regeneratedDueDate(
+        chore: after.chore,
+        today: today,
+        latestClosed: latestClosed,
+      );
+      if (dueDate == null) {
+        return;
+      }
+      final assignedMemberId = _regeneratedAssignee(
+        mode: after.chore.assignmentMode,
+        orderedMemberIds: after.assigneeMemberIds,
         latestClosed: latestClosed,
       );
       await chores.insertOccurrence(
@@ -378,10 +476,13 @@ class ChoreService {
     }
   }
 
-  /// The due date of the fresh occurrence [unpauseChore] should insert, or
-  /// `null` if it should insert none at all (a closed one-off must never
-  /// resurrect).
-  PlainDate? _unpauseDueDate({
+  /// The due date of a freshly (re)generated pending occurrence, or `null`
+  /// if none should be inserted at all (a closed one-off must never
+  /// resurrect). Shared by [unpauseChore] and [updateChore] — both need
+  /// "the next due date, given the most recently closed occurrence" under
+  /// the exact same two-floors rule (see `docs/specs/occurrence-lifecycle.md`
+  /// §2): never before [today], never at or before [latestClosed]'s slot.
+  PlainDate? _regeneratedDueDate({
     required Chore chore,
     required PlainDate today,
     required ChoreOccurrence? latestClosed,
@@ -415,8 +516,9 @@ class ChoreService {
     return nextScheduledOnOrAfter(recurrence, chore.startDate, fromDate);
   }
 
-  /// The assignee of the fresh occurrence inserted by [unpauseChore].
-  String? _unpauseAssignee({
+  /// The assignee of a freshly (re)generated pending occurrence. Shared by
+  /// [unpauseChore] and [updateChore]; see [_regeneratedDueDate].
+  String? _regeneratedAssignee({
     required AssignmentMode mode,
     required List<String> orderedMemberIds,
     required ChoreOccurrence? latestClosed,
@@ -432,6 +534,18 @@ class ChoreService {
           lastAssignedMemberId: latestClosed?.assignedMemberId,
         );
     }
+  }
+
+  /// Whether [a] and [b] are the same recurrence rule, compared by
+  /// serialized value (mirroring how a [Recurrence] is actually persisted —
+  /// see `RecurrenceConverter.toSql` in `lib/data/db/converters.dart`)
+  /// rather than identity, since [Recurrence] has no `==` override. A bare
+  /// `null` only ever equals `null`.
+  bool _sameRecurrence(Recurrence? a, Recurrence? b) {
+    if (a == null || b == null) {
+      return a == b;
+    }
+    return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
   }
 
   /// Fetches [choreId]'s details, throwing [StateError] if it doesn't exist.

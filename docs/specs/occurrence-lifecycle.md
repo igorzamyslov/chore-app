@@ -79,9 +79,11 @@ Both "close" the pending occurrence with `closedOn = today`:
 - One-off chores get no next occurrence.
 
 ### catchUpOverdue(String householdId)
-Runs on app start and on day change. For every active, unpaused,
-**schedule-anchored recurring** chore with a pending occurrence where at
-least one later series slot is ≤ today:
+Runs on app start, on app resume, and on local day change (the resume/
+day-change triggers are owned by `CatchUpController` in
+`lib/app/providers.dart` — see `docs/specs/polish-round-1.md` C1). For
+every active, unpaused, **schedule-anchored recurring** chore with a
+pending occurrence where at least one later series slot is ≤ today:
 
 - close the pending occurrence as `missed` (`closedOn = today`),
 - insert a new pending occurrence at the **latest** series slot ≤ today,
@@ -92,6 +94,10 @@ This maintains the product invariant: at most ONE visible overdue
 occurrence per chore, at its most recent missed slot. Completion-anchored
 and one-off chores are never auto-missed — they just stay overdue.
 Idempotent: a second call the same day changes nothing.
+
+Returns whether it changed anything (closed at least one chore's
+occurrence as missed and reinserted it) — `CatchUpController` uses this to
+decide whether a digest recompute is warranted afterward.
 
 ### pauseChore(String choreId)
 `setPaused(true)` + delete pending occurrences. History untouched.
@@ -128,6 +134,36 @@ resurrect either, same "skip sticks" principle as `completeOccurrence`/
 
 Both throw `StateError` if the chore doesn't exist or is soft-deleted;
 `pauseChore` on a paused chore (and unpause on unpaused) is a no-op.
+
+### updateChore(String id, {...})
+Same parameters as `ChoreRepository.updateChore` (title/notes/categoryId/
+recurrence/startDate/assignmentMode/assigneeMemberIds — same "omit to leave
+unchanged" convention; `notes`/`categoryId`/`recurrence` need drift's
+`Value` wrapper to distinguish "unchanged" from "set to null").
+
+Updates the chore via the repository, then, if the edit changed
+`recurrence` and/or `startDate` — compared by serialized value (two
+`Recurrence`s are equal iff their JSON encodings match; a bare `null` only
+ever equals `null`) — regenerates the chore's pending occurrence, in the
+same transaction:
+
+- delete the chore's current pending occurrence (if any);
+- if the chore is paused, stop there — a paused chore has no pending
+  occurrence by design (see `pauseChore`), and `unpauseChore` computes the
+  right one later, from this now-updated row;
+- otherwise insert a fresh one using THE SAME two-floors due-date rule as
+  `unpauseChore` (never before today; never at or before the latest closed
+  slot; closed one-off → nothing; completion anchor →
+  `max(today, nextAfterCompletion)`), with the assignee re-resolved the
+  same way (`fixed` → the assignee; `anyone` → null; `rotation` →
+  continues from `latestClosedOccurrence` via `nextRotationAssignee`).
+
+An edit that changes NEITHER `recurrence` nor `startDate` leaves the
+pending occurrence — and its assignee — completely untouched, no matter
+what else changed (title, notes, category, assignment mode/assignees).
+
+Throws `StateError` if the chore doesn't exist or is soft-deleted (same
+guard as `pauseChore`/`unpauseChore`).
 
 ### reopenOccurrence(String occurrenceId)
 The undo path for `completeOccurrence`/`skipOccurrence` (spec
@@ -184,6 +220,15 @@ ids. Cover at minimum:
    pause/unpause round trip (unpaused, zero pending, history untouched).
 7. Every multi-write method leaves consistent state if re-read mid-test
    (assert via repository watches/gets, not raw SQL).
+8. updateChore: changed recurrence and changed startDate both regenerate
+   (new due date per the two-floors rule, old pending row gone via delete —
+   not closed as `missed`); a weekday-pinned schedule recalculates against
+   the new pin; a completion-anchored edit recomputes from
+   `latestClosedOccurrence`; an edit touching neither field leaves the
+   pending occurrence and its assignee byte-for-byte untouched; a
+   completed one-off stays closed with no resurrection even when its
+   startDate changes; a paused chore's edit updates the row but inserts no
+   occurrence (unpausing afterward reads the updated rule correctly).
 
 Done criteria: `dart format` clean; `flutter analyze --fatal-infos
 --fatal-warnings` clean; `flutter test` fully green.

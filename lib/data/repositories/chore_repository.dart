@@ -272,22 +272,29 @@ class ChoreRepository {
     // join. This only stays correct because `createChore`/`updateChore`
     // always bump the chore row's `updated_at` whenever assignees change,
     // which is what actually drives this stream's re-emission.
-    return query.watch().asyncMap((rows) async {
-      final result = <ChoreWithDetails>[];
-      for (final row in rows) {
-        final chore = row.readTable(db.chores);
-        final category = row.readTableOrNull(db.categories);
-        final assigneeIds = await _currentAssigneeIds(chore.id);
-        result.add(
-          ChoreWithDetails(
-            chore: chore,
-            assigneeMemberIds: assigneeIds,
-            category: category,
-          ),
-        );
-      }
-      return result;
-    });
+    return query.watch().asyncMap(_choreDetailsFromRows);
+  }
+
+  /// Fetches every active chore in [householdId], each joined with its
+  /// ordered assignee ids and category — the one-shot `Future` equivalent
+  /// of [watchActiveChores]'s query (same `WHERE`/`ORDER BY`), with no
+  /// stream. Used by `ChoreService.catchUpOverdue`, which only ever needs a
+  /// single point-in-time read inside its transaction; reading it via
+  /// `watchActiveChores(...).first` there was needlessly indirect.
+  Future<List<ChoreWithDetails>> getActiveChores(String householdId) async {
+    final query =
+        db.select(db.chores).join([
+            leftOuterJoin(
+              db.categories,
+              db.categories.id.equalsExp(db.chores.categoryId),
+            ),
+          ])
+          ..where(
+            db.chores.householdId.equals(householdId) &
+                db.chores.deletedAt.isNull(),
+          )
+          ..orderBy([OrderingTerm(expression: db.chores.title)]);
+    return _choreDetailsFromRows(await query.get());
   }
 
   /// Fetches a single chore joined with its ordered assignee ids and
@@ -517,6 +524,29 @@ class ChoreRepository {
           ),
       ];
     });
+  }
+
+  /// Maps joined chore/category rows (from [watchActiveChores] or
+  /// [getActiveChores]) to [ChoreWithDetails], resolving each chore's
+  /// ordered assignee ids along the way. Shared so the two query methods
+  /// can't drift apart on how a row becomes a [ChoreWithDetails].
+  Future<List<ChoreWithDetails>> _choreDetailsFromRows(
+    List<TypedResult> rows,
+  ) async {
+    final result = <ChoreWithDetails>[];
+    for (final row in rows) {
+      final chore = row.readTable(db.chores);
+      final category = row.readTableOrNull(db.categories);
+      final assigneeIds = await _currentAssigneeIds(chore.id);
+      result.add(
+        ChoreWithDetails(
+          chore: chore,
+          assigneeMemberIds: assigneeIds,
+          category: category,
+        ),
+      );
+    }
+    return result;
   }
 
   Future<void> _insertAssignees(
