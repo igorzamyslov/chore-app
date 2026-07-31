@@ -1,0 +1,56 @@
+# Builds and publishes a signed release APK to GitHub Releases when a
+# version tag (v*) is pushed. Open-source distribution path (user decision
+# 2026-07-31): GitHub Releases now (installable directly or via Obtainium),
+# F-Droid submission later using the same tags + fastlane metadata.
+#
+# ONE-TIME USER SETUP (cannot be done by CI):
+#   1. Generate a keystore locally (keep it + the passwords somewhere safe;
+#      losing it means future updates can't install over old ones):
+#        keytool -genkey -v -keystore famdo-release.keystore \
+#          -alias famdo -keyalg RSA -keysize 2048 -validity 10000
+#   2. Add four repository secrets (Settings -> Secrets -> Actions):
+#        ANDROID_KEYSTORE_BASE64  (base64 < famdo-release.keystore)
+#        ANDROID_KEYSTORE_PASSWORD
+#        ANDROID_KEY_ALIAS        (famdo)
+#        ANDROID_KEY_PASSWORD
+#   3. Tag a release: git tag v0.1.0 && git push origin v0.1.0
+# Until the secrets exist this workflow fails at the signing step — that is
+# fail-closed on purpose (never ship a debug-signed "release").
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d \
+            > android/famdo-release.keystore
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/famdo-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release
+      - name: Rename artifact
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            famdo-${{ github.ref_name }}.apk
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: famdo-${{ github.ref_name }}.apk
+          generate_release_notes: true

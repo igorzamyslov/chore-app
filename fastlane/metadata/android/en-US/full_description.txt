@@ -1,0 +1,12 @@
+Famdo keeps a household's chores and shopping in one friendly place.
+
+* Recurring chores: every N days/weeks/months, weekday pinning, or "N days after last done"
+* Fair rotation between family members, or fixed assignment, or free-for-all
+* Skip, pause (vacations), undo — the schedule stays honest
+* Who actually did it: completions are credited to the person acting
+* Shopping list with categories, type-ahead suggestions and duplicate prevention
+* One gentle daily summary notification — only when something is actually due
+* English and German, light and dark, fully offline (your data stays on your device)
+* Export your data as JSON any time
+
+Free and open source (MIT). No ads, no tracking, no account required.

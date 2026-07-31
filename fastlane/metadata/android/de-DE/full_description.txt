@@ -1,0 +1,12 @@
+Famdo bringt die Aufgaben und den Einkauf deines Haushalts an einen Ort.
+
+* Wiederkehrende Aufgaben: alle N Tage/Wochen/Monate, feste Wochentage oder "N Tage nach dem letzten Mal"
+* Faire Rotation zwischen Familienmitgliedern, feste Zuteilung oder frei für alle
+* Überspringen, pausieren (Urlaub!), rückgängig machen — der Plan bleibt ehrlich
+* Wer war's wirklich: Erledigungen werden der Person gutgeschrieben, die gerade dran ist
+* Einkaufsliste mit Kategorien, Vorschlägen beim Tippen und Duplikat-Schutz
+* Eine freundliche tägliche Zusammenfassung — nur wenn wirklich etwas fällig ist
+* Deutsch und Englisch, hell und dunkel, komplett offline (deine Daten bleiben auf deinem Gerät)
+* Jederzeit Datenexport als JSON
+
+Frei und Open Source (MIT). Keine Werbung, kein Tracking, kein Konto nötig.
