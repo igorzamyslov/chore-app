@@ -24,11 +24,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Creates a new chore, or edits an existing one when [choreId] is given.
 ///
-/// Known v1 simplification: editing a chore's recurrence or start date does
-/// NOT regenerate its already-pending occurrence — the next occurrence only
-/// reflects the new rule once the current one is completed, skipped, or
-/// caught up as missed. Documented in
-/// `docs/specs/ui-foundation-chores.md`.
+/// Saving an edit routes through `ChoreService.updateChore` rather than
+/// `ChoreRepository.updateChore` directly: per
+/// `docs/specs/occurrence-lifecycle.md` §2, changing recurrence and/or
+/// start date regenerates the chore's pending occurrence (same rule as
+/// `unpauseChore`), so that rule needs to live at the service layer.
 class ChoreFormScreen extends ConsumerStatefulWidget {
   /// Creates the form. Omit [choreId] to create a new chore; pass an
   /// existing chore's id to edit it.
@@ -309,7 +309,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
 
     if (_isEditing) {
       await ref
-          .read(choreRepositoryProvider)
+          .read(choreServiceProvider)
           .updateChore(
             widget.choreId!,
             title: title,
