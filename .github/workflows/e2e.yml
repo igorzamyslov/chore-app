@@ -38,8 +38,9 @@ jobs:
           disable-animations: true
           script: |
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
-            $HOME/.maestro/bin/maestro test \
-              --env APP_ID=com.example.chore_app e2e/flows
+            # One line: emulator-runner executes each script line as its own
+            # sh -c, so a backslash continuation becomes a literal `\` arg.
+            $HOME/.maestro/bin/maestro test --env APP_ID=com.example.chore_app e2e/flows
 
   ios:
     if: github.ref == 'refs/heads/main'
