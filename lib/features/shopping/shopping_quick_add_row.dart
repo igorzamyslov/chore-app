@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_suggestions_list.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -195,8 +196,6 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   }
 
   void _showSnackbar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showAppSnackbar(context, message: message);
   }
 }

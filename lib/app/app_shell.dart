@@ -68,13 +68,24 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selected.index,
-        children: const [
-          ChoresListScreen(),
-          ShoppingListScreen(),
-          SettingsScreen(),
-        ],
+      // A nested ScaffoldMessenger so tab screens' `ScaffoldMessenger.of
+      // (context)` lookups resolve to it instead of the root one:
+      // ScaffoldMessenger only ever presents in the topmost Scaffold among
+      // its registered descendants, so without this the root messenger
+      // would present tab-screen snackbars in THIS Scaffold (the one below,
+      // owning `bottomNavigationBar`) — flush against `_BottomTabBar` with
+      // no room to breathe. Nesting it here makes each tab's own inner
+      // Scaffold the topmost one instead, so its snackbars present above
+      // the tab bar with margin (see `lib/app/snackbars.dart`).
+      body: ScaffoldMessenger(
+        child: IndexedStack(
+          index: _selected.index,
+          children: const [
+            ChoresListScreen(),
+            ShoppingListScreen(),
+            SettingsScreen(),
+          ],
+        ),
       ),
       bottomNavigationBar: _BottomTabBar(
         selected: _selected,

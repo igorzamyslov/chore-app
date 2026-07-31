@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/chore_action_sheet.dart';
@@ -174,18 +175,16 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           : l10n.choresSnackbarDoneNextDue(dueText);
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: l10n.choresSnackbarUndo,
-          onPressed: () {
-            unawaited(
-              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
-            );
-          },
-        ),
+    showAppSnackbar(
+      context,
+      message: message,
+      action: SnackBarAction(
+        label: l10n.choresSnackbarUndo,
+        onPressed: () {
+          unawaited(
+            ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
+          );
+        },
       ),
     );
   }
