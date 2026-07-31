@@ -1,0 +1,66 @@
+# Duplicate chore names are allowed by design (plan #4, user decision
+# 2026-07-24: no prohibition, no warning) -- two chores sharing a title must
+# stay independently row-targeted. Completing one must never affect the
+# other, and both a Done-today entry and a still-pending tile with the same
+# title must coexist afterwards.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+# First "Water plants" chore, due today (E2E_TODAY, see tool/e2e.sh).
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Water plants"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.save"
+- assertVisible:
+    id: "chores.add"
+- assertVisible: "(?s).*Water plants.*"
+# Second "Water plants" chore: same title, also due today. Duplicates are
+# legitimate by design -- the form must not reject or warn about this.
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Water plants"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.save"
+- assertVisible:
+    id: "chores.add"
+# Proves a SECOND matching row now exists (Maestro's `index` is 0-based)
+# before either is targeted individually.
+- assertVisible:
+    id: 'chores\.occurrence\..*\.complete'
+    index: 1
+# Complete only the first of the two matching rows. The two occurrences tie
+# on BOTH due date and title, so `watchPendingOccurrences`'s
+# `ORDER BY dueDate, title` can't break the tie either -- there is no
+# selector that names "the bedroom one" vs "the balcony one" the way the
+# widget/service suites can (they know the chore ids). This relies on
+# SQLite's practical (not contractually guaranteed) tendency to return
+# same-rank rows of a small, unindexed two-row scan in insertion order.
+# Per e2e/README.md's allowance for `index:` on unavoidable duplicate
+# labels: the row-targeting invariant under test doesn't depend on WHICH of
+# the two closes, only that exactly one does and the other is left alone.
+- tapOn:
+    id: 'chores\.occurrence\..*\.complete'
+    index: 0
+# Settle proof (README convention 6) BEFORE tapping the header: the
+# Done-today section animates in after a complete, and its final header
+# text doubles as the "exactly one closed" assertion.
+- assertVisible: "Done today (1)"
+- tapOn:
+    id: "chores.done.header"
+# Exactly one still-pending tile (the untouched sibling) AND the Done-today
+# row both title "Water plants" -- the exact invariant plan #4 requires.
+- assertVisible:
+    id: 'chores\.occurrence\..*\.complete'
+- assertVisible:
+    text: "(?s).*Water plants.*"
+    index: 1
