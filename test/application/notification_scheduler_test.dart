@@ -55,7 +55,7 @@ void main() {
 
     test('title is the app name', () async {
       await scheduler.scheduleDigest(plan);
-      expect(plugin.scheduledCalls.single.title, 'Chores');
+      expect(plugin.scheduledCalls.single.title, 'Famdo');
     });
 
     test("passes the plan's fireAt through unchanged", () async {
@@ -99,7 +99,7 @@ void main() {
       await germanScheduler.scheduleDigest(
         DigestPlan(fireAt: plan.fireAt, dueTodayCount: 2, overdueCount: 1),
       );
-      expect(plugin.scheduledCalls.single.title, 'Aufgaben');
+      expect(plugin.scheduledCalls.single.title, 'Famdo');
       expect(
         plugin.scheduledCalls.single.body,
         '2 Aufgaben heute · 1 überfällig',

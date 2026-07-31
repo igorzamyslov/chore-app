@@ -204,4 +204,7 @@ polarizing in families).
    mandatory on iOS if any third-party social login is offered — magic-link-only
    avoids that).
 3. Chore due *times* (vs day-granular only) in v1?
-4. App name (bundle ID uses a placeholder until decided). 🙂
+4. ~~App name (bundle ID uses a placeholder until decided).~~ Resolved
+   2026-07-31: **Famdo**, bundle/application id `io.github.igorzamyslov.famdo`
+   on both platforms (F-Droid convention for ids the developer verifiably
+   controls, ahead of open-source distribution).

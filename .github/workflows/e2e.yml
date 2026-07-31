@@ -43,12 +43,12 @@ jobs:
             # past Maestro's element timeout (run 30630911966 failed its
             # first flow's first tap this way). One throwaway launch warms
             # the VM/caches; the flow's own clearState relaunch is then fast.
-            adb shell monkey -p com.example.chore_app -c android.intent.category.LAUNCHER 1
+            adb shell monkey -p io.github.igorzamyslov.famdo -c android.intent.category.LAUNCHER 1
             sleep 20
-            adb shell am force-stop com.example.chore_app
+            adb shell am force-stop io.github.igorzamyslov.famdo
             # One line: emulator-runner executes each script line as its own
             # sh -c, so a backslash continuation becomes a literal `\` arg.
-            $HOME/.maestro/bin/maestro test --env APP_ID=com.example.chore_app e2e/flows
+            $HOME/.maestro/bin/maestro test --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
 
   ios:
     if: github.ref == 'refs/heads/main'
@@ -70,12 +70,12 @@ jobs:
           xcrun simctl bootstatus "$DEVICE_ID" -b
           xcrun simctl install booted build/ios/iphonesimulator/Runner.app
           # Warm-up launch — same cold-start rationale as the Android job.
-          xcrun simctl launch booted com.example.choreApp
+          xcrun simctl launch booted io.github.igorzamyslov.famdo
           sleep 20
-          xcrun simctl terminate booted com.example.choreApp || true
+          xcrun simctl terminate booted io.github.igorzamyslov.famdo || true
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
       - name: Run flows on simulator
         run: |
           $HOME/.maestro/bin/maestro test \
-            --env APP_ID=com.example.choreApp e2e/flows
+            --env APP_ID=io.github.igorzamyslov.famdo e2e/flows

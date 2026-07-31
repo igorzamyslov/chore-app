@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// The application title shown in the task switcher.
   ///
   /// In en, this message translates to:
-  /// **'Chores'**
+  /// **'Famdo'**
   String get appTitle;
 
   /// Shown full-screen when the app fails to bootstrap (e.g. the local database couldn't be opened).

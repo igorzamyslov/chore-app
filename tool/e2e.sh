@@ -27,7 +27,7 @@ cd "$ROOT"
 
 case "$PLATFORM" in
   ios)
-    APP_ID="com.example.choreApp"
+    APP_ID="io.github.igorzamyslov.famdo"
     flutter build ios --simulator --debug --dart-define=E2E_TODAY="$E2E_TODAY"
     if ! xcrun simctl list devices booted | grep -q "(Booted)"; then
       DEVICE_ID="$(xcrun simctl list devices available \
@@ -40,7 +40,7 @@ case "$PLATFORM" in
     xcrun simctl install booted build/ios/iphonesimulator/Runner.app
     ;;
   android)
-    APP_ID="com.example.chore_app"
+    APP_ID="io.github.igorzamyslov.famdo"
     ANDROID_SDK="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
     flutter build apk --debug --dart-define=E2E_TODAY="$E2E_TODAY"
     if ! "$ANDROID_SDK/platform-tools/adb" devices | grep -q "emulator-.*device$"; then
