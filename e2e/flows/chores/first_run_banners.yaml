@@ -11,6 +11,20 @@ tags:
 ---
 - launchApp:
     clearState: true
+    # `notifications: unset` (root-caused 2026-07-31): Maestro's Android
+    # driver silently auto-grants every manifest-declared runtime
+    # permission on `launchApp` — including POST_NOTIFICATIONS — even
+    # with `clearState: true`, unlike iOS (where the OS prompt still
+    # appears and Maestro just auto-taps Allow). A real fresh install has
+    # NOT been asked yet, so without this override
+    # `notificationPermissionGrantedProvider` correctly resolves `true`
+    # on Android (verified via `adb shell dumpsys package`: POST_NOTIFICATIONS
+    # read `granted=true` immediately after a plain `clearState` launch)
+    # and this assertion below fails — not a product bug, a
+    # test-environment mismatch. `unset` leaves the permission genuinely
+    # un-granted, matching a real fresh install on both platforms.
+    permissions:
+      notifications: unset
 - assertVisible:
     id: "onboarding.name"
 - tapOn:
