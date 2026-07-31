@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Android adaptive-icon foreground: the famdo_icon.svg glyph on a
+       TRANSPARENT background, scaled to 78% about the center so the whole
+       glyph (incl. cap radii) stays inside the adaptive safe zone (the
+       central ~66% survives every mask; corners get cropped). The teal
+       background comes from adaptive_icon_background in the launcher-icons
+       config, so only the white house + carved check live here. -->
+  <g transform="translate(112.64 112.64) scale(0.78)">
+    <path d="M512 205 L820 458 L820 820 L204 820 L204 458 Z"
+          fill="#FFFFFF" stroke="#FFFFFF" stroke-width="52"
+          stroke-linejoin="round"/>
+    <path d="M375 632 L478 735 L662 545"
+          fill="none" stroke="#26A69A" stroke-width="96"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

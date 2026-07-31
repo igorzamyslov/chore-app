@@ -1,0 +1,13 @@
+# Launcher-icon generation (dart run flutter_launcher_icons).
+# Source of truth: assets/icon/famdo_icon.svg (+ the _foreground variant for
+# Android's adaptive safe zone); the PNGs here are rendered from them via
+# rsvg-convert at 1024px. Re-render + re-run this tool when the SVG changes.
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#26A69A"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  ios: true
+  # iOS rejects icons with an alpha channel; icon.png is already flattened,
+  # this is belt-and-braces.
+  remove_alpha_ios: true

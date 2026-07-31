@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Famdo launcher icon: solid teal field, chunky white house silhouette,
+       bold checkmark carved out of the house body in the background teal.
+       No thin outlines anywhere: the check is a thick negative-space stroke,
+       so it stays crisp at 48px. -->
+  <rect width="1024" height="1024" fill="#26A69A"/>
+  <!-- House: pentagon silhouette. The white stroke with round joins gives
+       the silhouette soft rounded corners without extra path math. -->
+  <path d="M512 205 L820 458 L820 820 L204 820 L204 458 Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="52"
+        stroke-linejoin="round"/>
+  <!-- Checkmark: teal (background color) carved into the house body,
+       thick round-capped stroke, fully inside the body incl. cap radii. -->
+  <path d="M375 632 L478 735 L662 545"
+        fill="none" stroke="#26A69A" stroke-width="96"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
