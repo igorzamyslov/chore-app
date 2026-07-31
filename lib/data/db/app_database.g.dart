@@ -3885,6 +3885,28 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _onboardingNamePromptShownAtMeta =
+      const VerificationMeta('onboardingNamePromptShownAt');
+  @override
+  late final GeneratedColumn<String> onboardingNamePromptShownAt =
+      GeneratedColumn<String>(
+        'onboarding_name_prompt_shown_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _digestPrepromptShownAtMeta =
+      const VerificationMeta('digestPrepromptShownAt');
+  @override
+  late final GeneratedColumn<String> digestPrepromptShownAt =
+      GeneratedColumn<String>(
+        'digest_preprompt_shown_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3914,6 +3936,8 @@ class $SettingsTable extends Settings
     digestMinutes,
     actingMemberId,
     locale,
+    onboardingNamePromptShownAt,
+    digestPrepromptShownAt,
     createdAt,
     updatedAt,
   ];
@@ -3967,6 +3991,24 @@ class $SettingsTable extends Settings
         locale.isAcceptableOrUnknown(data['locale']!, _localeMeta),
       );
     }
+    if (data.containsKey('onboarding_name_prompt_shown_at')) {
+      context.handle(
+        _onboardingNamePromptShownAtMeta,
+        onboardingNamePromptShownAt.isAcceptableOrUnknown(
+          data['onboarding_name_prompt_shown_at']!,
+          _onboardingNamePromptShownAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('digest_preprompt_shown_at')) {
+      context.handle(
+        _digestPrepromptShownAtMeta,
+        digestPrepromptShownAt.isAcceptableOrUnknown(
+          data['digest_preprompt_shown_at']!,
+          _digestPrepromptShownAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4011,6 +4053,14 @@ class $SettingsTable extends Settings
       locale: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}locale'],
+      ),
+      onboardingNamePromptShownAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}onboarding_name_prompt_shown_at'],
+      ),
+      digestPrepromptShownAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}digest_preprompt_shown_at'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4060,6 +4110,20 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// level. Added in schemaVersion 4; see `AppDatabase.migration`.
   final String? locale;
 
+  /// ISO-8601 UTC moment the first-run "What's your name?" prompt was
+  /// shown (spec `docs/specs/polish-round-1.md`, G2) — `NULL` means it has
+  /// never been shown and should appear once. Set when the prompt is
+  /// dismissed OR completed; it never shows twice either way. Added in
+  /// schemaVersion 5; see `AppDatabase.migration`.
+  final String? onboardingNamePromptShownAt;
+
+  /// ISO-8601 UTC moment the digest pre-permission explainer was shown
+  /// (spec `docs/specs/polish-round-1.md`, G3) — `NULL` means never. The
+  /// explainer precedes the one-shot OS notification dialog, so it also
+  /// only ever appears once. Added in schemaVersion 5; see
+  /// `AppDatabase.migration`.
+  final String? digestPrepromptShownAt;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4071,6 +4135,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     required this.digestMinutes,
     this.actingMemberId,
     this.locale,
+    this.onboardingNamePromptShownAt,
+    this.digestPrepromptShownAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4085,6 +4151,16 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     }
     if (!nullToAbsent || locale != null) {
       map['locale'] = Variable<String>(locale);
+    }
+    if (!nullToAbsent || onboardingNamePromptShownAt != null) {
+      map['onboarding_name_prompt_shown_at'] = Variable<String>(
+        onboardingNamePromptShownAt,
+      );
+    }
+    if (!nullToAbsent || digestPrepromptShownAt != null) {
+      map['digest_preprompt_shown_at'] = Variable<String>(
+        digestPrepromptShownAt,
+      );
     }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
@@ -4102,6 +4178,13 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       locale: locale == null && nullToAbsent
           ? const Value.absent()
           : Value(locale),
+      onboardingNamePromptShownAt:
+          onboardingNamePromptShownAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(onboardingNamePromptShownAt),
+      digestPrepromptShownAt: digestPrepromptShownAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(digestPrepromptShownAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4118,6 +4201,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestMinutes: serializer.fromJson<int>(json['digestMinutes']),
       actingMemberId: serializer.fromJson<String?>(json['actingMemberId']),
       locale: serializer.fromJson<String?>(json['locale']),
+      onboardingNamePromptShownAt: serializer.fromJson<String?>(
+        json['onboardingNamePromptShownAt'],
+      ),
+      digestPrepromptShownAt: serializer.fromJson<String?>(
+        json['digestPrepromptShownAt'],
+      ),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4131,6 +4220,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'digestMinutes': serializer.toJson<int>(digestMinutes),
       'actingMemberId': serializer.toJson<String?>(actingMemberId),
       'locale': serializer.toJson<String?>(locale),
+      'onboardingNamePromptShownAt': serializer.toJson<String?>(
+        onboardingNamePromptShownAt,
+      ),
+      'digestPrepromptShownAt': serializer.toJson<String?>(
+        digestPrepromptShownAt,
+      ),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4142,6 +4237,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     int? digestMinutes,
     Value<String?> actingMemberId = const Value.absent(),
     Value<String?> locale = const Value.absent(),
+    Value<String?> onboardingNamePromptShownAt = const Value.absent(),
+    Value<String?> digestPrepromptShownAt = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4152,6 +4249,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         ? actingMemberId.value
         : this.actingMemberId,
     locale: locale.present ? locale.value : this.locale,
+    onboardingNamePromptShownAt: onboardingNamePromptShownAt.present
+        ? onboardingNamePromptShownAt.value
+        : this.onboardingNamePromptShownAt,
+    digestPrepromptShownAt: digestPrepromptShownAt.present
+        ? digestPrepromptShownAt.value
+        : this.digestPrepromptShownAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4168,6 +4271,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ? data.actingMemberId.value
           : this.actingMemberId,
       locale: data.locale.present ? data.locale.value : this.locale,
+      onboardingNamePromptShownAt: data.onboardingNamePromptShownAt.present
+          ? data.onboardingNamePromptShownAt.value
+          : this.onboardingNamePromptShownAt,
+      digestPrepromptShownAt: data.digestPrepromptShownAt.present
+          ? data.digestPrepromptShownAt.value
+          : this.digestPrepromptShownAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4181,6 +4290,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('digestMinutes: $digestMinutes, ')
           ..write('actingMemberId: $actingMemberId, ')
           ..write('locale: $locale, ')
+          ..write('onboardingNamePromptShownAt: $onboardingNamePromptShownAt, ')
+          ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4194,6 +4305,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     digestMinutes,
     actingMemberId,
     locale,
+    onboardingNamePromptShownAt,
+    digestPrepromptShownAt,
     createdAt,
     updatedAt,
   );
@@ -4206,6 +4319,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.digestMinutes == this.digestMinutes &&
           other.actingMemberId == this.actingMemberId &&
           other.locale == this.locale &&
+          other.onboardingNamePromptShownAt ==
+              this.onboardingNamePromptShownAt &&
+          other.digestPrepromptShownAt == this.digestPrepromptShownAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4216,6 +4332,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<int> digestMinutes;
   final Value<String?> actingMemberId;
   final Value<String?> locale;
+  final Value<String?> onboardingNamePromptShownAt;
+  final Value<String?> digestPrepromptShownAt;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4225,6 +4343,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestMinutes = const Value.absent(),
     this.actingMemberId = const Value.absent(),
     this.locale = const Value.absent(),
+    this.onboardingNamePromptShownAt = const Value.absent(),
+    this.digestPrepromptShownAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4235,6 +4355,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestMinutes = const Value.absent(),
     this.actingMemberId = const Value.absent(),
     this.locale = const Value.absent(),
+    this.onboardingNamePromptShownAt = const Value.absent(),
+    this.digestPrepromptShownAt = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4247,6 +4369,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<int>? digestMinutes,
     Expression<String>? actingMemberId,
     Expression<String>? locale,
+    Expression<String>? onboardingNamePromptShownAt,
+    Expression<String>? digestPrepromptShownAt,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4257,6 +4381,10 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (digestMinutes != null) 'digest_minutes': digestMinutes,
       if (actingMemberId != null) 'acting_member_id': actingMemberId,
       if (locale != null) 'locale': locale,
+      if (onboardingNamePromptShownAt != null)
+        'onboarding_name_prompt_shown_at': onboardingNamePromptShownAt,
+      if (digestPrepromptShownAt != null)
+        'digest_preprompt_shown_at': digestPrepromptShownAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4269,6 +4397,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<int>? digestMinutes,
     Value<String?>? actingMemberId,
     Value<String?>? locale,
+    Value<String?>? onboardingNamePromptShownAt,
+    Value<String?>? digestPrepromptShownAt,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4279,6 +4409,10 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       digestMinutes: digestMinutes ?? this.digestMinutes,
       actingMemberId: actingMemberId ?? this.actingMemberId,
       locale: locale ?? this.locale,
+      onboardingNamePromptShownAt:
+          onboardingNamePromptShownAt ?? this.onboardingNamePromptShownAt,
+      digestPrepromptShownAt:
+          digestPrepromptShownAt ?? this.digestPrepromptShownAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4303,6 +4437,16 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (locale.present) {
       map['locale'] = Variable<String>(locale.value);
     }
+    if (onboardingNamePromptShownAt.present) {
+      map['onboarding_name_prompt_shown_at'] = Variable<String>(
+        onboardingNamePromptShownAt.value,
+      );
+    }
+    if (digestPrepromptShownAt.present) {
+      map['digest_preprompt_shown_at'] = Variable<String>(
+        digestPrepromptShownAt.value,
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -4323,6 +4467,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('digestMinutes: $digestMinutes, ')
           ..write('actingMemberId: $actingMemberId, ')
           ..write('locale: $locale, ')
+          ..write('onboardingNamePromptShownAt: $onboardingNamePromptShownAt, ')
+          ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8640,6 +8786,8 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<int> digestMinutes,
       Value<String?> actingMemberId,
       Value<String?> locale,
+      Value<String?> onboardingNamePromptShownAt,
+      Value<String?> digestPrepromptShownAt,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8651,6 +8799,8 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<int> digestMinutes,
       Value<String?> actingMemberId,
       Value<String?> locale,
+      Value<String?> onboardingNamePromptShownAt,
+      Value<String?> digestPrepromptShownAt,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -8687,6 +8837,16 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get locale => $composableBuilder(
     column: $table.locale,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get onboardingNamePromptShownAt => $composableBuilder(
+    column: $table.onboardingNamePromptShownAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get digestPrepromptShownAt => $composableBuilder(
+    column: $table.digestPrepromptShownAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8735,6 +8895,16 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get onboardingNamePromptShownAt => $composableBuilder(
+    column: $table.onboardingNamePromptShownAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get digestPrepromptShownAt => $composableBuilder(
+    column: $table.digestPrepromptShownAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8775,6 +8945,16 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get locale =>
       $composableBuilder(column: $table.locale, builder: (column) => column);
+
+  GeneratedColumn<String> get onboardingNamePromptShownAt => $composableBuilder(
+    column: $table.onboardingNamePromptShownAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get digestPrepromptShownAt => $composableBuilder(
+    column: $table.digestPrepromptShownAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -8819,6 +8999,9 @@ class $$SettingsTableTableManager
                 Value<int> digestMinutes = const Value.absent(),
                 Value<String?> actingMemberId = const Value.absent(),
                 Value<String?> locale = const Value.absent(),
+                Value<String?> onboardingNamePromptShownAt =
+                    const Value.absent(),
+                Value<String?> digestPrepromptShownAt = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8828,6 +9011,8 @@ class $$SettingsTableTableManager
                 digestMinutes: digestMinutes,
                 actingMemberId: actingMemberId,
                 locale: locale,
+                onboardingNamePromptShownAt: onboardingNamePromptShownAt,
+                digestPrepromptShownAt: digestPrepromptShownAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -8839,6 +9024,9 @@ class $$SettingsTableTableManager
                 Value<int> digestMinutes = const Value.absent(),
                 Value<String?> actingMemberId = const Value.absent(),
                 Value<String?> locale = const Value.absent(),
+                Value<String?> onboardingNamePromptShownAt =
+                    const Value.absent(),
+                Value<String?> digestPrepromptShownAt = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -8848,6 +9036,8 @@ class $$SettingsTableTableManager
                 digestMinutes: digestMinutes,
                 actingMemberId: actingMemberId,
                 locale: locale,
+                onboardingNamePromptShownAt: onboardingNamePromptShownAt,
+                digestPrepromptShownAt: digestPrepromptShownAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

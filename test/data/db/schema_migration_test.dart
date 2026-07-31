@@ -74,8 +74,8 @@ void main() {
   });
 
   test(
-    'schemaVersion 3 -> 4 upgrade adds locale (NULL by default), keeping '
-    'the existing settings row (spec docs/next-session-plan.md #5)',
+    'schemaVersion 3 -> 5 upgrade adds locale and both shown-once flags '
+    '(NULL by default), keeping the existing settings row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v4_test',
@@ -88,13 +88,13 @@ void main() {
       final file = File('${dir.path}/test.sqlite');
 
       // Simulate a pre-existing v3 install without hand-copying v3's CREATE
-      // TABLE SQL: open the *current* (v4) schema once against a real file
-      // so `onCreate` materializes every table with its full v4 column
+      // TABLE SQL: open the *current* schema once against a real file so
+      // `onCreate` materializes every table with its full current column
       // set, insert a settings row with a non-NULL actingMemberId (so the
       // upgrade's "existing row survives" guarantee is actually exercised
-      // for both pre-existing columns), then drop the v4-only `locale`
-      // column and roll `user_version` back to 3 — reproducing exactly
-      // what a real v3 database on a user's device looks like.
+      // for both pre-existing columns), then drop every column newer than
+      // v3 and roll `user_version` back to 3 — reproducing exactly what a
+      // real v3 database on a user's device looks like.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -107,12 +107,18 @@ void main() {
             ),
           );
       await seed.customStatement('ALTER TABLE settings DROP COLUMN locale');
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN onboarding_name_prompt_shown_at',
+      );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN digest_preprompt_shown_at',
+      );
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 4)
+      // Re-opening the same file with the real (schemaVersion: 5)
       // `AppDatabase` now sees `user_version == 3` on disk vs. a declared
-      // `schemaVersion` of 4, so drift runs `onUpgrade(migrator, 3, 4)` —
+      // `schemaVersion` of 5, so drift runs `onUpgrade(migrator, 3, 5)` —
       // exactly the real upgrade path a v3 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -120,6 +126,8 @@ void main() {
       final row = await upgraded.select(upgraded.settings).getSingle();
       expect(row.id, 'device');
       expect(row.locale, isNull);
+      expect(row.onboardingNamePromptShownAt, isNull);
+      expect(row.digestPrepromptShownAt, isNull);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -129,12 +137,10 @@ void main() {
   );
 
   test(
-    'schemaVersion 2 -> 4 upgrade adds BOTH actingMemberId and locale, '
-    'keeping the existing settings row (specs '
-    'docs/specs/members-management.md, docs/next-session-plan.md #5) -- '
-    'this app never actually stops at v3 once schemaVersion is 4, so this '
-    'supersedes an earlier version of this file that isolated the v2 -> v3 '
-    'step alone',
+    'schemaVersion 2 -> 5 upgrade adds every later settings column, '
+    'keeping the existing settings row -- this app never actually stops '
+    'at an intermediate version once schemaVersion is 5, so this '
+    'supersedes earlier per-step tests',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v2_to_v4_test',
@@ -168,12 +174,18 @@ void main() {
         'ALTER TABLE settings DROP COLUMN acting_member_id',
       );
       await seed.customStatement('ALTER TABLE settings DROP COLUMN locale');
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN onboarding_name_prompt_shown_at',
+      );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN digest_preprompt_shown_at',
+      );
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 4)
+      // Re-opening the same file with the real (schemaVersion: 5)
       // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
-      // `schemaVersion` of 4, so drift runs `onUpgrade(migrator, 2, 4)`.
+      // `schemaVersion` of 5, so drift runs `onUpgrade(migrator, 2, 5)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -181,6 +193,8 @@ void main() {
       expect(row.id, 'device');
       expect(row.actingMemberId, isNull);
       expect(row.locale, isNull);
+      expect(row.onboardingNamePromptShownAt, isNull);
+      expect(row.digestPrepromptShownAt, isNull);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.digestEnabled, isTrue);

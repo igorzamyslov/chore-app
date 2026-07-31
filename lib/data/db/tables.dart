@@ -196,6 +196,20 @@ class Settings extends Table {
   /// level. Added in schemaVersion 4; see `AppDatabase.migration`.
   TextColumn get locale => text().nullable()();
 
+  /// ISO-8601 UTC moment the first-run "What's your name?" prompt was
+  /// shown (spec `docs/specs/polish-round-1.md`, G2) — `NULL` means it has
+  /// never been shown and should appear once. Set when the prompt is
+  /// dismissed OR completed; it never shows twice either way. Added in
+  /// schemaVersion 5; see `AppDatabase.migration`.
+  TextColumn get onboardingNamePromptShownAt => text().nullable()();
+
+  /// ISO-8601 UTC moment the digest pre-permission explainer was shown
+  /// (spec `docs/specs/polish-round-1.md`, G3) — `NULL` means never. The
+  /// explainer precedes the one-shot OS notification dialog, so it also
+  /// only ever appears once. Added in schemaVersion 5; see
+  /// `AppDatabase.migration`.
+  TextColumn get digestPrepromptShownAt => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

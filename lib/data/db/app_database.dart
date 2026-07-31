@@ -53,19 +53,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v4) column set, so a fresh v1 -> v4 jump already
-      // gets `actingMemberId` and `locale` for free — the branches below
-      // only need to backfill whichever of those columns an install that
-      // already has an older-shaped `settings` table is still missing (a
-      // "create then immediately re-add the same column" pair would
-      // otherwise throw a duplicate-column error).
+      // *current* (here, v5) column set, so a fresh v1 -> v5 jump already
+      // gets every later column for free — the branches below only need
+      // to backfill whichever columns an install that already has an
+      // older-shaped `settings` table is still missing (a "create then
+      // immediately re-add the same column" pair would otherwise throw a
+      // duplicate-column error).
       if (from < 2) {
         await migrator.createTable(settings);
       } else {
@@ -80,6 +80,17 @@ class AppDatabase extends _$AppDatabase {
           // nullable `settings.locale` column, defaulting to `NULL`
           // (follow the OS locale).
           await migrator.addColumn(settings, settings.locale);
+        }
+        if (from < 5) {
+          // v4 -> v5 (spec `docs/specs/polish-round-1.md` G2/G3): the two
+          // shown-once flags for the first-run name prompt and the digest
+          // pre-permission explainer, both defaulting to `NULL` (never
+          // shown).
+          await migrator.addColumn(
+            settings,
+            settings.onboardingNamePromptShownAt,
+          );
+          await migrator.addColumn(settings, settings.digestPrepromptShownAt);
         }
       }
     },

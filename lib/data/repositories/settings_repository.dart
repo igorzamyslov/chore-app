@@ -139,6 +139,36 @@ class SettingsRepository {
     );
   }
 
+  /// Records that the first-run name prompt has been shown (spec
+  /// `docs/specs/polish-round-1.md` G2) — it never shows again after this,
+  /// whether it was completed or dismissed.
+  Future<void> markOnboardingNamePromptShown() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        onboardingNamePromptShownAt: Value(_isoNow()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Records that the digest pre-permission explainer has been shown (spec
+  /// `docs/specs/polish-round-1.md` G3) — shown at most once, right before
+  /// the one-shot OS notification-permission dialog.
+  Future<void> markDigestPrepromptShown() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        digestPrepromptShownAt: Value(_isoNow()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,
