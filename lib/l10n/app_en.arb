@@ -551,6 +551,15 @@
     "description": "Button label in the digest permission hint row; opens the OS app settings screen."
   },
 
+  "settingsExportEntry": "Export data",
+  "@settingsExportEntry": {
+    "description": "Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet."
+  },
+  "settingsExportError": "Couldn't export your data. Please try again.",
+  "@settingsExportError": {
+    "description": "Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1)."
+  },
+
   "settingsMembersEntry": "Members",
   "@settingsMembersEntry": {
     "description": "Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry."
@@ -698,5 +707,38 @@
   "settingsAboutDonateSubtitle": "Coming soon",
   "@settingsAboutDonateSubtitle": {
     "description": "Subtitle of the About section's disabled donation/tip-jar placeholder row."
+  },
+
+  "settingsResetSectionTitle": "Danger zone",
+  "@settingsResetSectionTitle": {
+    "description": "Section header above the destructive reset row (spec docs/specs/polish-round-1.md B2), at the very bottom of Settings -- exists purely to visually separate it from every section above."
+  },
+  "settingsResetEntry": "Reset app data",
+  "@settingsResetEntry": {
+    "description": "The destructive Settings row (spec docs/specs/polish-round-1.md B2) that starts the double-confirm reset flow."
+  },
+  "settingsResetConfirm1Title": "Reset app data?",
+  "@settingsResetConfirm1Title": {
+    "description": "Title of the first reset confirmation dialog (spec docs/specs/polish-round-1.md B2)."
+  },
+  "settingsResetConfirm1Body": "This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can't be undone.",
+  "@settingsResetConfirm1Body": {
+    "description": "Body of the first reset confirmation dialog, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2)."
+  },
+  "settingsResetConfirm1Action": "Continue",
+  "@settingsResetConfirm1Action": {
+    "description": "Confirm button of the first reset dialog; advances to the second, final confirmation rather than deleting anything yet."
+  },
+  "settingsResetConfirm2Title": "Delete everything?",
+  "@settingsResetConfirm2Title": {
+    "description": "Title of the second (final) reset confirmation dialog (spec docs/specs/polish-round-1.md B2)."
+  },
+  "settingsResetConfirm2Body": "This is the last step. Once you confirm, everything is gone immediately.",
+  "@settingsResetConfirm2Body": {
+    "description": "Body of the second (final) reset confirmation dialog."
+  },
+  "settingsResetConfirm2Action": "Delete everything",
+  "@settingsResetConfirm2Action": {
+    "description": "The final destructive confirm button; tapping it wipes every table and re-bootstraps the app to the fresh-install state."
   }
 }

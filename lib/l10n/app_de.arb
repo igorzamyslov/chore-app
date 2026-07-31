@@ -131,6 +131,9 @@
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
 
+  "settingsExportEntry": "Daten exportieren",
+  "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
+
   "settingsMembersEntry": "Mitglieder",
 
   "manageMembersTitle": "Mitglieder",
@@ -169,5 +172,14 @@
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
   "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
   "settingsAboutDonateTitle": "Unterstütze die App",
-  "settingsAboutDonateSubtitle": "Bald verfügbar"
+  "settingsAboutDonateSubtitle": "Bald verfügbar",
+
+  "settingsResetSectionTitle": "Gefahrenzone",
+  "settingsResetEntry": "App-Daten zurücksetzen",
+  "settingsResetConfirm1Title": "App-Daten zurücksetzen?",
+  "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.",
+  "settingsResetConfirm1Action": "Weiter",
+  "settingsResetConfirm2Title": "Wirklich alles löschen?",
+  "settingsResetConfirm2Body": "Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.",
+  "settingsResetConfirm2Action": "Alles löschen"
 }
