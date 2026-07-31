@@ -20,16 +20,23 @@ pre-commit:
       stage_fixed: true
 
     - name: analyze
-      run: flutter analyze --fatal-infos --fatal-warnings
+      # `env -u GIT_DIR -u GIT_INDEX_FILE`: git sets these for hook
+      # subprocesses so *its own* git commands touch the right worktree/index,
+      # but Flutter's tool shells out to git too (to read its own SDK's
+      # version) and inherits them unchanged — GIT_DIR then points this repo's
+      # git at Flutter's SDK checkout, so the version read comes back
+      # 0.0.0-unknown and `permission_handler`'s `>=3.24.0` Flutter-SDK
+      # constraint fails to resolve. Unset both before invoking flutter/dart.
+      run: env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos --fatal-warnings
 
     - name: test
-      run: flutter test
+      run: env -u GIT_DIR -u GIT_INDEX_FILE flutter test
 
     - name: pubspec-lock-in-sync
       # Catches "edited pubspec.yaml but forgot pub get" drift.
-      run: dart pub get --enforce-lockfile --offline
+      run: env -u GIT_DIR -u GIT_INDEX_FILE dart pub get --enforce-lockfile --offline
 
 pre-push:
   jobs:
     - name: full-test-suite
-      run: flutter test
+      run: env -u GIT_DIR -u GIT_INDEX_FILE flutter test
