@@ -896,17 +896,35 @@ abstract class AppLocalizations {
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
 
-  /// Title of the About section's disabled donation/tip-jar placeholder row (no action wired yet).
+  /// Title of the About section's donation/tip-jar row; tapping opens the donate sheet (settingsAboutDonateSheetTitle).
   ///
   /// In en, this message translates to:
   /// **'Support the app'**
   String get settingsAboutDonateTitle;
 
-  /// Subtitle of the About section's disabled donation/tip-jar placeholder row.
+  /// Subtitle of the About section's donation/tip-jar row, naming the two options offered in the donate sheet.
   ///
   /// In en, this message translates to:
-  /// **'Coming soon'**
+  /// **'Ko-fi or PayPal — thank you!'**
   String get settingsAboutDonateSubtitle;
+
+  /// Title of the donate sheet opened from the About section's donate row, listing the Ko-fi and PayPal link rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Support Famdo'**
+  String get settingsAboutDonateSheetTitle;
+
+  /// Label of the donate sheet's Ko-fi row; brand name, deliberately identical across locales.
+  ///
+  /// In en, this message translates to:
+  /// **'Ko-fi'**
+  String get settingsAboutDonateKofiLabel;
+
+  /// Label of the donate sheet's PayPal row; brand name, deliberately identical across locales.
+  ///
+  /// In en, this message translates to:
+  /// **'PayPal'**
+  String get settingsAboutDonatePaypalLabel;
 
   /// Section header above the destructive reset row (spec docs/specs/polish-round-1.md B2), at the very bottom of Settings -- exists purely to visually separate it from every section above.
   ///

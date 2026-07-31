@@ -511,7 +511,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAboutDonateTitle => 'Unterstütze die App';
 
   @override
-  String get settingsAboutDonateSubtitle => 'Bald verfügbar';
+  String get settingsAboutDonateSubtitle => 'Ko-fi oder PayPal — danke dir!';
+
+  @override
+  String get settingsAboutDonateSheetTitle => 'Unterstütze Famdo';
+
+  @override
+  String get settingsAboutDonateKofiLabel => 'Ko-fi';
+
+  @override
+  String get settingsAboutDonatePaypalLabel => 'PayPal';
 
   @override
   String get settingsResetSectionTitle => 'Gefahrenzone';

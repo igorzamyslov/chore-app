@@ -5,14 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../../test_utils/pump_app.dart';
+import 'fake_url_launcher_platform.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the Settings tab's Language row/picker sheet and
 /// About section (spec `docs/next-session-plan.md` #5).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
+  final fakeUrlLauncher = FakeUrlLauncherPlatform();
 
   setUp(() {
     PackageInfo.setMockInitialValues(
@@ -22,6 +25,8 @@ void main() {
       buildNumber: '42',
       buildSignature: '',
     );
+    fakeUrlLauncher.reset();
+    UrlLauncherPlatform.instance = fakeUrlLauncher;
   });
 
   testChoreApp(
@@ -159,7 +164,8 @@ void main() {
   );
 
   testChoreApp(
-    'the donate placeholder row is disabled',
+    'the donate row is enabled and opens a sheet with Ko-fi and PayPal '
+    'links',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -171,8 +177,42 @@ void main() {
           matching: find.byType(ListTile),
         ),
       );
-      expect(tile.enabled, isFalse);
-      expect(tile.onTap, isNull);
+      expect(tile.enabled, isTrue);
+      expect(tile.onTap, isNotNull);
+
+      await tester.tap(find.bySemanticsIdentifier('settings.about.donate'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.about.donate.sheet'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.about.donate.kofi'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.about.donate.paypal'),
+        findsOneWidget,
+      );
+
+      // Tapping the Ko-fi row launches its URL externally and closes the
+      // sheet; the launching boundary is faked (fakeUrlLauncher), so no
+      // real OS "open URL" action happens.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.about.donate.kofi'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(fakeUrlLauncher.lastLaunchedUrl, 'https://ko-fi.com/igorzamyslov');
+      expect(
+        fakeUrlLauncher.lastOptions?.mode,
+        PreferredLaunchMode.externalApplication,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.about.donate.sheet'),
+        findsNothing,
+      );
 
       handle.dispose();
     },

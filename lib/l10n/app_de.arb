@@ -172,7 +172,10 @@
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
   "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
   "settingsAboutDonateTitle": "Unterstütze die App",
-  "settingsAboutDonateSubtitle": "Bald verfügbar",
+  "settingsAboutDonateSubtitle": "Ko-fi oder PayPal — danke dir!",
+  "settingsAboutDonateSheetTitle": "Unterstütze Famdo",
+  "settingsAboutDonateKofiLabel": "Ko-fi",
+  "settingsAboutDonatePaypalLabel": "PayPal",
 
   "settingsResetSectionTitle": "Gefahrenzone",
   "settingsResetEntry": "App-Daten zurücksetzen",

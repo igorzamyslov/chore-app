@@ -702,11 +702,23 @@
   },
   "settingsAboutDonateTitle": "Support the app",
   "@settingsAboutDonateTitle": {
-    "description": "Title of the About section's disabled donation/tip-jar placeholder row (no action wired yet)."
+    "description": "Title of the About section's donation/tip-jar row; tapping opens the donate sheet (settingsAboutDonateSheetTitle)."
   },
-  "settingsAboutDonateSubtitle": "Coming soon",
+  "settingsAboutDonateSubtitle": "Ko-fi or PayPal — thank you!",
   "@settingsAboutDonateSubtitle": {
-    "description": "Subtitle of the About section's disabled donation/tip-jar placeholder row."
+    "description": "Subtitle of the About section's donation/tip-jar row, naming the two options offered in the donate sheet."
+  },
+  "settingsAboutDonateSheetTitle": "Support Famdo",
+  "@settingsAboutDonateSheetTitle": {
+    "description": "Title of the donate sheet opened from the About section's donate row, listing the Ko-fi and PayPal link rows."
+  },
+  "settingsAboutDonateKofiLabel": "Ko-fi",
+  "@settingsAboutDonateKofiLabel": {
+    "description": "Label of the donate sheet's Ko-fi row; brand name, deliberately identical across locales."
+  },
+  "settingsAboutDonatePaypalLabel": "PayPal",
+  "@settingsAboutDonatePaypalLabel": {
+    "description": "Label of the donate sheet's PayPal row; brand name, deliberately identical across locales."
   },
 
   "settingsResetSectionTitle": "Danger zone",
