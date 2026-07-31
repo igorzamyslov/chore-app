@@ -38,6 +38,14 @@ jobs:
           disable-animations: true
           script: |
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            # Warm-up launch: the suite's FIRST flow otherwise carries the
+            # app's very first cold start on a cold runner, which can blow
+            # past Maestro's element timeout (run 30630911966 failed its
+            # first flow's first tap this way). One throwaway launch warms
+            # the VM/caches; the flow's own clearState relaunch is then fast.
+            adb shell monkey -p com.example.chore_app -c android.intent.category.LAUNCHER 1
+            sleep 20
+            adb shell am force-stop com.example.chore_app
             # One line: emulator-runner executes each script line as its own
             # sh -c, so a backslash continuation becomes a literal `\` arg.
             $HOME/.maestro/bin/maestro test --env APP_ID=com.example.chore_app e2e/flows
@@ -61,6 +69,10 @@ jobs:
           xcrun simctl boot "$DEVICE_ID"
           xcrun simctl bootstatus "$DEVICE_ID" -b
           xcrun simctl install booted build/ios/iphonesimulator/Runner.app
+          # Warm-up launch — same cold-start rationale as the Android job.
+          xcrun simctl launch booted com.example.choreApp
+          sleep 20
+          xcrun simctl terminate booted com.example.choreApp || true
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
       - name: Run flows on simulator
