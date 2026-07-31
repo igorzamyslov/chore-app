@@ -83,11 +83,14 @@ class HouseholdRepository {
     });
   }
 
-  /// Watches every member of [householdId], ordered by name.
+  /// Watches every member of [householdId], ordered by creation time (spec
+  /// `docs/specs/members-management.md` §2: stable, and consistent with the
+  /// chore-form assignee chips, the members screen, and the acting-member
+  /// switcher — all of which read this same order).
   Stream<List<Member>> watchMembers(String householdId) {
     final query = db.select(db.members)
       ..where((tbl) => tbl.householdId.equals(householdId))
-      ..orderBy([(tbl) => OrderingTerm(expression: tbl.name)]);
+      ..orderBy([(tbl) => OrderingTerm(expression: tbl.createdAt)]);
     return query.watch();
   }
 
@@ -130,6 +133,17 @@ class HouseholdRepository {
       db.members,
     )..where((tbl) => tbl.id.equals(memberId))).write(
       MembersCompanion(name: Value(name), updatedAt: Value(_isoNow())),
+    );
+  }
+
+  /// Changes an existing member's color (spec
+  /// `docs/specs/members-management.md` §3: the member edit sheet's color
+  /// swatch picker).
+  Future<void> recolorMember(String memberId, int color) async {
+    await (db.update(
+      db.members,
+    )..where((tbl) => tbl.id.equals(memberId))).write(
+      MembersCompanion(color: Value(color), updatedAt: Value(_isoNow())),
     );
   }
 

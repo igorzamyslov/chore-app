@@ -156,7 +156,8 @@ class Categories extends Table {
 
 /// Device-level app settings (spec `docs/specs/notifications.md`): a single
 /// row (`id` is always `'device'`) holding the daily digest notification
-/// preferences.
+/// preferences and (spec `docs/specs/members-management.md`) the current
+/// acting member.
 ///
 /// v1 note: settings are per-device, not per-household or per-member (there
 /// is no notion of "per-member notification preferences" until accounts
@@ -174,6 +175,18 @@ class Settings extends Table {
   /// The digest's fire time, as minutes since local midnight (default `480`
   /// = 08:00).
   IntColumn get digestMinutes => integer().withDefault(const Constant(480))();
+
+  /// The household member currently "acting" for single-user attribution
+  /// flows (chore completion `completedBy`, `createdBy`, shopping
+  /// `addedBy`), or `NULL` for the automatic fallback (first admin, else
+  /// first member) — see `actingMemberProvider` in `lib/app/providers.dart`.
+  ///
+  /// Deliberately no FK constraint: this is a single device-scoped row, not
+  /// a per-household one, and a dangling id (referencing a member that no
+  /// longer resolves) must degrade gracefully to the automatic fallback
+  /// rather than fail a constraint. Added in schemaVersion 3; see
+  /// `AppDatabase.migration`.
+  TextColumn get actingMemberId => text().nullable()();
 
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();

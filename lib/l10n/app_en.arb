@@ -193,6 +193,15 @@
     "description": "Category-filter menu entry that resets the filter to show every category's chores."
   },
 
+  "actingMemberButtonTooltip": "Switch who's acting",
+  "@actingMemberButtonTooltip": {
+    "description": "Tooltip for the chores app bar's leading acting-member avatar button (spec members-management §4)."
+  },
+  "actingMemberSheetTitle": "Who's doing chores right now?",
+  "@actingMemberSheetTitle": {
+    "description": "Title of the acting-member switcher bottom sheet opened from the chores app bar."
+  },
+
   "choresEmptyState": "No chores pending — nice work!",
   "@choresEmptyState": {
     "description": "Chores list empty-state message, shown when there are no pending occurrences to show."
@@ -501,6 +510,37 @@
   "settingsDigestPermissionAction": "Open settings",
   "@settingsDigestPermissionAction": {
     "description": "Button label in the digest permission hint row; opens the OS app settings screen."
+  },
+
+  "settingsMembersEntry": "Members",
+  "@settingsMembersEntry": {
+    "description": "Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry."
+  },
+
+  "manageMembersTitle": "Members",
+  "@manageMembersTitle": {
+    "description": "App bar title of the manage-members screen."
+  },
+  "manageMembersErrorMessage": "Could not load your members.",
+  "@manageMembersErrorMessage": {
+    "description": "Manage-members screen load-error message."
+  },
+
+  "memberEditNewTitle": "New member",
+  "@memberEditNewTitle": {
+    "description": "Member edit sheet heading when adding a new member."
+  },
+  "memberEditEditTitle": "Edit member",
+  "@memberEditEditTitle": {
+    "description": "Member edit sheet heading when editing an existing member."
+  },
+  "memberEditNameLabel": "Name",
+  "@memberEditNameLabel": {
+    "description": "Label of the member edit sheet's required name text field."
+  },
+  "memberEditColorLabel": "Color",
+  "@memberEditColorLabel": {
+    "description": "Section label above the member edit sheet's color swatch picker."
   },
 
   "settingsCategoriesEntry": "Categories",

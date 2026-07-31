@@ -7,6 +7,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -225,33 +226,14 @@ class _MemberAvatarName extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(member.color);
     final trimmedName = member.name.trim();
-    final initial = trimmedName.isEmpty
-        ? '?'
-        : trimmedName.substring(0, 1).toUpperCase();
     final firstName = trimmedName.isEmpty
         ? member.name
         : trimmedName.split(RegExp(r'\s+')).first;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 10,
-          backgroundColor: color,
-          child: Text(
-            initial,
-            textScaler: TextScaler.noScaling,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color:
-                  ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-                  ? Colors.white
-                  : Colors.black,
-            ),
-          ),
-        ),
+        MemberAvatar(member: member),
         const SizedBox(width: 4),
         Text(firstName),
       ],

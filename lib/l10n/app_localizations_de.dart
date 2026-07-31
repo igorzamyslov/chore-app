@@ -161,6 +161,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresFilterCategoryAll => 'Alle Kategorien';
 
   @override
+  String get actingMemberButtonTooltip => 'Aktives Mitglied wechseln';
+
+  @override
+  String get actingMemberSheetTitle => 'Wer ist gerade dran?';
+
+  @override
   String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
 
   @override
@@ -372,6 +378,28 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsDigestPermissionAction => 'Einstellungen öffnen';
+
+  @override
+  String get settingsMembersEntry => 'Mitglieder';
+
+  @override
+  String get manageMembersTitle => 'Mitglieder';
+
+  @override
+  String get manageMembersErrorMessage =>
+      'Deine Mitglieder konnten nicht geladen werden.';
+
+  @override
+  String get memberEditNewTitle => 'Neues Mitglied';
+
+  @override
+  String get memberEditEditTitle => 'Mitglied bearbeiten';
+
+  @override
+  String get memberEditNameLabel => 'Name';
+
+  @override
+  String get memberEditColorLabel => 'Farbe';
 
   @override
   String get settingsCategoriesEntry => 'Kategorien';

@@ -106,6 +106,24 @@ class SettingsRepository {
     );
   }
 
+  /// Sets the acting member (spec `docs/specs/members-management.md` §2):
+  /// [memberId] is read by `actingMemberProvider` (`lib/app/providers.dart`)
+  /// whenever it resolves to a current household member. Passing `null`
+  /// clears it back to the automatic fallback (first admin, else first
+  /// member) — this is an explicit `null` write, not "leave unchanged", so
+  /// [Value] wraps it unconditionally.
+  Future<void> setActingMember(String? memberId) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        actingMemberId: Value(memberId),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,

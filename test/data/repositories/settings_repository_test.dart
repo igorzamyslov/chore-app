@@ -112,4 +112,56 @@ void main() {
     )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
     expect(row.digestMinutes, 1439);
   });
+
+  test('setActingMember sets the id and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    expect(created.actingMemberId, isNull);
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setActingMember('member-1');
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.actingMemberId, 'member-1');
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setActingMember(null) clears a previously-set id', () async {
+    await repo.setActingMember('member-1');
+    var row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.actingMemberId, 'member-1');
+
+    await repo.setActingMember(null);
+    row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.actingMemberId, isNull);
+  });
+
+  test('setActingMember implicitly creates the row if missing', () async {
+    await repo.setActingMember('member-1');
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.actingMemberId, 'member-1');
+  });
+
+  test(
+    'watchSettings emits an updated value after setActingMember',
+    () async {
+      final emissions = <String?>[];
+      final sub = repo.watchSettings().listen(
+        (settings) => emissions.add(settings.actingMemberId),
+      );
+      addTearDown(sub.cancel);
+
+      await pumpEventQueue();
+      await repo.setActingMember('member-1');
+      await pumpEventQueue();
+
+      expect(emissions.last, 'member-1');
+    },
+  );
 }

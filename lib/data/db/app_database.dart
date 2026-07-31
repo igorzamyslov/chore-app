@@ -53,19 +53,25 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
-      // table. This is the first real migration this app has ever needed,
-      // so there's only a single `if`; a later migration would add another
-      // `if (from < 3) { ... }` alongside it, each guard independently
-      // idempotent so upgrading straight from an old version to the latest
-      // runs every intermediate step in order.
+      // table. [migrator.createTable] always builds the table from its
+      // *current* (here, v3) column set, so a fresh v1 -> v3 jump already
+      // gets `actingMemberId` for free — the `else if` below only needs to
+      // backfill that column for an install that already has the v2-shaped
+      // `settings` table (a "create then immediately re-add the same
+      // column" pair would otherwise throw a duplicate-column error).
       if (from < 2) {
         await migrator.createTable(settings);
+      } else if (from < 3) {
+        // v2 -> v3 (spec `docs/specs/members-management.md`): adds the
+        // nullable `settings.actingMemberId` column, defaulting to `NULL`
+        // (the automatic acting-member fallback).
+        await migrator.addColumn(settings, settings.actingMemberId);
       }
     },
     beforeOpen: (details) async {

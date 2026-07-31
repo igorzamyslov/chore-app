@@ -5,6 +5,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
+import 'package:chore_app/features/settings/manage_members_screen.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +55,19 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
             error: (error, stackTrace) => const [],
+          ),
+          semantic(
+            'settings.members',
+            child: ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: Text(l10n.settingsMembersEntry),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ManageMembersScreen(),
+                ),
+              ),
+            ),
           ),
           semantic(
             'settings.categories',

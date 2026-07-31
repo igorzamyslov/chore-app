@@ -219,7 +219,8 @@ final pausedChoresProvider = StreamProvider<List<ChoreWithDetails>>((
       );
 });
 
-/// Every member of the bootstrap household, ordered by name.
+/// Every member of the bootstrap household, ordered by creation time (see
+/// `HouseholdRepository.watchMembers`).
 final membersProvider = StreamProvider<List<Member>>((ref) async* {
   final householdId = await ref.watch(bootstrapProvider.future);
   yield* ref.watch(householdRepositoryProvider).watchMembers(householdId);
@@ -251,17 +252,34 @@ final shoppingCategoriesProvider = StreamProvider<List<Category>>((ref) async* {
       .watchCategories(householdId, CategoryKind.shopping);
 });
 
-/// The member who acts on behalf of the user for v1's single-user flows
-/// (completing an unassigned occurrence, `createdBy` on a new chore): the
-/// household's first admin member, or `null` while [membersProvider] hasn't
-/// loaded yet or has no members.
+/// The member who acts on behalf of the user for single-user attribution
+/// flows (completing an unassigned occurrence, `createdBy` on a new chore,
+/// shopping `addedBy`), and the member the acting-member switcher (spec
+/// `docs/specs/members-management.md` §4) shows as "current".
 ///
-/// Proper member switching (choosing which household member "you" are) is
-/// out of scope for v1.
+/// Resolution order, re-run every time [settingsProvider] or
+/// [membersProvider] changes:
+///
+/// 1. `settings.actingMemberId`, if it matches a member in
+///    [membersProvider]'s current list;
+/// 2. otherwise the household's first admin member, else its first member.
+///
+/// `null` only while [membersProvider] hasn't loaded yet or has no members.
+/// A stored id that doesn't resolve to a current member (cleared, or
+/// dangling) silently falls through to the fallback — this is a read-time
+/// self-heal, not a repair: nothing is written back to settings.
 final actingMemberProvider = Provider<Member?>((ref) {
   final members = ref.watch(membersProvider).value;
   if (members == null || members.isEmpty) {
     return null;
+  }
+  final storedId = ref.watch(settingsProvider).value?.actingMemberId;
+  if (storedId != null) {
+    for (final member in members) {
+      if (member.id == storedId) {
+        return member;
+      }
+    }
   }
   return members.firstWhere(
     (member) => member.role == MemberRole.admin,

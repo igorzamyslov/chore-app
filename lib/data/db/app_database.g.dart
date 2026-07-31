@@ -3865,6 +3865,17 @@ class $SettingsTable extends Settings
     requiredDuringInsert: false,
     defaultValue: const Constant(480),
   );
+  static const VerificationMeta _actingMemberIdMeta = const VerificationMeta(
+    'actingMemberId',
+  );
+  @override
+  late final GeneratedColumn<String> actingMemberId = GeneratedColumn<String>(
+    'acting_member_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3892,6 +3903,7 @@ class $SettingsTable extends Settings
     id,
     digestEnabled,
     digestMinutes,
+    actingMemberId,
     createdAt,
     updatedAt,
   ];
@@ -3927,6 +3939,15 @@ class $SettingsTable extends Settings
         digestMinutes.isAcceptableOrUnknown(
           data['digest_minutes']!,
           _digestMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('acting_member_id')) {
+      context.handle(
+        _actingMemberIdMeta,
+        actingMemberId.isAcceptableOrUnknown(
+          data['acting_member_id']!,
+          _actingMemberIdMeta,
         ),
       );
     }
@@ -3967,6 +3988,10 @@ class $SettingsTable extends Settings
         DriftSqlType.int,
         data['${effectivePrefix}digest_minutes'],
       )!,
+      actingMemberId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}acting_member_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -3995,6 +4020,18 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// = 08:00).
   final int digestMinutes;
 
+  /// The household member currently "acting" for single-user attribution
+  /// flows (chore completion `completedBy`, `createdBy`, shopping
+  /// `addedBy`), or `NULL` for the automatic fallback (first admin, else
+  /// first member) — see `actingMemberProvider` in `lib/app/providers.dart`.
+  ///
+  /// Deliberately no FK constraint: this is a single device-scoped row, not
+  /// a per-household one, and a dangling id (referencing a member that no
+  /// longer resolves) must degrade gracefully to the automatic fallback
+  /// rather than fail a constraint. Added in schemaVersion 3; see
+  /// `AppDatabase.migration`.
+  final String? actingMemberId;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4004,6 +4041,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     required this.id,
     required this.digestEnabled,
     required this.digestMinutes,
+    this.actingMemberId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4013,6 +4051,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     map['id'] = Variable<String>(id);
     map['digest_enabled'] = Variable<bool>(digestEnabled);
     map['digest_minutes'] = Variable<int>(digestMinutes);
+    if (!nullToAbsent || actingMemberId != null) {
+      map['acting_member_id'] = Variable<String>(actingMemberId);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4023,6 +4064,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       id: Value(id),
       digestEnabled: Value(digestEnabled),
       digestMinutes: Value(digestMinutes),
+      actingMemberId: actingMemberId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actingMemberId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4037,6 +4081,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       id: serializer.fromJson<String>(json['id']),
       digestEnabled: serializer.fromJson<bool>(json['digestEnabled']),
       digestMinutes: serializer.fromJson<int>(json['digestMinutes']),
+      actingMemberId: serializer.fromJson<String?>(json['actingMemberId']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4048,6 +4093,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'id': serializer.toJson<String>(id),
       'digestEnabled': serializer.toJson<bool>(digestEnabled),
       'digestMinutes': serializer.toJson<int>(digestMinutes),
+      'actingMemberId': serializer.toJson<String?>(actingMemberId),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4057,12 +4103,16 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     String? id,
     bool? digestEnabled,
     int? digestMinutes,
+    Value<String?> actingMemberId = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
     id: id ?? this.id,
     digestEnabled: digestEnabled ?? this.digestEnabled,
     digestMinutes: digestMinutes ?? this.digestMinutes,
+    actingMemberId: actingMemberId.present
+        ? actingMemberId.value
+        : this.actingMemberId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4075,6 +4125,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestMinutes: data.digestMinutes.present
           ? data.digestMinutes.value
           : this.digestMinutes,
+      actingMemberId: data.actingMemberId.present
+          ? data.actingMemberId.value
+          : this.actingMemberId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4086,6 +4139,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('id: $id, ')
           ..write('digestEnabled: $digestEnabled, ')
           ..write('digestMinutes: $digestMinutes, ')
+          ..write('actingMemberId: $actingMemberId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4093,8 +4147,14 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, digestEnabled, digestMinutes, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    digestEnabled,
+    digestMinutes,
+    actingMemberId,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4102,6 +4162,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.id == this.id &&
           other.digestEnabled == this.digestEnabled &&
           other.digestMinutes == this.digestMinutes &&
+          other.actingMemberId == this.actingMemberId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4110,6 +4171,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String> id;
   final Value<bool> digestEnabled;
   final Value<int> digestMinutes;
+  final Value<String?> actingMemberId;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4117,6 +4179,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.id = const Value.absent(),
     this.digestEnabled = const Value.absent(),
     this.digestMinutes = const Value.absent(),
+    this.actingMemberId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4125,6 +4188,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     required String id,
     this.digestEnabled = const Value.absent(),
     this.digestMinutes = const Value.absent(),
+    this.actingMemberId = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4135,6 +4199,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? id,
     Expression<bool>? digestEnabled,
     Expression<int>? digestMinutes,
+    Expression<String>? actingMemberId,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4143,6 +4208,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (id != null) 'id': id,
       if (digestEnabled != null) 'digest_enabled': digestEnabled,
       if (digestMinutes != null) 'digest_minutes': digestMinutes,
+      if (actingMemberId != null) 'acting_member_id': actingMemberId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4153,6 +4219,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String>? id,
     Value<bool>? digestEnabled,
     Value<int>? digestMinutes,
+    Value<String?>? actingMemberId,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4161,6 +4228,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       id: id ?? this.id,
       digestEnabled: digestEnabled ?? this.digestEnabled,
       digestMinutes: digestMinutes ?? this.digestMinutes,
+      actingMemberId: actingMemberId ?? this.actingMemberId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4178,6 +4246,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     }
     if (digestMinutes.present) {
       map['digest_minutes'] = Variable<int>(digestMinutes.value);
+    }
+    if (actingMemberId.present) {
+      map['acting_member_id'] = Variable<String>(actingMemberId.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
@@ -4197,6 +4268,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('id: $id, ')
           ..write('digestEnabled: $digestEnabled, ')
           ..write('digestMinutes: $digestMinutes, ')
+          ..write('actingMemberId: $actingMemberId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8512,6 +8584,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       required String id,
       Value<bool> digestEnabled,
       Value<int> digestMinutes,
+      Value<String?> actingMemberId,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8521,6 +8594,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<bool> digestEnabled,
       Value<int> digestMinutes,
+      Value<String?> actingMemberId,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -8547,6 +8621,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<int> get digestMinutes => $composableBuilder(
     column: $table.digestMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actingMemberId => $composableBuilder(
+    column: $table.actingMemberId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8585,6 +8664,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get actingMemberId => $composableBuilder(
+    column: $table.actingMemberId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8615,6 +8699,11 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<int> get digestMinutes => $composableBuilder(
     column: $table.digestMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get actingMemberId => $composableBuilder(
+    column: $table.actingMemberId,
     builder: (column) => column,
   );
 
@@ -8659,6 +8748,7 @@ class $$SettingsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<bool> digestEnabled = const Value.absent(),
                 Value<int> digestMinutes = const Value.absent(),
+                Value<String?> actingMemberId = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -8666,6 +8756,7 @@ class $$SettingsTableTableManager
                 id: id,
                 digestEnabled: digestEnabled,
                 digestMinutes: digestMinutes,
+                actingMemberId: actingMemberId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -8675,6 +8766,7 @@ class $$SettingsTableTableManager
                 required String id,
                 Value<bool> digestEnabled = const Value.absent(),
                 Value<int> digestMinutes = const Value.absent(),
+                Value<String?> actingMemberId = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -8682,6 +8774,7 @@ class $$SettingsTableTableManager
                 id: id,
                 digestEnabled: digestEnabled,
                 digestMinutes: digestMinutes,
+                actingMemberId: actingMemberId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

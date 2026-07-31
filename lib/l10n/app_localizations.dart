@@ -302,6 +302,18 @@ abstract class AppLocalizations {
   /// **'All categories'**
   String get choresFilterCategoryAll;
 
+  /// Tooltip for the chores app bar's leading acting-member avatar button (spec members-management §4).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch who\'s acting'**
+  String get actingMemberButtonTooltip;
+
+  /// Title of the acting-member switcher bottom sheet opened from the chores app bar.
+  ///
+  /// In en, this message translates to:
+  /// **'Who\'s doing chores right now?'**
+  String get actingMemberSheetTitle;
+
   /// Chores list empty-state message, shown when there are no pending occurrences to show.
   ///
   /// In en, this message translates to:
@@ -643,6 +655,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open settings'**
   String get settingsDigestPermissionAction;
+
+  /// Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get settingsMembersEntry;
+
+  /// App bar title of the manage-members screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get manageMembersTitle;
+
+  /// Manage-members screen load-error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load your members.'**
+  String get manageMembersErrorMessage;
+
+  /// Member edit sheet heading when adding a new member.
+  ///
+  /// In en, this message translates to:
+  /// **'New member'**
+  String get memberEditNewTitle;
+
+  /// Member edit sheet heading when editing an existing member.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit member'**
+  String get memberEditEditTitle;
+
+  /// Label of the member edit sheet's required name text field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get memberEditNameLabel;
+
+  /// Section label above the member edit sheet's color swatch picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get memberEditColorLabel;
 
   /// Settings screen list entry that opens category management (spec ux-round-2 B1).
   ///

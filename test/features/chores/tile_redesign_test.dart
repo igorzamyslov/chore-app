@@ -2,6 +2,7 @@ import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,9 +49,16 @@ void main() {
       await tester.pumpAndSettle();
 
       // The bootstrap member is named 'Me'; its first (and only) name
-      // token shows next to a single avatar circle.
+      // token shows next to a single avatar circle. Scoped to the tiles:
+      // the app bar's acting-member button is a CircleAvatar too.
       expect(find.text('Me'), findsOneWidget);
-      expect(find.byType(CircleAvatar), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(ChoreOccurrenceTile),
+          matching: find.byType(CircleAvatar),
+        ),
+        findsOneWidget,
+      );
     },
   );
 

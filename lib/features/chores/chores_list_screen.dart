@@ -8,6 +8,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/features/chores/acting_member_sheet.dart';
 import 'package:chore_app/features/chores/chore_action_sheet.dart';
 import 'package:chore_app/features/chores/chore_delete_dialog.dart';
 import 'package:chore_app/features/chores/chore_done_section.dart';
@@ -44,6 +45,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const ActingMemberButton(),
         title: Text(AppLocalizations.of(context).choresTabLabel),
         actions: [
           MemberFilterButton(

@@ -45,6 +45,9 @@
   "choresFilterCategoryTooltip": "Nach Kategorie filtern",
   "choresFilterCategoryAll": "Alle Kategorien",
 
+  "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
+  "actingMemberSheetTitle": "Wer ist gerade dran?",
+
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
 
@@ -115,6 +118,16 @@
   "settingsDigestTimeLabel": "Benachrichtigungszeit",
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
+
+  "settingsMembersEntry": "Mitglieder",
+
+  "manageMembersTitle": "Mitglieder",
+  "manageMembersErrorMessage": "Deine Mitglieder konnten nicht geladen werden.",
+
+  "memberEditNewTitle": "Neues Mitglied",
+  "memberEditEditTitle": "Mitglied bearbeiten",
+  "memberEditNameLabel": "Name",
+  "memberEditColorLabel": "Farbe",
 
   "settingsCategoriesEntry": "Kategorien",
 

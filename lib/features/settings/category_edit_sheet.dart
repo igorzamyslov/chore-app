@@ -1,6 +1,7 @@
 /// The category add/edit bottom sheet: rename, icon, color, save, delete.
 library;
 
+import 'package:chore_app/app/color_swatch_picker.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/theme.dart';
@@ -124,9 +125,11 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
           const SizedBox(height: 24),
           Text(l10n.categoryEditColorLabel, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
-          _ColorSwatches(
+          ColorSwatchPicker(
+            colors: CategoryRepository.seedColors,
             selected: _color,
             onSelected: (value) => setState(() => _color = value),
+            semanticIdPrefix: 'settings.categories.color',
           ),
           const SizedBox(height: 24),
           Row(
@@ -210,35 +213,6 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
   }
 }
 
-/// A 48dp-minimum tappable circular tile, used by both the icon grid and
-/// the color swatches (design-language: touch targets >= 48dp, enforced
-/// with sizing, not hope).
-class _PickerTile extends StatelessWidget {
-  const _PickerTile({
-    required this.isSelected,
-    required this.onTap,
-    required this.child,
-  });
-
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(width: 48, height: 48, child: Center(child: child)),
-      ),
-    );
-  }
-}
-
 /// The icon picker: a wrapped grid of [categoryIconIdentifiers], each drawn
 /// via `categoryIcon`. The selected tile is marked two ways — a filled
 /// background AND a small check badge — so selection never rides on color
@@ -259,7 +233,7 @@ class _IconGrid extends StatelessWidget {
         for (final identifier in categoryIconIdentifiers)
           semantic(
             'settings.categories.icon.$identifier',
-            child: _PickerTile(
+            child: PickerTile(
               isSelected: identifier == selected,
               onTap: () => onSelected(identifier),
               child: Stack(
@@ -286,79 +260,6 @@ class _IconGrid extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// The color picker: a wrapped row of [CategoryRepository.seedColors]
-/// swatches. The selected swatch is marked two ways — a contrasting border
-/// ring AND a checkmark — so selection never rides on color alone.
-class _ColorSwatches extends StatelessWidget {
-  const _ColorSwatches({required this.selected, required this.onSelected});
-
-  final int selected;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (
-          var index = 0;
-          index < CategoryRepository.seedColors.length;
-          index++
-        )
-          semantic(
-            'settings.categories.color.$index',
-            child: _ColorSwatch(
-              color: Color(CategoryRepository.seedColors[index]),
-              isSelected: CategoryRepository.seedColors[index] == selected,
-              ringColor: onSurface,
-              onTap: () => onSelected(CategoryRepository.seedColors[index]),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ColorSwatch extends StatelessWidget {
-  const _ColorSwatch({
-    required this.color,
-    required this.isSelected,
-    required this.ringColor,
-    required this.onTap,
-  });
-
-  final Color color;
-  final bool isSelected;
-  final Color ringColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final checkColor =
-        ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-        ? Colors.white
-        : Colors.black;
-    return _PickerTile(
-      isSelected: false,
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: isSelected ? Border.all(color: ringColor, width: 2) : null,
-        ),
-        child: isSelected
-            ? Icon(Icons.check, color: checkColor, size: 18)
-            : null,
-      ),
     );
   }
 }

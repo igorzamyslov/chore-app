@@ -71,4 +71,60 @@ void main() {
     final rows = await db.select(db.settings).get();
     expect(rows, isEmpty);
   });
+
+  test(
+    'schemaVersion 2 -> 3 upgrade adds actingMemberId (NULL by default), '
+    'keeping the existing settings row (spec '
+    'docs/specs/members-management.md)',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v3_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v2 install without hand-copying v2's CREATE
+      // TABLE SQL: open the *current* (v3) schema once against a real file
+      // so `onCreate` materializes every table with its full v3 column
+      // set, insert a settings row (so the upgrade's "existing row
+      // survives" guarantee is actually exercised), then drop the v3-only
+      // `acting_member_id` column and roll `user_version` back to 2 —
+      // reproducing exactly what a real v2 database on a user's device
+      // looks like.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN acting_member_id',
+      );
+      await seed.customStatement('PRAGMA user_version = 2');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 3)
+      // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
+      // `schemaVersion` of 3, so drift runs `onUpgrade(migrator, 2, 3)` —
+      // exactly the real upgrade path a v2 user's device would go through.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final row = await upgraded.select(upgraded.settings).getSingle();
+      expect(row.id, 'device');
+      expect(row.actingMemberId, isNull);
+      // The pre-existing row's own data survived the upgrade untouched.
+      expect(row.createdAt, 't0');
+      expect(row.digestEnabled, isTrue);
+      expect(row.digestMinutes, 480);
+    },
+  );
 }

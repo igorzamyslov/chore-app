@@ -161,6 +161,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresFilterCategoryAll => 'All categories';
 
   @override
+  String get actingMemberButtonTooltip => 'Switch who\'s acting';
+
+  @override
+  String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
+
+  @override
   String get choresEmptyState => 'No chores pending — nice work!';
 
   @override
@@ -369,6 +375,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDigestPermissionAction => 'Open settings';
+
+  @override
+  String get settingsMembersEntry => 'Members';
+
+  @override
+  String get manageMembersTitle => 'Members';
+
+  @override
+  String get manageMembersErrorMessage => 'Could not load your members.';
+
+  @override
+  String get memberEditNewTitle => 'New member';
+
+  @override
+  String get memberEditEditTitle => 'Edit member';
+
+  @override
+  String get memberEditNameLabel => 'Name';
+
+  @override
+  String get memberEditColorLabel => 'Color';
 
   @override
   String get settingsCategoriesEntry => 'Categories';
