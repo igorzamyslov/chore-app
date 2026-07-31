@@ -380,6 +380,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDigestPermissionAction => 'Einstellungen öffnen';
 
   @override
+  String get settingsExportEntry => 'Daten exportieren';
+
+  @override
+  String get settingsExportError =>
+      'Deine Daten konnten nicht exportiert werden. Versuch es noch mal.';
+
+  @override
   String get settingsMembersEntry => 'Mitglieder';
 
   @override
@@ -477,4 +484,30 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAboutDonateSubtitle => 'Bald verfügbar';
+
+  @override
+  String get settingsResetSectionTitle => 'Gefahrenzone';
+
+  @override
+  String get settingsResetEntry => 'App-Daten zurücksetzen';
+
+  @override
+  String get settingsResetConfirm1Title => 'App-Daten zurücksetzen?';
+
+  @override
+  String get settingsResetConfirm1Body =>
+      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.';
+
+  @override
+  String get settingsResetConfirm1Action => 'Weiter';
+
+  @override
+  String get settingsResetConfirm2Title => 'Wirklich alles löschen?';
+
+  @override
+  String get settingsResetConfirm2Body =>
+      'Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.';
+
+  @override
+  String get settingsResetConfirm2Action => 'Alles löschen';
 }

@@ -656,6 +656,18 @@ abstract class AppLocalizations {
   /// **'Open settings'**
   String get settingsDigestPermissionAction;
 
+  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Export data'**
+  String get settingsExportEntry;
+
+  /// Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1).
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t export your data. Please try again.'**
+  String get settingsExportError;
+
   /// Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry.
   ///
   /// In en, this message translates to:
@@ -841,6 +853,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Coming soon'**
   String get settingsAboutDonateSubtitle;
+
+  /// Section header above the destructive reset row (spec docs/specs/polish-round-1.md B2), at the very bottom of Settings -- exists purely to visually separate it from every section above.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get settingsResetSectionTitle;
+
+  /// The destructive Settings row (spec docs/specs/polish-round-1.md B2) that starts the double-confirm reset flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset app data'**
+  String get settingsResetEntry;
+
+  /// Title of the first reset confirmation dialog (spec docs/specs/polish-round-1.md B2).
+  ///
+  /// In en, this message translates to:
+  /// **'Reset app data?'**
+  String get settingsResetConfirm1Title;
+
+  /// Body of the first reset confirmation dialog, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.'**
+  String get settingsResetConfirm1Body;
+
+  /// Confirm button of the first reset dialog; advances to the second, final confirmation rather than deleting anything yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get settingsResetConfirm1Action;
+
+  /// Title of the second (final) reset confirmation dialog (spec docs/specs/polish-round-1.md B2).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete everything?'**
+  String get settingsResetConfirm2Title;
+
+  /// Body of the second (final) reset confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the last step. Once you confirm, everything is gone immediately.'**
+  String get settingsResetConfirm2Body;
+
+  /// The final destructive confirm button; tapping it wipes every table and re-bootstraps the app to the fresh-install state.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete everything'**
+  String get settingsResetConfirm2Action;
 }
 
 class _AppLocalizationsDelegate

@@ -5,9 +5,11 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
+import 'package:chore_app/features/settings/export_row.dart';
 import 'package:chore_app/features/settings/language_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
+import 'package:chore_app/features/settings/reset_flow.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +18,8 @@ import 'package:permission_handler/permission_handler.dart';
 /// The Settings tab (spec `docs/specs/ux-round-2.md` B1: "Manage
 /// categories"; spec `docs/specs/notifications.md`: the 'Daily summary'
 /// section; spec `docs/next-session-plan.md` #5: the Language row and the
-/// About section at the bottom).
+/// About section at the bottom; spec `docs/specs/polish-round-1.md` B1/B2:
+/// the export row and the destructive reset row at the very bottom).
 ///
 /// A plain [ListView] of entries/sections, leaving room for further
 /// settings beyond category management, language, digest, and About.
@@ -86,10 +89,13 @@ class SettingsScreen extends ConsumerWidget {
             ],
             error: (error, stackTrace) => const [],
           ),
+          const ExportDataTile(),
           const AboutSectionHeader(),
           const AboutVersionTile(),
           const AboutLicensesTile(),
           const AboutDonateTile(),
+          const ResetSectionHeader(),
+          const ResetDataTile(),
         ],
       ),
     );

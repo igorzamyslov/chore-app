@@ -377,6 +377,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDigestPermissionAction => 'Open settings';
 
   @override
+  String get settingsExportEntry => 'Export data';
+
+  @override
+  String get settingsExportError =>
+      'Couldn\'t export your data. Please try again.';
+
+  @override
   String get settingsMembersEntry => 'Members';
 
   @override
@@ -472,4 +479,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAboutDonateSubtitle => 'Coming soon';
+
+  @override
+  String get settingsResetSectionTitle => 'Danger zone';
+
+  @override
+  String get settingsResetEntry => 'Reset app data';
+
+  @override
+  String get settingsResetConfirm1Title => 'Reset app data?';
+
+  @override
+  String get settingsResetConfirm1Body =>
+      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.';
+
+  @override
+  String get settingsResetConfirm1Action => 'Continue';
+
+  @override
+  String get settingsResetConfirm2Title => 'Delete everything?';
+
+  @override
+  String get settingsResetConfirm2Body =>
+      'This is the last step. Once you confirm, everything is gone immediately.';
+
+  @override
+  String get settingsResetConfirm2Action => 'Delete everything';
 }
