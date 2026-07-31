@@ -1,5 +1,15 @@
 # Plan: next session (feedback round 4, captured 2026-07-24)
 
+**STATUS 2026-07-31: fully executed.** #1 unpause bug (7b19d05), #2
+snackbars (6bdd12a), #3+#4 verification suites (eb3fb92), #5 language +
+About (d7accb5), #6 design decision = solid cards shipped, glass
+rejected (fe7325a~1), #7 members + acting switcher (c35bd57, 744bd7b).
+Also landed: E2E CI fixes (Android script split, settle-proof, warm-up
+launch), acting-member attribution rule (d3fb16e), Supabase project
+facts (docs/backend-supabase.md). Remaining roadmap lives in the
+sections below ("Roadmap phases") and docs/app-lifecycle.md (G1-G3,
+G8-G9 small items; G4-G6 sync-spec prerequisites).
+
 *Analysis done, nothing implemented yet. Ordered by severity.*
 
 ## 1. BUG (confirmed by code inspection): done → pause → unpause resurrects today's instance
