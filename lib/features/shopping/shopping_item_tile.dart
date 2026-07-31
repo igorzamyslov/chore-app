@@ -1,6 +1,7 @@
 /// A single shopping item's list tile.
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:flutter/material.dart';
@@ -38,34 +39,36 @@ class ShoppingItemTile extends StatelessWidget {
     final quantityNote = shoppingItem.quantityNote;
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
-    return semantic(
-      'shopping.item.${shoppingItem.id}',
-      child: ListTile(
-        onTap: onTap,
-        leading: semantic(
-          'shopping.item.${shoppingItem.id}.check',
-          child: Checkbox(
-            value: checked,
-            shape: const CircleBorder(),
-            onChanged: (value) => onCheckedChanged(value ?? false),
+    return DepthCard(
+      child: semantic(
+        'shopping.item.${shoppingItem.id}',
+        child: ListTile(
+          onTap: onTap,
+          leading: semantic(
+            'shopping.item.${shoppingItem.id}.check',
+            child: Checkbox(
+              value: checked,
+              shape: const CircleBorder(),
+              onChanged: (value) => onCheckedChanged(value ?? false),
+            ),
           ),
-        ),
-        title: Text(
-          shoppingItem.name,
-          style: theme.textTheme.titleMedium?.copyWith(
-            decoration: checked ? TextDecoration.lineThrough : null,
-            color: checked ? mutedColor : null,
+          title: Text(
+            shoppingItem.name,
+            style: theme.textTheme.titleMedium?.copyWith(
+              decoration: checked ? TextDecoration.lineThrough : null,
+              color: checked ? mutedColor : null,
+            ),
           ),
-        ),
-        subtitle: quantityNote == null || quantityNote.isEmpty
-            ? null
-            : Text(
-                quantityNote,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: mutedColor,
-                  decoration: checked ? TextDecoration.lineThrough : null,
+          subtitle: quantityNote == null || quantityNote.isEmpty
+              ? null
+              : Text(
+                  quantityNote,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: mutedColor,
+                    decoration: checked ? TextDecoration.lineThrough : null,
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

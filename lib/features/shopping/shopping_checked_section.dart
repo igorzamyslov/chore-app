@@ -1,6 +1,7 @@
 /// The collapsed-by-default 'In the cart' checked-items section.
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -42,22 +43,28 @@ class ShoppingCheckedSection extends StatelessWidget {
     // line instead of squeezing the title into an awkward two-line wrap
     // (visual QA finding at AX2).
     return ExpansionTile(
-      title: Wrap(
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          semantic(
-            'shopping.checked.header',
-            child: Text(l10n.shoppingCartHeader(count)),
-          ),
-          semantic(
-            'shopping.clear',
-            child: TextButton(
-              onPressed: onClear,
-              child: Text(l10n.shoppingClearButton),
+      // Pill backdrop under `glassCards` only: the rows below already sit
+      // in their own cards (ShoppingItemTile), but this header isn't
+      // wrapped in one, so it needs its own contrast safeguard against the
+      // gradient wash — see the #6 plan report.
+      title: DepthTextBackdrop(
+        child: Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            semantic(
+              'shopping.checked.header',
+              child: Text(l10n.shoppingCartHeader(count)),
             ),
-          ),
-        ],
+            semantic(
+              'shopping.clear',
+              child: TextButton(
+                onPressed: onClear,
+                child: Text(l10n.shoppingClearButton),
+              ),
+            ),
+          ],
+        ),
       ),
       children: tiles,
     );

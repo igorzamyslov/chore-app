@@ -1,6 +1,7 @@
 /// A single pending occurrence's list tile.
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -99,53 +100,55 @@ class ChoreOccurrenceTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final notes = chore.notes;
-    return semantic(
-      'chores.occurrence.${chore.id}',
-      child: InkWell(
-        onLongPress: onOpenMenu,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            children: [
-              semantic(
-                'chores.occurrence.${chore.id}.complete',
-                child: IconButton(
-                  icon: const Icon(Icons.circle_outlined),
-                  tooltip: l10n.choresOccurrenceCompleteTooltip,
-                  onPressed: onComplete,
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(chore.title, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      _MetadataRow(
-                        occurrence: occurrence,
-                        today: today,
-                        section: section,
-                      ),
-                      if (notes != null && notes.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        _NoteLine(note: notes),
-                      ],
-                    ],
+    return DepthCard(
+      child: semantic(
+        'chores.occurrence.${chore.id}',
+        child: InkWell(
+          onLongPress: onOpenMenu,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                semantic(
+                  'chores.occurrence.${chore.id}.complete',
+                  child: IconButton(
+                    icon: const Icon(Icons.circle_outlined),
+                    tooltip: l10n.choresOccurrenceCompleteTooltip,
+                    onPressed: onComplete,
                   ),
                 ),
-              ),
-              semantic(
-                'chores.occurrence.${chore.id}.menu',
-                child: IconButton(
-                  icon: const Icon(Icons.more_vert),
-                  tooltip: l10n.choresOccurrenceMoreActionsTooltip,
-                  onPressed: onOpenMenu,
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(chore.title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        _MetadataRow(
+                          occurrence: occurrence,
+                          today: today,
+                          section: section,
+                        ),
+                        if (notes != null && notes.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _NoteLine(note: notes),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                semantic(
+                  'chores.occurrence.${chore.id}.menu',
+                  child: IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: l10n.choresOccurrenceMoreActionsTooltip,
+                    onPressed: onOpenMenu,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

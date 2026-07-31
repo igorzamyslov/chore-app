@@ -2,6 +2,7 @@
 /// (done or skipped) today, each with a Reopen action.
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -31,18 +32,24 @@ class ChoreDoneSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ExpansionTile(
-      title: semantic(
-        'chores.done.header',
-        child: Text(l10n.choresDoneHeader(occurrences.length)),
+    // Whole-section card (not per-row): the ExpansionTile already groups
+    // these rows visually, so a card per row would double up with the
+    // section's own chrome once expanded — one card wrapping the header +
+    // rows reads cleaner (judgment call, see the #6 plan report).
+    return DepthCard(
+      child: ExpansionTile(
+        title: semantic(
+          'chores.done.header',
+          child: Text(l10n.choresDoneHeader(occurrences.length)),
+        ),
+        children: [
+          for (final occurrence in occurrences)
+            _DoneRow(
+              occurrence: occurrence,
+              onReopen: () => onReopen(occurrence),
+            ),
+        ],
       ),
-      children: [
-        for (final occurrence in occurrences)
-          _DoneRow(
-            occurrence: occurrence,
-            onReopen: () => onReopen(occurrence),
-          ),
-      ],
     );
   }
 }

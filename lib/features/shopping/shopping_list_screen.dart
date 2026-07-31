@@ -1,6 +1,7 @@
 /// The shopping list screen (this feature's tab).
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
@@ -33,12 +34,18 @@ class ShoppingListScreen extends ConsumerWidget {
           const ShoppingQuickAddRow(),
           Expanded(
             child: itemsAsync.when(
-              data: (items) => _Body(
-                items: items,
-                onCheckedChanged: (id, {required checked}) =>
-                    _setChecked(ref, id, checked: checked),
-                onTapItem: (item) => showShoppingEditSheet(context, item: item),
-                onClear: () => _clearChecked(ref),
+              // The `glassCards` background wash sits behind the list
+              // only, not the quick-add row above it or loading/error
+              // placeholders — see DepthBackground's doc.
+              data: (items) => DepthBackground(
+                child: _Body(
+                  items: items,
+                  onCheckedChanged: (id, {required checked}) =>
+                      _setChecked(ref, id, checked: checked),
+                  onTapItem: (item) =>
+                      showShoppingEditSheet(context, item: item),
+                  onClear: () => _clearChecked(ref),
+                ),
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stackTrace) => _ErrorState(
@@ -157,9 +164,11 @@ class _EmptyMessage extends StatelessWidget {
         const SizedBox(height: 8),
         semantic(
           'shopping.empty',
-          child: Text(
-            AppLocalizations.of(context).shoppingEmptyState,
-            style: theme.textTheme.bodyLarge,
+          child: DepthTextBackdrop(
+            child: Text(
+              AppLocalizations.of(context).shoppingEmptyState,
+              style: theme.textTheme.bodyLarge,
+            ),
           ),
         ),
       ],

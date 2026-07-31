@@ -2,6 +2,7 @@
 /// a Resume action.
 library;
 
+import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
@@ -30,15 +31,19 @@ class ChorePausedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ExpansionTile(
-      title: semantic(
-        'chores.paused.header',
-        child: Text(l10n.choresPausedHeader(chores.length)),
+    // Whole-section card (not per-row): matches ChoreDoneSection's choice —
+    // see that file's comment and the #6 plan report.
+    return DepthCard(
+      child: ExpansionTile(
+        title: semantic(
+          'chores.paused.header',
+          child: Text(l10n.choresPausedHeader(chores.length)),
+        ),
+        children: [
+          for (final details in chores)
+            _PausedRow(details: details, onResume: () => onResume(details)),
+        ],
       ),
-      children: [
-        for (final details in chores)
-          _PausedRow(details: details, onResume: () => onResume(details)),
-      ],
     );
   }
 }
