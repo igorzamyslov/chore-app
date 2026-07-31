@@ -23,3 +23,9 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
 5. The app's smart defaults are part of the product: the repeat unit
    defaults to weekly-on-today's-weekday. Flows that need daily must tap
    `chore_form.repeat.unit.day` explicitly.
+6. **Settle before touching a freshly-created row.** After saving, assert
+   BOTH the destination element (convention 4) AND the new tile's own
+   text before tapping anything on that tile. On slow CI simulators the
+   row is still animating in right after save, and a tap during the
+   animation misses — the first live CI run failed exactly this way in
+   `skip_undo_journey` while locally everything was green.

@@ -19,6 +19,11 @@ tags:
     id: "chore_form.save"
 - assertVisible:
     id: "chores.add"
+# Settle proof before touching the tile: on slow CI simulators the row is
+# still animating in right after save, and a menu tap during the animation
+# misses (first live CI run failed exactly here). The FAB assert above only
+# proves we left the form; this proves the tile is rendered.
+- assertVisible: "(?s).*Mop kitchen.*"
 # Skip via the tile menu.
 - tapOn:
     id: 'chores\.occurrence\..*\.menu'
