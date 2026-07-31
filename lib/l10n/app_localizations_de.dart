@@ -9,7 +9,7 @@ class AppLocalizationsDe extends AppLocalizations {
   AppLocalizationsDe([String locale = 'de']) : super(locale);
 
   @override
-  String get appTitle => 'Aufgaben';
+  String get appTitle => 'Famdo';
 
   @override
   String appBootstrapError(Object error) {

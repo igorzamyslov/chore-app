@@ -1,4 +1,4 @@
-package com.example.chore_app
+package io.github.igorzamyslov.famdo
 
 import io.flutter.embedding.android.FlutterActivity
 

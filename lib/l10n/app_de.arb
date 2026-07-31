@@ -1,6 +1,6 @@
 {
   "@@locale": "de",
-  "appTitle": "Aufgaben",
+  "appTitle": "Famdo",
   "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
 
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",

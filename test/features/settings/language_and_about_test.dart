@@ -16,8 +16,8 @@ void main() {
 
   setUp(() {
     PackageInfo.setMockInitialValues(
-      appName: 'Chores (mock)',
-      packageName: 'com.example.chore_app',
+      appName: 'Famdo (mock)',
+      packageName: 'io.github.igorzamyslov.famdo',
       version: '9.9.9',
       buildNumber: '42',
       buildSignature: '',
