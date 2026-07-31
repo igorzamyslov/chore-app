@@ -1,7 +1,7 @@
 /// A single pending occurrence's list tile.
 library;
 
-import 'package:chore_app/app/depth_variant.dart';
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';

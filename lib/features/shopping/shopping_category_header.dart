@@ -1,7 +1,6 @@
 /// A category-run header for the shopping list's unchecked-items section.
 library;
 
-import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -33,22 +32,18 @@ class ShoppingCategoryHeader extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      // Pill backdrop under `glassCards` only (hard rule: text never sits
-      // directly on the gradient wash) — no-op under `flat`/`cards`.
-      child: DepthTextBackdrop(
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(color: color),
-              ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(color: color),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

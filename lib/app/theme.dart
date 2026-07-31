@@ -3,26 +3,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-/// Prototype switch for docs/next-session-plan.md #6 — flat is the
-/// shipped look; the other two exist only for the side-by-side decision.
-enum DesignVariant {
-  /// The shipped look: no cards, no background wash. Every variant-gated
-  /// widget in `lib/app/depth_variant.dart` is a no-op under this value.
-  flat,
-
-  /// Solid M3 `surfaceContainerLow` cards around tiles/rows, plain
-  /// background.
-  cards,
-
-  /// [cards], plus a static seed-tinted gradient wash behind the list.
-  glassCards,
-}
-
-/// Which [DesignVariant] the app is compiled with. The orchestrator flips
-/// this constant to build each variant for a side-by-side screenshot
-/// comparison; ship-time default is [DesignVariant.flat].
-const DesignVariant designVariant = DesignVariant.flat;
-
 /// The seed color every [ColorScheme] in this app is derived from.
 const Color _seedColor = Color(0xFF26A69A);
 

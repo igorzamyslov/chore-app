@@ -97,6 +97,20 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
   ('Delete chore?'), body = one line of specifics, actions = 'Cancel' +
   destructive-colored verb ('Delete').
 
+## Depth / cards
+
+- List content sits in solid cards, not directly on the plain background:
+  `DepthCard` wraps each row/tile in an M3 `surfaceContainerLow` card, 12dp
+  radius, elevation 0, `EdgeInsets.symmetric(horizontal: 12, vertical: 4)`
+  margins.
+- Done/paused sections get one card around the whole `ExpansionTile`
+  (header + rows together), not one card per row — the tile already groups
+  those rows visually, so per-row cards would double up.
+- Headers and empty states stay directly on the plain background — no
+  backdrop, no wash.
+- **Decision 2026-07-31**: solid cards chosen over a glass-backdrop variant
+  after a side-by-side on device; backgrounds stay plain.
+
 ## Definition of visual done (per screen)
 
 Screenshot review on iPhone (small: SE-class) + Pixel-class Android, light

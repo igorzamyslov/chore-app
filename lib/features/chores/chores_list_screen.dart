@@ -3,7 +3,6 @@ library;
 
 import 'dart:async';
 
-import 'package:chore_app/app/depth_variant.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
@@ -60,21 +59,17 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         ],
       ),
       body: occurrencesAsync.when(
-        // The `glassCards` background wash sits behind the list only (not
-        // behind loading/error placeholders) — see DepthBackground's doc.
-        data: (occurrences) => DepthBackground(
-          child: _Body(
-            occurrences: occurrences,
-            closedToday: closedToday ?? const [],
-            paused: paused ?? const [],
-            today: today,
-            memberFilter: _memberFilter,
-            categoryFilter: _categoryFilter,
-            onComplete: _complete,
-            onOpenMenu: _openMenu,
-            onReopen: _reopen,
-            onResume: _resume,
-          ),
+        data: (occurrences) => _Body(
+          occurrences: occurrences,
+          closedToday: closedToday ?? const [],
+          paused: paused ?? const [],
+          today: today,
+          memberFilter: _memberFilter,
+          categoryFilter: _categoryFilter,
+          onComplete: _complete,
+          onOpenMenu: _openMenu,
+          onReopen: _reopen,
+          onResume: _resume,
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => _ErrorState(
@@ -286,9 +281,7 @@ class _Body extends StatelessWidget {
       return Center(
         child: semantic(
           'chores.empty',
-          child: DepthTextBackdrop(
-            child: Text(AppLocalizations.of(context).choresEmptyState),
-          ),
+          child: Text(AppLocalizations.of(context).choresEmptyState),
         ),
       );
     }
@@ -313,9 +306,7 @@ class _Body extends StatelessWidget {
             child: Center(
               child: semantic(
                 'chores.empty',
-                child: DepthTextBackdrop(
-                  child: Text(AppLocalizations.of(context).choresEmptyState),
-                ),
+                child: Text(AppLocalizations.of(context).choresEmptyState),
               ),
             ),
           )
@@ -324,13 +315,9 @@ class _Body extends StatelessWidget {
             if (bySection[section] case final tiles? when tiles.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                // Pill backdrop under `glassCards` only — see
-                // DepthTextBackdrop's doc and the #6 plan report.
-                child: DepthTextBackdrop(
-                  child: Text(
-                    section.label(AppLocalizations.of(context)),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                child: Text(
+                  section.label(AppLocalizations.of(context)),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
               for (final occurrence in tiles)

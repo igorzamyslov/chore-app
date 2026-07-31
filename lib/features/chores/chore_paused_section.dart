@@ -2,7 +2,7 @@
 /// a Resume action.
 library;
 
-import 'package:chore_app/app/depth_variant.dart';
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/features/categories/category_badge.dart';

@@ -1,7 +1,7 @@
 /// A single shopping item's list tile.
 library;
 
-import 'package:chore_app/app/depth_variant.dart';
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:flutter/material.dart';
