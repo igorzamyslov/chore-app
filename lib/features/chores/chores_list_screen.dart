@@ -9,6 +9,7 @@ import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
+import 'package:chore_app/features/chores/active_chores_presence.dart';
 import 'package:chore_app/features/chores/chore_action_sheet.dart';
 import 'package:chore_app/features/chores/chore_delete_dialog.dart';
 import 'package:chore_app/features/chores/chore_done_section.dart';
@@ -17,6 +18,8 @@ import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
 import 'package:chore_app/features/chores/chore_paused_section.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
+import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
+import 'package:chore_app/features/chores/onboarding_name_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,6 +44,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final occurrencesAsync = ref.watch(pendingOccurrencesProvider);
     final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
+    final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
 
     return Scaffold(
@@ -58,23 +62,36 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           ),
         ],
       ),
-      body: occurrencesAsync.when(
-        data: (occurrences) => _Body(
-          occurrences: occurrences,
-          closedToday: closedToday ?? const [],
-          paused: paused ?? const [],
-          today: today,
-          memberFilter: _memberFilter,
-          categoryFilter: _categoryFilter,
-          onComplete: _complete,
-          onOpenMenu: _openMenu,
-          onReopen: _reopen,
-          onResume: _resume,
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => _ErrorState(
-          onRetry: () => ref.invalidate(pendingOccurrencesProvider),
-        ),
+      // The first-run banners (spec docs/specs/polish-round-1.md A2/A3)
+      // render above the list content, never blocking it: both are
+      // self-hiding (SizedBox.shrink) when their own conditions don't hold,
+      // so this Column adds nothing visible once a household is past both.
+      body: Column(
+        children: [
+          const OnboardingNameBanner(),
+          const DigestPrepromptBanner(),
+          Expanded(
+            child: occurrencesAsync.when(
+              data: (occurrences) => _Body(
+                occurrences: occurrences,
+                closedToday: closedToday ?? const [],
+                paused: paused ?? const [],
+                hasActiveChores: hasActiveChores,
+                today: today,
+                memberFilter: _memberFilter,
+                categoryFilter: _categoryFilter,
+                onComplete: _complete,
+                onOpenMenu: _openMenu,
+                onReopen: _reopen,
+                onResume: _resume,
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => _ErrorState(
+                onRetry: () => ref.invalidate(pendingOccurrencesProvider),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: semantic(
         'chores.add',
@@ -212,6 +229,7 @@ class _Body extends StatelessWidget {
     required this.occurrences,
     required this.closedToday,
     required this.paused,
+    required this.hasActiveChores,
     required this.today,
     required this.memberFilter,
     required this.categoryFilter,
@@ -224,6 +242,12 @@ class _Body extends StatelessWidget {
   final List<OccurrenceWithChore> occurrences;
   final List<ClosedOccurrenceWithChore> closedToday;
   final List<ChoreWithDetails> paused;
+
+  /// Whether the household has any active (non-deleted) chore at all —
+  /// unfiltered, unlike [occurrences]/[closedToday]/[paused] above — the
+  /// signal that distinguishes the "fresh install" empty state from "all
+  /// done" (spec `docs/specs/polish-round-1.md` A1).
+  final bool hasActiveChores;
   final PlainDate today;
   final String? memberFilter;
   final String? categoryFilter;
@@ -279,10 +303,7 @@ class _Body extends StatelessWidget {
 
     if (filtered.isEmpty && !hasCollapsedSections) {
       return Center(
-        child: semantic(
-          'chores.empty',
-          child: Text(AppLocalizations.of(context).choresEmptyState),
-        ),
+        child: _ChoresEmptyState(fresh: !hasActiveChores),
       );
     }
 
@@ -303,12 +324,7 @@ class _Body extends StatelessWidget {
         if (filtered.isEmpty)
           Padding(
             padding: const EdgeInsets.all(32),
-            child: Center(
-              child: semantic(
-                'chores.empty',
-                child: Text(AppLocalizations.of(context).choresEmptyState),
-              ),
-            ),
+            child: Center(child: _ChoresEmptyState(fresh: !hasActiveChores)),
           )
         else
           for (final section in ChoreSection.values)
@@ -337,6 +353,49 @@ class _Body extends StatelessWidget {
             onReopen: onReopen,
           ),
       ],
+    );
+  }
+}
+
+/// The chores list's empty state — two distinct copies/icons sharing one
+/// outer `chores.empty` container id (spec `docs/specs/polish-round-1.md`
+/// A1): [fresh] (zero non-deleted chores in the household) invites adding
+/// the first chore, child id `chores.empty.fresh`; otherwise the existing
+/// "all done" praise copy, child id `chores.empty.done`. E2E flows that
+/// assert the shared `chores.empty` id (e.g. after deleting the only
+/// chore) keep passing regardless of which child renders.
+class _ChoresEmptyState extends StatelessWidget {
+  const _ChoresEmptyState({required this.fresh});
+
+  final bool fresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+
+    return semantic(
+      'chores.empty',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            fresh ? Icons.add_task_outlined : Icons.task_alt_outlined,
+            size: 48,
+            color: color,
+          ),
+          const SizedBox(height: 8),
+          semantic(
+            fresh ? 'chores.empty.fresh' : 'chores.empty.done',
+            child: Text(
+              fresh ? l10n.choresEmptyFresh : l10n.choresEmptyState,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

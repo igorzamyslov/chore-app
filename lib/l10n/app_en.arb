@@ -204,11 +204,41 @@
 
   "choresEmptyState": "No chores pending — nice work!",
   "@choresEmptyState": {
-    "description": "Chores list empty-state message, shown when there are no pending occurrences to show."
+    "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done')."
+  },
+  "choresEmptyFresh": "Add your first chore with +",
+  "@choresEmptyFresh": {
+    "description": "Chores list empty-state message shown instead of choresEmptyState on a fresh install (zero non-deleted chores in the household yet) — spec docs/specs/polish-round-1.md A1."
   },
   "choresErrorMessage": "Could not load your chores.",
   "@choresErrorMessage": {
     "description": "Chores list load-error message."
+  },
+
+  "onboardingNameBannerMessage": "Who's doing the chores here?",
+  "@onboardingNameBannerMessage": {
+    "description": "First-run name-prompt banner copy at the top of the chores list (spec docs/specs/polish-round-1.md A2), shown while the household still consists of just the bootstrap 'Me' member."
+  },
+  "onboardingNameBannerSetAction": "Set my name",
+  "@onboardingNameBannerSetAction": {
+    "description": "Action button on the name-prompt banner opening the member edit sheet, prefilled for the bootstrap member."
+  },
+  "onboardingNameBannerDismissTooltip": "Dismiss",
+  "@onboardingNameBannerDismissTooltip": {
+    "description": "Tooltip for the name-prompt banner's X dismiss button."
+  },
+
+  "digestPrepromptMessage": "Want a daily summary of what's due?",
+  "@digestPrepromptMessage": {
+    "description": "Digest pre-prompt banner copy at the top of the chores list (spec docs/specs/polish-round-1.md A3), shown before the one-shot OS notification-permission dialog."
+  },
+  "digestPrepromptEnableAction": "Turn on",
+  "@digestPrepromptEnableAction": {
+    "description": "Digest pre-prompt banner's action that marks it shown, requests the OS notification permission, then triggers a digest recompute."
+  },
+  "digestPrepromptDismissAction": "Not now",
+  "@digestPrepromptDismissAction": {
+    "description": "Digest pre-prompt banner's dismiss action: marks it shown without requesting the OS permission (the digest stays enabled but silent until permission arrives via Settings)."
   },
 
   "choresSnackbarDone": "Done",
@@ -439,6 +469,15 @@
   "shoppingErrorMessage": "Could not load your shopping list.",
   "@shoppingErrorMessage": {
     "description": "Shopping list load-error message."
+  },
+
+  "shoppingDeletedSnackbar": "Removed",
+  "@shoppingDeletedSnackbar": {
+    "description": "Undo snackbar message shown after deleting a shopping item from its edit sheet (spec docs/specs/polish-round-1.md C3), mirroring the chores undo tone."
+  },
+  "shoppingDeletedUndo": "Undo",
+  "@shoppingDeletedUndo": {
+    "description": "Action label of the shopping-delete undo snackbar; restores the item by clearing its deleted_at (soft delete)."
   },
 
   "shoppingEditNameLabel": "Name",

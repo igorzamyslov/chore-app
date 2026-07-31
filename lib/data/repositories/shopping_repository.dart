@@ -349,6 +349,21 @@ class ShoppingRepository {
     );
   }
 
+  /// Restores a previously soft-deleted item (spec
+  /// `docs/specs/polish-round-1.md` C3): the UNDO action of the shopping
+  /// delete snackbar. A plain `deleted_at` clear — soft delete never
+  /// touched any other column, so there's nothing else to restore.
+  Future<void> restoreItem(String id) async {
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.equals(id))).write(
+      ShoppingItemsCompanion(
+        deletedAt: const Value(null),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   /// Soft-deletes every active, checked item in [householdId].
   Future<void> clearChecked(String householdId) async {
     final now = _isoNow();

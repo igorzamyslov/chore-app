@@ -194,7 +194,6 @@ class NotificationScheduler {
   final ui.Locale Function() localeResolver;
 
   bool _initialized = false;
-  bool _permissionRequested = false;
 
   /// Initializes the underlying plugin. Idempotent: only the first call
   /// does anything. Safe to call on every bootstrap/resume.
@@ -210,16 +209,18 @@ class NotificationScheduler {
   /// [digestNotificationId], localized title (the app name) and body (the
   /// due/overdue counts).
   ///
-  /// Requests the OS notification permission the first time this is ever
-  /// called on this [NotificationScheduler] instance (spec: "on first
-  /// enable", not app launch) — every call after that skips the request,
-  /// since the OS itself only ever prompts once.
+  /// Deliberately never requests the OS notification permission itself
+  /// (spec `docs/specs/polish-round-1.md` A3): that dialog is intrusive
+  /// enough that it must only ever fire from an explicit user tap (the
+  /// digest pre-prompt banner's 'Turn on', or the Settings digest
+  /// permission hint's recovery path) — never as a side effect of a
+  /// schedule attempt that could be triggered automatically (e.g. at
+  /// bootstrap, with the digest enabled by default). Callers that DO want
+  /// the permission requested call [DigestNotificationPlugin.
+  /// requestPermission] directly, before or after this method, as
+  /// appropriate.
   Future<void> scheduleDigest(DigestPlan plan) async {
     await ensureInitialized();
-    if (!_permissionRequested) {
-      _permissionRequested = true;
-      await plugin.requestPermission();
-    }
     final l10n = lookupAppLocalizations(localeResolver());
     await plugin.zonedSchedule(
       id: digestNotificationId,

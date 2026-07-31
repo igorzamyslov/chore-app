@@ -1,0 +1,60 @@
+# First-run banners journey (spec docs/specs/polish-round-1.md A2/A3):
+# a fresh launch shows the name-prompt banner; setting a name via the
+# EXISTING member edit sheet dismisses it; adding the first chore then
+# surfaces the digest pre-prompt banner (OS notification permission isn't
+# granted yet on a freshly-cleared install), dismissed via its own action.
+# Both are inline banner cards, never modals, so this flow (like every
+# other one in this suite) keeps starting from `clearState: true` clean.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "onboarding.name"
+- tapOn:
+    id: "onboarding.name.set"
+- assertVisible:
+    id: "members.edit.name"
+- tapOn:
+    id: "members.edit.name"
+- eraseText
+- inputText: "Jordan"
+- pressKey: Enter
+- tapOn:
+    id: "members.edit.save"
+# Destination-only assert (README convention 4): the sheet's own name-field
+# id is gone, proving it actually closed (matches the precedent in
+# e2e/flows/settings/members_and_acting.yaml — a bare text lookup, or an
+# element that stays in the hierarchy under the closing sheet's scrim,
+# could false-positive mid-transition).
+- assertNotVisible:
+    id: "members.edit.name"
+- assertNotVisible:
+    id: "onboarding.name"
+# Add the first chore: the digest pre-prompt banner only shows once a
+# chore exists (spec: a fresh install shows the name banner first).
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Water plants"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "(?s).*Water plants.*"
+- assertVisible:
+    id: "digest.preprompt"
+- tapOn:
+    id: "digest.preprompt.dismiss"
+- assertNotVisible:
+    id: "digest.preprompt"
+# The renamed member's name persisted through the whole journey. Android
+# merges the tappable row's descendants (avatar initial + name) into one
+# label (README convention 2), hence the (?s).* wrapping.
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.members"
+- assertVisible: "(?s).*Jordan.*"
