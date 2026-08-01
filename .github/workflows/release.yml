@@ -45,6 +45,17 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: flutter build apk --release
+      - name: Verify release APK can reach the network
+        # v0.2.0 shipped WITHOUT android.permission.INTERNET and every
+        # Supabase call failed silently on real phones: Flutter declares
+        # that permission only in the debug/profile manifests, so no debug
+        # build — simulator, emulator, or E2E — can ever reproduce it.
+        # Assert on the actual artifact, the only thing users install.
+        run: |
+          AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
+          "$AAPT" dump permissions build/app/outputs/flutter-apk/app-release.apk \
+            | grep -q "android.permission.INTERNET" \
+            || { echo "::error::Release APK lacks INTERNET permission — sync would fail silently on every device"; exit 1; }
       - name: Rename artifact
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk \

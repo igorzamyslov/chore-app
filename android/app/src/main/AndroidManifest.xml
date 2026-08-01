@@ -66,6 +66,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- Optional sync (spec docs/specs/sync-backend.md): Supabase auth +
+         REST + realtime need INTERNET. MUST be declared HERE, in the main
+         manifest — Flutter's template only declares it in the debug and
+         profile manifests (android/app/src/{debug,profile}/), for hot
+         reload. This app was local-first and needed no network at all
+         until v0.2.0, so the gap only surfaced in the first RELEASE build
+         that used sync: every Supabase call failed silently and sign-in
+         reported the generic "Couldn't send the sign-in link" (v0.2.0,
+         root-caused 2026-08-01 via `aapt2 dump permissions` on the
+         shipped APK). Debug builds could never reproduce it. The release
+         workflow now asserts this permission is present in the built APK
+         before publishing — see .github/workflows/release.yml. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
