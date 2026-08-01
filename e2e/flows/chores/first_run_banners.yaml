@@ -25,8 +25,18 @@ tags:
     # un-granted, matching a real fresh install on both platforms.
     permissions:
       notifications: unset
-- assertVisible:
-    id: "onboarding.name"
+# extendedWaitUntil, not assertVisible (root-caused 2026-08-01, README
+# "Cold starts"): this is the suite's only launchApp that BOTH clears
+# state AND sets permissions — the coldest possible start (fresh ART
+# verification, no warm caches) — and on CI emulators the first Flutter
+# frame can land after the default element-wait window (observed ~30s
+# via logcat while the default window expired at ~19s; the app itself
+# is fine). The long wait covers exactly that first frame; every later
+# step runs against a live app and keeps normal timeouts.
+- extendedWaitUntil:
+    visible:
+      id: "onboarding.name"
+    timeout: 90000
 - tapOn:
     id: "onboarding.name.set"
 - assertVisible:

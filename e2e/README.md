@@ -48,3 +48,16 @@ local emulator, old vs new version (install the candidate under a
 scratch `HOME` so the local install stays put), run the full suite on
 the candidate, then bump the pin and this note together. Keep the local
 `~/.maestro` at the pinned version so local runs and CI agree.
+
+## Cold starts (convention 8)
+
+The FIRST element wait after a `launchApp` that clears state AND sets
+`permissions:` must be an `extendedWaitUntil` (60–90s), never a bare
+`assertVisible`: that combination produces the coldest possible app
+start (fresh ART verification, nothing cached), and on CI emulators the
+first Flutter frame can land after Maestro's default element window —
+observed 2026-08-01 (logcat showed the first frame at ~30s while the
+default window expired at ~19s; the Maestro version pin shifts the odds
+but does not remove the race). Later steps run against a live app and
+keep normal timeouts. CI uploads `~/.maestro/tests` as a debug artifact
+on failure — start every CI-only investigation from those screenshots.

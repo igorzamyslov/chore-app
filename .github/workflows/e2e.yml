@@ -65,6 +65,15 @@ jobs:
             # One line: emulator-runner executes each script line as its own
             # sh -c, so a backslash continuation becomes a literal `\` arg.
             $HOME/.maestro/bin/maestro test --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
+      - name: Upload Maestro debug artifacts
+        # Failure screenshots + view hierarchies + maestro.log — without
+        # these, CI-only failures are undebuggable (learned 2026-08-01).
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-android
+          path: ~/.maestro/tests/
+          retention-days: 14
 
   ios:
     if: github.ref == 'refs/heads/main'
@@ -97,3 +106,10 @@ jobs:
         run: |
           $HOME/.maestro/bin/maestro test \
             --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
+      - name: Upload Maestro debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug-ios
+          path: ~/.maestro/tests/
+          retention-days: 14
