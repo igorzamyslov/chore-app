@@ -202,6 +202,17 @@ void main() {
       expect(find.text('Joined chore'), findsOneWidget);
       expect(find.text('Old chore'), findsNothing);
 
+      // Invalidation-sensitive assert (unlike the chores check above,
+      // whose query happens not to be household-scoped): the linked
+      // subtitle flows through currentHouseholdProvider, which watches
+      // bootstrapProvider's resolved household id — without _JoinRow's
+      // post-sheet ref.invalidate(bootstrapProvider) this would still
+      // point at the deleted old household and the subtitle would never
+      // appear.
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Synced with Joined household'), findsOneWidget);
+
       handle.dispose();
     },
   );
