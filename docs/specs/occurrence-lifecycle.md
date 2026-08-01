@@ -177,6 +177,20 @@ and the complete/skip snackbars' UNDO action). In one transaction:
   `completed_by`, while leaving `assigned_member_id` untouched (the
   occurrence is restored with the same assignee it had before closing).
 
+**LIFO restriction (amended 2026-08-01, field feedback B2 —
+docs/feedback/2026-08-01-field-feedback.md):** when a chore has SEVERAL
+closed-today occurrences (possible because the successor of a closed
+occurrence is itself immediately closable), only the LATEST of them —
+ordered by due date, then `updated_at` as tiebreak — may be reopened.
+Reopening a non-latest one throws `StateError`: the blanket
+delete-pending step above would otherwise destroy a sibling occurrence
+that an earlier reopen just restored (the original data-loss bug).
+Unwinding a multi-close chain therefore takes several reopens,
+newest-first, and restores exactly the original state at every step. The
+Done-today UI mirrors the rule: the Reopen affordance is shown only on
+each chore's latest closed-today row and reappears on the next row as
+the chain unwinds.
+
 Throws `StateError` if the chore has been deleted, or if [occurrenceId]
 isn't currently closed with `closed_on == today` — i.e. it's still
 `pending`, or it was closed on an earlier day. **This "closed today"

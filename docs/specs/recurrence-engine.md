@@ -163,17 +163,25 @@ PlainDate nextDueDateAfterClosing({
   required PlainDate startDate,
   required PlainDate closedDueDate,   // due date of the occurrence closed
   required PlainDate closedOn,        // date the user closed it
+  required bool skipped,              // skip vs done (2026-08-01, see below)
 });
-//   completion → nextAfterCompletion(rule, closedOn)
-//   schedule   → first series element STRICTLY AFTER
-//                max(closedDueDate, closedOn)
-//                (completing very late skips the missed slots — you don't get
-//                an instantly-overdue next occurrence; product decision)
+//   completion + done    → nextAfterCompletion(rule, closedOn)
+//   completion + skipped → nextAfterCompletion(rule,
+//                          max(closedDueDate, closedOn))
+//   schedule (either)    → first series element STRICTLY AFTER
+//                          max(closedDueDate, closedOn)
+//                          (completing very late skips the missed slots — you
+//                          don't get an instantly-overdue next occurrence;
+//                          product decision)
 ```
 
-`skip` and `done` are identical to the engine — both "close" an occurrence.
-(For completion-anchored chores the app passes the skip date as `closedOn`;
-documented in a doc comment, no special casing.)
+`skip` and `done` differ for completion-anchored chores only (amended
+2026-08-01 per field feedback B3, docs/feedback/2026-08-01-field-feedback.md):
+completing anchors at the completion day ("3 days after the last time it
+was done" — even when done early), while skipping a not-yet-due occurrence
+anchors at that occurrence's own due date ("skip Friday's attempt → next
+one is 3 days after Friday", not "3 days after the day I tapped skip").
+For overdue/today skips `closedOn` is the max, so nothing changes there.
 
 ## 4. Testing requirements
 

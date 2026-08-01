@@ -45,6 +45,10 @@ strikethrough title, who closed them, done-vs-skipped marker, and a
   pending (clear closed_on/completed_by, keep assignee). Throws StateError
   if the chore is deleted or the occurrence isn't closed-today.
 - Needs `ChoreRepository.watchClosedOnDate(householdId, PlainDate)`.
+- Amended 2026-08-01 (field feedback B2): with several closed-today rows
+  for ONE chore, the Reopen action is rendered only on that chore's
+  latest row (due date, then close time) — see the LIFO rule in
+  `docs/specs/occurrence-lifecycle.md` §reopenOccurrence.
 
 ### A4. Undo snackbar on complete AND skip
 After completing: 'Done — next due <due text>' (recurring) or 'Done'
