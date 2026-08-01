@@ -26,9 +26,21 @@ jobs:
           channel: stable
           cache: true
       - name: Build APK (pinned E2E clock)
-        run: flutter build apk --debug --dart-define=E2E_TODAY=2026-07-24
+        # SUPABASE_* defines empty: keeps the E2E app fully offline
+        # (supabaseConfigured false) — same as ci.yml and tool/e2e.sh.
+        # Missed in the P2a commit; caught 2026-08-01 via logcat showing
+        # "Supabase init completed" inside CI-equivalent E2E launches.
+        run: flutter build apk --debug --dart-define=E2E_TODAY=2026-07-24 --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
       - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+        # PINNED (2026-08-01): cli-2.8.0 (released 2026-07-31) regressed
+        # launchApp-with-clearState — clearAppState takes ~22s and the
+        # relaunch is cold enough that Flutter's first frame lands after
+        # Maestro's element-wait window on slow runners (reproduced
+        # locally: identical APK+emulator passes on 2.7.0, fails on 2.8.0
+        # with first_run_banners' first assert timing out). Upgrade
+        # deliberately: A/B the same APK on old vs new locally first
+        # (e2e/README.md "Maestro version" section).
+        run: curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=2.7.0 bash
       - name: Run flows on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -37,6 +49,10 @@ jobs:
           profile: pixel_7
           disable-animations: true
           script: |
+            # Digital Wellbeing ANR dialogs can cover the screen on slow
+            # emulators (observed 2026-08-01 during the Maestro 2.8.0
+            # investigation) — it contributes nothing to these tests.
+            adb shell pm disable-user --user 0 com.google.android.apps.wellbeing || true
             adb install -r build/app/outputs/flutter-apk/app-debug.apk
             # Warm-up launch: the suite's FIRST flow otherwise carries the
             # app's very first cold start on a cold runner, which can blow
@@ -60,7 +76,8 @@ jobs:
           channel: stable
           cache: true
       - name: Build simulator app (pinned E2E clock)
-        run: flutter build ios --simulator --debug --dart-define=E2E_TODAY=2026-07-24
+        # SUPABASE_* defines empty — see the Android job's build step.
+        run: flutter build ios --simulator --debug --dart-define=E2E_TODAY=2026-07-24 --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
       - name: Boot simulator
         run: |
           DEVICE_ID=$(xcrun simctl list devices available \
@@ -74,7 +91,8 @@ jobs:
           sleep 20
           xcrun simctl terminate booted io.github.igorzamyslov.famdo || true
       - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+        # PINNED — see the Android job's install step for the full story.
+        run: curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=2.7.0 bash
       - name: Run flows on simulator
         run: |
           $HOME/.maestro/bin/maestro test \

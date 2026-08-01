@@ -34,3 +34,17 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    and it failed to pop a pushed route on the simulator. Pop screens by
    tapping the app bar's BackButton instead — Flutter gives it the
    semantics label `Back` (MaterialLocalizations) on both platforms.
+
+## Maestro version (pinned)
+
+CI installs Maestro PINNED via `MAESTRO_VERSION` in
+`.github/workflows/e2e.yml` (currently **2.7.0**). Never unpin: cli-2.8.0
+(2026-07-31) regressed `launchApp` with `clearState` — clearing takes
+~20s and the relaunch is cold enough (ART re-verification) that Flutter's
+first frame can land AFTER Maestro's element-wait window on slow
+runners; `first_run_banners` flaked red on CI exactly this way with zero
+repo change. To upgrade the pin: A/B the SAME debug APK on the SAME
+local emulator, old vs new version (install the candidate under a
+scratch `HOME` so the local install stays put), run the full suite on
+the candidate, then bump the pin and this note together. Keep the local
+`~/.maestro` at the pinned version so local runs and CI agree.
