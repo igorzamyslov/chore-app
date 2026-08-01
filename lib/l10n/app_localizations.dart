@@ -512,10 +512,28 @@ abstract class AppLocalizations {
   /// **'Month'**
   String get choreFormUnitMonth;
 
-  /// Chore form recurrence-anchor option: due dates follow a fixed calendar schedule.
+  /// Chore form repeat-unit chip label for the day unit, pluralized by the current repeat interval so it reads correctly next to the interval number, e.g. 'Repeat every 2 Days'.
   ///
   /// In en, this message translates to:
-  /// **'On a fixed schedule'**
+  /// **'{count, plural, one{Day} other{Days}}'**
+  String choreFormUnitDayPlural(int count);
+
+  /// Chore form repeat-unit chip label for the week unit, pluralized by the current repeat interval, e.g. 'Repeat every 2 Weeks'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Week} other{Weeks}}'**
+  String choreFormUnitWeekPlural(int count);
+
+  /// Chore form repeat-unit chip label for the month unit, pluralized by the current repeat interval, e.g. 'Repeat every 2 Months'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Month} other{Months}}'**
+  String choreFormUnitMonthPlural(int count);
+
+  /// Chore form recurrence-anchor option: due dates follow a fixed calendar schedule (specific weekday/day-of-month), rather than being relative to the last completion.
+  ///
+  /// In en, this message translates to:
+  /// **'On fixed days'**
   String get choreFormAnchorScheduleTitle;
 
   /// Chore form recurrence-anchor option: due dates are relative to the last completion.
@@ -524,17 +542,29 @@ abstract class AppLocalizations {
   /// **'After last completion'**
   String get choreFormAnchorCompletionTitle;
 
-  /// Example hint under the fixed-schedule anchor option.
+  /// Example hint under the fixed-days anchor option.
   ///
   /// In en, this message translates to:
   /// **'e.g. every Tuesday'**
   String get choreFormAnchorScheduleSubtitle;
 
-  /// Example hint under the after-last-completion anchor option.
+  /// Concrete hint under the after-last-completion anchor option when the repeat unit is day, naming the actual current interval instead of a generic example.
   ///
   /// In en, this message translates to:
-  /// **'e.g. 4 days after last done'**
-  String get choreFormAnchorCompletionSubtitle;
+  /// **'{count, plural, one{1 day after last done} other{{count} days after last done}}'**
+  String choreFormAnchorCompletionSubtitleDay(int count);
+
+  /// Concrete hint under the after-last-completion anchor option when the repeat unit is week, naming the actual current interval instead of a generic example.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 week after last done} other{{count} weeks after last done}}'**
+  String choreFormAnchorCompletionSubtitleWeek(int count);
+
+  /// Concrete hint under the after-last-completion anchor option when the repeat unit is month, naming the actual current interval instead of a generic example.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 month after last done} other{{count} months after last done}}'**
+  String choreFormAnchorCompletionSubtitleMonth(int count);
 
   /// Monthly repeat chip label for 'day of month' mode; {ordinalDay} is the already locale-formatted ordinal day (e.g. '15th').
   ///
@@ -553,6 +583,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'On the last {weekday}'**
   String monthlyLastWeekdayLabel(String weekday);
+
+  /// Caption shown under the monthly pattern selector (and the weekly weekday chips when none are picked), pointing at the start date as the actual lever controlling the derived day/weekday.
+  ///
+  /// In en, this message translates to:
+  /// **'Follows the start date — change the start date to change the day.'**
+  String get choreFormPatternFollowsStartDate;
 
   /// Chore form assignment-mode chip: a fixed single assignee.
   ///

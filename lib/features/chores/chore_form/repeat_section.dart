@@ -59,12 +59,28 @@ class IntervalField extends StatelessWidget {
 }
 
 /// The day/week/month unit chip row.
+///
+/// Labels are pluralized by [interval] (field feedback G3 stage 1,
+/// `docs/feedback/2026-08-01-field-feedback.md`): this row sits directly
+/// under the interval number field, and its label is the only place a unit
+/// noun renders in the whole app, so "2 Month" read badly. There is no
+/// separate combined-reading widget elsewhere to fix instead.
 class UnitRow extends StatelessWidget {
   /// Creates the unit row.
-  const UnitRow({required this.value, required this.onChanged, super.key});
+  const UnitRow({
+    required this.value,
+    required this.interval,
+    required this.onChanged,
+    super.key,
+  });
 
   /// The currently-selected unit.
   final RecurrenceUnit value;
+
+  /// The current repeat interval, used only to pick the right plural form
+  /// of the unit noun (e.g. 'Day' vs 'Days'); it does not change which
+  /// chip is selected.
+  final int interval;
 
   /// Called when a different unit is picked.
   final ValueChanged<RecurrenceUnit> onChanged;
@@ -91,22 +107,40 @@ class UnitRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     switch (unit) {
       case RecurrenceUnit.day:
-        return l10n.choreFormUnitDay;
+        return l10n.choreFormUnitDayPlural(interval);
       case RecurrenceUnit.week:
-        return l10n.choreFormUnitWeek;
+        return l10n.choreFormUnitWeekPlural(interval);
       case RecurrenceUnit.month:
-        return l10n.choreFormUnitMonth;
+        return l10n.choreFormUnitMonthPlural(interval);
     }
   }
 }
 
 /// The schedule/completion anchor choice, each with a subtitle hint.
+///
+/// The after-last-completion subtitle names the actual current [interval]
+/// and [unit] (field feedback G3 stage 1) instead of a generic example, so
+/// it reads as a concrete sentence, e.g. '3 days after last done'.
 class AnchorRow extends StatelessWidget {
   /// Creates the anchor row.
-  const AnchorRow({required this.value, required this.onChanged, super.key});
+  const AnchorRow({
+    required this.value,
+    required this.interval,
+    required this.unit,
+    required this.onChanged,
+    super.key,
+  });
 
   /// The currently-selected anchor.
   final RecurrenceAnchor value;
+
+  /// The current repeat interval, used to make the after-last-completion
+  /// subtitle concrete.
+  final int interval;
+
+  /// The current repeat unit, used to pick which concrete subtitle message
+  /// (day/week/month) to render.
+  final RecurrenceUnit unit;
 
   /// Called when a different anchor is picked.
   final ValueChanged<RecurrenceAnchor> onChanged;
@@ -143,8 +177,16 @@ class AnchorRow extends StatelessWidget {
 
   String _subtitle(BuildContext context, RecurrenceAnchor anchor) {
     final l10n = AppLocalizations.of(context);
-    return anchor == RecurrenceAnchor.schedule
-        ? l10n.choreFormAnchorScheduleSubtitle
-        : l10n.choreFormAnchorCompletionSubtitle;
+    if (anchor == RecurrenceAnchor.schedule) {
+      return l10n.choreFormAnchorScheduleSubtitle;
+    }
+    switch (unit) {
+      case RecurrenceUnit.day:
+        return l10n.choreFormAnchorCompletionSubtitleDay(interval);
+      case RecurrenceUnit.week:
+        return l10n.choreFormAnchorCompletionSubtitleWeek(interval);
+      case RecurrenceUnit.month:
+        return l10n.choreFormAnchorCompletionSubtitleMonth(interval);
+    }
   }
 }
