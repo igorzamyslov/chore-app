@@ -11,6 +11,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +66,7 @@ class AccountSectionBody extends ConsumerWidget {
         children: [
           _SignedInTile(user: user),
           const _AdoptRow(),
+          const _JoinRow(),
         ],
       );
     }
@@ -290,9 +292,8 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
 /// error + 'Try again' state on failure -- rerunning is always safe (the
 /// service tolerates a half-succeeded previous attempt).
 ///
-/// Deliberately does NOT include a 'join' row/placeholder here (spec §7.4's
-/// P2c slice adds it) -- signed-in-and-unlinked is an accepted, if
-/// intermediate, UI state for this slice.
+/// [_JoinRow] (spec §7.4's P2c slice) is the sibling choice row, shown
+/// right below this one.
 class _AdoptRow extends ConsumerStatefulWidget {
   const _AdoptRow();
 
@@ -363,6 +364,50 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
       if (mounted) {
         setState(() => _running = false);
       }
+    }
+  }
+}
+
+/// The P2c join row (spec §7.4), shown below [_AdoptRow] whenever this
+/// device is signed in but unlinked: one line of explanatory copy; tapping
+/// it opens [showJoinHouseholdSheet]'s stepper. On a successful join, the
+/// household id `bootstrapProvider` resolves to has changed, so this
+/// invalidates it (spec §7.4 step 3's last sentence: "the post-replace UI
+/// must re-resolve the bootstrap household") and shows a snackbar naming
+/// the archive file the old data was saved to -- both done here, in the UI
+/// layer, rather than inside `HouseholdJoinService.join` itself, which has
+/// no `BuildContext`/`Ref` of its own to invalidate providers or show a
+/// snackbar with.
+class _JoinRow extends ConsumerWidget {
+  const _JoinRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.join',
+      child: ListTile(
+        leading: const Icon(Icons.group_add_outlined),
+        title: Text(l10n.settingsAccountJoinTitle),
+        subtitle: Text(l10n.settingsAccountJoinIntro),
+        onTap: () => _join(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _join(BuildContext context, WidgetRef ref) async {
+    final archiveFileName = await showJoinHouseholdSheet(context);
+    if (archiveFileName == null) {
+      return;
+    }
+    ref.invalidate(bootstrapProvider);
+    if (context.mounted) {
+      showAppSnackbar(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
+      );
     }
   }
 }

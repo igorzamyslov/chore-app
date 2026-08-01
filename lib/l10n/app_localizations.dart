@@ -1022,6 +1022,114 @@ abstract class AppLocalizations {
   /// **'Synced with {householdName}'**
   String settingsAccountLinkedSubtitle(String householdName);
 
+  /// Title of the Account section's P2c join row (spec docs/specs/sync-backend.md §7.4), shown below the adopt row while signed in and unlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Join an existing household'**
+  String get settingsAccountJoinTitle;
+
+  /// One-line explanatory copy under the join row's title, stating plainly up front that local data gets replaced (spec §4: reversible only via the archive file).
+  ///
+  /// In en, this message translates to:
+  /// **'Use an invite code from another device — this replaces your local data.'**
+  String get settingsAccountJoinIntro;
+
+  /// Snackbar shown after a successful join, naming the archive file the old household was saved to (spec §4/§7.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Your old data was saved to {fileName}.'**
+  String settingsAccountJoinSuccessSnackbar(String fileName);
+
+  /// Title of the join sheet's first step: the invite-code entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your invite code'**
+  String get joinHouseholdCodeTitle;
+
+  /// One-line explanatory copy on the join sheet's code-entry step.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a household member for the code from their Members screen.'**
+  String get joinHouseholdCodeBody;
+
+  /// Label of the join sheet's code TextField (id settings.account.join.code).
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get joinHouseholdCodeLabel;
+
+  /// Inline error shown on the code-entry step when listClaimableMembers throws (invalid/expired code).
+  ///
+  /// In en, this message translates to:
+  /// **'That code isn\'t valid or has expired. Please check it and try again.'**
+  String get joinHouseholdCodeError;
+
+  /// Label of the join sheet's 'Continue' buttons (code entry and the new-member name step).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get joinHouseholdContinue;
+
+  /// Title of the join sheet's chooser step, listing unclaimed member profiles plus 'I'm new here'.
+  ///
+  /// In en, this message translates to:
+  /// **'Which profile is yours?'**
+  String get joinHouseholdChooserTitle;
+
+  /// Label of one claimable-member row in the chooser step, naming the unclaimed profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you {name}?'**
+  String joinHouseholdChooserAreYou(String name);
+
+  /// Label of the chooser step's 'join as a new member' option, below the claimable-member rows.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m new here'**
+  String get joinHouseholdChooserNewMember;
+
+  /// Title of the join sheet's new-member name step (after picking 'I'm new here').
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your name?'**
+  String get joinHouseholdNewMemberTitle;
+
+  /// Label of the new-member name TextField (id settings.account.join.newMember.name).
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get joinHouseholdNewMemberNameLabel;
+
+  /// Title of the in-flow import-offer step (spec docs/specs/sync-backend.md §7.4 step 2, amended 2026-08-01).
+  ///
+  /// In en, this message translates to:
+  /// **'Bring over your open chores?'**
+  String get joinHouseholdImportTitle;
+
+  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and survives only in the archive file (spec §4).
+  ///
+  /// In en, this message translates to:
+  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept only in an archive file on this device.'**
+  String get joinHouseholdImportBody;
+
+  /// Accept button of the import-offer step.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring them over'**
+  String get joinHouseholdImportAccept;
+
+  /// Decline button of the import-offer step.
+  ///
+  /// In en, this message translates to:
+  /// **'Start fresh'**
+  String get joinHouseholdImportDecline;
+
+  /// Inline error shown on the join sheet's working step if downloading/replacing the household fails; retrying re-runs the remaining flow, which is safe (the archive was already written and the old data is untouched until the replace transaction commits).
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while joining the household. Please try again.'**
+  String get joinHouseholdWorkingError;
+
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///
   /// In en, this message translates to:

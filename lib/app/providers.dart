@@ -21,6 +21,7 @@ import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
+import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -198,6 +199,18 @@ final householdLinkServiceProvider = Provider<HouseholdLinkService>((ref) {
   return HouseholdLinkService(
     gateway: ref.watch(householdGatewayProvider),
     households: ref.watch(householdRepositoryProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
+/// The P2c join-flow service (spec `docs/specs/sync-backend.md` §7.4), built
+/// on [householdGatewayProvider], [appDatabaseProvider], and
+/// [settingsRepositoryProvider].
+final householdJoinServiceProvider = Provider<HouseholdJoinService>((ref) {
+  return HouseholdJoinService(
+    gateway: ref.watch(householdGatewayProvider),
+    database: ref.watch(appDatabaseProvider),
     settings: ref.watch(settingsRepositoryProvider),
     clock: ref.watch(clockProvider),
   );

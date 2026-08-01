@@ -793,6 +793,90 @@
       }
     }
   },
+  "settingsAccountJoinTitle": "Join an existing household",
+  "@settingsAccountJoinTitle": {
+    "description": "Title of the Account section's P2c join row (spec docs/specs/sync-backend.md §7.4), shown below the adopt row while signed in and unlinked."
+  },
+  "settingsAccountJoinIntro": "Use an invite code from another device — this replaces your local data.",
+  "@settingsAccountJoinIntro": {
+    "description": "One-line explanatory copy under the join row's title, stating plainly up front that local data gets replaced (spec §4: reversible only via the archive file)."
+  },
+  "settingsAccountJoinSuccessSnackbar": "Your old data was saved to {fileName}.",
+  "@settingsAccountJoinSuccessSnackbar": {
+    "description": "Snackbar shown after a successful join, naming the archive file the old household was saved to (spec §4/§7.4).",
+    "placeholders": {
+      "fileName": {
+        "type": "String",
+        "example": "famdo-archive-2026-08-01.json"
+      }
+    }
+  },
+  "joinHouseholdCodeTitle": "Enter your invite code",
+  "@joinHouseholdCodeTitle": {
+    "description": "Title of the join sheet's first step: the invite-code entry."
+  },
+  "joinHouseholdCodeBody": "Ask a household member for the code from their Members screen.",
+  "@joinHouseholdCodeBody": {
+    "description": "One-line explanatory copy on the join sheet's code-entry step."
+  },
+  "joinHouseholdCodeLabel": "Invite code",
+  "@joinHouseholdCodeLabel": {
+    "description": "Label of the join sheet's code TextField (id settings.account.join.code)."
+  },
+  "joinHouseholdCodeError": "That code isn't valid or has expired. Please check it and try again.",
+  "@joinHouseholdCodeError": {
+    "description": "Inline error shown on the code-entry step when listClaimableMembers throws (invalid/expired code)."
+  },
+  "joinHouseholdContinue": "Continue",
+  "@joinHouseholdContinue": {
+    "description": "Label of the join sheet's 'Continue' buttons (code entry and the new-member name step)."
+  },
+  "joinHouseholdChooserTitle": "Which profile is yours?",
+  "@joinHouseholdChooserTitle": {
+    "description": "Title of the join sheet's chooser step, listing unclaimed member profiles plus 'I'm new here'."
+  },
+  "joinHouseholdChooserAreYou": "Are you {name}?",
+  "@joinHouseholdChooserAreYou": {
+    "description": "Label of one claimable-member row in the chooser step, naming the unclaimed profile.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "joinHouseholdChooserNewMember": "I'm new here",
+  "@joinHouseholdChooserNewMember": {
+    "description": "Label of the chooser step's 'join as a new member' option, below the claimable-member rows."
+  },
+  "joinHouseholdNewMemberTitle": "What's your name?",
+  "@joinHouseholdNewMemberTitle": {
+    "description": "Title of the join sheet's new-member name step (after picking 'I'm new here')."
+  },
+  "joinHouseholdNewMemberNameLabel": "Name",
+  "@joinHouseholdNewMemberNameLabel": {
+    "description": "Label of the new-member name TextField (id settings.account.join.newMember.name)."
+  },
+  "joinHouseholdImportTitle": "Bring over your open chores?",
+  "@joinHouseholdImportTitle": {
+    "description": "Title of the in-flow import-offer step (spec docs/specs/sync-backend.md §7.4 step 2, amended 2026-08-01)."
+  },
+  "joinHouseholdImportBody": "Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept only in an archive file on this device.",
+  "@joinHouseholdImportBody": {
+    "description": "Body copy of the import-offer step -- states plainly that the old local data is replaced and survives only in the archive file (spec §4)."
+  },
+  "joinHouseholdImportAccept": "Bring them over",
+  "@joinHouseholdImportAccept": {
+    "description": "Accept button of the import-offer step."
+  },
+  "joinHouseholdImportDecline": "Start fresh",
+  "@joinHouseholdImportDecline": {
+    "description": "Decline button of the import-offer step."
+  },
+  "joinHouseholdWorkingError": "Something went wrong while joining the household. Please try again.",
+  "@joinHouseholdWorkingError": {
+    "description": "Inline error shown on the join sheet's working step if downloading/replacing the household fails; retrying re-runs the remaining flow, which is safe (the archive was already written and the old data is untouched until the replace transaction commits)."
+  },
 
   "settingsAboutSectionTitle": "About",
   "@settingsAboutSectionTitle": {
