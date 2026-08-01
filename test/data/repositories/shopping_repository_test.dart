@@ -404,6 +404,27 @@ void main() {
       );
 
       test(
+        'a name with an older ACTIVE row is never proposed, even when its '
+        'most recent row was cleared after shopping — "already on the '
+        'list" is checked against every row, not just the newest one',
+        () async {
+          // B3 duplicate prevention (a UI-level guard) normally makes this
+          // shape unreachable; the repository must not depend on that.
+          final active = await repo.addItem(householdId, name: 'Milk');
+          clock.advance(const Duration(minutes: 1));
+          final newer = await repo.addItem(householdId, name: 'Milk');
+          await repo.setChecked(newer.id, checked: true);
+          await repo.deleteItem(newer.id);
+
+          expect(active.deletedAt, isNull, reason: 'still on the list');
+          expect(
+            (await repo.suggestions(householdId, '')).map((s) => s.name),
+            isNot(contains('Milk')),
+          );
+        },
+      );
+
+      test(
         'the deleted-while-unchecked exclusion does not apply on the '
         'type-ahead (non-empty prefix) path',
         () async {
