@@ -122,34 +122,56 @@ class ShoppingRepository {
     });
   }
 
-  /// Returns up to [limit] type-ahead suggestions for [prefix]: distinct
-  /// normalized names (from ALL items ever added in [householdId],
-  /// including soft-deleted ones) whose normalized form starts with
-  /// [prefix]'s normalized form, ranked by frequency (row count for that
-  /// normalized name) then recency (latest `created_at`).
+  /// Returns up to [limit] suggestions for [prefix]: distinct normalized
+  /// names (from ALL items ever added in [householdId], including
+  /// soft-deleted ones) whose normalized form starts with [prefix]'s
+  /// normalized form, ranked by frequency (row count for that normalized
+  /// name) then recency (latest `created_at`).
   ///
   /// Each suggestion carries the most recent casing seen for its normalized
   /// name, plus the most recent non-null category used for it (which may
   /// come from an earlier row than the most recent one, if the most recent
-  /// row itself had no category). Returns an empty list if [prefix]
-  /// normalizes to the empty string (e.g. it's blank/whitespace-only).
+  /// row itself had no category). Returns an empty list if [prefix] is
+  /// non-empty but normalizes to the empty string (e.g. it's
+  /// whitespace-only) — that's the type-ahead path (spec
+  /// `docs/specs/ux-round-2.md` B2), and there's nothing meaningful to
+  /// match there.
   ///
-  /// See `docs/specs/ux-round-2.md` B2.
+  /// A literal empty [prefix] (not whitespace — the field genuinely has no
+  /// text) is the *focus-suggestions* path instead (field feedback F1,
+  /// `docs/feedback/2026-08-01-field-feedback.md`): every name matches (no
+  /// prefix filtering), but names with an active (non-deleted) item
+  /// currently in [householdId] — checked or unchecked — are excluded,
+  /// since surfacing something already visible on the same screen is
+  /// noise. The non-empty-prefix (type-ahead) path deliberately keeps
+  /// including active items: retyping an item that's already on the list
+  /// is how a user reaches the existing "already on the list" /
+  /// "moved back to the list" duplicate-prevention flow (spec B3), and
+  /// changing that would regress it.
   Future<List<ShoppingSuggestion>> suggestions(
     String householdId,
     String prefix, {
     int limit = 8,
   }) async {
     final normalizedPrefix = normalizeShoppingItemName(prefix);
-    if (normalizedPrefix.isEmpty) {
+    if (prefix.isNotEmpty && normalizedPrefix.isEmpty) {
       return const [];
     }
 
     final rows = await _historyRows(householdId);
+    final activeNormalizedNames = prefix.isEmpty
+        ? {
+            for (final row in rows)
+              if (row.item.deletedAt == null)
+                normalizeShoppingItemName(row.item.name),
+          }
+        : const <String>{};
+
     final groups = <String, List<_HistoryRow>>{};
     for (final row in rows) {
       final normalized = normalizeShoppingItemName(row.item.name);
-      if (!normalized.startsWith(normalizedPrefix)) {
+      if (!normalized.startsWith(normalizedPrefix) ||
+          activeNormalizedNames.contains(normalized)) {
         continue;
       }
       groups.putIfAbsent(normalized, () => []).add(row);
@@ -375,6 +397,28 @@ class ShoppingRepository {
         ))
         .write(
           ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+        );
+  }
+
+  /// Unchecks every active, checked item in [householdId] — the "Put all
+  /// back" bulk action (field feedback G1,
+  /// `docs/feedback/2026-08-01-field-feedback.md`) for e.g. a failed
+  /// checkout returning the whole cart to the main list in one action.
+  /// Mirrors [setChecked]'s uncheck semantics (`checkedAt = null`, bumping
+  /// `updatedAt`) for every matching row in a single UPDATE.
+  Future<void> uncheckAll(String householdId) async {
+    final now = _isoNow();
+    await (db.update(db.shoppingItems)..where(
+          (tbl) =>
+              tbl.householdId.equals(householdId) &
+              tbl.deletedAt.isNull() &
+              tbl.checkedAt.isNotNull(),
+        ))
+        .write(
+          ShoppingItemsCompanion(
+            checkedAt: const Value(null),
+            updatedAt: Value(now),
+          ),
         );
   }
 

@@ -380,6 +380,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingClearButton => 'Erledigte leeren';
 
   @override
+  String get shoppingUncheckAll => 'Alles zurücklegen';
+
+  @override
   String get shoppingAddHint => 'Artikel hinzufügen…';
 
   @override

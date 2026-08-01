@@ -512,6 +512,10 @@
   "@shoppingClearButton": {
     "description": "Button that clears every checked item immediately (no confirmation), shown in the checked-items section header."
   },
+  "shoppingUncheckAll": "Put all back",
+  "@shoppingUncheckAll": {
+    "description": "Button that unchecks every checked item immediately (no confirmation), returning them all to the main list — shown in the checked-items section header next to Clear checked."
+  },
 
   "shoppingAddHint": "Add item…",
   "@shoppingAddHint": {
