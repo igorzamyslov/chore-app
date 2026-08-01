@@ -350,6 +350,11 @@ class _Body extends StatelessWidget {
         if (filteredClosedToday.isNotEmpty)
           ChoreDoneSection(
             occurrences: filteredClosedToday,
+            // Computed from the UNFILTERED closedToday (see that
+            // function's doc comment on why filters mustn't affect it).
+            reopenableOccurrenceIds: latestClosedTodayOccurrenceIds(
+              closedToday,
+            ),
             onReopen: onReopen,
           ),
       ],

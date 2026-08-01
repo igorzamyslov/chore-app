@@ -14,6 +14,19 @@ import 'package:flutter/material.dart';
 /// first drops anything queued or showing, so only the most recent action's
 /// snackbar is ever presented.
 ///
+/// **`persist: false` is load-bearing, not decorative** (field feedback B1,
+/// `docs/feedback/2026-08-01-field-feedback.md`): [SnackBar.persist]
+/// defaults to `true` whenever [SnackBar.action] is non-null (Flutter's own
+/// default, not a bug in this app), which makes the `duration` timer a
+/// no-op — the bar then only closes when the user taps the action or
+/// another snackbar replaces it. Every close/skip toast here carries an
+/// UNDO action, so without this override they persisted forever — the
+/// exact "Done snackbar never goes away" report. This was verified by
+/// reproduction (see `test/app/sticky_snackbar_test.dart`): a plain
+/// `IndexedStack`/tab-switch theory was ruled out first (it did not
+/// reproduce), then this was found to reproduce even with no tab switch at
+/// all, isolating the true cause to this flag.
+///
 /// Uses [SnackBarBehavior.floating] with a modest uniform margin: paired
 /// with the app shell's nested [ScaffoldMessenger] (see
 /// `lib/app/app_shell.dart`), this keeps the snackbar within the current
@@ -36,6 +49,9 @@ void showAppSnackbar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         action: action,
+        // See the doc comment above: without this, an action snackbar
+        // never auto-dismisses.
+        persist: false,
       ),
     );
 }

@@ -316,6 +316,7 @@ void main() {
         startDate: start,
         closedDueDate: closedDueDate,
         closedOn: closedOn,
+        skipped: false,
       );
       expect(result, PlainDate(2026, 7, 28)); // next Tuesday
     });
@@ -330,12 +331,40 @@ void main() {
         startDate: start,
         closedDueDate: closedDueDate,
         closedOn: closedOn,
+        skipped: false,
       );
       expect(result.isAfter(closedOn), isTrue);
       expect(result, PlainDate(2026, 8, 18));
     });
 
-    test('completion anchor uses closedOn, not closedDueDate', () {
+    test(
+      'schedule anchor: result is identical for done and skipped '
+      '(unaffected by the skipped flag)',
+      () {
+        final rule = Recurrence.weekly(weekdays: {DateTime.tuesday});
+        final start = PlainDate(2026, 7, 21); // a Tuesday
+        final closedDueDate = start;
+        final closedOn = start.addDays(2); // the following Thursday
+        final done = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedDueDate,
+          closedOn: closedOn,
+          skipped: false,
+        );
+        final skipped = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedDueDate,
+          closedOn: closedOn,
+          skipped: true,
+        );
+        expect(skipped, done);
+        expect(skipped, PlainDate(2026, 7, 28));
+      },
+    );
+
+    test('completion anchor, done: uses closedOn, not closedDueDate', () {
       final rule = Recurrence.everyNDays(
         4,
         anchor: RecurrenceAnchor.completion,
@@ -343,16 +372,101 @@ void main() {
       final start = PlainDate(2026, 7, 1);
       final closedOn = PlainDate(2026, 7, 10);
       // closedDueDate is deliberately far from closedOn to prove it is
-      // ignored for a completion-anchored rule.
+      // ignored for a completion-anchored DONE close.
       final result = nextDueDateAfterClosing(
         rule: rule,
         startDate: start,
         closedDueDate: PlainDate(2020, 1, 1),
         closedOn: closedOn,
+        skipped: false,
       );
       expect(result, nextAfterCompletion(rule, closedOn));
       expect(result, PlainDate(2026, 7, 14));
     });
+
+    test(
+      'completion anchor, done: completing a FUTURE occurrence early still '
+      'anchors at closedOn (today), not the due date (field feedback B3 — '
+      'the "watering early" case, deliberately unchanged)',
+      () {
+        final rule = Recurrence.everyNDays(
+          3,
+          anchor: RecurrenceAnchor.completion,
+        );
+        final start = PlainDate(2026, 7, 1);
+        final closedOn = PlainDate(2026, 7, 10); // today
+        final closedDueDate = PlainDate(2026, 7, 13); // due 3 days from now
+        final result = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedDueDate,
+          closedOn: closedOn,
+          skipped: false,
+        );
+        expect(result, nextAfterCompletion(rule, closedOn));
+        expect(result, PlainDate(2026, 7, 13));
+      },
+    );
+
+    test(
+      'completion anchor, skipped: skipping a FUTURE occurrence anchors at '
+      'its OWN due date, not closedOn (field feedback B3 — the "skip did '
+      'nothing" bug this fixes: closedDueDate + interval, not closedOn + '
+      'interval)',
+      () {
+        final rule = Recurrence.everyNDays(
+          3,
+          anchor: RecurrenceAnchor.completion,
+        );
+        final start = PlainDate(2026, 7, 1);
+        final closedOn = PlainDate(2026, 7, 10); // today
+        final closedDueDate = PlainDate(2026, 7, 13); // due 3 days from now
+        final result = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedDueDate,
+          closedOn: closedOn,
+          skipped: true,
+        );
+        expect(result, nextAfterCompletion(rule, closedDueDate));
+        expect(result, PlainDate(2026, 7, 16)); // due date + interval
+      },
+    );
+
+    test(
+      'completion anchor, skipped: an overdue/today skip is unchanged -- '
+      'closedOn is already the max, so it anchors at closedOn + interval, '
+      'same as a done close would',
+      () {
+        final rule = Recurrence.everyNDays(
+          3,
+          anchor: RecurrenceAnchor.completion,
+        );
+        final start = PlainDate(2026, 7, 1);
+        final closedOn = PlainDate(2026, 7, 10); // today
+        final closedDueDate = PlainDate(2026, 7, 5); // overdue
+        final result = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedDueDate,
+          closedOn: closedOn,
+          skipped: true,
+        );
+        expect(result, nextAfterCompletion(rule, closedOn));
+        expect(result, PlainDate(2026, 7, 13)); // closedOn + interval
+
+        // A today-due skip lands at the same place too (closedOn ==
+        // closedDueDate, so max() picks either).
+        final todayResult = nextDueDateAfterClosing(
+          rule: rule,
+          startDate: start,
+          closedDueDate: closedOn,
+          closedOn: closedOn,
+          skipped: true,
+        );
+        expect(todayResult, PlainDate(2026, 7, 13));
+      },
+    );
   });
 
   group('performance sanity', () {
@@ -479,7 +593,7 @@ void main() {
 
     test(
       '(d) nextDueDateAfterClosing > max(closedDueDate, closedOn), '
-      'schedule anchor',
+      'schedule anchor -- holds regardless of the skipped flag',
       () {
         final random = Random(42);
         for (var i = 0; i < iterations; i++) {
@@ -487,11 +601,13 @@ void main() {
           final rule = randomScheduleRule(random);
           final closedDueDate = start.addDays(random.nextInt(200));
           final closedOn = closedDueDate.addDays(random.nextInt(60) - 20);
+          final skipped = random.nextBool();
           final result = nextDueDateAfterClosing(
             rule: rule,
             startDate: start,
             closedDueDate: closedDueDate,
             closedOn: closedOn,
+            skipped: skipped,
           );
           final threshold = closedDueDate.isAfter(closedOn)
               ? closedDueDate
