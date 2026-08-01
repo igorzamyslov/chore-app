@@ -89,6 +89,13 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(hintText: l10n.shoppingAddHint),
                     onSubmitted: (_) => _submit(),
+                    // Bug 2 (field feedback round 2,
+                    // docs/feedback/2026-08-01-field-feedback.md): focus-gain
+                    // only fires on a focus CHANGE, so returning to this tab
+                    // with the field still focused, or tapping an
+                    // already-focused field, fired nothing. An explicit
+                    // onTap covers both.
+                    onTap: () => unawaited(_updateSuggestions()),
                   ),
                 ),
               ),
@@ -220,6 +227,15 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     }
     _controller.clear();
     _focusNode.requestFocus();
+    // Bug 4 (field feedback round 2,
+    // docs/feedback/2026-08-01-field-feedback.md): a suggestion tap never
+    // types anything, so the controller is already empty here and
+    // `clear()` above doesn't notify `_onTextChanged` — without this
+    // explicit refresh the just-added item would stay proposed. Calling it
+    // unconditionally (typed submit and suggestion tap alike) refreshes
+    // every path uniformly; the newly active item is now excluded by the
+    // empty-prefix rule, so it drops out and the next candidate moves in.
+    unawaited(_updateSuggestions());
   }
 
   void _showSnackbar(String message) {

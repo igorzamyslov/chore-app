@@ -1,6 +1,8 @@
 /// The shopping list screen (this feature's tab).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
@@ -51,33 +53,56 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
         children: [
           const ShoppingQuickAddRow(),
           Expanded(
-            child: itemsAsync.when(
-              data: (items) {
-                final hasChecked = items.any(
-                  (item) => item.item.checkedAt != null,
-                );
-                if (!hasChecked && _cartExpanded) {
-                  // The section only mounts while ≥1 item is checked; once
-                  // it unmounts, reset so it starts collapsed next time
-                  // (documented behavior above).
-                  _cartExpanded = false;
+            // Bug 3 (field feedback round 2,
+            // docs/feedback/2026-08-01-field-feedback.md): the quick-add
+            // field keeps focus after F1's focus-suggestions appear, so the
+            // list stayed open while the user worked the list underneath.
+            // Unfocusing on a user-driven scroll dismisses it (the existing
+            // blur path already hides the list); only `ScrollStartNotification`
+            // with non-null `dragDetails` is a real user drag, so
+            // programmatic scrolls and overscroll glow are ignored.
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification is ScrollStartNotification &&
+                    notification.dragDetails != null) {
+                  FocusManager.instance.primaryFocus?.unfocus();
                 }
-                return _Body(
-                  items: items,
-                  cartExpanded: _cartExpanded,
-                  onCartExpansionChanged: (value) =>
-                      setState(() => _cartExpanded = value),
-                  onCheckedChanged: (id, {required checked}) =>
-                      _setChecked(ref, id, checked: checked),
-                  onTapItem: (item) =>
-                      showShoppingEditSheet(context, item: item),
-                  onClear: () => _clearChecked(ref),
-                  onUncheckAll: () => _uncheckAll(ref),
-                );
+                return false;
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stackTrace) => _ErrorState(
-                onRetry: () => ref.invalidate(shoppingItemsProvider),
+              child: itemsAsync.when(
+                data: (items) {
+                  final hasChecked = items.any(
+                    (item) => item.item.checkedAt != null,
+                  );
+                  if (!hasChecked && _cartExpanded) {
+                    // The section only mounts while ≥1 item is checked;
+                    // once it unmounts, reset so it starts collapsed next
+                    // time (documented behavior above).
+                    _cartExpanded = false;
+                  }
+                  return _Body(
+                    items: items,
+                    cartExpanded: _cartExpanded,
+                    onCartExpansionChanged: (value) =>
+                        setState(() => _cartExpanded = value),
+                    onCheckedChanged: (id, {required checked}) {
+                      // Bug 3: checking/unchecking an item is also "working
+                      // the list" — dismiss the suggestions the same way.
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(_setChecked(ref, id, checked: checked));
+                    },
+                    onTapItem: (item) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(showShoppingEditSheet(context, item: item));
+                    },
+                    onClear: () => _clearChecked(ref),
+                    onUncheckAll: () => _uncheckAll(ref),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stackTrace) => _ErrorState(
+                  onRetry: () => ref.invalidate(shoppingItemsProvider),
+                ),
               ),
             ),
           ),
