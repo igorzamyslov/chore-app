@@ -1,14 +1,19 @@
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/application/household_archive.dart';
+import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import '../../test_utils/pump_app.dart';
+import 'fake_archive_file_writer.dart';
 import 'fake_auth_gateway.dart';
 import 'fake_household_gateway.dart';
+import 'fake_path_provider_platform.dart';
 import 'settings_test_utils.dart';
 
 /// Finds the [TextField] wrapped by the semantic id [identifier].
@@ -36,6 +41,19 @@ Finder _filledButtonFor(String identifier) {
 /// send failure) and the signed-in display/sign-out confirm flow.
 void main() {
   final today = DateTime(2026, 7, 24, 9);
+
+  // The P2d reconnect flow's happy-path test below runs the shared join
+  // machinery (`HouseholdJoinService.join`), which -- like the P2c join
+  // sheet tests (`join_household_sheet_test.dart`) -- writes an automatic
+  // archive first. Harmless for every other test in this file (none of
+  // them touch the archive path).
+  late FakeArchiveFileWriter archiveWriter;
+
+  setUp(() {
+    PathProviderPlatform.instance = FakePathProviderPlatform('/fake-docs');
+    archiveWriter = FakeArchiveFileWriter();
+    ArchiveFileWriter.instance = archiveWriter;
+  });
 
   testChoreApp(
     "Noop gateway: shows the disabled 'coming soon' row, no interactive "
@@ -277,7 +295,8 @@ void main() {
   );
 
   testChoreApp(
-    'signed-in+unlinked: shows both the adopt row and the join row',
+    'signed-in+unlinked: shows both the adopt row and the join row, and no '
+    'reconnect row under the default (Noop) household gateway',
     today: today,
     overrides: [
       authGatewayProvider.overrideWithValue(
@@ -298,14 +317,42 @@ void main() {
         find.bySemanticsIdentifier('settings.account.join'),
         findsOneWidget,
       );
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
   );
 
+  final signedOutProbeGateway = FakeHouseholdGateway();
   testChoreApp(
-    'linked: hides the adopt row and the join row, shows the linked '
-    'subtitle on the signed-in tile',
+    'signed-out: myMembershipProvider never calls findMyMembership at all '
+    '(no signed-in user to probe with)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(FakeAuthGateway()),
+      householdGatewayProvider.overrideWithValue(signedOutProbeGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsNothing,
+      );
+      expect(signedOutProbeGateway.findMyMembershipCallCount, 0);
+
+      handle.dispose();
+    },
+  );
+
+  final noMembershipGateway = FakeHouseholdGateway();
+  testChoreApp(
+    'signed-in+unlinked, no membership found: probes findMyMembership, '
+    'shows no reconnect row, and leaves the adopt/join rows unchanged',
     today: today,
     overrides: [
       authGatewayProvider.overrideWithValue(
@@ -313,6 +360,49 @@ void main() {
           currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
         ),
       ),
+      householdGatewayProvider.overrideWithValue(noMembershipGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
+        findsOneWidget,
+      );
+      expect(noMembershipGateway.findMyMembershipCallCount, 1);
+
+      handle.dispose();
+    },
+  );
+
+  final linkedMembershipGateway = FakeHouseholdGateway()
+    ..membership = const MyMembership(
+      householdId: 'other-hh',
+      memberId: 'm-other',
+      memberName: 'Other',
+      householdName: 'Other household',
+    );
+  testChoreApp(
+    'linked: hides the adopt row, the join row, AND the reconnect row -- '
+    'even when findMyMembership WOULD report a membership -- and shows the '
+    'linked subtitle on the signed-in tile',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(linkedMembershipGateway),
     ],
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -329,6 +419,14 @@ void main() {
       );
       expect(
         find.bySemanticsIdentifier('settings.account.join'),
+        findsNothing,
+      );
+      // The reconnect row only ever renders from AccountSectionBody's
+      // UNLINKED branch -- once linked, myMembershipProvider's resolved
+      // value (if it settles at all before this device's settled linked
+      // state) has no code path left to surface it through.
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
         findsNothing,
       );
       expect(find.text('Synced with My household'), findsOneWidget);
@@ -471,6 +569,139 @@ void main() {
 
       settings = await database.select(database.settings).getSingle();
       expect(settings.syncHouseholdId, householdId);
+
+      handle.dispose();
+    },
+  );
+
+  final reconnectGateway = FakeHouseholdGateway()
+    ..membership = const MyMembership(
+      householdId: 'joined-hh',
+      memberId: 'm-anna',
+      memberName: 'Anna',
+      householdName: 'Joined household',
+    )
+    ..downloadSnapshotOverride = const HouseholdSnapshot(
+      household: Household(
+        id: 'joined-hh',
+        name: 'Joined household',
+        createdAt: 't0',
+        updatedAt: 't0',
+        syncDirty: false,
+      ),
+      members: [
+        Member(
+          id: 'm-anna',
+          householdId: 'joined-hh',
+          name: 'Anna',
+          color: 0xFF6D9F71,
+          role: MemberRole.member,
+          createdAt: 't0',
+          updatedAt: 't0',
+          syncDirty: false,
+        ),
+      ],
+    );
+
+  testChoreApp(
+    'reconnect happy path (spec §7.6): the reconnect row appears FIRST '
+    '(above the adopt row), tapping it skips straight to the import-offer '
+    'step (no code entry, no chooser), and completes the replace with NO '
+    'claim/join RPC -- archive written, old household replaced with the '
+    "downloaded snapshot, acting member = the membership's member, linked "
+    'subtitle shown',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(reconnectGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final oldHouseholdId = await currentHouseholdId(database);
+
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsOneWidget,
+      );
+      expect(find.text('Reconnect to Joined household'), findsOneWidget);
+
+      // The reconnect row sits ABOVE the adopt row (spec: "shown FIRST").
+      final reconnectTop = tester.getTopLeft(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+      );
+      final adoptTop = tester.getTopLeft(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+      );
+      expect(reconnectTop.dy, lessThan(adoptTop.dy));
+
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+      );
+      await tester.pumpAndSettle();
+
+      // Straight to the import-offer step -- no code field, no chooser.
+      expect(
+        find.bySemanticsIdentifier('settings.account.join.code'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join.import.decline'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.join.import.decline'),
+      );
+      await tester.pumpAndSettle();
+
+      // Sheet closed; success snackbar names the archive file.
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect.sheet'),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('famdo-archive-2026-07-24.json'),
+        findsOneWidget,
+      );
+
+      // No claim/join RPC at all -- reconnect already knows its household
+      // and member ids.
+      expect(reconnectGateway.claimMemberCalls, isEmpty);
+      expect(reconnectGateway.joinAsNewMemberCalls, isEmpty);
+      expect(reconnectGateway.downloadHouseholdCalls, ['joined-hh']);
+      expect(
+        archiveWriter.writtenFiles.keys,
+        contains('/fake-docs/famdo-archive-2026-07-24.json'),
+      );
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, 'joined-hh');
+      expect(settings.actingMemberId, 'm-anna');
+
+      final households = await database.select(database.households).get();
+      expect(households.map((h) => h.id), ['joined-hh']);
+
+      final oldHouseholdRows = await (database.select(
+        database.households,
+      )..where((tbl) => tbl.id.equals(oldHouseholdId))).get();
+      expect(oldHouseholdRows, isEmpty);
+
+      // Invalidation-sensitive assert (see the identical comment in
+      // join_household_sheet_test.dart): the linked subtitle flows through
+      // currentHouseholdProvider, which watches bootstrapProvider's
+      // resolved household id -- without _ReconnectRow's post-sheet
+      // ref.invalidate(bootstrapProvider) this would still point at the
+      // deleted old household.
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Synced with Joined household'), findsOneWidget);
 
       handle.dispose();
     },

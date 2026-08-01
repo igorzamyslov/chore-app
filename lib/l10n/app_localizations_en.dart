@@ -643,6 +643,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountComingSoonTitle => 'Sync — coming soon';
 
   @override
+  String settingsAccountReconnectTitle(String householdName) {
+    return 'Reconnect to $householdName';
+  }
+
+  @override
+  String get settingsAccountReconnectIntro =>
+      'Replaces your local data — it\'s kept only in an archive file on this device.';
+
+  @override
   String get settingsAccountAdoptTitle => 'Put my household online';
 
   @override

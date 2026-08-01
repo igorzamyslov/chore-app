@@ -1,15 +1,18 @@
 /// The settings screen's 'Account' section (spec
-/// `docs/specs/sync-backend.md` §5, §7.3): magic-link sign-in when signed
-/// out; when signed in, the account email + sign-out, plus (while unlinked)
-/// the P2b adopt row or (once linked) a subtitle naming the household; and
-/// a static 'coming soon' row when Supabase isn't configured
-/// ([NoopAuthGateway]).
+/// `docs/specs/sync-backend.md` §5, §7.3, §7.6): magic-link sign-in when
+/// signed out; when signed in, the account email + sign-out, plus (while
+/// unlinked) the P2d reconnect row (only when this account is already a
+/// claimed member elsewhere), the P2b adopt row, and the P2c join row, or
+/// (once linked) a subtitle naming the household; and a static 'coming
+/// soon' row when Supabase isn't configured ([NoopAuthGateway]).
 library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/application/household_gateway.dart';
+import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -41,8 +44,10 @@ class AccountSectionHeader extends StatelessWidget {
 /// The Account section's body: a static disabled row when
 /// [authGatewayProvider] resolves to [NoopAuthGateway] (Supabase not
 /// configured); the signed-out form or, when signed in, the signed-in tile
-/// -- joined by the P2b adopt row (spec §7.3) while
-/// `settings.syncHouseholdId` is still `null`.
+/// -- joined by the P2d reconnect row (spec §7.6, only when
+/// `myMembershipProvider` finds a membership), the P2b adopt row (spec
+/// §7.3), and the P2c join row while `settings.syncHouseholdId` is still
+/// `null`.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -61,10 +66,15 @@ class AccountSectionBody extends ConsumerWidget {
         .valueOrNull
         ?.syncHouseholdId;
     if (householdId == null) {
+      // Spec §7.6 (P2d reconnect): probe BEFORE showing adopt/join -- when
+      // the signed-in account already has a membership elsewhere, the
+      // reconnect row goes FIRST, above both.
+      final membership = ref.watch(myMembershipProvider).valueOrNull;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SignedInTile(user: user),
+          if (membership != null) _ReconnectRow(membership: membership),
           const _AdoptRow(),
           const _JoinRow(),
         ],
@@ -285,7 +295,65 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
   }
 }
 
-/// The P2b adopt row (spec §7.3), shown below [_SignedInTile] whenever this
+/// The P2d reconnect row (spec §7.6), shown ABOVE [_AdoptRow]/[_JoinRow]
+/// whenever this device is signed in, unlinked, AND
+/// `myMembershipProvider` resolves to a non-null `MyMembership` -- the
+/// signed-in account is already a claimed member of a household this
+/// DEVICE isn't currently linked to (a returning device: phone reset, new
+/// phone). Tapping it opens the join sheet
+/// (`lib/features/settings/join_household_sheet.dart`'s
+/// `showReconnectHouseholdSheet`) pre-loaded with a `ReconnectChoice` --
+/// skipping code entry and the claim/new-member chooser entirely, straight
+/// to the same in-flow import offer [_JoinRow] uses. Success mirrors
+/// [_JoinRow] exactly: `bootstrapProvider` invalidation (the household id
+/// changed) + the archive-naming snackbar.
+class _ReconnectRow extends ConsumerWidget {
+  const _ReconnectRow({required this.membership});
+
+  /// The already-claimed membership `myMembershipProvider` resolved to.
+  final MyMembership membership;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.reconnect',
+      child: ListTile(
+        leading: const Icon(Icons.sync_outlined),
+        title: Text(
+          l10n.settingsAccountReconnectTitle(membership.householdName),
+        ),
+        subtitle: Text(l10n.settingsAccountReconnectIntro),
+        onTap: () => _reconnect(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _reconnect(BuildContext context, WidgetRef ref) async {
+    final archiveFileName = await showReconnectHouseholdSheet(
+      context,
+      choice: ReconnectChoice(
+        householdId: membership.householdId,
+        memberId: membership.memberId,
+      ),
+    );
+    if (archiveFileName == null) {
+      return;
+    }
+    ref.invalidate(bootstrapProvider);
+    if (context.mounted) {
+      showAppSnackbar(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
+      );
+    }
+  }
+}
+
+/// The P2b adopt row (spec §7.3), shown below [_SignedInTile] (and,
+/// while a reconnect option exists, below [_ReconnectRow]) whenever this
 /// device is signed in but unlinked: one line of explanatory copy, a
 /// progress state while `HouseholdLinkService.adopt`
 /// (`lib/application/household_link_service.dart`) runs, and an inline

@@ -111,6 +111,21 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// succeeding.
   Exception? joinAsNewMemberError;
 
+  /// The membership [findMyMembership] returns unless
+  /// [findMyMembershipError] is set; `null` (the default) means "no
+  /// membership anywhere".
+  MyMembership? membership;
+
+  /// Set to make the next [findMyMembership] call throw this instead of
+  /// succeeding.
+  Exception? findMyMembershipError;
+
+  /// How many times [findMyMembership] has been called -- the P2d
+  /// reconnect probe (`myMembershipProvider`) is meant to be skipped
+  /// entirely while signed out or under `NoopHouseholdGateway`, so tests
+  /// assert this stays `0` in those cases.
+  int findMyMembershipCallCount = 0;
+
   final Set<String> _createdHouseholdIds = {};
 
   @override
@@ -217,5 +232,15 @@ class FakeHouseholdGateway implements HouseholdGateway {
         syncDirty: false,
       ),
     );
+  }
+
+  @override
+  Future<MyMembership?> findMyMembership() async {
+    findMyMembershipCallCount++;
+    final error = findMyMembershipError;
+    if (error != null) {
+      throw error;
+    }
+    return membership;
   }
 }
