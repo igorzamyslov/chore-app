@@ -288,7 +288,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormUnitMonth => 'Month';
 
   @override
-  String get choreFormAnchorScheduleTitle => 'On a fixed schedule';
+  String choreFormUnitDayPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Days',
+      one: 'Day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormUnitWeekPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Weeks',
+      one: 'Week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormUnitMonthPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Months',
+      one: 'Month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get choreFormAnchorScheduleTitle => 'On fixed days';
 
   @override
   String get choreFormAnchorCompletionTitle => 'After last completion';
@@ -297,7 +330,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAnchorScheduleSubtitle => 'e.g. every Tuesday';
 
   @override
-  String get choreFormAnchorCompletionSubtitle => 'e.g. 4 days after last done';
+  String choreFormAnchorCompletionSubtitleDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days after last done',
+      one: '1 day after last done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorCompletionSubtitleWeek(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weeks after last done',
+      one: '1 week after last done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorCompletionSubtitleMonth(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count months after last done',
+      one: '1 month after last done',
+    );
+    return '$_temp0';
+  }
 
   @override
   String monthlyDayOfMonthLabel(String ordinalDay) {
@@ -313,6 +376,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String monthlyLastWeekdayLabel(String weekday) {
     return 'On the last $weekday';
   }
+
+  @override
+  String get choreFormPatternFollowsStartDate =>
+      'Follows the start date — change the start date to change the day.';
 
   @override
   String get choreFormAssignmentFixed => 'Fixed';

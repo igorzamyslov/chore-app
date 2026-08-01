@@ -370,9 +370,39 @@
   "@choreFormUnitMonth": {
     "description": "Chore form repeat-unit chip: month."
   },
-  "choreFormAnchorScheduleTitle": "On a fixed schedule",
+  "choreFormUnitDayPlural": "{count, plural, one{Day} other{Days}}",
+  "@choreFormUnitDayPlural": {
+    "description": "Chore form repeat-unit chip label for the day unit, pluralized by the current repeat interval so it reads correctly next to the interval number, e.g. 'Repeat every 2 Days'.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "choreFormUnitWeekPlural": "{count, plural, one{Week} other{Weeks}}",
+  "@choreFormUnitWeekPlural": {
+    "description": "Chore form repeat-unit chip label for the week unit, pluralized by the current repeat interval, e.g. 'Repeat every 2 Weeks'.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "choreFormUnitMonthPlural": "{count, plural, one{Month} other{Months}}",
+  "@choreFormUnitMonthPlural": {
+    "description": "Chore form repeat-unit chip label for the month unit, pluralized by the current repeat interval, e.g. 'Repeat every 2 Months'.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "choreFormAnchorScheduleTitle": "On fixed days",
   "@choreFormAnchorScheduleTitle": {
-    "description": "Chore form recurrence-anchor option: due dates follow a fixed calendar schedule."
+    "description": "Chore form recurrence-anchor option: due dates follow a fixed calendar schedule (specific weekday/day-of-month), rather than being relative to the last completion."
   },
   "choreFormAnchorCompletionTitle": "After last completion",
   "@choreFormAnchorCompletionTitle": {
@@ -380,11 +410,37 @@
   },
   "choreFormAnchorScheduleSubtitle": "e.g. every Tuesday",
   "@choreFormAnchorScheduleSubtitle": {
-    "description": "Example hint under the fixed-schedule anchor option."
+    "description": "Example hint under the fixed-days anchor option."
   },
-  "choreFormAnchorCompletionSubtitle": "e.g. 4 days after last done",
-  "@choreFormAnchorCompletionSubtitle": {
-    "description": "Example hint under the after-last-completion anchor option."
+  "choreFormAnchorCompletionSubtitleDay": "{count, plural, one{1 day after last done} other{{count} days after last done}}",
+  "@choreFormAnchorCompletionSubtitleDay": {
+    "description": "Concrete hint under the after-last-completion anchor option when the repeat unit is day, naming the actual current interval instead of a generic example.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "choreFormAnchorCompletionSubtitleWeek": "{count, plural, one{1 week after last done} other{{count} weeks after last done}}",
+  "@choreFormAnchorCompletionSubtitleWeek": {
+    "description": "Concrete hint under the after-last-completion anchor option when the repeat unit is week, naming the actual current interval instead of a generic example.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
+  },
+  "choreFormAnchorCompletionSubtitleMonth": "{count, plural, one{1 month after last done} other{{count} months after last done}}",
+  "@choreFormAnchorCompletionSubtitleMonth": {
+    "description": "Concrete hint under the after-last-completion anchor option when the repeat unit is month, naming the actual current interval instead of a generic example.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "4"
+      }
+    }
   },
 
   "monthlyDayOfMonthLabel": "On the {ordinalDay}",
@@ -420,6 +476,10 @@
         "example": "Tuesday"
       }
     }
+  },
+  "choreFormPatternFollowsStartDate": "Follows the start date — change the start date to change the day.",
+  "@choreFormPatternFollowsStartDate": {
+    "description": "Caption shown under the monthly pattern selector (and the weekly weekday chips when none are picked), pointing at the start date as the actual lever controlling the derived day/weekday."
   },
 
   "choreFormAssignmentFixed": "Fixed",

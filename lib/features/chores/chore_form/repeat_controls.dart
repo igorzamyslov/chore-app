@@ -6,6 +6,7 @@ import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/features/chores/chore_form/monthly_mode_row.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_section.dart';
 import 'package:chore_app/features/chores/chore_form/weekday_chips.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Composes the interval/unit/anchor controls with the weekday chips (week
@@ -65,6 +66,11 @@ class RepeatControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Best-effort parse for display only (pluralizing the unit label and
+    // the after-last-completion subtitle); an invalid/empty field still
+    // shows *something* sensible here, and `intervalError` is what
+    // actually blocks save.
+    final interval = int.tryParse(intervalController.text.trim()) ?? 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -74,12 +80,25 @@ class RepeatControls extends StatelessWidget {
           errorText: intervalError,
         ),
         const SizedBox(height: 8),
-        UnitRow(value: unit, onChanged: onUnitChanged),
+        UnitRow(value: unit, interval: interval, onChanged: onUnitChanged),
         const SizedBox(height: 8),
-        AnchorRow(value: anchor, onChanged: onAnchorChanged),
+        AnchorRow(
+          value: anchor,
+          interval: interval,
+          unit: unit,
+          onChanged: onAnchorChanged,
+        ),
         if (unit == RecurrenceUnit.week) ...[
           const SizedBox(height: 8),
           WeekdayChips(selected: weekdays, onToggle: onWeekdayToggle),
+          // An empty selection derives the effective weekday from the
+          // start date (see WeekdayChips' doc comment); once at least one
+          // day is explicitly picked, the pattern no longer has a hidden
+          // dependency on the start date, so the hint no longer applies.
+          if (weekdays.isEmpty) ...[
+            const SizedBox(height: 4),
+            const _PatternFollowsStartDateHint(),
+          ],
         ],
         if (unit == RecurrenceUnit.month &&
             anchor == RecurrenceAnchor.schedule) ...[
@@ -89,8 +108,31 @@ class RepeatControls extends StatelessWidget {
             startDate: startDate,
             onChanged: onMonthlyModeChanged,
           ),
+          const SizedBox(height: 4),
+          const _PatternFollowsStartDateHint(),
         ],
       ],
+    );
+  }
+}
+
+/// A subtle one-line caption pointing at the start date as the lever that
+/// actually controls the derived monthly day / weekly weekday (field
+/// feedback G3 stage 1): both `MonthlyModeRow` and an empty `WeekdayChips`
+/// selection silently compute their pattern from the chore's start date,
+/// which is easy to miss since the start date field sits well below this
+/// one in the form.
+class _PatternFollowsStartDateHint extends StatelessWidget {
+  const _PatternFollowsStartDateHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      AppLocalizations.of(context).choreFormPatternFollowsStartDate,
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
   }
 }

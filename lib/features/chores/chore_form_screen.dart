@@ -67,6 +67,11 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   void initState() {
     super.initState();
     _startDate = PlainDate.fromDateTime(ref.read(clockProvider).now());
+    // RepeatControls reads the interval's live text (to pluralize the unit
+    // label and the after-last-completion subtitle, field feedback
+    // G3 stage 1); typing into the field doesn't otherwise trigger a
+    // rebuild, so this keeps that reading in sync as the user types.
+    _intervalController.addListener(_onIntervalTextChanged);
     final choreId = widget.choreId;
     if (choreId != null) {
       _loading = true;
@@ -78,8 +83,14 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
-    _intervalController.dispose();
+    _intervalController
+      ..removeListener(_onIntervalTextChanged)
+      ..dispose();
     super.dispose();
+  }
+
+  void _onIntervalTextChanged() {
+    setState(() {});
   }
 
   Future<void> _loadExisting(String choreId) async {

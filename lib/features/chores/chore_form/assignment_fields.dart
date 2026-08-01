@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -11,7 +12,9 @@ import 'package:flutter/material.dart';
 /// `fixed` shows a single-select chip row (exactly one member must be
 /// picked); `rotation` shows a multi-select chip row where each selected
 /// chip carries a visible order badge reflecting tap order (at least two
-/// members must be picked); `anyone` shows no assignee chips.
+/// members must be picked); `anyone` shows no assignee chips. Every
+/// assignee chip leads with the member's `MemberAvatar` (field feedback
+/// F3, `docs/feedback/2026-08-01-field-feedback.md`).
 class AssignmentFields extends StatelessWidget {
   /// Creates the assignment fields.
   const AssignmentFields({
@@ -73,6 +76,13 @@ class AssignmentFields extends StatelessWidget {
                 semantic(
                   'chore_form.assignee.${member.id}',
                   child: FilterChip(
+                    // The selection checkmark would otherwise paint over
+                    // the avatar (Flutter darkens+overlays it), hiding the
+                    // exact thing this chip most needs to show once
+                    // picked; the chip's own selected styling already
+                    // conveys the state without it.
+                    showCheckmark: false,
+                    avatar: MemberAvatar(member: member, radius: 12),
                     label: Text(_chipLabel(context, member)),
                     selected: selectedMemberIds.contains(member.id),
                     onSelected: (_) => onMemberTap(member.id),

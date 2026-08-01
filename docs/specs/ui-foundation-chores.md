@@ -106,20 +106,33 @@ error text `semantic('app.bootstrap_error')`.
 - Repeat toggle OFF = one-off. ON reveals:
   - interval stepper/text (int ≥ 1; invalid input → inline error 'Must be
     at least 1'),
-  - unit segmented control (day/week/month),
-  - anchor choice with the user-facing labels 'On a fixed schedule' /
-    'After last completion' (subtitle hints: 'e.g. every Tuesday' /
-    'e.g. 4 days after last done'),
+  - unit segmented control (day/week/month) — chip labels pluralize with
+    the current interval ('Day'/'Days' etc., field feedback G3 stage 1:
+    it's the only place a unit noun renders next to the interval number,
+    so it doubles as the "2 months" composed reading the feedback asked
+    for),
+  - anchor choice with the user-facing labels 'On fixed days' / 'After
+    last completion' (subtitle hints: 'e.g. every Tuesday' / a concrete,
+    interval-aware sentence e.g. '3 days after last done' — field
+    feedback G3 stage 1),
   - week unit: weekday chips Mon..Sun (multi-select; empty allowed =
     derive from start date),
   - month unit + schedule anchor: monthly mode toggle (day-of-month vs
     nth-weekday, computed from the picked start date, e.g. 'On the 15th' /
-    'On the 3rd Tuesday').
+    'On the 3rd Tuesday'),
+  - whenever the pattern silently derives from the start date (monthly
+    mode always; weekly with no weekday picked) a one-line caption below
+    it says so ('Follows the start date — change the start date to change
+    the day.', field feedback G3 stage 1) — it disappears once a weekday
+    is explicitly picked, since the pattern is then fully visible in the
+    chips.
 - Start date: date picker, defaults to today, min today - 1 year.
 - Assignment: segmented fixed/rotation/anyone; fixed → single-select member
   chips; rotation → multi-select member chips in tap order with visible
-  order badges (1, 2, …). Validation errors inline: fixed needs exactly
-  one ('Pick one member'), rotation at least two ('Pick at least two').
+  order badges (1, 2, …), each chip showing the member's `MemberAvatar`
+  before their name (field feedback F3). Validation errors inline: fixed
+  needs exactly one ('Pick one member'), rotation at least two ('Pick at
+  least two').
 - Save: create via `ChoreService.createChore` (or update via
   `updateChore`; editing recurrence/startDate does NOT regenerate the
   pending occurrence in v1 — document this known simplification in a
