@@ -10,8 +10,11 @@
         fill="#FFFFFF" stroke="#FFFFFF" stroke-width="52"
         stroke-linejoin="round"/>
   <!-- Checkmark: teal (background color) carved into the house body,
-       thick round-capped stroke, fully inside the body incl. cap radii. -->
-  <path d="M375 632 L478 735 L662 545"
+       thick round-capped stroke, fully inside the body incl. cap radii.
+       Raised 80u (2026-08-01) to sit at the house's approximate center
+       rather than low in the body — the right-arm tip clears the eaves
+       line (y=458) with room for the 48u cap radius. -->
+  <path d="M375 552 L478 655 L662 465"
         fill="none" stroke="#26A69A" stroke-width="96"
         stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
