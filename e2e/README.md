@@ -60,14 +60,17 @@ first frame in the failure screenshots on BOTH platforms):
    (cold OR warm relaunch) can lose the race against the first tap;
    the default element window is not enough headroom. Later steps run
    against a live app and keep normal timeouts.
-2. **Permission overrides never ride inside `launchApp`.** Bundling
-   `permissions:` into the launch stanza lets the permission operations
-   race the process start — Android kills a process whose runtime
-   permission changes, which intermittently left the app permanently
-   blank. Sequence standalone steps instead:
-   `clearState` → `setPermissions` → `launchApp`
-   (see first_run_banners.yaml), so the permission state is settled
-   before the process exists.
+2. **Permission overrides ride inside EVERY `launchApp` that needs
+   them — there is no other way.** Proven empirically via dumpsys
+   (2026-08-01): Maestro's Android driver auto-grants all manifest
+   runtime permissions on every launchApp, so standalone
+   `setPermissions` or a bare relaunch always ends granted=true again;
+   only a launch carrying the `permissions:` stanza applies the
+   override. The stanza launch has an internal revoke-vs-start race
+   that can leave the app permanently blank on slow emulators — handle
+   it with the bounded-optional-wait + conditional stanza-relaunch
+   pattern in first_run_banners.yaml (relaunch WITH the stanza, WITHOUT
+   clearState).
 
 CI uploads `~/.maestro/tests` as a debug artifact on failure — start
 every CI-only investigation from those screenshots, never from theory.

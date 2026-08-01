@@ -9,36 +9,40 @@ appId: ${APP_ID}
 tags:
   - happy
 ---
-# Split into standalone steps, NOT a single launchApp stanza (CI
-# root-cause 2026-08-01, second iteration): bundling `permissions:` into
-# `launchApp` lets the permission operations race the app process start —
-# Android kills a process whose runtime permission changes, and on CI
-# emulators that race intermittently left the app permanently on a blank
-# first frame (debug artifacts show a white screen even after a 90s
-# wait, while every stanza-free flow on the same run launched fine).
-# Sequencing clearState → setPermissions → launchApp makes the permission
-# state settled BEFORE the process exists, removing the race by
-# construction.
-#
-# `notifications: unset` itself (root-caused 2026-07-31): Maestro's
-# Android driver silently auto-grants every manifest-declared runtime
-# permission — including POST_NOTIFICATIONS — unlike iOS. A real fresh
-# install has NOT been asked yet, so without this override the digest
-# pre-prompt assertions below fail — a test-environment mismatch, not a
-# product bug. `unset` matches a real fresh install on both platforms.
-- clearState
-- setPermissions:
+# The permissions override MUST ride inside launchApp (proven
+# empirically 2026-08-01, third iteration): Maestro's Android driver
+# auto-grants every manifest runtime permission on EVERY launchApp —
+# verified via dumpsys that a standalone setPermissions or a bare
+# relaunch always ends granted=true again. Only a launch carrying the
+# stanza applies `unset` as part of that launch. (`unset` itself matches
+# a real fresh install, where the user has never been asked — the
+# original 2026-07-31 root cause.)
+- launchApp:
+    clearState: true
     permissions:
       notifications: unset
-- launchApp
-# extendedWaitUntil, not assertVisible (root-caused 2026-08-01, README
-# "Cold starts"): this is the suite's only launchApp that BOTH clears
-# state AND sets permissions — the coldest possible start (fresh ART
-# verification, no warm caches) — and on CI emulators the first Flutter
-# frame can land after the default element-wait window (observed ~30s
-# via logcat while the default window expired at ~19s; the app itself
-# is fine). The long wait covers exactly that first frame; every later
-# step runs against a live app and keeps normal timeouts.
+# The stanza launch has an internal revoke-vs-start race: the permission
+# change can kill the freshly-started process, intermittently leaving a
+# permanently blank app on slow CI emulators (debug artifacts: white
+# frame beyond 90s). Healthy path: the bounded wait below succeeds and
+# the recovery is skipped. Race path: the wait times out (optional, so
+# the flow continues), and the conditional relaunch restarts the app —
+# WITH the stanza again (a bare launchApp would re-grant) and WITHOUT
+# clearState (the cleared-fresh state must survive).
+- extendedWaitUntil:
+    visible:
+      id: "onboarding.name"
+    timeout: 60000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "onboarding.name"
+    commands:
+      - launchApp:
+          permissions:
+            notifications: unset
+# The authoritative first assert (README convention 8 cold-start wait).
 - extendedWaitUntil:
     visible:
       id: "onboarding.name"
