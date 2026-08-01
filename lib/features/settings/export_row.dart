@@ -1,6 +1,7 @@
-/// The Settings tab's 'Export data' row (spec
-/// `docs/specs/polish-round-1.md` B1): builds a full JSON backup of every
-/// table and hands it to the OS share sheet.
+/// The Settings tab's 'Data' section header and 'Export data' row (spec
+/// `docs/specs/polish-round-1.md` B1; spec
+/// `docs/feedback/2026-08-01-field-feedback.md` B4/F7): builds a full JSON
+/// backup of every table and hands it to the OS share sheet.
 library;
 
 import 'dart:convert';
@@ -14,7 +15,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// The 'Export data' row, placed between the digest section and About.
+/// Section header above the Data section's rows -- the export row
+/// ([ExportDataTile]) followed by the destructive reset row
+/// (`ResetDataTile`, `reset_flow.dart`) -- at the very bottom of Settings
+/// (spec `docs/feedback/2026-08-01-field-feedback.md` B4/F7). Matches every
+/// other Settings section header's style.
+class DataSectionHeader extends StatelessWidget {
+  /// Creates the section header.
+  const DataSectionHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        AppLocalizations.of(context).settingsDataSectionTitle,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// The 'Export data' row, the first row under [DataSectionHeader].
 ///
 /// Tapping it builds the backup document via [buildExportDocument] (the
 /// pure, share_plus-free half of this feature) and shares the encoded bytes

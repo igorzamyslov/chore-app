@@ -709,6 +709,27 @@
     "description": "Language picker option for German. A proper name: shown as 'Deutsch' regardless of the app's current UI locale, so this value is identical in every arb file."
   },
 
+  "settingsAppearanceEntry": "Appearance",
+  "@settingsAppearanceEntry": {
+    "description": "Settings screen list entry that opens the theme picker sheet (spec docs/feedback/2026-08-01-field-feedback.md G2), shown directly below the Language row. Its subtitle shows the current choice (System / Light / Dark)."
+  },
+  "settingsAppearanceSheetTitle": "Appearance",
+  "@settingsAppearanceSheetTitle": {
+    "description": "Heading of the appearance picker bottom sheet opened from the settingsAppearanceEntry row."
+  },
+  "settingsAppearanceSystem": "System",
+  "@settingsAppearanceSystem": {
+    "description": "Appearance picker option (and settingsAppearanceEntry subtitle) meaning 'follow the OS theme' -- a stored settings.themeMode of NULL."
+  },
+  "settingsAppearanceLight": "Light",
+  "@settingsAppearanceLight": {
+    "description": "Appearance picker option (and settingsAppearanceEntry subtitle) for the light theme -- a stored settings.themeMode of 'light'."
+  },
+  "settingsAppearanceDark": "Dark",
+  "@settingsAppearanceDark": {
+    "description": "Appearance picker option (and settingsAppearanceEntry subtitle) for the dark theme -- a stored settings.themeMode of 'dark'."
+  },
+
   "settingsAccountSectionTitle": "Account",
   "@settingsAccountSectionTitle": {
     "description": "Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section."
@@ -921,9 +942,9 @@
     "description": "Label of the donate sheet's PayPal row; brand name, deliberately identical across locales."
   },
 
-  "settingsResetSectionTitle": "Danger zone",
-  "@settingsResetSectionTitle": {
-    "description": "Section header above the destructive reset row (spec docs/specs/polish-round-1.md B2), at the very bottom of Settings -- exists purely to visually separate it from every section above."
+  "settingsDataSectionTitle": "Data",
+  "@settingsDataSectionTitle": {
+    "description": "Settings screen section header above the export row and the destructive reset row (spec docs/feedback/2026-08-01-field-feedback.md B4/F7), grouping both at the very bottom of Settings."
   },
   "settingsResetEntry": "Reset app data",
   "@settingsResetEntry": {

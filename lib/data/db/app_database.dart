@@ -53,14 +53,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v6) column set, so a fresh v1 -> v6 jump already
+      // *current* (here, v7) column set, so a fresh v1 -> v7 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then
@@ -98,6 +98,12 @@ class AppDatabase extends _$AppDatabase {
           // no data rewrite.
           await migrator.addColumn(settings, settings.syncHouseholdId);
           await migrator.addColumn(settings, settings.syncLinkedAt);
+        }
+        if (from < 7) {
+          // v6 -> v7 (spec `docs/feedback/2026-08-01-field-feedback.md`
+          // G2): the nullable `settings.themeMode` column, defaulting to
+          // `NULL` (follow the OS theme) -- no data rewrite.
+          await migrator.addColumn(settings, settings.themeMode);
         }
       }
     },

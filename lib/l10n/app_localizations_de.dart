@@ -519,6 +519,21 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsLanguageDeutsch => 'Deutsch';
 
   @override
+  String get settingsAppearanceEntry => 'Erscheinungsbild';
+
+  @override
+  String get settingsAppearanceSheetTitle => 'Erscheinungsbild';
+
+  @override
+  String get settingsAppearanceSystem => 'System';
+
+  @override
+  String get settingsAppearanceLight => 'Hell';
+
+  @override
+  String get settingsAppearanceDark => 'Dunkel';
+
+  @override
   String get settingsAccountSectionTitle => 'Konto';
 
   @override
@@ -673,7 +688,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAboutDonatePaypalLabel => 'PayPal';
 
   @override
-  String get settingsResetSectionTitle => 'Gefahrenzone';
+  String get settingsDataSectionTitle => 'Daten';
 
   @override
   String get settingsResetEntry => 'App-Daten zurücksetzen';

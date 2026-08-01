@@ -33,6 +33,7 @@ import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -134,6 +135,35 @@ final localeOverrideProvider = Provider<Locale?>((ref) {
       return const Locale('de');
     default:
       return null;
+  }
+});
+
+/// The manual theme override chosen via Settings (spec
+/// `docs/feedback/2026-08-01-field-feedback.md` G2): the stored
+/// `settings.themeMode` mapped to a [ThemeMode] for `MaterialApp.themeMode`
+/// (`lib/app/app.dart`), or [ThemeMode.system] to follow the OS theme.
+///
+/// An unrecognized stored value (future-proofing against a value this build
+/// doesn't know) also maps to [ThemeMode.system] rather than throwing,
+/// matching [localeOverrideProvider]'s "read-time self-heal, nothing
+/// written back" approach to a stale/foreign stored value.
+///
+/// Watched unconditionally from `ChoreApp.build` (`lib/app/app.dart`) --
+/// including while `bootstrapProvider` is still loading or has errored --
+/// so this reads [settingsProvider] via `valueOrNull` rather than `value`:
+/// the latter rethrows the underlying error when the watched provider
+/// itself is in an `AsyncError` state (e.g. a broken database connection),
+/// which would otherwise crash the loading/error screens this theme also
+/// applies to.
+final themeModeProvider = Provider<ThemeMode>((ref) {
+  final stored = ref.watch(settingsProvider).valueOrNull?.themeMode;
+  switch (stored) {
+    case 'light':
+      return ThemeMode.light;
+    case 'dark':
+      return ThemeMode.dark;
+    default:
+      return ThemeMode.system;
   }
 });
 
