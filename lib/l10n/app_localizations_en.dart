@@ -577,6 +577,69 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsAccountJoinTitle => 'Join an existing household';
+
+  @override
+  String get settingsAccountJoinIntro =>
+      'Use an invite code from another device — this replaces your local data.';
+
+  @override
+  String settingsAccountJoinSuccessSnackbar(String fileName) {
+    return 'Your old data was saved to $fileName.';
+  }
+
+  @override
+  String get joinHouseholdCodeTitle => 'Enter your invite code';
+
+  @override
+  String get joinHouseholdCodeBody =>
+      'Ask a household member for the code from their Members screen.';
+
+  @override
+  String get joinHouseholdCodeLabel => 'Invite code';
+
+  @override
+  String get joinHouseholdCodeError =>
+      'That code isn\'t valid or has expired. Please check it and try again.';
+
+  @override
+  String get joinHouseholdContinue => 'Continue';
+
+  @override
+  String get joinHouseholdChooserTitle => 'Which profile is yours?';
+
+  @override
+  String joinHouseholdChooserAreYou(String name) {
+    return 'Are you $name?';
+  }
+
+  @override
+  String get joinHouseholdChooserNewMember => 'I\'m new here';
+
+  @override
+  String get joinHouseholdNewMemberTitle => 'What\'s your name?';
+
+  @override
+  String get joinHouseholdNewMemberNameLabel => 'Name';
+
+  @override
+  String get joinHouseholdImportTitle => 'Bring over your open chores?';
+
+  @override
+  String get joinHouseholdImportBody =>
+      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept only in an archive file on this device.';
+
+  @override
+  String get joinHouseholdImportAccept => 'Bring them over';
+
+  @override
+  String get joinHouseholdImportDecline => 'Start fresh';
+
+  @override
+  String get joinHouseholdWorkingError =>
+      'Something went wrong while joining the household. Please try again.';
+
+  @override
   String get settingsAboutSectionTitle => 'About';
 
   @override

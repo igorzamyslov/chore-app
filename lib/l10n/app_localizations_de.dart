@@ -584,6 +584,69 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get settingsAccountJoinTitle => 'Einem bestehenden Haushalt beitreten';
+
+  @override
+  String get settingsAccountJoinIntro =>
+      'Nutze einen Einladungscode von einem anderen Gerät — das ersetzt deine lokalen Daten.';
+
+  @override
+  String settingsAccountJoinSuccessSnackbar(String fileName) {
+    return 'Deine alten Daten wurden in $fileName gespeichert.';
+  }
+
+  @override
+  String get joinHouseholdCodeTitle => 'Gib deinen Einladungscode ein';
+
+  @override
+  String get joinHouseholdCodeBody =>
+      'Frag ein Haushaltsmitglied nach dem Code aus seinem Mitglieder-Bildschirm.';
+
+  @override
+  String get joinHouseholdCodeLabel => 'Einladungscode';
+
+  @override
+  String get joinHouseholdCodeError =>
+      'Der Code ist ungültig oder abgelaufen. Bitte überprüfe ihn und versuch es noch mal.';
+
+  @override
+  String get joinHouseholdContinue => 'Weiter';
+
+  @override
+  String get joinHouseholdChooserTitle => 'Welches Profil gehört dir?';
+
+  @override
+  String joinHouseholdChooserAreYou(String name) {
+    return 'Bist du $name?';
+  }
+
+  @override
+  String get joinHouseholdChooserNewMember => 'Ich bin neu hier';
+
+  @override
+  String get joinHouseholdNewMemberTitle => 'Wie heißt du?';
+
+  @override
+  String get joinHouseholdNewMemberNameLabel => 'Name';
+
+  @override
+  String get joinHouseholdImportTitle => 'Deine offenen Aufgaben mitnehmen?';
+
+  @override
+  String get joinHouseholdImportBody =>
+      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt bleibt nur in einer Archivdatei auf diesem Gerät erhalten.';
+
+  @override
+  String get joinHouseholdImportAccept => 'Mitnehmen';
+
+  @override
+  String get joinHouseholdImportDecline => 'Neu anfangen';
+
+  @override
+  String get joinHouseholdWorkingError =>
+      'Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.';
+
+  @override
   String get settingsAboutSectionTitle => 'Über die App';
 
   @override

@@ -252,7 +252,7 @@ void main() {
   );
 
   testChoreApp(
-    'unlinked+signed-out: shows no adopt row',
+    'unlinked+signed-out: shows no adopt row and no join row',
     today: today,
     overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
     (tester, database) async {
@@ -261,6 +261,10 @@ void main() {
 
       expect(
         find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
         findsNothing,
       );
       expect(
@@ -273,8 +277,35 @@ void main() {
   );
 
   testChoreApp(
-    'linked: hides the adopt row and shows the linked subtitle on the '
-    'signed-in tile',
+    'signed-in+unlinked: shows both the adopt row and the join row',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'linked: hides the adopt row and the join row, shows the linked '
+    'subtitle on the signed-in tile',
     today: today,
     overrides: [
       authGatewayProvider.overrideWithValue(
@@ -294,6 +325,10 @@ void main() {
 
       expect(
         find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
         findsNothing,
       );
       expect(find.text('Synced with My household'), findsOneWidget);

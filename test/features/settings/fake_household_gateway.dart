@@ -58,6 +58,14 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// succeeding.
   Exception? downloadHouseholdError;
 
+  /// If set, [downloadHousehold] returns this snapshot unconditionally
+  /// (regardless of [_createdHouseholdIds] / the requested household id) --
+  /// used by the P2c join-flow tests, which need a canned snapshot for a
+  /// household this fake never "created" via [createHousehold] (join/claim
+  /// never calls it). Falls back to the P2b adopt tests' original
+  /// [_createdHouseholdIds]-based behavior when left `null`.
+  HouseholdSnapshot? downloadSnapshotOverride;
+
   /// Every [createHousehold] call, in call order.
   final List<CreateHouseholdCall> createHouseholdCalls = [];
 
@@ -192,6 +200,10 @@ class FakeHouseholdGateway implements HouseholdGateway {
     final error = downloadHouseholdError;
     if (error != null) {
       throw error;
+    }
+    final override = downloadSnapshotOverride;
+    if (override != null) {
+      return override;
     }
     if (!_createdHouseholdIds.contains(householdId)) {
       return const HouseholdSnapshot();
