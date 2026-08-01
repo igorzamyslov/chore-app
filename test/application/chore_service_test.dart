@@ -1017,6 +1017,134 @@ void main() {
     });
   });
 
+  group('LIFO reopen (field feedback B2)', () {
+    // A completion-anchored, rotation-assigned chore due TODAY. Completing
+    // it (A) creates B due today+3 (completion anchor, done -> closedOn +
+    // interval). Completing B TODAY too (early — B isn't due for 3 more
+    // days) creates C, ALSO due today+3 (done always anchors at closedOn,
+    // per the amended B3 contract — completing early yields the same
+    // successor date). So closed-today now holds A (due today) and B (due
+    // today+3): B is the latest by due date.
+    Future<
+      (
+        Chore chore,
+        String m1,
+        String m2,
+        ChoreOccurrence closedA,
+        ChoreOccurrence closedB,
+      )
+    >
+    setUpTwoCloses(PlainDate today) async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final chore = await serviceOn(today).createChore(
+        householdId: householdId,
+        title: 'Water plants',
+        startDate: today,
+        assignmentMode: AssignmentMode.rotation,
+        recurrence: Recurrence.everyNDays(
+          3,
+          anchor: RecurrenceAnchor.completion,
+        ),
+        assigneeMemberIds: [m1, m2],
+      );
+      final a = await repo.pendingOccurrenceOf(chore.id);
+      expect(a!.assignedMemberId, m1);
+      await serviceOn(today).completeOccurrence(a.id, completedBy: m1);
+
+      final b = await repo.pendingOccurrenceOf(chore.id);
+      expect(b!.dueDate, today.addDays(3));
+      expect(b.assignedMemberId, m2);
+      await serviceOn(today).completeOccurrence(b.id, completedBy: m2);
+
+      final c = await repo.pendingOccurrenceOf(chore.id);
+      expect(c!.dueDate, today.addDays(3));
+
+      final closedA = await (db.select(
+        db.choreOccurrences,
+      )..where((tbl) => tbl.id.equals(a.id))).getSingle();
+      final closedB = await (db.select(
+        db.choreOccurrences,
+      )..where((tbl) => tbl.id.equals(b.id))).getSingle();
+      return (chore, m1, m2, closedA, closedB);
+    }
+
+    test(
+      'unwinding newest-first (reopen B, then reopen A) restores exactly '
+      'one pending occurrence due today with the original assignee, and no '
+      'occurrence is lost along the way',
+      () async {
+        final today = PlainDate(2026, 1, 1);
+        final (chore, m1, m2, closedA, closedB) = await setUpTwoCloses(today);
+
+        // Reopen the LATEST (B, due today+3): deletes pending C, restores B
+        // to pending due today+3, keeping its own (m2) assignee.
+        await serviceOn(today).reopenOccurrence(closedB.id);
+        final afterFirstReopen = await repo.pendingOccurrenceOf(chore.id);
+        expect(afterFirstReopen!.id, closedB.id);
+        expect(afterFirstReopen.dueDate, today.addDays(3));
+        expect(afterFirstReopen.assignedMemberId, m2);
+
+        // A is now the latest closed-today row (the only one left).
+        // Reopen it: deletes pending B, restores A to pending due today,
+        // keeping its own (m1) assignee.
+        await serviceOn(today).reopenOccurrence(closedA.id);
+        final afterSecondReopen = await repo.pendingOccurrenceOf(chore.id);
+        expect(afterSecondReopen!.id, closedA.id);
+        expect(afterSecondReopen.dueDate, today);
+        expect(afterSecondReopen.assignedMemberId, m1);
+        expect(afterSecondReopen.status, OccurrenceStatus.pending);
+        expect(afterSecondReopen.closedOn, isNull);
+
+        // Exactly back to where it started: ONE occurrence total for this
+        // chore (A, pending, due today) -- B and C both fully unwound, no
+        // occurrence lost or duplicated along the way.
+        final allOccurrences = await (db.select(
+          db.choreOccurrences,
+        )..where((tbl) => tbl.choreId.equals(chore.id))).get();
+        expect(allOccurrences, hasLength(1));
+        expect(allOccurrences.single.id, closedA.id);
+      },
+    );
+
+    test(
+      'reopening the NON-latest closed-today row first throws StateError '
+      'and changes nothing',
+      () async {
+        final today = PlainDate(2026, 1, 1);
+        final (chore, _, _, closedA, closedB) = await setUpTwoCloses(today);
+
+        await expectLater(
+          serviceOn(today).reopenOccurrence(closedA.id),
+          throwsStateError,
+        );
+
+        // Untouched: C is still the sole pending occurrence, and both A and
+        // B are still closed exactly as they were.
+        final stillPending = await repo.pendingOccurrenceOf(chore.id);
+        expect(stillPending!.dueDate, today.addDays(3));
+        expect(stillPending.id, isNot(closedB.id));
+
+        final aRow = await (db.select(
+          db.choreOccurrences,
+        )..where((tbl) => tbl.id.equals(closedA.id))).getSingle();
+        expect(aRow.status, OccurrenceStatus.done);
+        expect(aRow.closedOn, today);
+
+        final bRow = await (db.select(
+          db.choreOccurrences,
+        )..where((tbl) => tbl.id.equals(closedB.id))).getSingle();
+        expect(bRow.status, OccurrenceStatus.done);
+        expect(bRow.closedOn, today);
+
+        final allOccurrences = await (db.select(
+          db.choreOccurrences,
+        )..where((tbl) => tbl.choreId.equals(chore.id))).get();
+        expect(allOccurrences, hasLength(3));
+      },
+    );
+  });
+
   group('read-after-write consistency', () {
     test(
       'watchPendingOccurrences and watchActiveChores reflect state right '

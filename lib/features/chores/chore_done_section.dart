@@ -13,18 +13,29 @@ import 'package:flutter/material.dart';
 /// 'Done today (N)', holding one row per closed-today [occurrences] entry.
 ///
 /// See `docs/specs/ux-round-2.md` A3. The caller only mounts this widget
-/// while there's at least one closed-today occurrence, so every row always
-/// has a visible Reopen action.
+/// while there's at least one closed-today occurrence.
+///
+/// **LIFO amendment (2026-08-01, field feedback B2 —
+/// `docs/feedback/2026-08-01-field-feedback.md`):** a row only gets a
+/// Reopen action if its occurrence id is in [reopenableOccurrenceIds] —
+/// each chore's LATEST closed-today row, per
+/// `ChoreService.reopenOccurrence`'s LIFO contract. The affordance
+/// reappears on the next-latest row once the chain unwinds.
 class ChoreDoneSection extends StatelessWidget {
   /// Creates the section for [occurrences], closed today.
   const ChoreDoneSection({
     required this.occurrences,
+    required this.reopenableOccurrenceIds,
     required this.onReopen,
     super.key,
   });
 
   /// The occurrences closed (done or skipped) today, to list.
   final List<ClosedOccurrenceWithChore> occurrences;
+
+  /// The ids of the rows that may show the Reopen action — see
+  /// [latestClosedTodayOccurrenceIds].
+  final Set<String> reopenableOccurrenceIds;
 
   /// Called with the tapped row's occurrence when its Reopen action fires.
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
@@ -46,6 +57,9 @@ class ChoreDoneSection extends StatelessWidget {
           for (final occurrence in occurrences)
             _DoneRow(
               occurrence: occurrence,
+              showReopen: reopenableOccurrenceIds.contains(
+                occurrence.occurrence.id,
+              ),
               onReopen: () => onReopen(occurrence),
             ),
         ],
@@ -54,10 +68,56 @@ class ChoreDoneSection extends StatelessWidget {
   }
 }
 
+/// The ids of each chore's LATEST closed-today occurrence in [occurrences]
+/// — ordered by due date, then `updatedAt` as tiebreak, matching the LIFO
+/// rule `ChoreService.reopenOccurrence` enforces (see its doc comment and
+/// `docs/specs/occurrence-lifecycle.md` §reopenOccurrence).
+///
+/// Deliberately computed over the FULL closed-today list, not whatever
+/// member/category-filtered subset the caller displays: an active filter
+/// can hide a chore's true latest row (e.g. it was closed by a different
+/// member than the one filtered on) without changing which row the service
+/// will actually accept — computing from the filtered list could offer
+/// Reopen on a row that then throws `StateError` when tapped.
+Set<String> latestClosedTodayOccurrenceIds(
+  List<ClosedOccurrenceWithChore> occurrences,
+) {
+  final latestByChore = <String, ClosedOccurrenceWithChore>{};
+  for (final row in occurrences) {
+    final current = latestByChore[row.chore.id];
+    if (current == null || _isLaterClosedToday(row, current)) {
+      latestByChore[row.chore.id] = row;
+    }
+  }
+  return {for (final row in latestByChore.values) row.occurrence.id};
+}
+
+/// Whether [a] closed later than [b]: by due date first, then `updatedAt`
+/// (ISO-8601 UTC, so lexical order matches chronological order) as the
+/// tiebreak — the same ordering `ChoreService.reopenOccurrence` uses.
+bool _isLaterClosedToday(
+  ClosedOccurrenceWithChore a,
+  ClosedOccurrenceWithChore b,
+) {
+  final dueCompare = a.occurrence.dueDate.compareTo(b.occurrence.dueDate);
+  if (dueCompare != 0) {
+    return dueCompare > 0;
+  }
+  return a.occurrence.updatedAt.compareTo(b.occurrence.updatedAt) > 0;
+}
+
 class _DoneRow extends StatelessWidget {
-  const _DoneRow({required this.occurrence, required this.onReopen});
+  const _DoneRow({
+    required this.occurrence,
+    required this.showReopen,
+    required this.onReopen,
+  });
 
   final ClosedOccurrenceWithChore occurrence;
+
+  /// Whether this row is its chore's latest closed-today occurrence — see
+  /// [ChoreDoneSection]'s LIFO doc comment.
+  final bool showReopen;
   final VoidCallback onReopen;
 
   @override
@@ -112,13 +172,17 @@ class _DoneRow extends StatelessWidget {
           ],
         ),
       ),
-      trailing: semantic(
-        'chores.done.${occurrence.occurrence.id}.reopen',
-        child: TextButton(
-          onPressed: onReopen,
-          child: Text(l10n.choresDoneReopen),
-        ),
-      ),
+      // LIFO amendment: plain absence (no placeholder) on every row except
+      // the chore's latest closed-today one — see the class doc comment.
+      trailing: showReopen
+          ? semantic(
+              'chores.done.${occurrence.occurrence.id}.reopen',
+              child: TextButton(
+                onPressed: onReopen,
+                child: Text(l10n.choresDoneReopen),
+              ),
+            )
+          : null,
     );
   }
 }

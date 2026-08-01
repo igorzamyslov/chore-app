@@ -108,25 +108,38 @@ PlainDate firstDueDate(Recurrence rule, PlainDate startDate) {
 }
 
 /// Due date of the next occurrence after closing one, whether it was
-/// completed ("done") or explicitly skipped — the engine treats both
-/// identically as "closing" an occurrence. (For completion-anchored chores
-/// the app is expected to pass the skip date as [closedOn]; there is no
-/// special casing here.)
+/// completed ("done") or explicitly skipped, per [skipped].
 ///
-/// - completion anchor: [nextAfterCompletion] applied to [closedOn].
-/// - schedule anchor: the first series element **strictly after**
-///   `max(closedDueDate, closedOn)`. Completing very late therefore skips
-///   the missed slots instead of surfacing an instantly-overdue next
-///   occurrence — this is a deliberate product decision, not a bug.
+/// - completion anchor, **done**: [nextAfterCompletion] applied to
+///   [closedOn] — "watered the plants again today" means "next watering N
+///   days from today", even when the closed occurrence was due earlier or
+///   later than today.
+/// - completion anchor, **skipped** (amended 2026-08-01, field feedback
+///   B3, `docs/feedback/2026-08-01-field-feedback.md`): [nextAfterCompletion]
+///   applied to `max(closedDueDate, closedOn)` instead. Skipping a
+///   not-yet-due occurrence anchors at that occurrence's OWN due date —
+///   "skip Friday's attempt, next one is N days after Friday", not "N days
+///   after the day I tapped skip" (which used to just re-create the same
+///   future date and look like the skip did nothing). For an overdue/today
+///   skip, `closedOn` is already the max, so nothing changes there.
+/// - schedule anchor (either [skipped] value — unaffected by it): the first
+///   series element **strictly after** `max(closedDueDate, closedOn)`.
+///   Completing very late therefore skips the missed slots instead of
+///   surfacing an instantly-overdue next occurrence — this is a deliberate
+///   product decision, not a bug.
 PlainDate nextDueDateAfterClosing({
   required Recurrence rule,
   required PlainDate startDate,
   required PlainDate closedDueDate,
   required PlainDate closedOn,
+  required bool skipped,
 }) {
   switch (rule.anchor) {
     case RecurrenceAnchor.completion:
-      return nextAfterCompletion(rule, closedOn);
+      final anchorDate = skipped
+          ? (closedDueDate.isAfter(closedOn) ? closedDueDate : closedOn)
+          : closedOn;
+      return nextAfterCompletion(rule, anchorDate);
     case RecurrenceAnchor.schedule:
       final threshold = closedDueDate.isAfter(closedOn)
           ? closedDueDate

@@ -346,8 +346,20 @@ class ChoreService {
   /// §2). The "closed today" restriction is enforced here, at the service
   /// level — [ChoreRepository] has no notion of "today".
   ///
-  /// Throws [StateError] if the chore has been deleted, or if
-  /// [occurrenceId] isn't currently closed with `closedOn == today`.
+  /// **LIFO restriction (amended 2026-08-01, field feedback B2 —
+  /// `docs/feedback/2026-08-01-field-feedback.md`):** a chore can have
+  /// SEVERAL closed-today occurrences (the successor of a closed occurrence
+  /// can itself be closed immediately), and the blanket
+  /// "delete the pending occurrence" step above would destroy a sibling an
+  /// earlier reopen just restored — the original data-loss bug. So only the
+  /// LATEST closed-today occurrence of [occurrenceId]'s chore — ordered by
+  /// due date, then `updatedAt` as tiebreak — may be reopened; reopening any
+  /// other one throws [StateError] and changes nothing. Unwinding a
+  /// multi-close chain therefore takes several reopens, newest-first.
+  ///
+  /// Throws [StateError] if the chore has been deleted, if [occurrenceId]
+  /// isn't currently closed with `closedOn == today`, or if it isn't the
+  /// latest closed-today occurrence of its chore.
   Future<void> reopenOccurrence(String occurrenceId) async {
     final today = _today;
     await database.transaction(() async {
@@ -362,6 +374,20 @@ class ChoreService {
       final choreDetails = await chores.getChore(occurrence.choreId);
       if (choreDetails == null || choreDetails.chore.deletedAt != null) {
         throw StateError('Chore ${occurrence.choreId} has been deleted');
+      }
+
+      final closedToday = await _closedTodayOccurrencesOf(
+        occurrence.choreId,
+        today,
+      );
+      // `occurrence` itself is always in this list (it just passed the
+      // closed-today check above), so `closedToday` is never empty here.
+      if (closedToday.first.id != occurrenceId) {
+        throw StateError(
+          'Occurrence $occurrenceId is not the latest closed-today '
+          'occurrence of chore ${occurrence.choreId}; reopen '
+          '${closedToday.first.id} first',
+        );
       }
 
       await chores.deletePendingOccurrences(occurrence.choreId);
@@ -412,6 +438,7 @@ class ChoreService {
         startDate: chore.startDate,
         closedDueDate: occurrence.dueDate,
         closedOn: today,
+        skipped: status == OccurrenceStatus.skipped,
       );
       final nextAssignee = _nextAssignee(
         mode: chore.assignmentMode,
@@ -573,6 +600,33 @@ class ChoreService {
     return (database.select(
       database.choreOccurrences,
     )..where((tbl) => tbl.id.equals(occurrenceId))).getSingleOrNull();
+  }
+
+  /// [choreId]'s occurrences closed (done/skipped/missed) with
+  /// `closedOn == today`, ordered newest-first by due date then
+  /// `updatedAt` — the LIFO order [reopenOccurrence] enforces (see its doc
+  /// comment). Direct query rather than a [ChoreRepository] method since,
+  /// like [_findOccurrence], this is a service-only, "today"-aware shape.
+  Future<List<ChoreOccurrence>> _closedTodayOccurrencesOf(
+    String choreId,
+    PlainDate today,
+  ) {
+    return (database.select(database.choreOccurrences)
+          ..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.status.equalsValue(OccurrenceStatus.pending).not() &
+                tbl.closedOn.equalsValue(today),
+          )
+          ..orderBy([
+            (tbl) =>
+                OrderingTerm(expression: tbl.dueDate, mode: OrderingMode.desc),
+            (tbl) => OrderingTerm(
+              expression: tbl.updatedAt,
+              mode: OrderingMode.desc,
+            ),
+          ]))
+        .get();
   }
 }
 
