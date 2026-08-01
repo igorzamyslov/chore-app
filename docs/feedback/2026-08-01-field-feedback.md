@@ -133,10 +133,14 @@ rushed alongside sync work.
 ## Features
 
 - **F1 (now):** the suggestion engine already ranks by frequency+recency
-  with prefix matching and list-exclusion. Change: focusing the empty
-  quick-add field shows the top 5 (empty-prefix query). Ranking stays
-  "most added, recency as tiebreak" — "most checked" would hide staples
-  you add but haven't bought yet.
+  with prefix matching. Change: focusing the empty quick-add field shows
+  the top 5 (empty-prefix query). Ranking stays "most added, recency as
+  tiebreak" — "most checked" would hide staples you add but haven't
+  bought yet. CORRECTION (found during implementation): type-ahead never
+  excluded on-list items, and mustn't — retyping an on-list item is how
+  the duplicate-prevention snackbars are reached. Exclusion therefore
+  applies ONLY to the focus (empty-prefix) path, where surfacing items
+  already visible on screen would be pure noise.
 - **F3 (now):** reuse `MemberAvatar` wherever members are named — chore
   form assignee chips, acting-member sheet, rotation order list.
 - **F7 (light now, rest later):** with B4's Data section the settings
