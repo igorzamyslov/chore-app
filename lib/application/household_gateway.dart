@@ -1,7 +1,11 @@
 /// Client-side household-sync abstraction (spec
-/// `docs/specs/sync-backend.md` §7.2) -- the second and last Supabase seam,
+/// `docs/specs/sync-backend.md` §7.2) -- the second Supabase seam (P2),
 /// exactly parallel to `AuthGateway`/`lib/application/auth_gateway.dart` in
-/// shape and laziness.
+/// shape and laziness. P3 (spec §8) adds a third, narrower one --
+/// `SyncTransport` (`lib/application/sync_engine.dart`) -- for the ongoing
+/// ENGINE's ROW-level push/pull; this file's two bulk paths
+/// (`uploadHouseholdData`/`downloadHousehold`) stay P2b/P2c-only (adopt's
+/// initial upload, join's initial download).
 ///
 /// Widgets and the application-layer services built on this (e.g.
 /// `HouseholdLinkService`, `lib/application/household_link_service.dart`)
@@ -11,12 +15,15 @@
 /// Tests substitute their own fake (see
 /// `test/features/settings/fake_household_gateway.dart`) rather than
 /// exercising either implementation in this file directly.
+///
+/// Row mapping (local typed drift rows <-> the server's snake_case/ISO
+/// shape) lives in `lib/data/sync/row_mappers.dart`, shared with the P3
+/// engine rather than duplicated here.
 library;
 
-import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/db/converters.dart';
 import 'package:chore_app/data/repositories/household_repository.dart'
     show HouseholdSnapshot;
+import 'package:chore_app/data/sync/row_mappers.dart' as row_mappers;
 import 'package:meta/meta.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -205,17 +212,18 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       // NOTHING needs no UPDATE privilege and keeps the retry semantics
       // this method promises: a re-run skips already-uploaded rows.
       await _client.from('members').upsert([
-        for (final member in snapshot.members) _memberRow(member),
+        for (final member in snapshot.members) row_mappers.memberRow(member),
       ], ignoreDuplicates: true);
     }
     if (snapshot.categories.isNotEmpty) {
       await _client.from('categories').upsert([
-        for (final category in snapshot.categories) _categoryRow(category),
+        for (final category in snapshot.categories)
+          row_mappers.categoryRow(category),
       ]);
     }
     if (snapshot.chores.isNotEmpty) {
       await _client.from('chores').upsert([
-        for (final chore in snapshot.chores) _choreRow(chore),
+        for (final chore in snapshot.chores) row_mappers.choreRow(chore),
       ]);
     }
     // chore_assignees/chore_occurrences denormalize household_id (spec §2:
@@ -229,7 +237,7 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       await _client.from('chore_assignees').upsert(
         [
           for (final assignee in snapshot.choreAssignees)
-            _choreAssigneeRow(assignee, choreHouseholdIds),
+            row_mappers.choreAssigneeRow(assignee, choreHouseholdIds),
         ],
         onConflict: 'chore_id,member_id',
       );
@@ -237,12 +245,13 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
     if (snapshot.choreOccurrences.isNotEmpty) {
       await _client.from('chore_occurrences').upsert([
         for (final occurrence in snapshot.choreOccurrences)
-          _choreOccurrenceRow(occurrence, choreHouseholdIds),
+          row_mappers.choreOccurrenceRow(occurrence, choreHouseholdIds),
       ]);
     }
     if (snapshot.shoppingItems.isNotEmpty) {
       await _client.from('shopping_items').upsert([
-        for (final item in snapshot.shoppingItems) _shoppingItemRow(item),
+        for (final item in snapshot.shoppingItems)
+          row_mappers.shoppingItemRow(item),
       ]);
     }
   }
@@ -335,191 +344,22 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
     return HouseholdSnapshot(
       household: householdRows.isEmpty
           ? null
-          : _householdFromRow(householdRows.first),
-      members: [for (final row in members) _memberFromRow(row)],
-      categories: [for (final row in categories) _categoryFromRow(row)],
-      chores: [for (final row in chores) _choreFromRow(row)],
+          : row_mappers.householdFromRow(householdRows.first),
+      members: [for (final row in members) row_mappers.memberFromRow(row)],
+      categories: [
+        for (final row in categories) row_mappers.categoryFromRow(row),
+      ],
+      chores: [for (final row in chores) row_mappers.choreFromRow(row)],
       choreAssignees: [
-        for (final row in choreAssignees) _choreAssigneeFromRow(row),
+        for (final row in choreAssignees) row_mappers.choreAssigneeFromRow(row),
       ],
       choreOccurrences: [
-        for (final row in choreOccurrences) _choreOccurrenceFromRow(row),
+        for (final row in choreOccurrences)
+          row_mappers.choreOccurrenceFromRow(row),
       ],
       shoppingItems: [
-        for (final row in shoppingItems) _shoppingItemFromRow(row),
+        for (final row in shoppingItems) row_mappers.shoppingItemFromRow(row),
       ],
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Row mapping: local typed drift rows <-> the server's snake_case/ISO
-  // shape (per-table mapping read off
-  // supabase/migrations/20260731120000_initial_schema.sql).
-
-  Map<String, Object?> _memberRow(Member member) => {
-    'id': member.id,
-    'household_id': member.householdId,
-    'name': member.name,
-    'color': member.color,
-    'role': member.role.name,
-    'user_id': member.userId,
-    'created_at': member.createdAt,
-    'updated_at': member.updatedAt,
-  };
-
-  Member _memberFromRow(Map<String, Object?> row) => Member(
-    id: row['id']! as String,
-    householdId: row['household_id']! as String,
-    name: row['name']! as String,
-    color: (row['color']! as num).toInt(),
-    role: MemberRole.values.byName(row['role']! as String),
-    userId: row['user_id'] as String?,
-    createdAt: row['created_at']! as String,
-    updatedAt: row['updated_at']! as String,
-  );
-
-  Map<String, Object?> _categoryRow(Category category) => {
-    'id': category.id,
-    'household_id': category.householdId,
-    'kind': category.kind.name,
-    'name': category.name,
-    'icon': category.icon,
-    'color': category.color,
-    'sort_order': category.sortOrder,
-    'created_at': category.createdAt,
-    'updated_at': category.updatedAt,
-    'deleted_at': category.deletedAt,
-  };
-
-  Category _categoryFromRow(Map<String, Object?> row) => Category(
-    id: row['id']! as String,
-    householdId: row['household_id']! as String,
-    kind: CategoryKind.values.byName(row['kind']! as String),
-    name: row['name']! as String,
-    icon: row['icon']! as String,
-    color: (row['color']! as num).toInt(),
-    sortOrder: (row['sort_order']! as num).toInt(),
-    createdAt: row['created_at']! as String,
-    updatedAt: row['updated_at']! as String,
-    deletedAt: row['deleted_at'] as String?,
-  );
-
-  Map<String, Object?> _choreRow(Chore chore) => {
-    'id': chore.id,
-    'household_id': chore.householdId,
-    'title': chore.title,
-    'notes': chore.notes,
-    'category_id': chore.categoryId,
-    'recurrence': chore.recurrence == null
-        ? null
-        : const RecurrenceConverter().toSql(chore.recurrence!),
-    'start_date': chore.startDate.toIso8601(),
-    'assignment_mode': chore.assignmentMode.name,
-    'paused_at': chore.pausedAt,
-    'created_by': chore.createdBy,
-    'created_at': chore.createdAt,
-    'updated_at': chore.updatedAt,
-    'deleted_at': chore.deletedAt,
-  };
-
-  Chore _choreFromRow(Map<String, Object?> row) => Chore(
-    id: row['id']! as String,
-    householdId: row['household_id']! as String,
-    title: row['title']! as String,
-    notes: row['notes'] as String?,
-    categoryId: row['category_id'] as String?,
-    recurrence: row['recurrence'] == null
-        ? null
-        : const RecurrenceConverter().fromSql(row['recurrence']! as String),
-    startDate: const PlainDateConverter().fromSql(row['start_date']! as String),
-    assignmentMode: AssignmentMode.values.byName(
-      row['assignment_mode']! as String,
-    ),
-    pausedAt: row['paused_at'] as String?,
-    createdBy: row['created_by'] as String?,
-    createdAt: row['created_at']! as String,
-    updatedAt: row['updated_at']! as String,
-    deletedAt: row['deleted_at'] as String?,
-  );
-
-  Map<String, Object?> _choreAssigneeRow(
-    ChoreAssignee assignee,
-    Map<String, String> choreHouseholdIds,
-  ) => {
-    'chore_id': assignee.choreId,
-    'member_id': assignee.memberId,
-    'household_id': choreHouseholdIds[assignee.choreId],
-    'position': assignee.position,
-  };
-
-  ChoreAssignee _choreAssigneeFromRow(Map<String, Object?> row) =>
-      ChoreAssignee(
-        choreId: row['chore_id']! as String,
-        memberId: row['member_id']! as String,
-        position: (row['position']! as num).toInt(),
-      );
-
-  Map<String, Object?> _choreOccurrenceRow(
-    ChoreOccurrence occurrence,
-    Map<String, String> choreHouseholdIds,
-  ) => {
-    'id': occurrence.id,
-    'chore_id': occurrence.choreId,
-    'household_id': choreHouseholdIds[occurrence.choreId],
-    'due_date': occurrence.dueDate.toIso8601(),
-    'status': occurrence.status.name,
-    'assigned_member_id': occurrence.assignedMemberId,
-    'completed_by': occurrence.completedBy,
-    'closed_on': occurrence.closedOn?.toIso8601(),
-    'created_at': occurrence.createdAt,
-    'updated_at': occurrence.updatedAt,
-  };
-
-  ChoreOccurrence _choreOccurrenceFromRow(Map<String, Object?> row) =>
-      ChoreOccurrence(
-        id: row['id']! as String,
-        choreId: row['chore_id']! as String,
-        dueDate: const PlainDateConverter().fromSql(row['due_date']! as String),
-        status: OccurrenceStatus.values.byName(row['status']! as String),
-        assignedMemberId: row['assigned_member_id'] as String?,
-        completedBy: row['completed_by'] as String?,
-        closedOn: row['closed_on'] == null
-            ? null
-            : const PlainDateConverter().fromSql(row['closed_on']! as String),
-        createdAt: row['created_at']! as String,
-        updatedAt: row['updated_at']! as String,
-      );
-
-  Map<String, Object?> _shoppingItemRow(ShoppingItem item) => {
-    'id': item.id,
-    'household_id': item.householdId,
-    'name': item.name,
-    'quantity_note': item.quantityNote,
-    'category_id': item.categoryId,
-    'added_by': item.addedBy,
-    'checked_at': item.checkedAt,
-    'created_at': item.createdAt,
-    'updated_at': item.updatedAt,
-    'deleted_at': item.deletedAt,
-  };
-
-  ShoppingItem _shoppingItemFromRow(Map<String, Object?> row) => ShoppingItem(
-    id: row['id']! as String,
-    householdId: row['household_id']! as String,
-    name: row['name']! as String,
-    quantityNote: row['quantity_note'] as String?,
-    categoryId: row['category_id'] as String?,
-    addedBy: row['added_by'] as String?,
-    checkedAt: row['checked_at'] as String?,
-    createdAt: row['created_at']! as String,
-    updatedAt: row['updated_at']! as String,
-    deletedAt: row['deleted_at'] as String?,
-  );
-
-  Household _householdFromRow(Map<String, Object?> row) => Household(
-    id: row['id']! as String,
-    name: row['name']! as String,
-    createdAt: row['created_at']! as String,
-    updatedAt: row['updated_at']! as String,
-  );
 }

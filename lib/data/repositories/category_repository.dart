@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -119,6 +120,7 @@ class CategoryRepository {
             sortOrder: Value(sortOrder),
             createdAt: now,
             updatedAt: now,
+            syncDirty: syncDirtyOnWrite,
           ),
         );
     return Category(
@@ -131,6 +133,7 @@ class CategoryRepository {
       sortOrder: sortOrder,
       createdAt: now,
       updatedAt: now,
+      syncDirty: true,
     );
   }
 
@@ -157,6 +160,7 @@ class CategoryRepository {
         color: color != null ? Value(color) : const Value.absent(),
         sortOrder: sortOrder != null ? Value(sortOrder) : const Value.absent(),
         updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -170,7 +174,11 @@ class CategoryRepository {
       await (db.update(
         db.categories,
       )..where((tbl) => tbl.id.equals(id))).write(
-        CategoriesCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+        CategoriesCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          syncDirty: syncDirtyOnWrite,
+        ),
       );
       await (db.update(db.chores)..where(
             (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
@@ -179,6 +187,7 @@ class CategoryRepository {
             ChoresCompanion(
               categoryId: const Value(null),
               updatedAt: Value(now),
+              syncDirty: syncDirtyOnWrite,
             ),
           );
       await (db.update(db.shoppingItems)..where(
@@ -188,6 +197,7 @@ class CategoryRepository {
             ShoppingItemsCompanion(
               categoryId: const Value(null),
               updatedAt: Value(now),
+              syncDirty: syncDirtyOnWrite,
             ),
           );
     });
@@ -233,7 +243,11 @@ class CategoryRepository {
         await (db.update(
           db.categories,
         )..where((tbl) => tbl.id.equals(orderedCategoryIds[i]))).write(
-          CategoriesCompanion(sortOrder: Value(i), updatedAt: Value(now)),
+          CategoriesCompanion(
+            sortOrder: Value(i),
+            updatedAt: Value(now),
+            syncDirty: syncDirtyOnWrite,
+          ),
         );
       }
     });
@@ -265,6 +279,7 @@ class CategoryRepository {
                 sortOrder: Value(i),
                 createdAt: now,
                 updatedAt: now,
+                syncDirty: syncDirtyOnWrite,
               ),
             );
       }

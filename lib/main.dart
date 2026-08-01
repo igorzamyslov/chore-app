@@ -21,17 +21,24 @@ Future<void> main() async {
     );
   }
   final container = ProviderContainer();
-  // Activates the digest reschedule-on-mutation wiring and the chore
-  // catch-up resume/day-change wiring immediately, before the widget tree
+  // Activates the digest reschedule-on-mutation wiring, the chore catch-up
+  // resume/day-change wiring, and the P3 sync engine (spec
+  // `docs/specs/sync-backend.md` §8.3) immediately, before the widget tree
   // even builds (spec `docs/specs/notifications.md` architecture #2:
   // reschedule triggers include "bootstrap"; spec
   // `docs/specs/polish-round-1.md` C1). Deliberately NOT wired inside
-  // `ChoreApp`/`AppShell` — see `DigestRescheduleController`'s and
-  // `CatchUpController`'s doc comments in `lib/app/providers.dart` for why.
+  // `ChoreApp`/`AppShell` — see `DigestRescheduleController`'s,
+  // `CatchUpController`'s, and `SyncEngineController`'s doc comments in
+  // `lib/app/providers.dart` for why.
   final digestController = container.read(digestRescheduleControllerProvider);
   final catchUpController = container.read(catchUpControllerProvider);
+  final syncEngineController = container.read(syncEngineControllerProvider);
   WidgetsBinding.instance.addObserver(
-    _AppResumeObserver(digestController, catchUpController),
+    _AppResumeObserver(
+      digestController,
+      catchUpController,
+      syncEngineController,
+    ),
   );
   runApp(
     UncontrolledProviderScope(container: container, child: const ChoreApp()),
@@ -39,15 +46,23 @@ Future<void> main() async {
 }
 
 /// Re-triggers the digest reschedule (and re-checks the OS notification
-/// permission), and re-runs chore catch-up, whenever the app resumes from
-/// the background — the lifecycle trigger neither wiring can observe via
-/// Riverpod alone, since an OS lifecycle transition isn't itself a
-/// watchable value.
+/// permission), re-runs chore catch-up, and re-pulls sync changes (spec
+/// `docs/specs/sync-backend.md` §8.3), whenever the app resumes from the
+/// background — the lifecycle trigger none of the three wirings can
+/// observe via Riverpod alone, since an OS lifecycle transition isn't
+/// itself a watchable value. The single observer instance below is REUSED
+/// for all three (not a second `WidgetsBindingObserver`), per
+/// `SyncEngineController`'s doc comment.
 class _AppResumeObserver extends WidgetsBindingObserver {
-  _AppResumeObserver(this._digestController, this._catchUpController);
+  _AppResumeObserver(
+    this._digestController,
+    this._catchUpController,
+    this._syncEngineController,
+  );
 
   final DigestRescheduleController _digestController;
   final CatchUpController _catchUpController;
+  final SyncEngineController _syncEngineController;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -55,6 +70,7 @@ class _AppResumeObserver extends WidgetsBindingObserver {
       unawaited(_digestController.refreshPermissionState());
       _digestController.triggerRecompute();
       _catchUpController.triggerOnResume();
+      _syncEngineController.triggerOnResume();
     }
   }
 }

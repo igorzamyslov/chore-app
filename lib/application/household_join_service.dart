@@ -372,6 +372,13 @@ class HouseholdJoinService {
           createdAt: now,
           updatedAt: now,
           deletedAt: const Value(null),
+          // Brand-new local rows the joined household doesn't have yet
+          // (spec `docs/specs/sync-backend.md` §8.1: every insert/update of
+          // a synced row marks it dirty) -- step 5 below best-effort
+          // pushes them immediately, but this is what lets P3's ongoing
+          // sync engine pick them up later if that push fails or is
+          // interrupted.
+          syncDirty: true,
         ),
       );
       occurrenceCopies.add(
@@ -384,6 +391,7 @@ class HouseholdJoinService {
           closedOn: const Value(null),
           createdAt: now,
           updatedAt: now,
+          syncDirty: true,
         ),
       );
     }
@@ -407,6 +415,7 @@ class HouseholdJoinService {
           createdAt: now,
           updatedAt: now,
           deletedAt: const Value(null),
+          syncDirty: true,
         ),
     ];
 

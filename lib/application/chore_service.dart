@@ -9,6 +9,7 @@ library;
 import 'dart:convert';
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
@@ -400,6 +401,7 @@ class ChoreService {
           closedOn: const Value(null),
           completedBy: const Value(null),
           updatedAt: Value(clock.now().toUtc().toIso8601String()),
+          syncDirty: syncDirtyOnWrite,
         ),
       );
     });

@@ -209,6 +209,24 @@ class SettingsRepository {
     );
   }
 
+  /// Sets the pull cursor (spec `docs/specs/sync-backend.md` §8.1/8.3):
+  /// [at] is the server-clock timestamp fetched via the `server_now()` RPC
+  /// in the SAME round trip as the pull it's paired with -- never the
+  /// device clock. Called by `SupabaseSyncEngine.pullSince` only AFTER its
+  /// pull transaction has committed (spec §8.3: "set `syncLastPulledAt` to
+  /// the fetched server now() only after the transaction commits").
+  Future<void> setSyncLastPulledAt(DateTime at) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        syncLastPulledAt: Value(at.toUtc().toIso8601String()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,
