@@ -231,15 +231,22 @@ name prompt, auto color). Then, per §4, strictly in this order:
 1. Automatic JSON export (G8 exporter) written to the app documents dir
    (filename `famdo-archive-<date>.json`); abort the whole join if this
    write fails.
-2. `downloadHousehold` → replace: soft-archive = local rows of the old
+2. Import offer, IN-FLOW (amended 2026-08-01; a post-replace banner
+   can't work — the offer's source rows are exactly what step 3
+   deletes, so the choice must happen while they still exist): one
+   screen/sheet step "Bring over your open chores and unchecked
+   shopping items?" with accept/decline. On accept, the open chores
+   (new UUIDs, no history) + unchecked items are captured NOW and
+   carried into step 3.
+3. `downloadHousehold` → replace: soft-archive = local rows of the old
    household are DELETED after the export succeeds (the file IS the
    archive; UI copy states this plainly), snapshot inserted, settings
-   repointed (actingMemberId = claimed/new member, linked fields set).
-3. One-time import offer (banner on Chores tab, dismissible): copies
-   OPEN chores (as new chores, new UUIDs, no history) + unchecked
-   shopping items into the joined household, locally AND via
-   `uploadHouseholdData` of just those rows; banner never returns after
-   accept/dismiss (settings-stamped like other one-time banners).
+   repointed (actingMemberId = claimed/new member, linked fields set),
+   accepted import copies inserted locally AND pushed via
+   `uploadHouseholdData` of just those rows. Client-side the whole
+   replace is one local transaction; the post-replace UI must re-resolve
+   the bootstrap household (provider invalidation), since the household
+   id changes.
 
 ### 7.5 Testing
 
