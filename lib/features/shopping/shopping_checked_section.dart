@@ -5,22 +5,40 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-/// The checked-items section: a collapsed-by-default [ExpansionTile] headed
+/// The checked-items section: a controlled [ExpansionTile] headed
 /// 'In the cart (N)', holding [tiles] (already-built tile widgets for every
-/// checked item), with a 'Clear checked' button that calls [onClear]
-/// immediately — no confirmation dialog (spec `docs/specs/ux-round-2.md`
-/// B4: items are soft-deleted and suggestions make recovery one keystroke
-/// away, so a confirm here would fail design-language rule 3).
+/// checked item), with 'Put all back' and 'Clear checked' buttons — neither
+/// gated behind a confirmation dialog (spec `docs/specs/ux-round-2.md` B4:
+/// items are soft-deleted and suggestions make recovery one keystroke away,
+/// so a confirm here would fail design-language rule 3).
+///
+/// [expanded] and [onExpansionChanged] hoist the expand/collapse state to
+/// the caller (field feedback G1,
+/// `docs/feedback/2026-08-01-field-feedback.md`): checking/unchecking an
+/// item rebuilds and re-parents this section within the shopping list's
+/// `ListView`, which can make a bare, uncontrolled `ExpansionTile` forget
+/// whether it was open. Passing the current value back in as
+/// `initiallyExpanded` on every build means the section's open/closed state
+/// survives no matter how the surrounding list reshuffles it, as long as the
+/// caller's own state survives (see `ShoppingListScreen`).
 ///
 /// The caller only mounts this widget while there's at least one checked
 /// item (see `docs/specs/ui-shopping.md`), so 'Clear checked' is always
-/// shown here.
+/// shown here. Per the same contract, the caller resets [expanded] to
+/// `false` once this section unmounts, so its *next* appearance always
+/// starts collapsed — a deliberate, documented simplification: it's only
+/// the "stay open while working inside an already-open section" case that
+/// was broken, not "remember collapsed/expanded across separate shopping
+/// trips".
 class ShoppingCheckedSection extends StatelessWidget {
   /// Creates the section for [count] checked items, rendering [tiles].
   const ShoppingCheckedSection({
     required this.count,
     required this.tiles,
+    required this.expanded,
+    required this.onExpansionChanged,
     required this.onClear,
+    required this.onUncheckAll,
     super.key,
   });
 
@@ -30,18 +48,32 @@ class ShoppingCheckedSection extends StatelessWidget {
   /// The already-built tile widgets for each checked item.
   final List<Widget> tiles;
 
+  /// Whether the section is currently expanded, per the caller's hoisted
+  /// state.
+  final bool expanded;
+
+  /// Called with the new expanded value whenever the user taps the section
+  /// header to toggle it.
+  final ValueChanged<bool> onExpansionChanged;
+
   /// Called when the user taps 'Clear checked', to clear all checked items
   /// immediately.
   final VoidCallback onClear;
+
+  /// Called when the user taps 'Put all back', to uncheck every checked
+  /// item immediately (field feedback G1).
+  final VoidCallback onUncheckAll;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     // Wrap, not Row: at accessibility text sizes the header text and the
-    // Clear button don't fit side by side — the button flows to its own
+    // action buttons don't fit side by side — buttons flow to their own
     // line instead of squeezing the title into an awkward two-line wrap
     // (visual QA finding at AX2).
     return ExpansionTile(
+      initiallyExpanded: expanded,
+      onExpansionChanged: onExpansionChanged,
       title: Wrap(
         spacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -49,6 +81,13 @@ class ShoppingCheckedSection extends StatelessWidget {
           semantic(
             'shopping.checked.header',
             child: Text(l10n.shoppingCartHeader(count)),
+          ),
+          semantic(
+            'shopping.uncheckAll',
+            child: TextButton(
+              onPressed: onUncheckAll,
+              child: Text(l10n.shoppingUncheckAll),
+            ),
           ),
           semantic(
             'shopping.clear',

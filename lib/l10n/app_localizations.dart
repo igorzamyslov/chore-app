@@ -656,6 +656,12 @@ abstract class AppLocalizations {
   /// **'Clear checked'**
   String get shoppingClearButton;
 
+  /// Button that unchecks every checked item immediately (no confirmation), returning them all to the main list — shown in the checked-items section header next to Clear checked.
+  ///
+  /// In en, this message translates to:
+  /// **'Put all back'**
+  String get shoppingUncheckAll;
+
   /// Placeholder hint text of the shopping list's quick-add text field.
   ///
   /// In en, this message translates to:

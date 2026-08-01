@@ -119,6 +119,7 @@
 
   "shoppingCartHeader": "{count, plural, one{Im Einkaufswagen (1)} other{Im Einkaufswagen ({count})}}",
   "shoppingClearButton": "Erledigte leeren",
+  "shoppingUncheckAll": "Alles zurücklegen",
 
   "shoppingAddHint": "Artikel hinzufügen…",
   "shoppingAddTooltip": "Artikel hinzufügen",

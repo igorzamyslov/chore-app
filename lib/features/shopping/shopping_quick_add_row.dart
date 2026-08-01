@@ -30,8 +30,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// The field clears and keeps focus after all three outcomes, so entry can
 /// continue right away. Suggestions are re-queried on every keystroke via
-/// `ShoppingRepository.suggestions` and disappear as soon as the field is
-/// empty.
+/// `ShoppingRepository.suggestions`.
+///
+/// Focusing the field while it's still empty shows the top 5 suggestions by
+/// the same ranking (field feedback F1,
+/// `docs/feedback/2026-08-01-field-feedback.md`) — a quiet nudge toward
+/// what's usually bought, before the user has typed anything. Typing a
+/// prefix seamlessly narrows to the existing type-ahead behavior; clearing
+/// the field back to empty while still focused returns to the top-5 view.
+/// Losing focus always hides the list, however it got there.
 class ShoppingQuickAddRow extends ConsumerStatefulWidget {
   /// Creates the quick-add row.
   const ShoppingQuickAddRow({super.key});
@@ -50,6 +57,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   void initState() {
     super.initState();
     _controller.addListener(_onTextChanged);
+    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
@@ -57,7 +65,9 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     _controller
       ..removeListener(_onTextChanged)
       ..dispose();
-    _focusNode.dispose();
+    _focusNode
+      ..removeListener(_onFocusChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -107,12 +117,27 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     unawaited(_updateSuggestions());
   }
 
+  /// Shows the top-5 focus-suggestions (F1) when focus is gained while the
+  /// field is still empty; hides whatever's showing as soon as focus is
+  /// lost, regardless of how it got there (typed prefix or empty-focus).
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus) {
+      unawaited(_updateSuggestions());
+    } else if (_suggestions.isNotEmpty) {
+      setState(() => _suggestions = const []);
+    }
+  }
+
   /// Re-queries suggestions for the field's current text, discarding the
-  /// result if the text has since changed (e.g. it raced with a submit that
-  /// cleared the field).
+  /// result if the text or focus state has since changed (e.g. it raced
+  /// with a submit that cleared the field, or with a blur).
+  ///
+  /// An empty query only queries (the F1 top-5) while the field still has
+  /// focus; an empty, unfocused field hides the list instead, same as
+  /// clearing the text always did.
   Future<void> _updateSuggestions() async {
     final query = _controller.text;
-    if (query.isEmpty) {
+    if (query.isEmpty && !_focusNode.hasFocus) {
       if (_suggestions.isNotEmpty) {
         setState(() => _suggestions = const []);
       }
@@ -121,8 +146,10 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     final results = await ref
         .read(shoppingRepositoryProvider)
-        .suggestions(householdId, query);
-    if (!mounted || _controller.text != query) {
+        .suggestions(householdId, query, limit: query.isEmpty ? 5 : 8);
+    if (!mounted ||
+        _controller.text != query ||
+        (query.isEmpty && !_focusNode.hasFocus)) {
       return;
     }
     setState(() => _suggestions = results);

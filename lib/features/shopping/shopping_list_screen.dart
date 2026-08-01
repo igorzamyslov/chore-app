@@ -16,12 +16,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
 /// collapsed-by-default checked section.
-class ShoppingListScreen extends ConsumerWidget {
+class ShoppingListScreen extends ConsumerStatefulWidget {
   /// Creates the shopping list screen.
   const ShoppingListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShoppingListScreen> createState() => _ShoppingListScreenState();
+}
+
+class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
+  /// Whether the checked-items ('In the cart') section is expanded.
+  ///
+  /// Hoisted here rather than left as an uncontrolled `ExpansionTile`'s own
+  /// internal state (field feedback G1,
+  /// `docs/feedback/2026-08-01-field-feedback.md`): checking/unchecking an
+  /// item rebuilds and re-parents `ShoppingCheckedSection` within the
+  /// `ListView` below, which can reset a bare `ExpansionTile`'s expansion.
+  /// This screen stays mounted for the tab's entire lifetime (see the
+  /// `IndexedStack` in `lib/app/app_shell.dart`), so this field survives
+  /// every such rebuild. Reset to `false` in [build] whenever the section
+  /// itself unmounts (no checked items left) — its next appearance always
+  /// starts collapsed, by design.
+  bool _cartExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final itemsAsync = ref.watch(shoppingItemsProvider);
 
     return Scaffold(
@@ -33,13 +52,29 @@ class ShoppingListScreen extends ConsumerWidget {
           const ShoppingQuickAddRow(),
           Expanded(
             child: itemsAsync.when(
-              data: (items) => _Body(
-                items: items,
-                onCheckedChanged: (id, {required checked}) =>
-                    _setChecked(ref, id, checked: checked),
-                onTapItem: (item) => showShoppingEditSheet(context, item: item),
-                onClear: () => _clearChecked(ref),
-              ),
+              data: (items) {
+                final hasChecked = items.any(
+                  (item) => item.item.checkedAt != null,
+                );
+                if (!hasChecked && _cartExpanded) {
+                  // The section only mounts while ≥1 item is checked; once
+                  // it unmounts, reset so it starts collapsed next time
+                  // (documented behavior above).
+                  _cartExpanded = false;
+                }
+                return _Body(
+                  items: items,
+                  cartExpanded: _cartExpanded,
+                  onCartExpansionChanged: (value) =>
+                      setState(() => _cartExpanded = value),
+                  onCheckedChanged: (id, {required checked}) =>
+                      _setChecked(ref, id, checked: checked),
+                  onTapItem: (item) =>
+                      showShoppingEditSheet(context, item: item),
+                  onClear: () => _clearChecked(ref),
+                  onUncheckAll: () => _uncheckAll(ref),
+                );
+              },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stackTrace) => _ErrorState(
                 onRetry: () => ref.invalidate(shoppingItemsProvider),
@@ -61,20 +96,31 @@ class ShoppingListScreen extends ConsumerWidget {
     final householdId = ref.read(bootstrapProvider).requireValue;
     return ref.read(shoppingRepositoryProvider).clearChecked(householdId);
   }
+
+  Future<void> _uncheckAll(WidgetRef ref) {
+    final householdId = ref.read(bootstrapProvider).requireValue;
+    return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
+  }
 }
 
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
+    required this.cartExpanded,
+    required this.onCartExpansionChanged,
     required this.onCheckedChanged,
     required this.onTapItem,
     required this.onClear,
+    required this.onUncheckAll,
   });
 
   final List<ShoppingItemWithCategory> items;
+  final bool cartExpanded;
+  final ValueChanged<bool> onCartExpansionChanged;
   final void Function(String id, {required bool checked}) onCheckedChanged;
   final ValueChanged<ShoppingItemWithCategory> onTapItem;
   final VoidCallback onClear;
+  final VoidCallback onUncheckAll;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +149,10 @@ class _Body extends StatelessWidget {
         ShoppingCheckedSection(
           count: checked.length,
           tiles: [for (final item in checked) _tileFor(item)],
+          expanded: cartExpanded,
+          onExpansionChanged: onCartExpansionChanged,
           onClear: onClear,
+          onUncheckAll: onUncheckAll,
         ),
     ];
 

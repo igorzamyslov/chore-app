@@ -376,6 +376,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingClearButton => 'Clear checked';
 
   @override
+  String get shoppingUncheckAll => 'Put all back';
+
+  @override
   String get shoppingAddHint => 'Add item…';
 
   @override
