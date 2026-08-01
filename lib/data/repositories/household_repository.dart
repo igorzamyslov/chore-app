@@ -3,7 +3,63 @@ library;
 
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:drift/drift.dart';
+import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
+
+/// A full typed snapshot of one household's data (spec
+/// `docs/specs/sync-backend.md` §7.2), read directly via the typed drift row
+/// classes -- see `HouseholdRepository.loadSnapshot`, which builds one, and
+/// `HouseholdGateway` (`lib/application/household_gateway.dart`), whose
+/// `uploadHouseholdData`/`downloadHousehold` pass one across the Supabase
+/// seam.
+///
+/// Deliberately NOT built from `buildExportDocument`
+/// (`lib/application/data_export.dart`): that reads raw SQL rows (so
+/// converter-mapped columns like `chores.recurrence` come back as their
+/// stored JSON text, not a decoded `Recurrence`), which is right for a
+/// verbatim JSON backup but wrong here -- the Supabase gateway needs typed
+/// values to re-encode per-column for each request.
+@immutable
+class HouseholdSnapshot {
+  /// Creates a snapshot. Every list defaults to empty, and [household] to
+  /// `null`, so a caller can build a partial snapshot (e.g.
+  /// `HouseholdGateway.uploadHouseholdData`'s payload never includes
+  /// [household] -- the household row itself is created by the
+  /// `create_household` RPC, not uploaded).
+  const HouseholdSnapshot({
+    this.household,
+    this.members = const [],
+    this.categories = const [],
+    this.chores = const [],
+    this.choreAssignees = const [],
+    this.choreOccurrences = const [],
+    this.shoppingItems = const [],
+  });
+
+  /// The household's own row, or `null` when this snapshot doesn't carry
+  /// one (every upload payload; a failed/empty
+  /// `HouseholdGateway.downloadHousehold`).
+  final Household? household;
+
+  /// Every member row, in FK-parent-first upload order (spec §7.2: right
+  /// after the household itself).
+  final List<Member> members;
+
+  /// Every category row.
+  final List<Category> categories;
+
+  /// Every chore row.
+  final List<Chore> chores;
+
+  /// Every chore-assignee row.
+  final List<ChoreAssignee> choreAssignees;
+
+  /// Every chore-occurrence row.
+  final List<ChoreOccurrence> choreOccurrences;
+
+  /// Every shopping-item row.
+  final List<ShoppingItem> shoppingItems;
+}
 
 /// Repository for the household bootstrap and its member roster.
 ///
@@ -92,6 +148,72 @@ class HouseholdRepository {
       ..where((tbl) => tbl.householdId.equals(householdId))
       ..orderBy([(tbl) => OrderingTerm(expression: tbl.createdAt)]);
     return query.watch();
+  }
+
+  /// Watches [householdId]'s own row -- currently only used for its `name`
+  /// (see `currentHouseholdProvider`, `lib/app/providers.dart`, backing the
+  /// Account section's 'linked' subtitle, spec
+  /// `docs/specs/sync-backend.md` §7.3 last paragraph).
+  Stream<Household> watchHousehold(String householdId) {
+    final query = db.select(db.households)
+      ..where((tbl) => tbl.id.equals(householdId));
+    return query.watchSingle();
+  }
+
+  /// Loads a full typed [HouseholdSnapshot] of [householdId]'s data (spec
+  /// `docs/specs/sync-backend.md` §7.2), for `HouseholdLinkService.adopt`
+  /// (`lib/application/household_link_service.dart`) to hand to
+  /// `HouseholdGateway.uploadHouseholdData`.
+  ///
+  /// Includes every row regardless of `deletedAt` -- soft-deleted rows
+  /// (tombstones) upload too, per spec §7.2 "tombstones included".
+  Future<HouseholdSnapshot> loadSnapshot(String householdId) async {
+    final household = await (db.select(
+      db.households,
+    )..where((tbl) => tbl.id.equals(householdId))).getSingleOrNull();
+    final members = await (db.select(
+      db.members,
+    )..where((tbl) => tbl.householdId.equals(householdId))).get();
+    final categories = await (db.select(
+      db.categories,
+    )..where((tbl) => tbl.householdId.equals(householdId))).get();
+    final chores = await (db.select(
+      db.chores,
+    )..where((tbl) => tbl.householdId.equals(householdId))).get();
+    final choreIds = chores.map((chore) => chore.id).toSet();
+    final choreAssignees = choreIds.isEmpty
+        ? <ChoreAssignee>[]
+        : await (db.select(
+            db.choreAssignees,
+          )..where((tbl) => tbl.choreId.isIn(choreIds))).get();
+    final choreOccurrences = choreIds.isEmpty
+        ? <ChoreOccurrence>[]
+        : await (db.select(
+            db.choreOccurrences,
+          )..where((tbl) => tbl.choreId.isIn(choreIds))).get();
+    final shoppingItems = await (db.select(
+      db.shoppingItems,
+    )..where((tbl) => tbl.householdId.equals(householdId))).get();
+    return HouseholdSnapshot(
+      household: household,
+      members: members,
+      categories: categories,
+      chores: chores,
+      choreAssignees: choreAssignees,
+      choreOccurrences: choreOccurrences,
+      shoppingItems: shoppingItems,
+    );
+  }
+
+  /// Sets [memberId]'s role (spec `docs/specs/sync-backend.md` §7.3 step 3:
+  /// the acting member becomes admin locally right after adopting,
+  /// mirroring `create_household`'s server-side rule).
+  Future<void> setMemberRole(String memberId, MemberRole role) async {
+    await (db.update(
+      db.members,
+    )..where((tbl) => tbl.id.equals(memberId))).write(
+      MembersCompanion(role: Value(role), updatedAt: Value(_isoNow())),
+    );
   }
 
   /// Adds a new member to [householdId].

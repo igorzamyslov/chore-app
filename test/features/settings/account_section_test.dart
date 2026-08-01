@@ -1,10 +1,14 @@
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 import 'fake_auth_gateway.dart';
+import 'fake_household_gateway.dart';
 import 'settings_test_utils.dart';
 
 /// Finds the [TextField] wrapped by the semantic id [identifier].
@@ -242,6 +246,196 @@ void main() {
         find.bySemanticsIdentifier('settings.account.email'),
         findsOneWidget,
       );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'unlinked+signed-out: shows no adopt row',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.email'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'linked: hides the adopt row and shows the linked subtitle on the '
+    'signed-in tile',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(find.text('Synced with My household'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  final happyPathGateway = FakeHouseholdGateway();
+  testChoreApp(
+    'adopt happy path: creates the household with the LOCAL id and the '
+    "acting member's id/name/color, uploads everything else, links "
+    "settings, flips the acting member's role to admin, and flips the UI "
+    'to the linked subtitle',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(happyPathGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final me = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();
+      // Demote the bootstrap member first, so the "flips to admin" part of
+      // this test is actually exercised (it's created as admin already).
+      await HouseholdRepository(
+        database,
+      ).setMemberRole(me.id, MemberRole.member);
+      final expectedCategoryIds =
+          (await database.select(database.categories).get())
+              .map((category) => category.id)
+              .toSet();
+
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(find.text('Synced with My household'), findsOneWidget);
+
+      expect(happyPathGateway.createHouseholdCalls, hasLength(1));
+      final createCall = happyPathGateway.createHouseholdCalls.single;
+      expect(createCall.householdId, householdId);
+      expect(createCall.memberId, me.id);
+      expect(createCall.memberName, 'Me');
+      expect(createCall.memberColor, me.color);
+
+      expect(happyPathGateway.uploadHouseholdDataCalls, hasLength(1));
+      final uploaded = happyPathGateway.uploadHouseholdDataCalls.single;
+      // The acting member is excluded -- it was already created by step 1.
+      expect(uploaded.members, isEmpty);
+      expect(
+        uploaded.categories.map((category) => category.id).toSet(),
+        expectedCategoryIds,
+      );
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, householdId);
+      expect(settings.syncLinkedAt, isNotNull);
+
+      final updatedMe = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(updatedMe.role, MemberRole.admin);
+
+      handle.dispose();
+    },
+  );
+
+  final retryGateway = FakeHouseholdGateway()
+    ..uploadHouseholdDataError = Exception('network down');
+  testChoreApp(
+    'adopt with upload failure then successful retry: a second '
+    'createHousehold call that throws (simulating "already exists with me '
+    'as member") is tolerated as step-1 success, and the flow completes',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(retryGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+
+      // First attempt: createHousehold succeeds, upload fails -> inline
+      // error + "Try again", still unlinked.
+      expect(find.text('Try again'), findsOneWidget);
+      expect(
+        find.text("Couldn't put your household online. Please try again."),
+        findsOneWidget,
+      );
+      var settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, isNull);
+      expect(retryGateway.createHouseholdCalls, hasLength(1));
+      expect(retryGateway.uploadHouseholdDataCalls, hasLength(1));
+
+      // Retry: this time createHousehold itself throws (e.g. a unique
+      // violation on rerun) -- the service must detect the household
+      // already exists (from the first attempt) and continue anyway; the
+      // upload succeeds this time.
+      retryGateway
+        ..uploadHouseholdDataError = null
+        ..createHouseholdError = Exception('household already exists');
+
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(find.text('Synced with My household'), findsOneWidget);
+
+      expect(retryGateway.createHouseholdCalls, hasLength(2));
+      expect(retryGateway.downloadHouseholdCalls, isNotEmpty);
+      expect(retryGateway.uploadHouseholdDataCalls, hasLength(2));
+
+      settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, householdId);
 
       handle.dispose();
     },

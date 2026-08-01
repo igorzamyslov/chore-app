@@ -74,8 +74,9 @@ void main() {
   });
 
   test(
-    'schemaVersion 3 -> 5 upgrade adds locale and both shown-once flags '
-    '(NULL by default), keeping the existing settings row',
+    'schemaVersion 3 -> 6 upgrade adds locale, both shown-once flags, and '
+    'the sync-linked columns (NULL by default), keeping the existing '
+    'settings row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v4_test',
@@ -113,12 +114,18 @@ void main() {
       await seed.customStatement(
         'ALTER TABLE settings DROP COLUMN digest_preprompt_shown_at',
       );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_household_id',
+      );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_linked_at',
+      );
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 5)
+      // Re-opening the same file with the real (schemaVersion: 6)
       // `AppDatabase` now sees `user_version == 3` on disk vs. a declared
-      // `schemaVersion` of 5, so drift runs `onUpgrade(migrator, 3, 5)` —
+      // `schemaVersion` of 6, so drift runs `onUpgrade(migrator, 3, 6)` —
       // exactly the real upgrade path a v3 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -128,6 +135,8 @@ void main() {
       expect(row.locale, isNull);
       expect(row.onboardingNamePromptShownAt, isNull);
       expect(row.digestPrepromptShownAt, isNull);
+      expect(row.syncHouseholdId, isNull);
+      expect(row.syncLinkedAt, isNull);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -137,9 +146,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 2 -> 5 upgrade adds every later settings column, '
+    'schemaVersion 2 -> 6 upgrade adds every later settings column, '
     'keeping the existing settings row -- this app never actually stops '
-    'at an intermediate version once schemaVersion is 5, so this '
+    'at an intermediate version once schemaVersion is 6, so this '
     'supersedes earlier per-step tests',
     () async {
       final dir = await Directory.systemTemp.createTemp(
@@ -152,14 +161,13 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v2 install: open the *current* (v4) schema
-      // once so `onCreate` materializes every table with its full v4
-      // column set, insert a settings row, then drop BOTH the v3-only
-      // `acting_member_id` column and the v4-only `locale` column and roll
-      // `user_version` back to 2 — reproducing exactly what a real v2
-      // database on a user's device looks like, so the `from < 2` branch
-      // is never hit and both `if (from < 3)` / `if (from < 4)` backfills
-      // inside the `else` branch run in the same upgrade.
+      // Simulate a pre-existing v2 install: open the *current* (v6) schema
+      // once so `onCreate` materializes every table with its full v6
+      // column set, insert a settings row, then drop every column newer
+      // than v2 and roll `user_version` back to 2 — reproducing exactly
+      // what a real v2 database on a user's device looks like, so the
+      // `from < 2` branch is never hit and every `if (from < N)` backfill
+      // inside the `else` branch runs in the same upgrade.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -180,12 +188,18 @@ void main() {
       await seed.customStatement(
         'ALTER TABLE settings DROP COLUMN digest_preprompt_shown_at',
       );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_household_id',
+      );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_linked_at',
+      );
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 5)
+      // Re-opening the same file with the real (schemaVersion: 6)
       // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
-      // `schemaVersion` of 5, so drift runs `onUpgrade(migrator, 2, 5)`.
+      // `schemaVersion` of 6, so drift runs `onUpgrade(migrator, 2, 6)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -195,8 +209,70 @@ void main() {
       expect(row.locale, isNull);
       expect(row.onboardingNamePromptShownAt, isNull);
       expect(row.digestPrepromptShownAt, isNull);
+      expect(row.syncHouseholdId, isNull);
+      expect(row.syncLinkedAt, isNull);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
+      expect(row.digestEnabled, isTrue);
+      expect(row.digestMinutes, 480);
+    },
+  );
+
+  test(
+    'schemaVersion 5 -> 6 upgrade adds syncHouseholdId and syncLinkedAt '
+    '(NULL by default, no data rewrite), keeping the existing settings row',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v6_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v5 install: open the *current* (v6) schema
+      // once so `onCreate` materializes every table with its full v6 column
+      // set, insert a settings row with a non-NULL actingMemberId (so the
+      // upgrade's "existing row survives" guarantee is actually exercised),
+      // then drop both v6-only columns and roll `user_version` back to 5 --
+      // reproducing exactly what a real v5 database on a user's device
+      // looks like.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+            ),
+          );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_household_id',
+      );
+      await seed.customStatement(
+        'ALTER TABLE settings DROP COLUMN sync_linked_at',
+      );
+      await seed.customStatement('PRAGMA user_version = 5');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 6)
+      // `AppDatabase` now sees `user_version == 5` on disk vs. a declared
+      // `schemaVersion` of 6, so drift runs `onUpgrade(migrator, 5, 6)` --
+      // exactly the real upgrade path a v5 user's device would go through.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final row = await upgraded.select(upgraded.settings).getSingle();
+      expect(row.id, 'device');
+      expect(row.syncHouseholdId, isNull);
+      expect(row.syncLinkedAt, isNull);
+      // The pre-existing row's own data survived the upgrade untouched.
+      expect(row.createdAt, 't0');
+      expect(row.actingMemberId, 'member-1');
       expect(row.digestEnabled, isTrue);
       expect(row.digestMinutes, 480);
     },

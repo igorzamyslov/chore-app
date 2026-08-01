@@ -1,7 +1,9 @@
 /// The settings screen's 'Account' section (spec
-/// `docs/specs/sync-backend.md` §5): magic-link sign-in when signed out,
-/// the account email + sign-out when signed in, and a static 'coming soon'
-/// row when Supabase isn't configured ([NoopAuthGateway]).
+/// `docs/specs/sync-backend.md` §5, §7.3): magic-link sign-in when signed
+/// out; when signed in, the account email + sign-out, plus (while unlinked)
+/// the P2b adopt row or (once linked) a subtitle naming the household; and
+/// a static 'coming soon' row when Supabase isn't configured
+/// ([NoopAuthGateway]).
 library;
 
 import 'package:chore_app/app/providers.dart';
@@ -37,8 +39,9 @@ class AccountSectionHeader extends StatelessWidget {
 
 /// The Account section's body: a static disabled row when
 /// [authGatewayProvider] resolves to [NoopAuthGateway] (Supabase not
-/// configured), else the signed-in or signed-out state per
-/// [currentAuthUserProvider].
+/// configured); the signed-out form or, when signed in, the signed-in tile
+/// -- joined by the P2b adopt row (spec §7.3) while
+/// `settings.syncHouseholdId` is still `null`.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -49,7 +52,24 @@ class AccountSectionBody extends ConsumerWidget {
       return const _ComingSoonTile();
     }
     final user = ref.watch(currentAuthUserProvider).valueOrNull;
-    return user != null ? _SignedInTile(user: user) : const _SignedOutForm();
+    if (user == null) {
+      return const _SignedOutForm();
+    }
+    final householdId = ref
+        .watch(settingsProvider)
+        .valueOrNull
+        ?.syncHouseholdId;
+    if (householdId == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SignedInTile(user: user),
+          const _AdoptRow(),
+        ],
+      );
+    }
+    final householdName = ref.watch(currentHouseholdProvider).valueOrNull?.name;
+    return _SignedInTile(user: user, householdName: householdName);
   }
 }
 
@@ -72,21 +92,30 @@ class _ComingSoonTile extends StatelessWidget {
   }
 }
 
-/// The signed-in row: account email, with a 'Sign out' action that opens a
-/// confirmation dialog first.
+/// The signed-in row: account email (plus, once linked, a subtitle naming
+/// the household -- spec §7.3 last paragraph), with a 'Sign out' action
+/// that opens a confirmation dialog first.
 class _SignedInTile extends ConsumerWidget {
-  const _SignedInTile({required this.user});
+  const _SignedInTile({required this.user, this.householdName});
 
   final AuthUser user;
+
+  /// The linked household's name, or `null` while unlinked (or while it
+  /// hasn't loaded yet).
+  final String? householdName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final householdName = this.householdName;
     return semantic(
       'settings.account.signedIn',
       child: ListTile(
         leading: const Icon(Icons.account_circle_outlined),
         title: Text(user.email),
+        subtitle: householdName == null
+            ? null
+            : Text(l10n.settingsAccountLinkedSubtitle(householdName)),
         trailing: semantic(
           'settings.account.signOut',
           child: TextButton(
@@ -249,6 +278,90 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
     } finally {
       if (mounted) {
         setState(() => _sending = false);
+      }
+    }
+  }
+}
+
+/// The P2b adopt row (spec §7.3), shown below [_SignedInTile] whenever this
+/// device is signed in but unlinked: one line of explanatory copy, a
+/// progress state while `HouseholdLinkService.adopt`
+/// (`lib/application/household_link_service.dart`) runs, and an inline
+/// error + 'Try again' state on failure -- rerunning is always safe (the
+/// service tolerates a half-succeeded previous attempt).
+///
+/// Deliberately does NOT include a 'join' row/placeholder here (spec §7.4's
+/// P2c slice adds it) -- signed-in-and-unlinked is an accepted, if
+/// intermediate, UI state for this slice.
+class _AdoptRow extends ConsumerStatefulWidget {
+  const _AdoptRow();
+
+  @override
+  ConsumerState<_AdoptRow> createState() => _AdoptRowState();
+}
+
+class _AdoptRowState extends ConsumerState<_AdoptRow> {
+  bool _running = false;
+  bool _failed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.adopt',
+      child: ListTile(
+        leading: _running
+            ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.cloud_upload_outlined),
+        title: Text(
+          _failed
+              ? l10n.settingsAccountAdoptRetry
+              : l10n.settingsAccountAdoptTitle,
+        ),
+        subtitle: Text(
+          _failed
+              ? l10n.settingsAccountAdoptError
+              : l10n.settingsAccountAdoptIntro,
+          style: _failed
+              ? TextStyle(color: Theme.of(context).colorScheme.error)
+              : null,
+        ),
+        enabled: !_running,
+        onTap: _running ? null : _adopt,
+      ),
+    );
+  }
+
+  Future<void> _adopt() async {
+    // Unreachable in practice: by the time the Account section can show
+    // this row, the household is already bootstrapped and has an acting
+    // member (spec `docs/specs/members-management.md`) -- a `null` here
+    // would be a programming bug, not an expected runtime failure, so it's
+    // left to crash rather than folded into the inline error state below.
+    final actingMemberId = ref.read(actingMemberProvider)?.id;
+    if (actingMemberId == null) {
+      throw StateError('No acting member to adopt with.');
+    }
+    setState(() {
+      _running = true;
+      _failed = false;
+    });
+    try {
+      final householdId = await ref.read(bootstrapProvider.future);
+      await ref
+          .read(householdLinkServiceProvider)
+          .adopt(householdId: householdId, actingMemberId: actingMemberId);
+    } on Exception catch (_) {
+      if (mounted) {
+        setState(() => _failed = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _running = false);
       }
     }
   }

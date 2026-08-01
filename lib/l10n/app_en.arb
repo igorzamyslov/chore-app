@@ -565,6 +565,37 @@
     "description": "Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry."
   },
 
+  "settingsMembersInviteEntry": "Invite",
+  "@settingsMembersInviteEntry": {
+    "description": "Title of the Members screen's 'Invite' row (spec docs/specs/sync-backend.md §7.3), shown only once this device is linked. Tapping it creates an invite code and opens the invite-code sheet."
+  },
+  "settingsMembersInviteSheetTitle": "Invite a household member",
+  "@settingsMembersInviteSheetTitle": {
+    "description": "Heading of the bottom sheet opened from the Invite row, showing the newly created code."
+  },
+  "settingsMembersInviteSheetBody": "Share this code with them — it expires in 7 days.",
+  "@settingsMembersInviteSheetBody": {
+    "description": "One-line explanatory copy in the invite-code sheet, stating the code's expiry (spec docs/specs/sync-backend.md §1: invites default to a 7-day expiry)."
+  },
+  "settingsMembersInviteShare": "Share",
+  "@settingsMembersInviteShare": {
+    "description": "Label of the invite-code sheet's share button (share_plus)."
+  },
+  "settingsMembersInviteShareText": "Join my household on Famdo — enter the code {code} when you sign in.",
+  "@settingsMembersInviteShareText": {
+    "description": "The message text handed to the OS share sheet when the invite-code sheet's share button is tapped.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "AB3D7XQ9"
+      }
+    }
+  },
+  "settingsMembersInviteError": "Couldn't create an invite. Please try again.",
+  "@settingsMembersInviteError": {
+    "description": "Snackbar shown when creating an invite code fails; the sheet is never opened in that case."
+  },
+
   "manageMembersTitle": "Members",
   "@manageMembersTitle": {
     "description": "App bar title of the manage-members screen."
@@ -735,6 +766,32 @@
   "settingsAccountComingSoonTitle": "Sync — coming soon",
   "@settingsAccountComingSoonTitle": {
     "description": "Label of the Account section's single disabled row shown when Supabase isn't configured (NoopAuthGateway) -- e.g. tests, E2E, and F-Droid builds without sync wired up."
+  },
+  "settingsAccountAdoptTitle": "Put my household online",
+  "@settingsAccountAdoptTitle": {
+    "description": "Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked."
+  },
+  "settingsAccountAdoptIntro": "Makes your household available on your other devices.",
+  "@settingsAccountAdoptIntro": {
+    "description": "One-line explanatory copy under the adopt row's title, in its normal (non-error) state."
+  },
+  "settingsAccountAdoptRetry": "Try again",
+  "@settingsAccountAdoptRetry": {
+    "description": "Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe."
+  },
+  "settingsAccountAdoptError": "Couldn't put your household online. Please try again.",
+  "@settingsAccountAdoptError": {
+    "description": "Inline error shown as the adopt row's subtitle after a failed attempt."
+  },
+  "settingsAccountLinkedSubtitle": "Synced with {householdName}",
+  "@settingsAccountLinkedSubtitle": {
+    "description": "Subtitle the signed-in tile gains once this device is linked (spec docs/specs/sync-backend.md §7.3 last paragraph), naming the household.",
+    "placeholders": {
+      "householdName": {
+        "type": "String",
+        "example": "My household"
+      }
+    }
   },
 
   "settingsAboutSectionTitle": "About",

@@ -1,19 +1,23 @@
+import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
+import 'fake_household_gateway.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the manage-members screen (spec
 /// `docs/specs/members-management.md` §3, §6): bootstrap-only state, the
 /// add flow (including the disabled-save guard and cross-screen
-/// propagation into the chore form's assignee chips), rename, recolor, and
-/// the "duplicate names are allowed" invariant shared with chores (see
-/// `test/features/chores/duplicate_names_widget_test.dart`).
+/// propagation into the chore form's assignee chips), rename, recolor, the
+/// "duplicate names are allowed" invariant shared with chores (see
+/// `test/features/chores/duplicate_names_widget_test.dart`), and the P2b
+/// 'Invite' row (spec `docs/specs/sync-backend.md` §7.3).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -223,6 +227,60 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Anna'), findsNWidgets(2));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'invite row hidden while unlinked',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite'),
+        findsNothing,
+      );
+      // The bootstrap-only row is still the only one.
+      expect(find.byType(ListTile), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  final inviteGateway = FakeHouseholdGateway();
+  testChoreApp(
+    'invite row visible once linked; tap creates an invite and shows the '
+    "sheet with the fake's code",
+    today: today,
+    overrides: [
+      householdGatewayProvider.overrideWithValue(inviteGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.bySemanticsIdentifier('settings.members.invite'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.sheet'),
+        findsOneWidget,
+      );
+      expect(find.text('AB3D7XQ9'), findsOneWidget);
+      expect(inviteGateway.createInviteCalls, [householdId]);
 
       handle.dispose();
     },

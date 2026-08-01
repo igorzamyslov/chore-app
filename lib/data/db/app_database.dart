@@ -53,14 +53,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v5) column set, so a fresh v1 -> v5 jump already
+      // *current* (here, v6) column set, so a fresh v1 -> v6 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then
@@ -91,6 +91,13 @@ class AppDatabase extends _$AppDatabase {
             settings.onboardingNamePromptShownAt,
           );
           await migrator.addColumn(settings, settings.digestPrepromptShownAt);
+        }
+        if (from < 6) {
+          // v5 -> v6 (spec `docs/specs/sync-backend.md` §7.1): the two
+          // linked-state columns, both defaulting to `NULL` (unlinked) --
+          // no data rewrite.
+          await migrator.addColumn(settings, settings.syncHouseholdId);
+          await migrator.addColumn(settings, settings.syncLinkedAt);
         }
       }
     },

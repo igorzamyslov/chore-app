@@ -10,6 +10,9 @@
 /// fake; see that provider's doc comment. [authGatewayProvider] is a
 /// fourth, used only by Settings Account-section tests (spec
 /// `docs/specs/sync-backend.md` §5); see its own doc comment.
+/// [householdGatewayProvider] is a fifth -- alongside [authGatewayProvider],
+/// the two Settings/Members widget tests need on top of db/clock (spec
+/// `docs/specs/sync-backend.md` §7.2); see its own doc comment.
 library;
 
 import 'dart:async';
@@ -17,6 +20,8 @@ import 'dart:async';
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/household_gateway.dart';
+import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
@@ -166,6 +171,45 @@ final authGatewayProvider = Provider<AuthGateway>((ref) {
 /// under [NoopAuthGateway]).
 final currentAuthUserProvider = StreamProvider<AuthUser?>((ref) {
   return ref.watch(authGatewayProvider).watchUser();
+});
+
+/// The client-household gateway backing the P2b adopt flow (Settings'
+/// Account section) and the Members screen's invite row (spec
+/// `docs/specs/sync-backend.md` §7.2): the real [SupabaseHouseholdGateway]
+/// when Supabase is configured ([supabaseConfigured]), else the
+/// always-throwing [NoopHouseholdGateway] -- unreachable in practice
+/// because every call site is gated on a signed-in user, which
+/// [NoopAuthGateway] never produces.
+///
+/// Widget tests override this directly with a fake (see
+/// `test/features/settings/fake_household_gateway.dart`) -- the fourth
+/// provider override (alongside [appDatabaseProvider], [clockProvider], and
+/// [authGatewayProvider]) that Settings/Members widget tests need.
+final householdGatewayProvider = Provider<HouseholdGateway>((ref) {
+  return supabaseConfigured
+      ? const SupabaseHouseholdGateway()
+      : const NoopHouseholdGateway();
+});
+
+/// The P2b adopt-flow service (spec `docs/specs/sync-backend.md` §7.3),
+/// built on [householdGatewayProvider], [householdRepositoryProvider], and
+/// [settingsRepositoryProvider].
+final householdLinkServiceProvider = Provider<HouseholdLinkService>((ref) {
+  return HouseholdLinkService(
+    gateway: ref.watch(householdGatewayProvider),
+    households: ref.watch(householdRepositoryProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
+/// The bootstrap household's own row (currently just its `name`), kept in
+/// sync with the database. Backs the Account section's 'linked' subtitle
+/// (spec `docs/specs/sync-backend.md` §7.3 last paragraph), which names the
+/// household once this device is linked.
+final currentHouseholdProvider = StreamProvider<Household>((ref) async* {
+  final householdId = await ref.watch(bootstrapProvider.future);
+  yield* ref.watch(householdRepositoryProvider).watchHousehold(householdId);
 });
 
 /// The OS-level notification plugin (or fake), wrapped by

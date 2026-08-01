@@ -728,6 +728,42 @@ abstract class AppLocalizations {
   /// **'Members'**
   String get settingsMembersEntry;
 
+  /// Title of the Members screen's 'Invite' row (spec docs/specs/sync-backend.md §7.3), shown only once this device is linked. Tapping it creates an invite code and opens the invite-code sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get settingsMembersInviteEntry;
+
+  /// Heading of the bottom sheet opened from the Invite row, showing the newly created code.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a household member'**
+  String get settingsMembersInviteSheetTitle;
+
+  /// One-line explanatory copy in the invite-code sheet, stating the code's expiry (spec docs/specs/sync-backend.md §1: invites default to a 7-day expiry).
+  ///
+  /// In en, this message translates to:
+  /// **'Share this code with them — it expires in 7 days.'**
+  String get settingsMembersInviteSheetBody;
+
+  /// Label of the invite-code sheet's share button (share_plus).
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get settingsMembersInviteShare;
+
+  /// The message text handed to the OS share sheet when the invite-code sheet's share button is tapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Join my household on Famdo — enter the code {code} when you sign in.'**
+  String settingsMembersInviteShareText(String code);
+
+  /// Snackbar shown when creating an invite code fails; the sheet is never opened in that case.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create an invite. Please try again.'**
+  String get settingsMembersInviteError;
+
   /// App bar title of the manage-members screen.
   ///
   /// In en, this message translates to:
@@ -955,6 +991,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sync — coming soon'**
   String get settingsAccountComingSoonTitle;
+
+  /// Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Put my household online'**
+  String get settingsAccountAdoptTitle;
+
+  /// One-line explanatory copy under the adopt row's title, in its normal (non-error) state.
+  ///
+  /// In en, this message translates to:
+  /// **'Makes your household available on your other devices.'**
+  String get settingsAccountAdoptIntro;
+
+  /// Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get settingsAccountAdoptRetry;
+
+  /// Inline error shown as the adopt row's subtitle after a failed attempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t put your household online. Please try again.'**
+  String get settingsAccountAdoptError;
+
+  /// Subtitle the signed-in tile gains once this device is linked (spec docs/specs/sync-backend.md §7.3 last paragraph), naming the household.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced with {householdName}'**
+  String settingsAccountLinkedSubtitle(String householdName);
 
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///

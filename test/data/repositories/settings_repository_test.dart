@@ -213,4 +213,54 @@ void main() {
 
     expect(emissions.last, 'de');
   });
+
+  test(
+    'setSyncLinked sets both syncHouseholdId and syncLinkedAt together, and '
+    'bumps updated_at',
+    () async {
+      final created = await repo.ensureSettings();
+      expect(created.syncHouseholdId, isNull);
+      expect(created.syncLinkedAt, isNull);
+      clock.advance(const Duration(minutes: 5));
+      final linkedAt = DateTime.utc(2026, 2);
+
+      await repo.setSyncLinked(householdId: 'household-1', linkedAt: linkedAt);
+
+      final updated =
+          await (db.select(
+                db.settings,
+              )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId)))
+              .getSingle();
+      expect(updated.syncHouseholdId, 'household-1');
+      expect(updated.syncLinkedAt, linkedAt.toIso8601String());
+      expect(updated.updatedAt, isNot(created.updatedAt));
+    },
+  );
+
+  test('setSyncLinked implicitly creates the row if missing', () async {
+    await repo.setSyncLinked(
+      householdId: 'household-1',
+      linkedAt: DateTime.utc(2026),
+    );
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.syncHouseholdId, 'household-1');
+  });
+
+  test('watchSettings emits an updated value after setSyncLinked', () async {
+    final emissions = <String?>[];
+    final sub = repo.watchSettings().listen(
+      (settings) => emissions.add(settings.syncHouseholdId),
+    );
+    addTearDown(sub.cancel);
+
+    await pumpEventQueue();
+    await repo.setSyncLinked(
+      householdId: 'household-1',
+      linkedAt: DateTime.utc(2026),
+    );
+    await pumpEventQueue();
+
+    expect(emissions.last, 'household-1');
+  });
 }
