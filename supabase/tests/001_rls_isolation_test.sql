@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(32);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: three auth users (inserted while still superuser), households
@@ -221,6 +221,9 @@ select is(
                      'Carol', 4278190083),
   '10000000-0000-0000-0000-000000000001'::uuid,
   'join_as_new_member retry still succeeds after the invite expired');
+
+-- server_now() (migration 20260801140000): the P3 pull-cursor clock.
+select isnt(server_now(), null, 'server_now() returns a timestamp');
 
 -- ---------------------------------------------------------------------------
 -- Trigger contract: updated_at is server-authored, client values ignored.

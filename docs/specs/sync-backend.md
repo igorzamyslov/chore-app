@@ -257,3 +257,87 @@ name prompt, auto color). Then, per §4, strictly in this order:
   live-stack flows are exercised manually against `supabase start` and,
   as a P3 stretch, via the two-simulator harness.
 - pgTAP already covers the server side; no new SQL in P2b/P2c.
+
+### 7.6 P2 verification record
+
+2026-08-01: full live smoke test against the local stack passed —
+magic-link sign-in (Mailpit → PKCE verify → `famdo://` deep link), adopt
+(RPC + bulk upload), invite sheet, second-device join with claim,
+download/replace, both devices linked; server roster verified in SQL.
+Idempotent claim/join retries hardened server-side (migration
+20260801130000, pgTAP 31 green).
+
+## 8. P3 client design (binding for the sync engine)
+
+Everything below rides on §3's protocol; this section pins the client
+shapes so implementation slices need no further design decisions.
+
+### 8.1 Client schema v8
+
+- Every synced table (`households`, `members`, `categories`, `chores`,
+  `chore_assignees`, `chore_occurrences`, `shopping_items`) gains
+  `syncDirty` BoolColumn, default FALSE, non-null. Migration v7→v8 adds
+  the columns; existing rows stay false (a linked device's rows are on
+  the server already — P2 uploaded/downloaded them; unlinked devices
+  never push anyway).
+- `Settings` gains `syncLastPulledAt` (nullable text, server-clock ISO
+  from the pull round trip — never the device clock).
+- Repositories mark `syncDirty: true` on EVERY local insert/update of
+  synced rows (including soft deletes; a shared drift helper, not
+  copy-paste in every method). The flag is set unconditionally — also
+  while unlinked or signed out; it's meaningless until linked, cheap to
+  keep accurate, and makes "link later" push everything that changed.
+  The ONLY writers that clear it (set false) are the engine's
+  post-push confirmation and the pull's row-replace.
+
+### 8.2 SyncEngine seam
+
+`lib/application/sync_engine.dart`: `abstract class SyncEngine` with
+`Future<void> pushDirty()`, `Future<void> pullSince()`, `void start()`,
+`void stop()` (start = begin realtime subscription + resume-triggered
+pulls; idempotent). `NoopSyncEngine` (all no-ops) when Supabase is
+unconfigured OR the device is unlinked; `SupabaseSyncEngine` otherwise —
+provider `syncEngineProvider` re-evaluates on the linked state
+(watches settingsProvider's `syncHouseholdId`).
+
+### 8.3 SupabaseSyncEngine behavior
+
+- **pushDirty**: per table in FK order, select rows where
+  `syncDirty == true`, upsert to the server (members via
+  insert-with-ignore + a second UPDATE limited to the granted columns
+  (name, color, role, deleted_at) for already-existing rows — the §7.2
+  grants constraint applies to the engine too), then clear the flag on
+  exactly the pushed row ids IN THE SAME order they were read (a row
+  dirtied again mid-push must stay dirty: clear with
+  `WHERE id IN (...) AND updated_at == <the value read>` or re-check
+  dirty rows after clearing — implementer's choice, tested either way).
+- **pullSince**: one round trip fetching server `now()` FIRST (an RPC
+  `server_now()` — new one-line SECURITY INVOKER function, add to the
+  migrations + checklist), then per table rows with
+  `updated_at > syncLastPulledAt` (RLS scopes to the household). Apply
+  LWW per §3: replace the local row UNLESS its `syncDirty` is true
+  (local dirty wins; the next push settles it). Occurrences/chores
+  referencing not-yet-pulled parents: apply tables in FK order within
+  one local transaction. Set `syncLastPulledAt` to the fetched server
+  now() only after the transaction commits.
+- **Triggers**: pull on (a) `start()`, (b) app resume (reuse the
+  CatchUpController's lifecycle hook pattern — do NOT add a second
+  lifecycle observer), (c) after every successful push, (d) realtime
+  `postgres_changes` event for the household (the event only
+  short-circuits the timer — the payload is ignored; data always comes
+  from the pull path). Push on: any local write while linked (debounced
+  ~2s), app resume, reconnect.
+- **Failure posture**: every engine error is swallowed into a silent
+  retry-later (log in debug); the app NEVER surfaces sync errors in P3
+  (local-first: the UI is always consistent with the local db).
+
+### 8.4 Testing
+
+- Unit/widget: FakeSyncEngine recording calls; engine logic tested
+  against the in-memory db with a FakeHouseholdGateway-style transport
+  fake (no live Supabase in the suite).
+- LWW matrix as service-level tests: pulled-newer vs local-clean
+  (replace), pulled vs local-dirty (keep local), tombstone pull
+  (deletedAt replicates), dirty-tombstone push.
+- The two-simulator live test (§6 P3 stretch) stays manual, following
+  the §7.6 smoke-test method.
