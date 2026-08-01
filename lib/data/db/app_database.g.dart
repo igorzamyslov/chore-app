@@ -3907,6 +3907,28 @@ class $SettingsTable extends Settings
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _syncHouseholdIdMeta = const VerificationMeta(
+    'syncHouseholdId',
+  );
+  @override
+  late final GeneratedColumn<String> syncHouseholdId = GeneratedColumn<String>(
+    'sync_household_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncLinkedAtMeta = const VerificationMeta(
+    'syncLinkedAt',
+  );
+  @override
+  late final GeneratedColumn<String> syncLinkedAt = GeneratedColumn<String>(
+    'sync_linked_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3938,6 +3960,8 @@ class $SettingsTable extends Settings
     locale,
     onboardingNamePromptShownAt,
     digestPrepromptShownAt,
+    syncHouseholdId,
+    syncLinkedAt,
     createdAt,
     updatedAt,
   ];
@@ -4009,6 +4033,24 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('sync_household_id')) {
+      context.handle(
+        _syncHouseholdIdMeta,
+        syncHouseholdId.isAcceptableOrUnknown(
+          data['sync_household_id']!,
+          _syncHouseholdIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sync_linked_at')) {
+      context.handle(
+        _syncLinkedAtMeta,
+        syncLinkedAt.isAcceptableOrUnknown(
+          data['sync_linked_at']!,
+          _syncLinkedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4061,6 +4103,14 @@ class $SettingsTable extends Settings
       digestPrepromptShownAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}digest_preprompt_shown_at'],
+      ),
+      syncHouseholdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_household_id'],
+      ),
+      syncLinkedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_linked_at'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4124,6 +4174,19 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// `AppDatabase.migration`.
   final String? digestPrepromptShownAt;
 
+  /// The server household this DEVICE is linked to (spec
+  /// `docs/specs/sync-backend.md` §7.1), or `NULL` while unlinked --
+  /// "linked" ⇔ `syncHouseholdId != null`. Always set/cleared together with
+  /// [syncLinkedAt] -- see `SettingsRepository.setSyncLinked`. Added in
+  /// schemaVersion 6; see `AppDatabase.migration`.
+  final String? syncHouseholdId;
+
+  /// ISO-8601 UTC moment linking completed (spec
+  /// `docs/specs/sync-backend.md` §7.1) -- `NULL` while unlinked. Always
+  /// set/cleared together with [syncHouseholdId]. Added in schemaVersion 6;
+  /// see `AppDatabase.migration`.
+  final String? syncLinkedAt;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4137,6 +4200,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.locale,
     this.onboardingNamePromptShownAt,
     this.digestPrepromptShownAt,
+    this.syncHouseholdId,
+    this.syncLinkedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4162,6 +4227,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         digestPrepromptShownAt,
       );
     }
+    if (!nullToAbsent || syncHouseholdId != null) {
+      map['sync_household_id'] = Variable<String>(syncHouseholdId);
+    }
+    if (!nullToAbsent || syncLinkedAt != null) {
+      map['sync_linked_at'] = Variable<String>(syncLinkedAt);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4185,6 +4256,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestPrepromptShownAt: digestPrepromptShownAt == null && nullToAbsent
           ? const Value.absent()
           : Value(digestPrepromptShownAt),
+      syncHouseholdId: syncHouseholdId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncHouseholdId),
+      syncLinkedAt: syncLinkedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncLinkedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4207,6 +4284,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestPrepromptShownAt: serializer.fromJson<String?>(
         json['digestPrepromptShownAt'],
       ),
+      syncHouseholdId: serializer.fromJson<String?>(json['syncHouseholdId']),
+      syncLinkedAt: serializer.fromJson<String?>(json['syncLinkedAt']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4226,6 +4305,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'digestPrepromptShownAt': serializer.toJson<String?>(
         digestPrepromptShownAt,
       ),
+      'syncHouseholdId': serializer.toJson<String?>(syncHouseholdId),
+      'syncLinkedAt': serializer.toJson<String?>(syncLinkedAt),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4239,6 +4320,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> locale = const Value.absent(),
     Value<String?> onboardingNamePromptShownAt = const Value.absent(),
     Value<String?> digestPrepromptShownAt = const Value.absent(),
+    Value<String?> syncHouseholdId = const Value.absent(),
+    Value<String?> syncLinkedAt = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4255,6 +4338,10 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     digestPrepromptShownAt: digestPrepromptShownAt.present
         ? digestPrepromptShownAt.value
         : this.digestPrepromptShownAt,
+    syncHouseholdId: syncHouseholdId.present
+        ? syncHouseholdId.value
+        : this.syncHouseholdId,
+    syncLinkedAt: syncLinkedAt.present ? syncLinkedAt.value : this.syncLinkedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4277,6 +4364,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       digestPrepromptShownAt: data.digestPrepromptShownAt.present
           ? data.digestPrepromptShownAt.value
           : this.digestPrepromptShownAt,
+      syncHouseholdId: data.syncHouseholdId.present
+          ? data.syncHouseholdId.value
+          : this.syncHouseholdId,
+      syncLinkedAt: data.syncLinkedAt.present
+          ? data.syncLinkedAt.value
+          : this.syncLinkedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4292,6 +4385,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('locale: $locale, ')
           ..write('onboardingNamePromptShownAt: $onboardingNamePromptShownAt, ')
           ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
+          ..write('syncHouseholdId: $syncHouseholdId, ')
+          ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4307,6 +4402,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     locale,
     onboardingNamePromptShownAt,
     digestPrepromptShownAt,
+    syncHouseholdId,
+    syncLinkedAt,
     createdAt,
     updatedAt,
   );
@@ -4322,6 +4419,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.onboardingNamePromptShownAt ==
               this.onboardingNamePromptShownAt &&
           other.digestPrepromptShownAt == this.digestPrepromptShownAt &&
+          other.syncHouseholdId == this.syncHouseholdId &&
+          other.syncLinkedAt == this.syncLinkedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4334,6 +4433,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> locale;
   final Value<String?> onboardingNamePromptShownAt;
   final Value<String?> digestPrepromptShownAt;
+  final Value<String?> syncHouseholdId;
+  final Value<String?> syncLinkedAt;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4345,6 +4446,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.locale = const Value.absent(),
     this.onboardingNamePromptShownAt = const Value.absent(),
     this.digestPrepromptShownAt = const Value.absent(),
+    this.syncHouseholdId = const Value.absent(),
+    this.syncLinkedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4357,6 +4460,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.locale = const Value.absent(),
     this.onboardingNamePromptShownAt = const Value.absent(),
     this.digestPrepromptShownAt = const Value.absent(),
+    this.syncHouseholdId = const Value.absent(),
+    this.syncLinkedAt = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4371,6 +4476,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? locale,
     Expression<String>? onboardingNamePromptShownAt,
     Expression<String>? digestPrepromptShownAt,
+    Expression<String>? syncHouseholdId,
+    Expression<String>? syncLinkedAt,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4385,6 +4492,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         'onboarding_name_prompt_shown_at': onboardingNamePromptShownAt,
       if (digestPrepromptShownAt != null)
         'digest_preprompt_shown_at': digestPrepromptShownAt,
+      if (syncHouseholdId != null) 'sync_household_id': syncHouseholdId,
+      if (syncLinkedAt != null) 'sync_linked_at': syncLinkedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4399,6 +4508,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? locale,
     Value<String?>? onboardingNamePromptShownAt,
     Value<String?>? digestPrepromptShownAt,
+    Value<String?>? syncHouseholdId,
+    Value<String?>? syncLinkedAt,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4413,6 +4524,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           onboardingNamePromptShownAt ?? this.onboardingNamePromptShownAt,
       digestPrepromptShownAt:
           digestPrepromptShownAt ?? this.digestPrepromptShownAt,
+      syncHouseholdId: syncHouseholdId ?? this.syncHouseholdId,
+      syncLinkedAt: syncLinkedAt ?? this.syncLinkedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4447,6 +4560,12 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         digestPrepromptShownAt.value,
       );
     }
+    if (syncHouseholdId.present) {
+      map['sync_household_id'] = Variable<String>(syncHouseholdId.value);
+    }
+    if (syncLinkedAt.present) {
+      map['sync_linked_at'] = Variable<String>(syncLinkedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -4469,6 +4588,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('locale: $locale, ')
           ..write('onboardingNamePromptShownAt: $onboardingNamePromptShownAt, ')
           ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
+          ..write('syncHouseholdId: $syncHouseholdId, ')
+          ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8788,6 +8909,8 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> locale,
       Value<String?> onboardingNamePromptShownAt,
       Value<String?> digestPrepromptShownAt,
+      Value<String?> syncHouseholdId,
+      Value<String?> syncLinkedAt,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8801,6 +8924,8 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> locale,
       Value<String?> onboardingNamePromptShownAt,
       Value<String?> digestPrepromptShownAt,
+      Value<String?> syncHouseholdId,
+      Value<String?> syncLinkedAt,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -8847,6 +8972,16 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get digestPrepromptShownAt => $composableBuilder(
     column: $table.digestPrepromptShownAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncHouseholdId => $composableBuilder(
+    column: $table.syncHouseholdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncLinkedAt => $composableBuilder(
+    column: $table.syncLinkedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8905,6 +9040,16 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncHouseholdId => $composableBuilder(
+    column: $table.syncHouseholdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncLinkedAt => $composableBuilder(
+    column: $table.syncLinkedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8956,6 +9101,16 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get syncHouseholdId => $composableBuilder(
+    column: $table.syncHouseholdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncLinkedAt => $composableBuilder(
+    column: $table.syncLinkedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9002,6 +9157,8 @@ class $$SettingsTableTableManager
                 Value<String?> onboardingNamePromptShownAt =
                     const Value.absent(),
                 Value<String?> digestPrepromptShownAt = const Value.absent(),
+                Value<String?> syncHouseholdId = const Value.absent(),
+                Value<String?> syncLinkedAt = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9013,6 +9170,8 @@ class $$SettingsTableTableManager
                 locale: locale,
                 onboardingNamePromptShownAt: onboardingNamePromptShownAt,
                 digestPrepromptShownAt: digestPrepromptShownAt,
+                syncHouseholdId: syncHouseholdId,
+                syncLinkedAt: syncLinkedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9027,6 +9186,8 @@ class $$SettingsTableTableManager
                 Value<String?> onboardingNamePromptShownAt =
                     const Value.absent(),
                 Value<String?> digestPrepromptShownAt = const Value.absent(),
+                Value<String?> syncHouseholdId = const Value.absent(),
+                Value<String?> syncLinkedAt = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -9038,6 +9199,8 @@ class $$SettingsTableTableManager
                 locale: locale,
                 onboardingNamePromptShownAt: onboardingNamePromptShownAt,
                 digestPrepromptShownAt: digestPrepromptShownAt,
+                syncHouseholdId: syncHouseholdId,
+                syncLinkedAt: syncLinkedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

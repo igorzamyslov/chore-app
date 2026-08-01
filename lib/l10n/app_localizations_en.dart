@@ -414,6 +414,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMembersEntry => 'Members';
 
   @override
+  String get settingsMembersInviteEntry => 'Invite';
+
+  @override
+  String get settingsMembersInviteSheetTitle => 'Invite a household member';
+
+  @override
+  String get settingsMembersInviteSheetBody =>
+      'Share this code with them — it expires in 7 days.';
+
+  @override
+  String get settingsMembersInviteShare => 'Share';
+
+  @override
+  String settingsMembersInviteShareText(String code) {
+    return 'Join my household on Famdo — enter the code $code when you sign in.';
+  }
+
+  @override
+  String get settingsMembersInviteError =>
+      'Couldn\'t create an invite. Please try again.';
+
+  @override
   String get manageMembersTitle => 'Members';
 
   @override
@@ -534,6 +556,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountComingSoonTitle => 'Sync — coming soon';
+
+  @override
+  String get settingsAccountAdoptTitle => 'Put my household online';
+
+  @override
+  String get settingsAccountAdoptIntro =>
+      'Makes your household available on your other devices.';
+
+  @override
+  String get settingsAccountAdoptRetry => 'Try again';
+
+  @override
+  String get settingsAccountAdoptError =>
+      'Couldn\'t put your household online. Please try again.';
+
+  @override
+  String settingsAccountLinkedSubtitle(String householdName) {
+    return 'Synced with $householdName';
+  }
 
   @override
   String get settingsAboutSectionTitle => 'About';

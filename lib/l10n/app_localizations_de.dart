@@ -418,6 +418,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsMembersEntry => 'Mitglieder';
 
   @override
+  String get settingsMembersInviteEntry => 'Einladen';
+
+  @override
+  String get settingsMembersInviteSheetTitle => 'Haushaltsmitglied einladen';
+
+  @override
+  String get settingsMembersInviteSheetBody =>
+      'Teile diesen Code — er ist 7 Tage gültig.';
+
+  @override
+  String get settingsMembersInviteShare => 'Teilen';
+
+  @override
+  String settingsMembersInviteShareText(String code) {
+    return 'Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code $code ein.';
+  }
+
+  @override
+  String get settingsMembersInviteError =>
+      'Die Einladung konnte nicht erstellt werden. Versuch es noch mal.';
+
+  @override
   String get manageMembersTitle => 'Mitglieder';
 
   @override
@@ -541,6 +563,25 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsAccountComingSoonTitle =>
       'Synchronisierung — bald verfügbar';
+
+  @override
+  String get settingsAccountAdoptTitle => 'Meinen Haushalt online stellen';
+
+  @override
+  String get settingsAccountAdoptIntro =>
+      'Macht deinen Haushalt auf deinen anderen Geräten verfügbar.';
+
+  @override
+  String get settingsAccountAdoptRetry => 'Erneut versuchen';
+
+  @override
+  String get settingsAccountAdoptError =>
+      'Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.';
+
+  @override
+  String settingsAccountLinkedSubtitle(String householdName) {
+    return 'Synchronisiert mit $householdName';
+  }
 
   @override
   String get settingsAboutSectionTitle => 'Über die App';

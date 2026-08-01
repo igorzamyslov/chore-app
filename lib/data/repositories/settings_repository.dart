@@ -169,6 +169,28 @@ class SettingsRepository {
     );
   }
 
+  /// Links this device to [householdId] as of [linkedAt] (spec
+  /// `docs/specs/sync-backend.md` §7.1): sets `syncHouseholdId` and
+  /// `syncLinkedAt` together -- "linked" ⇔ `syncHouseholdId != null`.
+  /// Called once, as the last step of the adopt flow
+  /// (`HouseholdLinkService.adopt`, `lib/application/household_link_service.dart`),
+  /// only after every earlier step has already succeeded.
+  Future<void> setSyncLinked({
+    required String householdId,
+    required DateTime linkedAt,
+  }) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        syncHouseholdId: Value(householdId),
+        syncLinkedAt: Value(linkedAt.toUtc().toIso8601String()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,

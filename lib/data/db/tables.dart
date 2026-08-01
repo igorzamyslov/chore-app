@@ -210,6 +210,19 @@ class Settings extends Table {
   /// `AppDatabase.migration`.
   TextColumn get digestPrepromptShownAt => text().nullable()();
 
+  /// The server household this DEVICE is linked to (spec
+  /// `docs/specs/sync-backend.md` §7.1), or `NULL` while unlinked --
+  /// "linked" ⇔ `syncHouseholdId != null`. Always set/cleared together with
+  /// [syncLinkedAt] -- see `SettingsRepository.setSyncLinked`. Added in
+  /// schemaVersion 6; see `AppDatabase.migration`.
+  TextColumn get syncHouseholdId => text().nullable()();
+
+  /// ISO-8601 UTC moment linking completed (spec
+  /// `docs/specs/sync-backend.md` §7.1) -- `NULL` while unlinked. Always
+  /// set/cleared together with [syncHouseholdId]. Added in schemaVersion 6;
+  /// see `AppDatabase.migration`.
+  TextColumn get syncLinkedAt => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

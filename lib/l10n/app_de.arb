@@ -136,6 +136,13 @@
 
   "settingsMembersEntry": "Mitglieder",
 
+  "settingsMembersInviteEntry": "Einladen",
+  "settingsMembersInviteSheetTitle": "Haushaltsmitglied einladen",
+  "settingsMembersInviteSheetBody": "Teile diesen Code — er ist 7 Tage gültig.",
+  "settingsMembersInviteShare": "Teilen",
+  "settingsMembersInviteShareText": "Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code {code} ein.",
+  "settingsMembersInviteError": "Die Einladung konnte nicht erstellt werden. Versuch es noch mal.",
+
   "manageMembersTitle": "Mitglieder",
   "manageMembersErrorMessage": "Deine Mitglieder konnten nicht geladen werden.",
 
@@ -181,6 +188,11 @@
   "settingsAccountSignOutConfirmAction": "Abmelden",
   "settingsAccountSignOutError": "Abmelden hat nicht geklappt. Versuch es noch mal.",
   "settingsAccountComingSoonTitle": "Synchronisierung — bald verfügbar",
+  "settingsAccountAdoptTitle": "Meinen Haushalt online stellen",
+  "settingsAccountAdoptIntro": "Macht deinen Haushalt auf deinen anderen Geräten verfügbar.",
+  "settingsAccountAdoptRetry": "Erneut versuchen",
+  "settingsAccountAdoptError": "Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.",
+  "settingsAccountLinkedSubtitle": "Synchronisiert mit {householdName}",
 
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",

@@ -2,13 +2,16 @@
 /// `docs/specs/members-management.md` §3): list, add, rename, and recolor
 /// household members. No delete affordance in this version — see the
 /// spec's §1 scope note (deletion needs a reassignment story for chores
-/// referencing the member).
+/// referencing the member). Once linked (spec `docs/specs/sync-backend.md`
+/// §7.3), also gains an 'Invite' row above the member list.
 library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/features/settings/invite_code_sheet.dart';
 import 'package:chore_app/features/settings/member_edit_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -25,15 +28,20 @@ class ManageMembersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final membersAsync = ref.watch(membersProvider);
+    final linked =
+        ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageMembersTitle)),
       body: membersAsync.when(
         data: (members) => ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: members.length,
+          itemCount: members.length + (linked ? 1 : 0),
           itemBuilder: (context, index) {
-            final member = members[index];
+            if (linked && index == 0) {
+              return const _InviteRow();
+            }
+            final member = members[linked ? index - 1 : index];
             return _MemberRow(
               member: member,
               onTap: () => showMemberEditSheet(context, member: member),
@@ -52,6 +60,49 @@ class ManageMembersScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// The 'Invite' row (spec `docs/specs/sync-backend.md` §7.3), shown only
+/// once linked: creates an invite code via [householdGatewayProvider] and
+/// opens [showInviteCodeSheet] with it, or a generic error snackbar on
+/// failure.
+class _InviteRow extends ConsumerWidget {
+  const _InviteRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.members.invite',
+      child: ListTile(
+        leading: const Icon(Icons.person_add_alt_outlined),
+        title: Text(l10n.settingsMembersInviteEntry),
+        onTap: () => _invite(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _invite(BuildContext context, WidgetRef ref) async {
+    final householdId = ref.read(settingsProvider).value?.syncHouseholdId;
+    if (householdId == null) {
+      return;
+    }
+    try {
+      final code = await ref
+          .read(householdGatewayProvider)
+          .createInvite(householdId);
+      if (context.mounted) {
+        await showInviteCodeSheet(context, code: code);
+      }
+    } on Exception catch (_) {
+      if (context.mounted) {
+        showAppSnackbar(
+          context,
+          message: AppLocalizations.of(context).settingsMembersInviteError,
+        );
+      }
+    }
   }
 }
 
