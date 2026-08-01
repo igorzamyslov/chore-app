@@ -183,8 +183,12 @@ fake. Methods mirror the P1 RPCs and the two bulk paths:
 - `uploadHouseholdData(snapshot)` — PostgREST upserts, in FK order:
   members (the non-caller ones, `user_id` null), categories, chores,
   chore_assignees, chore_occurrences, shopping_items. Verbatim rows,
-  tombstones included. Idempotent (upsert) so a failed upload is
-  re-runnable as-is.
+  tombstones included. Idempotent so a failed upload is re-runnable
+  as-is. Members specifically use insert-with-ignore (ON CONFLICT DO
+  NOTHING), not a real upsert: the fail-closed grants give UPDATE on
+  members for (name, color, role, deleted_at) only, and Postgres checks
+  UPDATE privilege on an upsert's whole SET list at plan time — a full-row
+  members upsert is rejected (42501) even when no conflict occurs.
 - `createInvite(householdId)` → code (8 chars).
 - `listClaimableMembers(code)` → `[(memberId, name, color)]`.
 - `claimMember(code, memberId)` → householdId.

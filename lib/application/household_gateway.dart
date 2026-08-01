@@ -74,8 +74,9 @@ abstract class HouseholdGateway {
   /// PostgREST upserts of everything else in [snapshot] -- members (the
   /// non-caller ones; `user_id` stays `null`), categories, chores,
   /// chore-assignees, chore-occurrences, then shopping items, in that FK
-  /// order. Rows travel verbatim, tombstones included. Idempotent (upsert),
-  /// so a failed upload is re-runnable as-is.
+  /// order. Rows travel verbatim, tombstones included. Idempotent, so a
+  /// failed upload is re-runnable as-is (members via insert-with-ignore
+  /// rather than upsert -- see the implementation for the grants reason).
   Future<void> uploadHouseholdData(HouseholdSnapshot snapshot);
 
   /// RPC `create_invite`: creates an 8-character invite code for
@@ -195,9 +196,17 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
   @override
   Future<void> uploadHouseholdData(HouseholdSnapshot snapshot) async {
     if (snapshot.members.isNotEmpty) {
+      // `ignoreDuplicates` (ON CONFLICT DO NOTHING), NOT a plain upsert:
+      // the server's fail-closed grants give `authenticated` UPDATE on
+      // members for (name, color, role, deleted_at) ONLY, and Postgres
+      // checks UPDATE privilege on every column in an ON CONFLICT DO
+      // UPDATE SET list at plan time — conflict or not — so a plain
+      // upsert of full member rows is rejected outright (42501). DO
+      // NOTHING needs no UPDATE privilege and keeps the retry semantics
+      // this method promises: a re-run skips already-uploaded rows.
       await _client.from('members').upsert([
         for (final member in snapshot.members) _memberRow(member),
-      ]);
+      ], ignoreDuplicates: true);
     }
     if (snapshot.categories.isNotEmpty) {
       await _client.from('categories').upsert([
