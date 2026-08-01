@@ -258,7 +258,32 @@ name prompt, auto color). Then, per §4, strictly in this order:
   as a P3 stretch, via the two-simulator harness.
 - pgTAP already covers the server side; no new SQL in P2b/P2c.
 
-### 7.6 P2 verification record
+### 7.6 P2d — reconnect (returning device)
+
+Gap found 2026-08-01: a user whose profile is ALREADY claimed by their
+account (phone reset, new phone) cannot rejoin — `list_claimable_members`
+only offers unclaimed profiles, and "I'm new here" would duplicate them.
+No server change needed: their account IS a member server-side, so RLS
+already grants full read access.
+
+- `HouseholdGateway` gains `findMyMembership()`: PostgREST select on
+  `members` where `user_id = auth.uid()` (RLS-scoped anyway), returning
+  (householdId, memberId, householdName via a joined/second select) or
+  null.
+- Account section, signed-in AND unlinked: BEFORE showing adopt/join,
+  probe `findMyMembership()`; when non-null, show a third row FIRST
+  (`settings.account.reconnect`): "Reconnect to <household>" with copy
+  stating it replaces local data (same archive guarantee as join).
+- Flow: reuse the join machinery with a new `ReconnectChoice(memberId)`
+  that SKIPS the claim RPC (already claimed — idempotency also covers a
+  re-claim, but no call is cleaner) and skips code entry entirely; the
+  archive-first ordering, import offer, download/replace, and
+  settings-repoint steps are identical to §7.4.
+- Tests: fake gateway returns a membership → reconnect row appears and
+  completes the replace; returns null → adopt/join rows as today;
+  linked → no reconnect row.
+
+### 7.7 P2 verification record
 
 2026-08-01: full live smoke test against the local stack passed —
 magic-link sign-in (Mailpit → PKCE verify → `famdo://` deep link), adopt
@@ -340,7 +365,7 @@ provider `syncEngineProvider` re-evaluates on the linked state
   (replace), pulled vs local-dirty (keep local), tombstone pull
   (deletedAt replicates), dirty-tombstone push.
 - The two-simulator live test (§6 P3 stretch) stays manual, following
-  the §7.6 smoke-test method.
+  the §7.7 smoke-test method.
 
 ### 8.5 Known limitations (P3, accepted)
 
