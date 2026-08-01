@@ -347,6 +347,80 @@ void main() {
     });
   });
 
+  group(
+    'suggestions — empty-prefix (focus) deleted-vs-cleared rule '
+    '(field feedback round 2, bug 1)',
+    () {
+      test(
+        'excludes a name whose most recent row was deleted while still '
+        'unchecked — explicitly removed without ever being bought',
+        () async {
+          final item = await repo.addItem(householdId, name: 'Milk');
+          await repo.deleteItem(item.id); // never checked first
+
+          final results = await repo.suggestions(householdId, '');
+          expect(results.map((s) => s.name), isNot(contains('Milk')));
+        },
+      );
+
+      test(
+        'still proposes a name whose most recent row was checked THEN '
+        'deleted — cleared after shopping via clearChecked',
+        () async {
+          final item = await repo.addItem(householdId, name: 'Milk');
+          await repo.setChecked(item.id, checked: true);
+          await repo.deleteItem(item.id);
+
+          final results = await repo.suggestions(householdId, '');
+          expect(results.map((s) => s.name), contains('Milk'));
+        },
+      );
+
+      test(
+        're-adding a name after it was deleted-while-unchecked makes it '
+        'eligible again, since only the MOST RECENT row is looked at',
+        () async {
+          final first = await repo.addItem(householdId, name: 'Milk');
+          await repo.deleteItem(first.id); // explicit removal, excluded
+          clock.advance(const Duration(minutes: 1));
+
+          expect(
+            (await repo.suggestions(householdId, '')).map((s) => s.name),
+            isNot(contains('Milk')),
+          );
+
+          // Re-added, then bought and cleared: the newest row is now
+          // checked-then-deleted, which stays eligible — the earlier
+          // explicit deletion no longer matters.
+          final second = await repo.addItem(householdId, name: 'Milk');
+          await repo.setChecked(second.id, checked: true);
+          await repo.deleteItem(second.id);
+
+          expect(
+            (await repo.suggestions(householdId, '')).map((s) => s.name),
+            contains('Milk'),
+          );
+        },
+      );
+
+      test(
+        'the deleted-while-unchecked exclusion does not apply on the '
+        'type-ahead (non-empty prefix) path',
+        () async {
+          final removed = await repo.addItem(householdId, name: 'Milk');
+          await repo.deleteItem(removed.id); // never checked
+          clock.advance(const Duration(minutes: 1));
+          final cleared = await repo.addItem(householdId, name: 'Mint');
+          await repo.setChecked(cleared.id, checked: true);
+          await repo.deleteItem(cleared.id);
+
+          final results = await repo.suggestions(householdId, 'mi');
+          expect(results.map((s) => s.name), containsAll(['Milk', 'Mint']));
+        },
+      );
+    },
+  );
+
   group('findActiveByNormalizedName', () {
     test('matches active items regardless of case/whitespace', () async {
       await repo.addItem(householdId, name: 'Oat   Milk');

@@ -202,7 +202,12 @@ void main() {
       ];
 
       // Soft-delete every history row except the one "Milk" instance that
-      // represents it currently sitting on the list.
+      // represents it currently sitting on the list. Each is checked
+      // before being cleared (bought-then-cleared, like a real
+      // `clearChecked` trip) so bug 1's deleted-while-unchecked exclusion
+      // (field feedback round 2) does not apply to them — that exclusion
+      // is only for items explicitly removed without ever being bought;
+      // see the dedicated test below for that case.
       for (final id in [
         butter,
         eggs,
@@ -213,6 +218,7 @@ void main() {
         milk2,
         ...bananas,
       ]) {
+        await repo.setChecked(id, checked: true);
         await repo.deleteItem(id);
       }
       expect(milk3, isNotEmpty);
@@ -259,6 +265,212 @@ void main() {
       // Blurring the field hides the list again.
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'tapping an already-focused field re-queries suggestions (bug 2, '
+    'field feedback round 2): focus alone only fires on a CHANGE, so a '
+    'tap that does not change focus must still refresh the list',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final repo = ShoppingRepository(database, newId: () => 'bread-1');
+      final bread = await repo.addItem(householdId, name: 'Bread');
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+
+      // First tap: focus goes from none -> focused, and the (empty)
+      // history so far shows nothing since "Bread" is still active.
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
+
+      // Without ever losing focus, "Bread" gets bought and cleared behind
+      // the scenes — it's now eligible, but nothing re-queried the focus
+      // node (no focus change happened).
+      await repo.setChecked(bread.id, checked: true);
+      await repo.clearChecked(householdId);
+
+      // Tapping the field again does NOT change its focus state (it's
+      // already focused) — only the explicit `onTap` handler can produce
+      // a fresh query here.
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
+          matching: find.text('Bread'),
+        ),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'tapping a proposal removes it from the top-5 and pulls in the next '
+    'candidate (bug 4, field feedback round 2)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+
+      var clockTime = DateTime.utc(2026, 7);
+      var nextId = 0;
+      final repo = ShoppingRepository(
+        database,
+        newId: () => 'seed-${nextId++}',
+        nowUtc: () => clockTime,
+      );
+
+      // Six distinct, equal-frequency (1 each) names, seeded oldest first
+      // so recency ranks them newest-first: item5 > item4 > ... > item0.
+      // Each is bought-then-cleared so all six are eligible focus
+      // suggestions, with "item0" left just outside the initial top 5.
+      final names = ['Item0', 'Item1', 'Item2', 'Item3', 'Item4', 'Item5'];
+      for (final name in names) {
+        final item = await repo.addItem(householdId, name: name);
+        await repo.setChecked(item.id, checked: true);
+        await repo.deleteItem(item.id);
+        clockTime = clockTime.add(const Duration(minutes: 1));
+      }
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+
+      Finder suggestionText(int index, String text) => find.descendant(
+        of: find.bySemanticsIdentifier('shopping.suggestion.$index'),
+        matching: find.text(text),
+      );
+
+      // Top 5 newest-first; "Item0" (oldest) is the 6th, not shown yet.
+      expect(suggestionText(0, 'Item5'), findsOneWidget);
+      expect(suggestionText(1, 'Item4'), findsOneWidget);
+      expect(suggestionText(2, 'Item3'), findsOneWidget);
+      expect(suggestionText(3, 'Item2'), findsOneWidget);
+      expect(suggestionText(4, 'Item1'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.5'),
+        findsNothing,
+      );
+
+      // Tap the top suggestion ("Item5"): it gets added (now active), so
+      // it drops out of the candidate pool entirely, and "Item0" — the
+      // previously-excluded 6th — moves into the newly-opened 5th slot.
+      await tester.tap(find.bySemanticsIdentifier('shopping.suggestion.0'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Item5'), findsOneWidget); // now on the list
+      expect(suggestionText(0, 'Item5'), findsNothing);
+      expect(suggestionText(0, 'Item4'), findsOneWidget);
+      expect(suggestionText(1, 'Item3'), findsOneWidget);
+      expect(suggestionText(2, 'Item2'), findsOneWidget);
+      expect(suggestionText(3, 'Item1'), findsOneWidget);
+      expect(suggestionText(4, 'Item0'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'checking an item off hides the suggestions (bug 3, field feedback '
+    'round 2): the quick-add field loses focus once the user works the '
+    'list',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      var nextId = 0;
+      final repo = ShoppingRepository(
+        database,
+        newId: () => 'item-${nextId++}',
+      );
+      final milk = await repo.addItem(householdId, name: 'Milk');
+      final bread = await repo.addItem(householdId, name: 'Bread');
+      await repo.setChecked(bread.id, checked: true);
+      await repo.deleteItem(bread.id); // an eligible focus-suggestion
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
+          matching: find.text('Bread'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.bySemanticsIdentifier('shopping.item.${milk.id}.check'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'scrolling the shopping list hides the suggestions (bug 3, field '
+    'feedback round 2)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      // Shrink the viewport so a modest number of items overflows it,
+      // guaranteeing the drag below is a real, extent-backed scroll.
+      tester.view.physicalSize = const Size(800, 600);
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final householdId = await currentHouseholdId(database);
+      var nextId = 0;
+      final repo = ShoppingRepository(
+        database,
+        newId: () => 'item-${nextId++}',
+      );
+      final bread = await repo.addItem(householdId, name: 'Bread');
+      await repo.setChecked(bread.id, checked: true);
+      await repo.deleteItem(bread.id); // an eligible focus-suggestion
+      for (var i = 0; i < 20; i++) {
+        await repo.addItem(householdId, name: 'Filler item $i');
+      }
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
+          matching: find.text('Bread'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
       expect(
         find.bySemanticsIdentifier('shopping.suggestion.0'),
         findsNothing,

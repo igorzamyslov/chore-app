@@ -141,14 +141,29 @@ class ShoppingRepository {
   /// A literal empty [prefix] (not whitespace — the field genuinely has no
   /// text) is the *focus-suggestions* path instead (field feedback F1,
   /// `docs/feedback/2026-08-01-field-feedback.md`): every name matches (no
-  /// prefix filtering), but names with an active (non-deleted) item
-  /// currently in [householdId] — checked or unchecked — are excluded,
-  /// since surfacing something already visible on the same screen is
-  /// noise. The non-empty-prefix (type-ahead) path deliberately keeps
-  /// including active items: retyping an item that's already on the list
-  /// is how a user reaches the existing "already on the list" /
-  /// "moved back to the list" duplicate-prevention flow (spec B3), and
-  /// changing that would regress it.
+  /// prefix filtering), but a name is excluded when its MOST RECENT history
+  /// row (by `created_at`) is either:
+  /// - an active (non-deleted) item currently in [householdId] — checked
+  ///   or unchecked — since surfacing something already visible on the
+  ///   same screen is noise, or
+  /// - deleted while still unchecked (`deleted_at != null && checked_at ==
+  ///   null`): the user explicitly removed it from the list without buying
+  ///   it, so re-offering it is unwanted (field feedback round 2, bug 1,
+  ///   `docs/feedback/2026-08-01-field-feedback.md`).
+  ///
+  /// A name whose most recent row was instead checked off and THEN
+  /// deleted (`checked_at != null`, i.e. cleared after shopping via
+  /// [clearChecked]) stays eligible — re-suggesting staples already bought
+  /// is the whole point of this feature. Because only the most recent row
+  /// is considered, adding the name again later (a newer row) makes it
+  /// eligible again regardless of an earlier explicit deletion.
+  ///
+  /// The non-empty-prefix (type-ahead) path deliberately keeps including
+  /// active items, and never applies the deleted-while-unchecked
+  /// exclusion above: retyping an item that's already on the list is how
+  /// a user reaches the existing "already on the list" / "moved back to
+  /// the list" duplicate-prevention flow (spec B3), and changing that
+  /// would regress it.
   Future<List<ShoppingSuggestion>> suggestions(
     String householdId,
     String prefix, {
@@ -160,19 +175,15 @@ class ShoppingRepository {
     }
 
     final rows = await _historyRows(householdId);
-    final activeNormalizedNames = prefix.isEmpty
-        ? {
-            for (final row in rows)
-              if (row.item.deletedAt == null)
-                normalizeShoppingItemName(row.item.name),
-          }
+    final excludedNormalizedNames = prefix.isEmpty
+        ? _namesToExcludeFromFocusSuggestions(rows)
         : const <String>{};
 
     final groups = <String, List<_HistoryRow>>{};
     for (final row in rows) {
       final normalized = normalizeShoppingItemName(row.item.name);
       if (!normalized.startsWith(normalizedPrefix) ||
-          activeNormalizedNames.contains(normalized)) {
+          excludedNormalizedNames.contains(normalized)) {
         continue;
       }
       groups.putIfAbsent(normalized, () => []).add(row);
@@ -208,6 +219,35 @@ class ShoppingRepository {
     });
 
     return [for (final entry in ranked.take(limit)) entry.suggestion];
+  }
+
+  /// Computes the set of normalized names to exclude from the
+  /// focus-suggestions (empty-prefix) path of [suggestions]: for each
+  /// normalized name, only its MOST RECENT row (by `created_at`) among
+  /// [rows] is considered. A name is excluded when that row is active
+  /// (`deleted_at == null`, i.e. still on the list — regardless of checked
+  /// state) OR was deleted while unchecked (`checked_at == null`, i.e. the
+  /// user explicitly removed it without buying it — field feedback round
+  /// 2, bug 1). A name whose most recent row was checked-then-deleted
+  /// (cleared after shopping) is left eligible.
+  Set<String> _namesToExcludeFromFocusSuggestions(List<_HistoryRow> rows) {
+    final mostRecentByName = <String, _HistoryRow>{};
+    for (final row in rows) {
+      final normalized = normalizeShoppingItemName(row.item.name);
+      final current = mostRecentByName[normalized];
+      if (current == null ||
+          DateTime.parse(
+            row.item.createdAt,
+          ).isAfter(DateTime.parse(current.item.createdAt))) {
+        mostRecentByName[normalized] = row;
+      }
+    }
+    return {
+      for (final entry in mostRecentByName.entries)
+        if (entry.value.item.deletedAt == null ||
+            entry.value.item.checkedAt == null)
+          entry.key,
+    };
   }
 
   /// Finds the ACTIVE (non-deleted) item in [householdId] whose normalized

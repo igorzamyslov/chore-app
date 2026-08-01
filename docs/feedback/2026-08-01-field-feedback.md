@@ -192,3 +192,87 @@ Assessment for a self-hosted family app distributed as open source:
 
 Sync P2c (join household) continues in parallel throughout; it remains
 the top standing priority (multi-phone).
+
+## Round 2 (2026-08-01, shopping suggestions)
+
+F1 (focus-suggestions) shipped earlier today; Igor's first real use of it
+surfaced four bugs, all in `ShoppingRepository.suggestions` and the
+quick-add row/list screen that consume it. Root-caused individually
+before any fix landed.
+
+### Bug 1 — explicitly deleted items still got proposed
+
+`suggestions()`'s empty-prefix (focus) path builds its candidate pool
+from the household's FULL history, including soft-deleted rows — correct
+for items cleared after shopping (`clearChecked` soft-deletes checked
+items; re-suggesting those staples is the point of F1), but wrong for
+items the user deleted outright without ever buying them: those kept
+coming back every time the field was focused.
+
+**Product decision — the deleted-vs-cleared rule:** the distinguishing
+signal is `checked_at`, not just `deleted_at`. Only the MOST RECENT
+history row for a normalized name is consulted:
+- most recent row deleted while still unchecked (`deleted_at != null &&
+  checked_at == null`) → "I removed this, stop offering it" → excluded
+  from focus-suggestions.
+- most recent row checked THEN deleted (`checked_at != null`, i.e. a
+  `clearChecked` sweep after a shopping trip) → stays eligible; this is
+  exactly the staple-restocking case F1 exists for.
+- Because only the latest row counts, re-adding a name after an explicit
+  deletion (a newer row) makes it eligible again regardless of the
+  earlier deletion — there's no permanent "blocklist".
+
+This exclusion applies ONLY to the empty-prefix (focus) path. The
+non-empty-prefix (type-ahead) path is unchanged on purpose: retyping an
+on-list or recently-deleted name is how B3's duplicate-prevention
+snackbars ("Already on the list" / "Moved back to the list") are
+reached, and narrowing that pool would regress it.
+
+### Bug 2 — proposals sometimes didn't appear until switching tabs
+
+The quick-add field's suggestion refresh was wired only to
+`FocusNode`'s listener, which fires on a focus CHANGE. Returning to the
+Shopping tab with the field still focused (it never actually lost focus,
+since `ShoppingListScreen` stays mounted in the tab `IndexedStack`), or
+tapping a field that was already focused, produced no change event, so
+nothing re-queried. Fix: an explicit `onTap` on the `TextField` calls the
+same `_updateSuggestions()` unconditionally, independent of whether
+focus itself changed.
+
+### Bug 3 — proposals never went away while the user worked the list
+
+The field keeps focus while its suggestion list is showing, so the list
+stayed open indefinitely while the user checked items off underneath it
+— nothing dismissed it except an explicit blur. Fix: the quick-add field
+is now unfocused (reusing the existing blur-hides-suggestions path)
+whenever the user turns to the list — on a user-driven scroll
+(`NotificationListener<ScrollNotification>` reacting only to
+`ScrollStartNotification` with non-null `dragDetails`, so programmatic
+scrolls and overscroll glow are ignored) and on any item check/tap. No
+blanket `GestureDetector` was added, to avoid swallowing taps elsewhere
+on the screen.
+
+### Bug 4 — tapping a proposal left it visibly still proposed
+
+`_addOrRestore` cleared the input and re-requested focus at the end,
+relying on the text-changed listener to refresh suggestions — which
+works after a typed submit (the controller goes from non-empty to
+empty, so `clear()` does notify), but a suggestion tap never typed
+anything: the controller is already empty, so `clear()` is a no-op and
+never notifies. The just-added item stayed in the proposed list until
+some other event forced a refresh. Fix: `_addOrRestore` now calls
+`_updateSuggestions()` explicitly at the end on every path. Since the
+newly-added item is immediately active, Bug 1's own exclusion rule drops
+it out of the pool right away, and the next-best candidate moves into
+the top 5 — the behavior Igor asked for.
+
+### Fallout on existing tests
+
+One pre-existing widget test ("focusing the empty quick-add field shows
+the top-5...") seeded its cleared-history fixtures by deleting items
+directly without ever checking them first — i.e. it was unknowingly
+exercising the exact "deleted-while-unchecked" shape Bug 1's fix now
+excludes. Updated the fixture to check each item before deleting it
+(mirroring a real `clearChecked` trip), which is what the test always
+intended to simulate; behavior asserted by the test (cleared items stay
+suggested) is unchanged, only the seeding got more precise.
