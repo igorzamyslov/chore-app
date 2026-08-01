@@ -151,3 +151,98 @@ Never-signed-in users never see any of this.
 - **P4**: G6 delete-account edge function, leave-household, ownership
   transfer. First paste-SQL handoff to the real project at the END of
   P1 review (schema stabilized enough) or P2, user's call.
+
+## 7. P2 client design (binding for slices P2b/P2c)
+
+P2a (auth foundation: `AuthGateway`, Account section, deep links) landed
+2026-08-01. The remaining P2 work splits into P2b (first device: adopt +
+invite) and P2c (second device: join), both against this section.
+
+### 7.1 Local linked-state (client schema v6)
+
+`Settings` gains two nullable text columns, always set/cleared together:
+
+- `syncHouseholdId` — the server household this DEVICE is linked to.
+- `syncLinkedAt` — ISO timestamp when linking completed.
+
+"Linked" ⇔ `syncHouseholdId != null`. Migration v5→v6 adds both columns
+(nullable, default null); no data rewrite. NOTE: §3's "schema v6 adds
+sync_dirty" is hereby renumbered — the dirty flag and `syncLastPulledAt`
+cursor become client schema **v7** in P3.
+
+### 7.2 HouseholdGateway (the second and last Supabase seam)
+
+`lib/application/household_gateway.dart`, exactly parallel to
+`AuthGateway`: interface + `NoopHouseholdGateway` (every method throws
+`StateError`; unreachable because the UI gates on a signed-in user, which
+Noop auth never produces) + `SupabaseHouseholdGateway`. Widget tests use a
+fake. Methods mirror the P1 RPCs and the two bulk paths:
+
+- `createHousehold(householdId, name, memberId, memberName, memberColor)`
+  → RPC `create_household` (ids preserved — the RPCs take client UUIDs).
+- `uploadHouseholdData(snapshot)` — PostgREST upserts, in FK order:
+  members (the non-caller ones, `user_id` null), categories, chores,
+  chore_assignees, chore_occurrences, shopping_items. Verbatim rows,
+  tombstones included. Idempotent (upsert) so a failed upload is
+  re-runnable as-is.
+- `createInvite(householdId)` → code (8 chars).
+- `listClaimableMembers(code)` → `[(memberId, name, color)]`.
+- `claimMember(code, memberId)` → householdId.
+- `joinAsNewMember(code, memberId, name, color)` → householdId.
+- `downloadHousehold(householdId)` → snapshot (plain selects; RLS scopes).
+
+Snapshot type: a plain class of typed row lists; the Supabase impl owns
+snake_case/ISO mapping (per-table mapping read off the P1 migration file).
+
+### 7.3 P2b — adopt ("Put my household online") + invite
+
+Account section, signed-in AND unlinked (banner-not-modal convention:
+"blocking" in §4 is satisfied because nothing syncs until a choice is
+made): shows the two choice rows (`settings.account.adopt`,
+`settings.account.join`) with one line of explanatory copy each.
+
+Adopt steps, in order, resumable at every point:
+1. RPC `create_household` with the LOCAL household id + name and the
+   ACTING member's id/name/color (the acting member is "the caller's
+   member profile" of §4; server makes it admin + sets `user_id`).
+2. `uploadHouseholdData` (everything else, upsert = retry-safe).
+3. Local: acting member's role → admin (mirror the server rule).
+4. Local: set `syncHouseholdId`+`syncLinkedAt` (only after 1–2 succeed).
+Failure surface: inline error state + "Try again" on the adopt row —
+rerunning is safe (RPC failure on rerun after a half-success: treat
+"household already exists with my user as member" as step-1 success and
+continue with 2).
+
+Invite: once linked, the Members screen gains an "Invite" row
+(`settings.members.invite`): tap → `createInvite` → bottom sheet with the
+code in large type + a share button (share_plus). Account section's
+signed-in tile gains a "linked" subtitle (household name).
+
+### 7.4 P2c — join ("Join an existing household")
+
+From the join row: enter code (`settings.account.join.code` field) →
+`listClaimableMembers` → chooser: each unclaimed profile ("Are you
+Anna?") + "I'm new here" → `claimMember` or `joinAsNewMember` (new UUID,
+name prompt, auto color). Then, per §4, strictly in this order:
+1. Automatic JSON export (G8 exporter) written to the app documents dir
+   (filename `famdo-archive-<date>.json`); abort the whole join if this
+   write fails.
+2. `downloadHousehold` → replace: soft-archive = local rows of the old
+   household are DELETED after the export succeeds (the file IS the
+   archive; UI copy states this plainly), snapshot inserted, settings
+   repointed (actingMemberId = claimed/new member, linked fields set).
+3. One-time import offer (banner on Chores tab, dismissible): copies
+   OPEN chores (as new chores, new UUIDs, no history) + unchecked
+   shopping items into the joined household, locally AND via
+   `uploadHouseholdData` of just those rows; banner never returns after
+   accept/dismiss (settings-stamped like other one-time banners).
+
+### 7.5 Testing
+
+- Widget tests: `FakeHouseholdGateway` (third override on top of
+  db/clock + auth fake), covering adopt success/retry, join
+  claim/join-new, export-fails-aborts-join, import-offer accept/dismiss.
+- E2E stays fully offline (empty SUPABASE_* defines → 'coming soon');
+  live-stack flows are exercised manually against `supabase start` and,
+  as a P3 stretch, via the two-simulator harness.
+- pgTAP already covers the server side; no new SQL in P2b/P2c.
