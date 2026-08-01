@@ -18,6 +18,7 @@ import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 /// Opens the join sheet. Resolves to the archive file's name on a
 /// successful join (for the caller's post-join snackbar), or `null` if the
@@ -282,7 +283,16 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   void _confirmNewMember() {
     final name = _nameController.text.trim();
     setState(() {
-      _choice = NewMemberChoice(name: name, color: _autoColor());
+      // The uuid is minted HERE, once per confirmed choice -- not inside
+      // the join service -- so a retry after an interrupted join re-sends
+      // the same id and the server's idempotent join_as_new_member
+      // (migration 20260801130000) recognizes it. See
+      // NewMemberChoice.memberId.
+      _choice = NewMemberChoice(
+        memberId: const Uuid().v4(),
+        name: name,
+        color: _autoColor(),
+      );
       _step = _Step.importOffer;
     });
   }

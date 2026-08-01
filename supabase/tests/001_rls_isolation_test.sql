@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(31);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: three auth users (inserted while still superuser), households
@@ -171,6 +171,24 @@ select is((select count(*) from chores
            where household_id = '10000000-0000-0000-0000-000000000001'),
   1::bigint, 'a joined member gains read access to household data');
 
+-- Idempotent retries (migration 20260801130000): re-invoking the SAME
+-- claim/join by the SAME caller returns the household id instead of
+-- failing — the client's join flow retries this way after an interrupted
+-- download/replace.
+select test_login('00000000-0000-0000-0000-00000000000b');
+select is(
+  claim_member(current_setting('test.invite_code'),
+               '20000000-0000-0000-0000-00000000000c'::uuid),
+  '10000000-0000-0000-0000-000000000001'::uuid,
+  'claim_member retry by the same claimer returns the household id');
+select test_login('00000000-0000-0000-0000-00000000000c');
+select is(
+  join_as_new_member(current_setting('test.invite_code'),
+                     '20000000-0000-0000-0000-00000000000d'::uuid,
+                     'Carol', 4278190083),
+  '10000000-0000-0000-0000-000000000001'::uuid,
+  'join_as_new_member retry with the same member id returns the household id');
+
 -- Expired invite is rejected.
 select test_login('00000000-0000-0000-0000-00000000000a');
 update household_invites set expires_at = now() - interval '1 hour'
@@ -185,6 +203,24 @@ select throws_ok(
 select throws_ok(
   $$select list_claimable_members('NOPENOPE')$$,
   'P0001', 'invalid or expired invite', 'unknown codes are rejected');
+
+-- The idempotent retry path survives invite EXPIRY too (deliberate: the
+-- prior successful redemption is the proof of entitlement, so the retry
+-- short-circuits before invite validation — see migration
+-- 20260801130000's header).
+select test_login('00000000-0000-0000-0000-00000000000b');
+select is(
+  claim_member(current_setting('test.invite_code'),
+               '20000000-0000-0000-0000-00000000000c'::uuid),
+  '10000000-0000-0000-0000-000000000001'::uuid,
+  'claim_member retry still succeeds after the invite expired');
+select test_login('00000000-0000-0000-0000-00000000000c');
+select is(
+  join_as_new_member(current_setting('test.invite_code'),
+                     '20000000-0000-0000-0000-00000000000d'::uuid,
+                     'Carol', 4278190083),
+  '10000000-0000-0000-0000-000000000001'::uuid,
+  'join_as_new_member retry still succeeds after the invite expired');
 
 -- ---------------------------------------------------------------------------
 -- Trigger contract: updated_at is server-authored, client values ignored.

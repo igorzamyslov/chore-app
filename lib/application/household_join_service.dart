@@ -39,8 +39,20 @@ class ClaimMemberChoice extends JoinChoice {
 /// The caller asked to join as a brand-new member instead ("I'm new here").
 @immutable
 class NewMemberChoice extends JoinChoice {
-  /// Creates a new-member choice with [name] and an auto-assigned [color].
-  const NewMemberChoice({required this.name, required this.color});
+  /// Creates a new-member choice with [memberId], [name], and an
+  /// auto-assigned [color].
+  const NewMemberChoice({
+    required this.memberId,
+    required this.name,
+    required this.color,
+  });
+
+  /// The new member's id, generated ONCE when the choice is made (not per
+  /// [HouseholdJoinService.join] call): a retry after an interrupted join
+  /// re-sends the SAME id, which is what lets the server's idempotent
+  /// `join_as_new_member` (migration 20260801130000) recognize the retry
+  /// and return the household instead of failing on a duplicate.
+  final String memberId;
 
   /// The new member's display name, as entered by the caller.
   final String name;
@@ -89,17 +101,15 @@ class HouseholdJoinResult {
 /// server-side -- a failure the user can't act on by retrying (the archive
 /// write itself doesn't depend on the claim having happened).
 ///
-/// **Known limitation.** Retrying the whole flow after a failure that
-/// happens after step 2 already succeeded (i.e. during download/replace/
-/// upload) re-invokes `claimMember`/`joinAsNewMember` a second time, which
-/// can itself fail server-side (e.g. `claim_member`'s second call finds the
-/// profile no longer unclaimed). Unlike `HouseholdLinkService.adopt`'s
-/// half-success tolerance (which double-checks via `downloadHousehold`),
-/// there's no equivalent cheap check available here -- no RPC answers "is
-/// this member already linked to me". A retry landing in that narrow
-/// window surfaces as a fresh inline error rather than quietly succeeding;
-/// the user must back out and restart the join, re-entering the code. This
-/// is an accepted, documented gap rather than something this slice solves.
+/// **Retry after a post-claim failure** (download/replace interrupted):
+/// re-running the flow re-invokes `claimMember`/`joinAsNewMember` with the
+/// SAME member id ([ClaimMemberChoice.memberId] is inherently stable;
+/// [NewMemberChoice.memberId] is generated once when the choice is made,
+/// not per call). The server's idempotent RPCs (migration
+/// 20260801130000) recognize "this member is already the caller's" and
+/// return the household id as success -- even if the invite expired in
+/// between -- so the retry proceeds straight to download/replace instead
+/// of failing.
 class HouseholdJoinService {
   /// Creates the service.
   HouseholdJoinService({
@@ -169,11 +179,11 @@ class HouseholdJoinService {
       case ClaimMemberChoice(:final memberId):
         actingMemberId = memberId;
         joinedHouseholdId = await gateway.claimMember(code, memberId);
-      case NewMemberChoice(:final name, :final color):
-        actingMemberId = newId();
+      case NewMemberChoice(:final memberId, :final name, :final color):
+        actingMemberId = memberId;
         joinedHouseholdId = await gateway.joinAsNewMember(
           code: code,
-          memberId: actingMemberId,
+          memberId: memberId,
           memberName: name,
           memberColor: color,
         );
