@@ -227,6 +227,34 @@ final householdGatewayProvider = Provider<HouseholdGateway>((ref) {
       : const NoopHouseholdGateway();
 });
 
+/// Whether the signed-in caller's account is ALREADY a claimed member of
+/// SOME household this DEVICE isn't currently linked to -- probed for the
+/// Account section's P2d reconnect row (spec `docs/specs/sync-backend.md`
+/// §7.6) via [HouseholdGateway.findMyMembership].
+///
+/// Returns `null` WITHOUT calling the gateway at all in either of two
+/// cases: signed out (no [currentAuthUserProvider] user yet), or
+/// [householdGatewayProvider] resolves to [NoopHouseholdGateway] (Supabase
+/// unconfigured) -- both make the probe meaningless, and the second would
+/// throw anyway. Otherwise resolves to the gateway's answer: a
+/// [MyMembership] when this account is already a member elsewhere, else
+/// `null`.
+///
+/// Watching [currentAuthUserProvider] directly (not `.future`) re-runs this
+/// probe every time the auth state changes -- sign-in, sign-out, or the
+/// initial resolve -- rather than only once.
+final myMembershipProvider = FutureProvider<MyMembership?>((ref) async {
+  final gateway = ref.watch(householdGatewayProvider);
+  if (gateway is NoopHouseholdGateway) {
+    return null;
+  }
+  final user = ref.watch(currentAuthUserProvider).valueOrNull;
+  if (user == null) {
+    return null;
+  }
+  return gateway.findMyMembership();
+});
+
 /// The P2b adopt-flow service (spec `docs/specs/sync-backend.md` §7.3),
 /// built on [householdGatewayProvider], [householdRepositoryProvider], and
 /// [settingsRepositoryProvider].

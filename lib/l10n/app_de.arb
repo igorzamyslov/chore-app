@@ -201,6 +201,8 @@
   "settingsAccountSignOutConfirmAction": "Abmelden",
   "settingsAccountSignOutError": "Abmelden hat nicht geklappt. Versuch es noch mal.",
   "settingsAccountComingSoonTitle": "Synchronisierung — bald verfügbar",
+  "settingsAccountReconnectTitle": "Mit {householdName} neu verbinden",
+  "settingsAccountReconnectIntro": "Ersetzt deine lokalen Daten — sie bleiben nur in einer Archivdatei auf diesem Gerät erhalten.",
   "settingsAccountAdoptTitle": "Meinen Haushalt online stellen",
   "settingsAccountAdoptIntro": "Macht deinen Haushalt auf deinen anderen Geräten verfügbar.",
   "settingsAccountAdoptRetry": "Erneut versuchen",

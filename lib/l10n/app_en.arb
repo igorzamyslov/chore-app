@@ -852,6 +852,20 @@
   "@settingsAccountComingSoonTitle": {
     "description": "Label of the Account section's single disabled row shown when Supabase isn't configured (NoopAuthGateway) -- e.g. tests, E2E, and F-Droid builds without sync wired up."
   },
+  "settingsAccountReconnectTitle": "Reconnect to {householdName}",
+  "@settingsAccountReconnectTitle": {
+    "description": "Title of the Account section's P2d reconnect row (spec docs/specs/sync-backend.md §7.6), shown FIRST -- above the adopt/join rows -- whenever this device is signed in, unlinked, and the signed-in account is already a claimed member of a household elsewhere (a returning device: phone reset, new phone).",
+    "placeholders": {
+      "householdName": {
+        "type": "String",
+        "example": "My household"
+      }
+    }
+  },
+  "settingsAccountReconnectIntro": "Replaces your local data — it's kept only in an archive file on this device.",
+  "@settingsAccountReconnectIntro": {
+    "description": "One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same archive guarantee as join)."
+  },
   "settingsAccountAdoptTitle": "Put my household online",
   "@settingsAccountAdoptTitle": {
     "description": "Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked."

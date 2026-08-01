@@ -61,6 +61,50 @@ class ClaimableMember {
   String toString() => 'ClaimableMember($memberId, $name, $color)';
 }
 
+/// The caller's own already-claimed member profile, as found by
+/// `HouseholdGateway.findMyMembership` (spec §7.6, P2d reconnect): a
+/// returning device (phone reset, new phone) whose signed-in account is
+/// already a member of a household this DEVICE isn't currently linked to.
+@immutable
+class MyMembership {
+  /// Creates a membership result.
+  const MyMembership({
+    required this.householdId,
+    required this.memberId,
+    required this.memberName,
+    required this.householdName,
+  });
+
+  /// The household the caller's account is already a member of.
+  final String householdId;
+
+  /// The caller's already-claimed member profile id in [householdId].
+  final String memberId;
+
+  /// The already-claimed member's display name.
+  final String memberName;
+
+  /// [householdId]'s name, for the reconnect row's "Reconnect to
+  /// {householdName}" copy.
+  final String householdName;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MyMembership &&
+      other.householdId == householdId &&
+      other.memberId == memberId &&
+      other.memberName == memberName &&
+      other.householdName == householdName;
+
+  @override
+  int get hashCode =>
+      Object.hash(householdId, memberId, memberName, householdName);
+
+  @override
+  String toString() =>
+      'MyMembership($householdId, $memberId, $memberName, $householdName)';
+}
+
 /// The narrow seam between the app's household data and the Supabase
 /// backend (spec `docs/specs/sync-backend.md` §7.2): household/invite
 /// bootstrap RPCs, plus the two bulk data-transfer paths.
@@ -111,6 +155,14 @@ abstract class HouseholdGateway {
   /// Plain selects (RLS-scoped) of every row belonging to [householdId],
   /// as a [HouseholdSnapshot].
   Future<HouseholdSnapshot> downloadHousehold(String householdId);
+
+  /// Spec §7.6 (P2d reconnect): PostgREST select on `members` where
+  /// `user_id = auth.uid()` (RLS-scoped anyway), limit 1, plus a second
+  /// select on `households` for that row's name -- looks up whether the
+  /// caller's signed-in account is ALREADY a claimed member of some
+  /// household (a returning device: phone reset, new phone). Returns
+  /// `null` when the caller has no membership anywhere.
+  Future<MyMembership?> findMyMembership();
 }
 
 /// The always-throwing [HouseholdGateway] returned by
@@ -158,6 +210,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
   @override
   Future<HouseholdSnapshot> downloadHousehold(String householdId) =>
       _unreachable();
+
+  @override
+  Future<MyMembership?> findMyMembership() => _unreachable();
 
   Never _unreachable() => throw StateError(
     'Supabase is not configured; HouseholdGateway is unreachable -- every '
@@ -360,6 +415,40 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       shoppingItems: [
         for (final row in shoppingItems) row_mappers.shoppingItemFromRow(row),
       ],
+    );
+  }
+
+  @override
+  Future<MyMembership?> findMyMembership() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      // No signed-in session to look up -- unreachable in practice (see the
+      // interface doc comment/`myMembershipProvider`, which never calls
+      // this without one), but a `null` result is still the right answer.
+      return null;
+    }
+    final memberRows = await _client
+        .from('members')
+        .select()
+        .eq('user_id', userId)
+        .limit(1);
+    if (memberRows.isEmpty) {
+      return null;
+    }
+    final memberRow = memberRows.first;
+    final householdId = memberRow['household_id']! as String;
+    final householdRows = await _client
+        .from('households')
+        .select()
+        .eq('id', householdId)
+        .limit(1);
+    return MyMembership(
+      householdId: householdId,
+      memberId: memberRow['id']! as String,
+      memberName: memberRow['name']! as String,
+      householdName: householdRows.isEmpty
+          ? ''
+          : householdRows.first['name']! as String,
     );
   }
 }

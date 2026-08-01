@@ -3,6 +3,8 @@
 /// Settings Account section's join row/sheet
 /// (`lib/features/settings/join_household_sheet.dart`) once the user has
 /// picked an existing profile to claim or asked to join as a new member.
+/// Also backs the P2d reconnect flow (§7.6, `ReconnectChoice`) via the same
+/// sheet, opened by the Account section's reconnect row instead.
 library;
 
 import 'package:chore_app/application/household_archive.dart';
@@ -61,6 +63,26 @@ class NewMemberChoice extends JoinChoice {
   final int color;
 }
 
+/// The caller's account is ALREADY a claimed member of [householdId] (the
+/// P2d reconnect flow, spec §7.6: a returning device -- phone reset, new
+/// phone -- whose signed-in account already has a profile server-side).
+/// Both ids come straight from the `MyMembership` the Account section's
+/// `findMyMembership` probe already resolved, so [HouseholdJoinService.join]
+/// skips the claim/join-as-new RPC entirely for this choice -- no invite
+/// code is needed either.
+@immutable
+class ReconnectChoice extends JoinChoice {
+  /// Creates a reconnect choice for the already-claimed [memberId] in
+  /// [householdId].
+  const ReconnectChoice({required this.householdId, required this.memberId});
+
+  /// The household this device is reconnecting to.
+  final String householdId;
+
+  /// The caller's already-claimed member profile id in [householdId].
+  final String memberId;
+}
+
 /// The outcome of a successful [HouseholdJoinService.join] call.
 @immutable
 class HouseholdJoinResult {
@@ -79,12 +101,17 @@ class HouseholdJoinResult {
   final String archiveFileName;
 }
 
-/// Runs the P2c join flow: archives the local household, links this
-/// device's account to a member profile in the joined household (claiming
-/// an existing one or creating a new one), downloads the joined household's
-/// data, and replaces the local household with it -- optionally carrying
-/// over the old household's still-open chores and unchecked shopping items
-/// as fresh, history-free copies.
+/// Runs the P2c join flow (and, via [ReconnectChoice], the P2d reconnect
+/// flow -- spec §7.6): archives the local household, links this device's
+/// account to a member profile in the joined household (claiming an
+/// existing one, creating a new one, or -- for reconnect -- reusing an
+/// already-claimed one with no RPC at all), downloads the joined
+/// household's data, and replaces the local household with it -- optionally
+/// carrying over the old household's still-open chores and unchecked
+/// shopping items as fresh, history-free copies. Every step past the
+/// claim/join/reconnect branch (archive-first ordering, import offer,
+/// download/replace, settings-repoint, best-effort upload) is IDENTICAL and
+/// shared across all three [JoinChoice] variants.
 ///
 /// **Deliberate ordering refinement vs. the spec's own step list.** Spec
 /// §7.4 lists the archive export as its step 1, implicitly AFTER the
@@ -145,11 +172,17 @@ class HouseholdJoinService {
   /// chores and unchecked shopping items as fresh copies into the joined
   /// household.
   ///
+  /// [code] is `null` for [ReconnectChoice] (spec §7.6: reconnect "skips
+  /// code entry entirely" -- no invite is involved), and required for
+  /// [ClaimMemberChoice]/[NewMemberChoice].
+  ///
   /// Strictly in this order (see the class doc comment for why steps 1/2
   /// are swapped vs. the spec's literal list):
   /// 1. Write the automatic archive (`writeHouseholdArchive`) -- abort the
   ///    whole join, untouched, if this throws.
-  /// 2. `claimMember`/`joinAsNewMember`, per [choice].
+  /// 2. `claimMember`/`joinAsNewMember`, per [choice] -- skipped entirely
+  ///    for [ReconnectChoice], which already carries the household/member
+  ///    ids of an existing, already-claimed membership.
   /// 3. `downloadHousehold` of the joined household.
   /// 4. One local transaction: capture the import copies (read BEFORE any
   ///    deletion, per spec §7.4 step 2), delete [oldHouseholdId]'s rows
@@ -160,9 +193,9 @@ class HouseholdJoinService {
   ///    local-only until P3's sync engine picks them up.
   Future<HouseholdJoinResult> join({
     required String oldHouseholdId,
-    required String code,
     required JoinChoice choice,
     required bool importAccepted,
+    String? code,
   }) async {
     // Step 1.
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -178,15 +211,21 @@ class HouseholdJoinService {
     switch (choice) {
       case ClaimMemberChoice(:final memberId):
         actingMemberId = memberId;
-        joinedHouseholdId = await gateway.claimMember(code, memberId);
+        joinedHouseholdId = await gateway.claimMember(code!, memberId);
       case NewMemberChoice(:final memberId, :final name, :final color):
         actingMemberId = memberId;
         joinedHouseholdId = await gateway.joinAsNewMember(
-          code: code,
+          code: code!,
           memberId: memberId,
           memberName: name,
           memberColor: color,
         );
+      case ReconnectChoice(:final householdId, :final memberId):
+        // Spec §7.6: already claimed server-side -- no RPC call at all,
+        // straight into the shared download/replace machinery below with
+        // the membership's own ids.
+        actingMemberId = memberId;
+        joinedHouseholdId = householdId;
     }
 
     // Step 3.

@@ -69,4 +69,48 @@ void main() {
     final households = await db.select(db.households).get();
     expect(households.map((h) => h.id), ['joined-hh']);
   });
+
+  test(
+    'reconnect (spec §7.6): no code, no claim/join RPC -- downloads and '
+    'replaces straight from the ReconnectChoice ids',
+    () async {
+      final gateway = FakeHouseholdGateway()
+        ..downloadSnapshotOverride = const HouseholdSnapshot(
+          household: Household(
+            id: 'joined-hh',
+            name: 'Joined household',
+            createdAt: 't0',
+            updatedAt: 't0',
+            syncDirty: false,
+          ),
+        );
+      final service = HouseholdJoinService(
+        gateway: gateway,
+        database: db,
+        settings: SettingsRepository(db),
+        clock: Clock.fixed(DateTime.utc(2026, 7, 24)),
+      );
+
+      final result = await service.join(
+        oldHouseholdId: 'old-hh',
+        choice: const ReconnectChoice(
+          householdId: 'joined-hh',
+          memberId: 'm-anna',
+        ),
+        importAccepted: false,
+      );
+
+      expect(result.householdId, 'joined-hh');
+      expect(gateway.claimMemberCalls, isEmpty);
+      expect(gateway.joinAsNewMemberCalls, isEmpty);
+      expect(gateway.downloadHouseholdCalls, ['joined-hh']);
+
+      final households = await db.select(db.households).get();
+      expect(households.map((h) => h.id), ['joined-hh']);
+
+      final settings = await db.select(db.settings).getSingle();
+      expect(settings.actingMemberId, 'm-anna');
+      expect(settings.syncHouseholdId, 'joined-hh');
+    },
+  );
 }

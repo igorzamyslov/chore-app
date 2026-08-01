@@ -649,6 +649,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Synchronisierung — bald verfügbar';
 
   @override
+  String settingsAccountReconnectTitle(String householdName) {
+    return 'Mit $householdName neu verbinden';
+  }
+
+  @override
+  String get settingsAccountReconnectIntro =>
+      'Ersetzt deine lokalen Daten — sie bleiben nur in einer Archivdatei auf diesem Gerät erhalten.';
+
+  @override
   String get settingsAccountAdoptTitle => 'Meinen Haushalt online stellen';
 
   @override

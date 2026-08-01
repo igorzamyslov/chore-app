@@ -4,6 +4,14 @@
 /// "Are you Anna?"/"I'm new here" chooser, the in-flow import offer, then a
 /// working/result state -- ending in `HouseholdJoinService.join`
 /// (`lib/application/household_join_service.dart`).
+///
+/// [showReconnectHouseholdSheet] reuses this exact same sheet for the P2d
+/// reconnect flow (spec §7.6): the Account section's reconnect row already
+/// knows which household/member it's reconnecting to (from the
+/// `findMyMembership` probe), so it opens the sheet pre-loaded with a
+/// [ReconnectChoice], starting directly at the import-offer step -- code
+/// entry and the claim/new-member chooser never apply to reconnect and are
+/// skipped entirely.
 library;
 
 import 'dart:async';
@@ -35,10 +43,33 @@ Future<String?> showJoinHouseholdSheet(BuildContext context) {
   );
 }
 
+/// Opens the join sheet pre-loaded with [choice] (a [ReconnectChoice], per
+/// this library's doc comment), starting directly at the import-offer step.
+/// Resolves the same way [showJoinHouseholdSheet] does.
+Future<String?> showReconnectHouseholdSheet(
+  BuildContext context, {
+  required JoinChoice choice,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheetContext) => semantic(
+      'settings.account.reconnect.sheet',
+      child: _JoinHouseholdSheet(initialChoice: choice),
+    ),
+  );
+}
+
 enum _Step { code, chooser, newMemberName, importOffer, working }
 
 class _JoinHouseholdSheet extends ConsumerStatefulWidget {
-  const _JoinHouseholdSheet();
+  const _JoinHouseholdSheet({this.initialChoice});
+
+  /// When set (the P2d reconnect flow, via [showReconnectHouseholdSheet]),
+  /// the sheet starts directly at [_Step.importOffer] with this choice
+  /// already made, skipping code entry and the claim/new-member chooser.
+  final JoinChoice? initialChoice;
 
   @override
   ConsumerState<_JoinHouseholdSheet> createState() =>
@@ -49,7 +80,7 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   final _codeController = TextEditingController();
   final _nameController = TextEditingController();
 
-  _Step _step = _Step.code;
+  late _Step _step;
   bool _busy = false;
   String? _inlineError;
 
@@ -60,6 +91,9 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   @override
   void initState() {
     super.initState();
+    final initialChoice = widget.initialChoice;
+    _choice = initialChoice;
+    _step = initialChoice == null ? _Step.code : _Step.importOffer;
     _codeController.addListener(_onFieldChanged);
     _nameController.addListener(_onFieldChanged);
   }
@@ -378,7 +412,9 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
           .read(householdJoinServiceProvider)
           .join(
             oldHouseholdId: oldHouseholdId,
-            code: _code,
+            // Reconnect (ReconnectChoice) carries no invite code at all --
+            // see HouseholdJoinService.join's doc comment.
+            code: choice is ReconnectChoice ? null : _code,
             choice: choice,
             importAccepted: _importAccepted,
           );

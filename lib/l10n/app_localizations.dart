@@ -1064,6 +1064,18 @@ abstract class AppLocalizations {
   /// **'Sync — coming soon'**
   String get settingsAccountComingSoonTitle;
 
+  /// Title of the Account section's P2d reconnect row (spec docs/specs/sync-backend.md §7.6), shown FIRST -- above the adopt/join rows -- whenever this device is signed in, unlinked, and the signed-in account is already a claimed member of a household elsewhere (a returning device: phone reset, new phone).
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect to {householdName}'**
+  String settingsAccountReconnectTitle(String householdName);
+
+  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same archive guarantee as join).
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces your local data — it\'s kept only in an archive file on this device.'**
+  String get settingsAccountReconnectIntro;
+
   /// Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked.
   ///
   /// In en, this message translates to:
