@@ -57,11 +57,14 @@ abstract class SyncEngine {
   /// throws -- every failure is swallowed into a silent retry-later.
   Future<void> pullSince();
 
-  /// Begins the ongoing triggers: an immediate pull, a listener that
-  /// schedules a debounced [pushDirty] on any local write to a synced
-  /// table, and a realtime subscription that schedules a [pullSince] on any
-  /// server-side change (spec §8.3). Idempotent -- a second call while
-  /// already started is a no-op.
+  /// Begins the ongoing triggers: an immediate [pushDirty] (which itself
+  /// pulls afterward on success -- this is also what recovers rows left
+  /// dirty from a prior session that never got pushed, e.g. after a cold
+  /// start while linked), a listener that schedules a debounced
+  /// [pushDirty] on any local write to a synced table, and a realtime
+  /// subscription that schedules a [pullSince] on any server-side change
+  /// (spec §8.3). Idempotent -- a second call while already started is a
+  /// no-op.
   void start();
 
   /// Disarms everything [start] armed (timers, subscriptions). Idempotent.
@@ -215,8 +218,12 @@ class SupabaseSyncEngine implements SyncEngine {
     _realtimeSubscription = transport
         .householdChanges(householdId)
         .listen((_) => unawaited(pullSince()));
-    // Pull on start (spec §8.3a).
-    unawaited(pullSince());
+    // Push on start (recovers rows left dirty from a prior session that
+    // never got pushed -- e.g. a cold start while linked), which itself
+    // pulls afterward on success (spec §8.3a/c): this covers "pull on
+    // start" too, so a bare pullSince() call here is not enough on its
+    // own.
+    unawaited(pushDirty());
   }
 
   @override
@@ -246,7 +253,12 @@ class SupabaseSyncEngine implements SyncEngine {
       await _pushChoreAssignees();
       await _pushChoreOccurrences();
       await _pushShoppingItems();
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // Catches `Error` subclasses too, not just `Exception` -- spec
+      // §8.3's "every engine error is swallowed" is read literally here:
+      // an uncaught `Error` (e.g. from an unexpected server response
+      // shape) would otherwise propagate to the zone and could be killed
+      // silently, with no debug log at all.
       _logFailure('pushDirty', error, stackTrace);
       return;
     }
@@ -330,7 +342,9 @@ class SupabaseSyncEngine implements SyncEngine {
 
       // Cursor stored only after the transaction above commits (spec §8.3).
       await settings.setSyncLastPulledAt(serverNow);
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // See pushDirty's matching catch for why this is `on Object`, not
+      // `on Exception`.
       _logFailure('pullSince', error, stackTrace);
     }
   }
