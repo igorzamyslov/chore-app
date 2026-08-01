@@ -223,6 +223,14 @@ class Settings extends Table {
   /// see `AppDatabase.migration`.
   TextColumn get syncLinkedAt => text().nullable()();
 
+  /// The user's manual theme override: `'light'` or `'dark'`, or `NULL` to
+  /// follow the OS theme -- see `themeModeProvider` in
+  /// `lib/app/providers.dart`. An unrecognized stored value (future installs
+  /// storing a value this build doesn't know) is treated the same as `NULL`
+  /// by that provider, rather than enforced at the schema level -- mirrors
+  /// [locale]. Added in schemaVersion 7; see `AppDatabase.migration`.
+  TextColumn get themeMode => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

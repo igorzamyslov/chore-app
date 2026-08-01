@@ -175,6 +175,12 @@
   "settingsLanguageEnglish": "English",
   "settingsLanguageDeutsch": "Deutsch",
 
+  "settingsAppearanceEntry": "Erscheinungsbild",
+  "settingsAppearanceSheetTitle": "Erscheinungsbild",
+  "settingsAppearanceSystem": "System",
+  "settingsAppearanceLight": "Hell",
+  "settingsAppearanceDark": "Dunkel",
+
   "settingsAccountSectionTitle": "Konto",
   "settingsAccountIntro": "Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.",
   "settingsAccountEmailLabel": "E-Mail-Adresse",
@@ -203,7 +209,7 @@
   "settingsAboutDonateKofiLabel": "Ko-fi",
   "settingsAboutDonatePaypalLabel": "PayPal",
 
-  "settingsResetSectionTitle": "Gefahrenzone",
+  "settingsDataSectionTitle": "Daten",
   "settingsResetEntry": "App-Daten zurücksetzen",
   "settingsResetConfirm1Title": "App-Daten zurücksetzen?",
   "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.",

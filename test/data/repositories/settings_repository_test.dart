@@ -214,6 +214,55 @@ void main() {
     expect(emissions.last, 'de');
   });
 
+  test('setThemeMode sets the value and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    expect(created.themeMode, isNull);
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setThemeMode('dark');
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.themeMode, 'dark');
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setThemeMode(null) clears a previously-set value', () async {
+    await repo.setThemeMode('light');
+    var row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.themeMode, 'light');
+
+    await repo.setThemeMode(null);
+    row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.themeMode, isNull);
+  });
+
+  test('setThemeMode implicitly creates the row if missing', () async {
+    await repo.setThemeMode('dark');
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.themeMode, 'dark');
+  });
+
+  test('watchSettings emits an updated value after setThemeMode', () async {
+    final emissions = <String?>[];
+    final sub = repo.watchSettings().listen(
+      (settings) => emissions.add(settings.themeMode),
+    );
+    addTearDown(sub.cancel);
+
+    await pumpEventQueue();
+    await repo.setThemeMode('dark');
+    await pumpEventQueue();
+
+    expect(emissions.last, 'dark');
+  });
+
   test(
     'setSyncLinked sets both syncHouseholdId and syncLinkedAt together, and '
     'bumps updated_at',

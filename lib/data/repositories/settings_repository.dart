@@ -191,6 +191,24 @@ class SettingsRepository {
     );
   }
 
+  /// Sets the user's manual theme override (spec
+  /// `docs/feedback/2026-08-01-field-feedback.md` G2): `'light'` or
+  /// `'dark'`, read by `themeModeProvider` (`lib/app/providers.dart`) to
+  /// drive `MaterialApp.themeMode`. Passing `null` clears it back to
+  /// following the OS theme -- this is an explicit `null` write, not "leave
+  /// unchanged", so [Value] wraps it unconditionally.
+  Future<void> setThemeMode(String? themeMode) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        themeMode: Value(themeMode),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,

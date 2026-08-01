@@ -3929,6 +3929,17 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _themeModeMeta = const VerificationMeta(
+    'themeMode',
+  );
+  @override
+  late final GeneratedColumn<String> themeMode = GeneratedColumn<String>(
+    'theme_mode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3962,6 +3973,7 @@ class $SettingsTable extends Settings
     digestPrepromptShownAt,
     syncHouseholdId,
     syncLinkedAt,
+    themeMode,
     createdAt,
     updatedAt,
   ];
@@ -4051,6 +4063,12 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('theme_mode')) {
+      context.handle(
+        _themeModeMeta,
+        themeMode.isAcceptableOrUnknown(data['theme_mode']!, _themeModeMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4111,6 +4129,10 @@ class $SettingsTable extends Settings
       syncLinkedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}sync_linked_at'],
+      ),
+      themeMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}theme_mode'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4187,6 +4209,14 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// see `AppDatabase.migration`.
   final String? syncLinkedAt;
 
+  /// The user's manual theme override: `'light'` or `'dark'`, or `NULL` to
+  /// follow the OS theme -- see `themeModeProvider` in
+  /// `lib/app/providers.dart`. An unrecognized stored value (future installs
+  /// storing a value this build doesn't know) is treated the same as `NULL`
+  /// by that provider, rather than enforced at the schema level -- mirrors
+  /// [locale]. Added in schemaVersion 7; see `AppDatabase.migration`.
+  final String? themeMode;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4202,6 +4232,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.digestPrepromptShownAt,
     this.syncHouseholdId,
     this.syncLinkedAt,
+    this.themeMode,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4233,6 +4264,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     if (!nullToAbsent || syncLinkedAt != null) {
       map['sync_linked_at'] = Variable<String>(syncLinkedAt);
     }
+    if (!nullToAbsent || themeMode != null) {
+      map['theme_mode'] = Variable<String>(themeMode);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4262,6 +4296,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLinkedAt: syncLinkedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(syncLinkedAt),
+      themeMode: themeMode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(themeMode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4286,6 +4323,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       ),
       syncHouseholdId: serializer.fromJson<String?>(json['syncHouseholdId']),
       syncLinkedAt: serializer.fromJson<String?>(json['syncLinkedAt']),
+      themeMode: serializer.fromJson<String?>(json['themeMode']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4307,6 +4345,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       ),
       'syncHouseholdId': serializer.toJson<String?>(syncHouseholdId),
       'syncLinkedAt': serializer.toJson<String?>(syncLinkedAt),
+      'themeMode': serializer.toJson<String?>(themeMode),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4322,6 +4361,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> digestPrepromptShownAt = const Value.absent(),
     Value<String?> syncHouseholdId = const Value.absent(),
     Value<String?> syncLinkedAt = const Value.absent(),
+    Value<String?> themeMode = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4342,6 +4382,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         ? syncHouseholdId.value
         : this.syncHouseholdId,
     syncLinkedAt: syncLinkedAt.present ? syncLinkedAt.value : this.syncLinkedAt,
+    themeMode: themeMode.present ? themeMode.value : this.themeMode,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4370,6 +4411,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLinkedAt: data.syncLinkedAt.present
           ? data.syncLinkedAt.value
           : this.syncLinkedAt,
+      themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4387,6 +4429,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
           ..write('syncHouseholdId: $syncHouseholdId, ')
           ..write('syncLinkedAt: $syncLinkedAt, ')
+          ..write('themeMode: $themeMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4404,6 +4447,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     digestPrepromptShownAt,
     syncHouseholdId,
     syncLinkedAt,
+    themeMode,
     createdAt,
     updatedAt,
   );
@@ -4421,6 +4465,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.digestPrepromptShownAt == this.digestPrepromptShownAt &&
           other.syncHouseholdId == this.syncHouseholdId &&
           other.syncLinkedAt == this.syncLinkedAt &&
+          other.themeMode == this.themeMode &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4435,6 +4480,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> digestPrepromptShownAt;
   final Value<String?> syncHouseholdId;
   final Value<String?> syncLinkedAt;
+  final Value<String?> themeMode;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4448,6 +4494,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestPrepromptShownAt = const Value.absent(),
     this.syncHouseholdId = const Value.absent(),
     this.syncLinkedAt = const Value.absent(),
+    this.themeMode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4462,6 +4509,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.digestPrepromptShownAt = const Value.absent(),
     this.syncHouseholdId = const Value.absent(),
     this.syncLinkedAt = const Value.absent(),
+    this.themeMode = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4478,6 +4526,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? digestPrepromptShownAt,
     Expression<String>? syncHouseholdId,
     Expression<String>? syncLinkedAt,
+    Expression<String>? themeMode,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4494,6 +4543,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         'digest_preprompt_shown_at': digestPrepromptShownAt,
       if (syncHouseholdId != null) 'sync_household_id': syncHouseholdId,
       if (syncLinkedAt != null) 'sync_linked_at': syncLinkedAt,
+      if (themeMode != null) 'theme_mode': themeMode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4510,6 +4560,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? digestPrepromptShownAt,
     Value<String?>? syncHouseholdId,
     Value<String?>? syncLinkedAt,
+    Value<String?>? themeMode,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4526,6 +4577,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           digestPrepromptShownAt ?? this.digestPrepromptShownAt,
       syncHouseholdId: syncHouseholdId ?? this.syncHouseholdId,
       syncLinkedAt: syncLinkedAt ?? this.syncLinkedAt,
+      themeMode: themeMode ?? this.themeMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4566,6 +4618,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (syncLinkedAt.present) {
       map['sync_linked_at'] = Variable<String>(syncLinkedAt.value);
     }
+    if (themeMode.present) {
+      map['theme_mode'] = Variable<String>(themeMode.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -4590,6 +4645,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('digestPrepromptShownAt: $digestPrepromptShownAt, ')
           ..write('syncHouseholdId: $syncHouseholdId, ')
           ..write('syncLinkedAt: $syncLinkedAt, ')
+          ..write('themeMode: $themeMode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8911,6 +8967,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> digestPrepromptShownAt,
       Value<String?> syncHouseholdId,
       Value<String?> syncLinkedAt,
+      Value<String?> themeMode,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8926,6 +8983,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> digestPrepromptShownAt,
       Value<String?> syncHouseholdId,
       Value<String?> syncLinkedAt,
+      Value<String?> themeMode,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -8982,6 +9040,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get syncLinkedAt => $composableBuilder(
     column: $table.syncLinkedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9050,6 +9113,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9111,6 +9179,9 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get themeMode =>
+      $composableBuilder(column: $table.themeMode, builder: (column) => column);
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9159,6 +9230,7 @@ class $$SettingsTableTableManager
                 Value<String?> digestPrepromptShownAt = const Value.absent(),
                 Value<String?> syncHouseholdId = const Value.absent(),
                 Value<String?> syncLinkedAt = const Value.absent(),
+                Value<String?> themeMode = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9172,6 +9244,7 @@ class $$SettingsTableTableManager
                 digestPrepromptShownAt: digestPrepromptShownAt,
                 syncHouseholdId: syncHouseholdId,
                 syncLinkedAt: syncLinkedAt,
+                themeMode: themeMode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9188,6 +9261,7 @@ class $$SettingsTableTableManager
                 Value<String?> digestPrepromptShownAt = const Value.absent(),
                 Value<String?> syncHouseholdId = const Value.absent(),
                 Value<String?> syncLinkedAt = const Value.absent(),
+                Value<String?> themeMode = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -9201,6 +9275,7 @@ class $$SettingsTableTableManager
                 digestPrepromptShownAt: digestPrepromptShownAt,
                 syncHouseholdId: syncHouseholdId,
                 syncLinkedAt: syncLinkedAt,
+                themeMode: themeMode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

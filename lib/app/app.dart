@@ -28,6 +28,7 @@ class ChoreApp extends ConsumerWidget {
       locale: ref.watch(localeOverrideProvider),
       theme: appLightTheme,
       darkTheme: appDarkTheme,
+      themeMode: ref.watch(themeModeProvider),
       home: bootstrap.when(
         data: (_) => const AppShell(),
         loading: () => const Scaffold(

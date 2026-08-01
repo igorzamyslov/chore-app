@@ -914,6 +914,36 @@ abstract class AppLocalizations {
   /// **'Deutsch'**
   String get settingsLanguageDeutsch;
 
+  /// Settings screen list entry that opens the theme picker sheet (spec docs/feedback/2026-08-01-field-feedback.md G2), shown directly below the Language row. Its subtitle shows the current choice (System / Light / Dark).
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearanceEntry;
+
+  /// Heading of the appearance picker bottom sheet opened from the settingsAppearanceEntry row.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearanceSheetTitle;
+
+  /// Appearance picker option (and settingsAppearanceEntry subtitle) meaning 'follow the OS theme' -- a stored settings.themeMode of NULL.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsAppearanceSystem;
+
+  /// Appearance picker option (and settingsAppearanceEntry subtitle) for the light theme -- a stored settings.themeMode of 'light'.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsAppearanceLight;
+
+  /// Appearance picker option (and settingsAppearanceEntry subtitle) for the dark theme -- a stored settings.themeMode of 'dark'.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsAppearanceDark;
+
   /// Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section.
   ///
   /// In en, this message translates to:
@@ -1070,11 +1100,11 @@ abstract class AppLocalizations {
   /// **'PayPal'**
   String get settingsAboutDonatePaypalLabel;
 
-  /// Section header above the destructive reset row (spec docs/specs/polish-round-1.md B2), at the very bottom of Settings -- exists purely to visually separate it from every section above.
+  /// Settings screen section header above the export row and the destructive reset row (spec docs/feedback/2026-08-01-field-feedback.md B4/F7), grouping both at the very bottom of Settings.
   ///
   /// In en, this message translates to:
-  /// **'Danger zone'**
-  String get settingsResetSectionTitle;
+  /// **'Data'**
+  String get settingsDataSectionTitle;
 
   /// The destructive Settings row (spec docs/specs/polish-round-1.md B2) that starts the double-confirm reset flow.
   ///
