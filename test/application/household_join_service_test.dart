@@ -46,6 +46,7 @@ void main() {
           name: 'Joined household',
           createdAt: 't0',
           updatedAt: 't0',
+          syncDirty: false,
         ),
       );
     final service = HouseholdJoinService(

@@ -9,6 +9,21 @@ class $HouseholdsTable extends Households
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $HouseholdsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -50,7 +65,13 @@ class $HouseholdsTable extends Households
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, createdAt, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    syncDirty,
+    id,
+    name,
+    createdAt,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -63,6 +84,12 @@ class $HouseholdsTable extends Households
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -101,6 +128,10 @@ class $HouseholdsTable extends Households
   Household map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Household(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -127,6 +158,12 @@ class $HouseholdsTable extends Households
 }
 
 class Household extends DataClass implements Insertable<Household> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -139,6 +176,7 @@ class Household extends DataClass implements Insertable<Household> {
   /// ISO-8601 UTC timestamp of the last update.
   final String updatedAt;
   const Household({
+    required this.syncDirty,
     required this.id,
     required this.name,
     required this.createdAt,
@@ -147,6 +185,7 @@ class Household extends DataClass implements Insertable<Household> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_at'] = Variable<String>(createdAt);
@@ -156,6 +195,7 @@ class Household extends DataClass implements Insertable<Household> {
 
   HouseholdsCompanion toCompanion(bool nullToAbsent) {
     return HouseholdsCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       name: Value(name),
       createdAt: Value(createdAt),
@@ -169,6 +209,7 @@ class Household extends DataClass implements Insertable<Household> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Household(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
@@ -179,6 +220,7 @@ class Household extends DataClass implements Insertable<Household> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdAt': serializer.toJson<String>(createdAt),
@@ -187,11 +229,13 @@ class Household extends DataClass implements Insertable<Household> {
   }
 
   Household copyWith({
+    bool? syncDirty,
     String? id,
     String? name,
     String? createdAt,
     String? updatedAt,
   }) => Household(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
@@ -199,6 +243,7 @@ class Household extends DataClass implements Insertable<Household> {
   );
   Household copyWithCompanion(HouseholdsCompanion data) {
     return Household(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -209,6 +254,7 @@ class Household extends DataClass implements Insertable<Household> {
   @override
   String toString() {
     return (StringBuffer('Household(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
@@ -218,11 +264,12 @@ class Household extends DataClass implements Insertable<Household> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, createdAt, updatedAt);
+  int get hashCode => Object.hash(syncDirty, id, name, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Household &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.name == this.name &&
           other.createdAt == this.createdAt &&
@@ -230,12 +277,14 @@ class Household extends DataClass implements Insertable<Household> {
 }
 
 class HouseholdsCompanion extends UpdateCompanion<Household> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> name;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
   const HouseholdsCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -243,6 +292,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
     this.rowid = const Value.absent(),
   });
   HouseholdsCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String name,
     required String createdAt,
@@ -253,6 +303,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Household> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? createdAt,
@@ -260,6 +311,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdAt != null) 'created_at': createdAt,
@@ -269,6 +321,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
   }
 
   HouseholdsCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? name,
     Value<String>? createdAt,
@@ -276,6 +329,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
     Value<int>? rowid,
   }) {
     return HouseholdsCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
@@ -287,6 +341,9 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -308,6 +365,7 @@ class HouseholdsCompanion extends UpdateCompanion<Household> {
   @override
   String toString() {
     return (StringBuffer('HouseholdsCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
@@ -323,6 +381,21 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $MembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -406,6 +479,7 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    syncDirty,
     id,
     householdId,
     name,
@@ -427,6 +501,12 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -490,6 +570,10 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
   Member map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Member(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -537,6 +621,12 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
 }
 
 class Member extends DataClass implements Insertable<Member> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -561,6 +651,7 @@ class Member extends DataClass implements Insertable<Member> {
   /// ISO-8601 UTC timestamp of the last update.
   final String updatedAt;
   const Member({
+    required this.syncDirty,
     required this.id,
     required this.householdId,
     required this.name,
@@ -573,6 +664,7 @@ class Member extends DataClass implements Insertable<Member> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['household_id'] = Variable<String>(householdId);
     map['name'] = Variable<String>(name);
@@ -590,6 +682,7 @@ class Member extends DataClass implements Insertable<Member> {
 
   MembersCompanion toCompanion(bool nullToAbsent) {
     return MembersCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       householdId: Value(householdId),
       name: Value(name),
@@ -609,6 +702,7 @@ class Member extends DataClass implements Insertable<Member> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Member(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       householdId: serializer.fromJson<String>(json['householdId']),
       name: serializer.fromJson<String>(json['name']),
@@ -625,6 +719,7 @@ class Member extends DataClass implements Insertable<Member> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'householdId': serializer.toJson<String>(householdId),
       'name': serializer.toJson<String>(name),
@@ -639,6 +734,7 @@ class Member extends DataClass implements Insertable<Member> {
   }
 
   Member copyWith({
+    bool? syncDirty,
     String? id,
     String? householdId,
     String? name,
@@ -648,6 +744,7 @@ class Member extends DataClass implements Insertable<Member> {
     String? createdAt,
     String? updatedAt,
   }) => Member(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     householdId: householdId ?? this.householdId,
     name: name ?? this.name,
@@ -659,6 +756,7 @@ class Member extends DataClass implements Insertable<Member> {
   );
   Member copyWithCompanion(MembersCompanion data) {
     return Member(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       householdId: data.householdId.present
           ? data.householdId.value
@@ -675,6 +773,7 @@ class Member extends DataClass implements Insertable<Member> {
   @override
   String toString() {
     return (StringBuffer('Member(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('name: $name, ')
@@ -689,6 +788,7 @@ class Member extends DataClass implements Insertable<Member> {
 
   @override
   int get hashCode => Object.hash(
+    syncDirty,
     id,
     householdId,
     name,
@@ -702,6 +802,7 @@ class Member extends DataClass implements Insertable<Member> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Member &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.householdId == this.householdId &&
           other.name == this.name &&
@@ -713,6 +814,7 @@ class Member extends DataClass implements Insertable<Member> {
 }
 
 class MembersCompanion extends UpdateCompanion<Member> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> householdId;
   final Value<String> name;
@@ -723,6 +825,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
   final Value<String> updatedAt;
   final Value<int> rowid;
   const MembersCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.householdId = const Value.absent(),
     this.name = const Value.absent(),
@@ -734,6 +837,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     this.rowid = const Value.absent(),
   });
   MembersCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String householdId,
     required String name,
@@ -751,6 +855,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Member> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? householdId,
     Expression<String>? name,
@@ -762,6 +867,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (householdId != null) 'household_id': householdId,
       if (name != null) 'name': name,
@@ -775,6 +881,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
   }
 
   MembersCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? householdId,
     Value<String>? name,
@@ -786,6 +893,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     Value<int>? rowid,
   }) {
     return MembersCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       householdId: householdId ?? this.householdId,
       name: name ?? this.name,
@@ -801,6 +909,9 @@ class MembersCompanion extends UpdateCompanion<Member> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -836,6 +947,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
   @override
   String toString() {
     return (StringBuffer('MembersCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('name: $name, ')
@@ -856,6 +968,21 @@ class $CategoriesTable extends Categories
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $CategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -962,6 +1089,7 @@ class $CategoriesTable extends Categories
   );
   @override
   List<GeneratedColumn> get $columns => [
+    syncDirty,
     id,
     householdId,
     kind,
@@ -985,6 +1113,12 @@ class $CategoriesTable extends Categories
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -1062,6 +1196,10 @@ class $CategoriesTable extends Categories
   Category map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Category(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -1117,6 +1255,12 @@ class $CategoriesTable extends Categories
 }
 
 class Category extends DataClass implements Insertable<Category> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -1147,6 +1291,7 @@ class Category extends DataClass implements Insertable<Category> {
   /// ISO-8601 UTC soft-delete timestamp; `NULL` means active.
   final String? deletedAt;
   const Category({
+    required this.syncDirty,
     required this.id,
     required this.householdId,
     required this.kind,
@@ -1161,6 +1306,7 @@ class Category extends DataClass implements Insertable<Category> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['household_id'] = Variable<String>(householdId);
     {
@@ -1182,6 +1328,7 @@ class Category extends DataClass implements Insertable<Category> {
 
   CategoriesCompanion toCompanion(bool nullToAbsent) {
     return CategoriesCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       householdId: Value(householdId),
       kind: Value(kind),
@@ -1203,6 +1350,7 @@ class Category extends DataClass implements Insertable<Category> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Category(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       householdId: serializer.fromJson<String>(json['householdId']),
       kind: $CategoriesTable.$converterkind.fromJson(
@@ -1221,6 +1369,7 @@ class Category extends DataClass implements Insertable<Category> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'householdId': serializer.toJson<String>(householdId),
       'kind': serializer.toJson<String>(
@@ -1237,6 +1386,7 @@ class Category extends DataClass implements Insertable<Category> {
   }
 
   Category copyWith({
+    bool? syncDirty,
     String? id,
     String? householdId,
     CategoryKind? kind,
@@ -1248,6 +1398,7 @@ class Category extends DataClass implements Insertable<Category> {
     String? updatedAt,
     Value<String?> deletedAt = const Value.absent(),
   }) => Category(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     householdId: householdId ?? this.householdId,
     kind: kind ?? this.kind,
@@ -1261,6 +1412,7 @@ class Category extends DataClass implements Insertable<Category> {
   );
   Category copyWithCompanion(CategoriesCompanion data) {
     return Category(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       householdId: data.householdId.present
           ? data.householdId.value
@@ -1279,6 +1431,7 @@ class Category extends DataClass implements Insertable<Category> {
   @override
   String toString() {
     return (StringBuffer('Category(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('kind: $kind, ')
@@ -1295,6 +1448,7 @@ class Category extends DataClass implements Insertable<Category> {
 
   @override
   int get hashCode => Object.hash(
+    syncDirty,
     id,
     householdId,
     kind,
@@ -1310,6 +1464,7 @@ class Category extends DataClass implements Insertable<Category> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Category &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.householdId == this.householdId &&
           other.kind == this.kind &&
@@ -1323,6 +1478,7 @@ class Category extends DataClass implements Insertable<Category> {
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> householdId;
   final Value<CategoryKind> kind;
@@ -1335,6 +1491,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String?> deletedAt;
   final Value<int> rowid;
   const CategoriesCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.householdId = const Value.absent(),
     this.kind = const Value.absent(),
@@ -1348,6 +1505,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.rowid = const Value.absent(),
   });
   CategoriesCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String householdId,
     required CategoryKind kind,
@@ -1368,6 +1526,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Category> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? householdId,
     Expression<String>? kind,
@@ -1381,6 +1540,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (householdId != null) 'household_id': householdId,
       if (kind != null) 'kind': kind,
@@ -1396,6 +1556,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   }
 
   CategoriesCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? householdId,
     Value<CategoryKind>? kind,
@@ -1409,6 +1570,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Value<int>? rowid,
   }) {
     return CategoriesCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       householdId: householdId ?? this.householdId,
       kind: kind ?? this.kind,
@@ -1426,6 +1588,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -1467,6 +1632,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   @override
   String toString() {
     return (StringBuffer('CategoriesCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('kind: $kind, ')
@@ -1488,6 +1654,21 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ChoresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -1630,6 +1811,7 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    syncDirty,
     id,
     householdId,
     title,
@@ -1656,6 +1838,12 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -1735,6 +1923,10 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
   Chore map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Chore(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -1810,6 +2002,12 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
 }
 
 class Chore extends DataClass implements Insertable<Chore> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -1850,6 +2048,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   /// ISO-8601 UTC soft-delete timestamp; `NULL` means active.
   final String? deletedAt;
   const Chore({
+    required this.syncDirty,
     required this.id,
     required this.householdId,
     required this.title,
@@ -1867,6 +2066,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['household_id'] = Variable<String>(householdId);
     map['title'] = Variable<String>(title);
@@ -1907,6 +2107,7 @@ class Chore extends DataClass implements Insertable<Chore> {
 
   ChoresCompanion toCompanion(bool nullToAbsent) {
     return ChoresCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       householdId: Value(householdId),
       title: Value(title),
@@ -1941,6 +2142,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Chore(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       householdId: serializer.fromJson<String>(json['householdId']),
       title: serializer.fromJson<String>(json['title']),
@@ -1962,6 +2164,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'householdId': serializer.toJson<String>(householdId),
       'title': serializer.toJson<String>(title),
@@ -1981,6 +2184,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   }
 
   Chore copyWith({
+    bool? syncDirty,
     String? id,
     String? householdId,
     String? title,
@@ -1995,6 +2199,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     String? updatedAt,
     Value<String?> deletedAt = const Value.absent(),
   }) => Chore(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     householdId: householdId ?? this.householdId,
     title: title ?? this.title,
@@ -2011,6 +2216,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   );
   Chore copyWithCompanion(ChoresCompanion data) {
     return Chore(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       householdId: data.householdId.present
           ? data.householdId.value
@@ -2038,6 +2244,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   @override
   String toString() {
     return (StringBuffer('Chore(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('title: $title, ')
@@ -2057,6 +2264,7 @@ class Chore extends DataClass implements Insertable<Chore> {
 
   @override
   int get hashCode => Object.hash(
+    syncDirty,
     id,
     householdId,
     title,
@@ -2075,6 +2283,7 @@ class Chore extends DataClass implements Insertable<Chore> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Chore &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.householdId == this.householdId &&
           other.title == this.title &&
@@ -2091,6 +2300,7 @@ class Chore extends DataClass implements Insertable<Chore> {
 }
 
 class ChoresCompanion extends UpdateCompanion<Chore> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> householdId;
   final Value<String> title;
@@ -2106,6 +2316,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   final Value<String?> deletedAt;
   final Value<int> rowid;
   const ChoresCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.householdId = const Value.absent(),
     this.title = const Value.absent(),
@@ -2122,6 +2333,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     this.rowid = const Value.absent(),
   });
   ChoresCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String householdId,
     required String title,
@@ -2144,6 +2356,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Chore> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? householdId,
     Expression<String>? title,
@@ -2160,6 +2373,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (householdId != null) 'household_id': householdId,
       if (title != null) 'title': title,
@@ -2178,6 +2392,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   }
 
   ChoresCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? householdId,
     Value<String>? title,
@@ -2194,6 +2409,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Value<int>? rowid,
   }) {
     return ChoresCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       householdId: householdId ?? this.householdId,
       title: title ?? this.title,
@@ -2214,6 +2430,9 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -2268,6 +2487,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   @override
   String toString() {
     return (StringBuffer('ChoresCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('title: $title, ')
@@ -2293,6 +2513,21 @@ class $ChoreAssigneesTable extends ChoreAssignees
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ChoreAssigneesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _choreIdMeta = const VerificationMeta(
     'choreId',
   );
@@ -2333,7 +2568,12 @@ class $ChoreAssigneesTable extends ChoreAssignees
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [choreId, memberId, position];
+  List<GeneratedColumn> get $columns => [
+    syncDirty,
+    choreId,
+    memberId,
+    position,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2346,6 +2586,12 @@ class $ChoreAssigneesTable extends ChoreAssignees
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('chore_id')) {
       context.handle(
         _choreIdMeta,
@@ -2379,6 +2625,10 @@ class $ChoreAssigneesTable extends ChoreAssignees
   ChoreAssignee map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ChoreAssignee(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       choreId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}chore_id'],
@@ -2401,6 +2651,12 @@ class $ChoreAssigneesTable extends ChoreAssignees
 }
 
 class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// The chore being assigned.
   final String choreId;
 
@@ -2410,6 +2666,7 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   /// 0-based rotation order.
   final int position;
   const ChoreAssignee({
+    required this.syncDirty,
     required this.choreId,
     required this.memberId,
     required this.position,
@@ -2417,6 +2674,7 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['chore_id'] = Variable<String>(choreId);
     map['member_id'] = Variable<String>(memberId);
     map['position'] = Variable<int>(position);
@@ -2425,6 +2683,7 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
 
   ChoreAssigneesCompanion toCompanion(bool nullToAbsent) {
     return ChoreAssigneesCompanion(
+      syncDirty: Value(syncDirty),
       choreId: Value(choreId),
       memberId: Value(memberId),
       position: Value(position),
@@ -2437,6 +2696,7 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChoreAssignee(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       choreId: serializer.fromJson<String>(json['choreId']),
       memberId: serializer.fromJson<String>(json['memberId']),
       position: serializer.fromJson<int>(json['position']),
@@ -2446,20 +2706,27 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'choreId': serializer.toJson<String>(choreId),
       'memberId': serializer.toJson<String>(memberId),
       'position': serializer.toJson<int>(position),
     };
   }
 
-  ChoreAssignee copyWith({String? choreId, String? memberId, int? position}) =>
-      ChoreAssignee(
-        choreId: choreId ?? this.choreId,
-        memberId: memberId ?? this.memberId,
-        position: position ?? this.position,
-      );
+  ChoreAssignee copyWith({
+    bool? syncDirty,
+    String? choreId,
+    String? memberId,
+    int? position,
+  }) => ChoreAssignee(
+    syncDirty: syncDirty ?? this.syncDirty,
+    choreId: choreId ?? this.choreId,
+    memberId: memberId ?? this.memberId,
+    position: position ?? this.position,
+  );
   ChoreAssignee copyWithCompanion(ChoreAssigneesCompanion data) {
     return ChoreAssignee(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       choreId: data.choreId.present ? data.choreId.value : this.choreId,
       memberId: data.memberId.present ? data.memberId.value : this.memberId,
       position: data.position.present ? data.position.value : this.position,
@@ -2469,6 +2736,7 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   @override
   String toString() {
     return (StringBuffer('ChoreAssignee(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('choreId: $choreId, ')
           ..write('memberId: $memberId, ')
           ..write('position: $position')
@@ -2477,28 +2745,32 @@ class ChoreAssignee extends DataClass implements Insertable<ChoreAssignee> {
   }
 
   @override
-  int get hashCode => Object.hash(choreId, memberId, position);
+  int get hashCode => Object.hash(syncDirty, choreId, memberId, position);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChoreAssignee &&
+          other.syncDirty == this.syncDirty &&
           other.choreId == this.choreId &&
           other.memberId == this.memberId &&
           other.position == this.position);
 }
 
 class ChoreAssigneesCompanion extends UpdateCompanion<ChoreAssignee> {
+  final Value<bool> syncDirty;
   final Value<String> choreId;
   final Value<String> memberId;
   final Value<int> position;
   final Value<int> rowid;
   const ChoreAssigneesCompanion({
+    this.syncDirty = const Value.absent(),
     this.choreId = const Value.absent(),
     this.memberId = const Value.absent(),
     this.position = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ChoreAssigneesCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String choreId,
     required String memberId,
     required int position,
@@ -2507,12 +2779,14 @@ class ChoreAssigneesCompanion extends UpdateCompanion<ChoreAssignee> {
        memberId = Value(memberId),
        position = Value(position);
   static Insertable<ChoreAssignee> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? choreId,
     Expression<String>? memberId,
     Expression<int>? position,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (choreId != null) 'chore_id': choreId,
       if (memberId != null) 'member_id': memberId,
       if (position != null) 'position': position,
@@ -2521,12 +2795,14 @@ class ChoreAssigneesCompanion extends UpdateCompanion<ChoreAssignee> {
   }
 
   ChoreAssigneesCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? choreId,
     Value<String>? memberId,
     Value<int>? position,
     Value<int>? rowid,
   }) {
     return ChoreAssigneesCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       choreId: choreId ?? this.choreId,
       memberId: memberId ?? this.memberId,
       position: position ?? this.position,
@@ -2537,6 +2813,9 @@ class ChoreAssigneesCompanion extends UpdateCompanion<ChoreAssignee> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (choreId.present) {
       map['chore_id'] = Variable<String>(choreId.value);
     }
@@ -2555,6 +2834,7 @@ class ChoreAssigneesCompanion extends UpdateCompanion<ChoreAssignee> {
   @override
   String toString() {
     return (StringBuffer('ChoreAssigneesCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('choreId: $choreId, ')
           ..write('memberId: $memberId, ')
           ..write('position: $position, ')
@@ -2570,6 +2850,21 @@ class $ChoreOccurrencesTable extends ChoreOccurrences
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ChoreOccurrencesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -2675,6 +2970,7 @@ class $ChoreOccurrencesTable extends ChoreOccurrences
   );
   @override
   List<GeneratedColumn> get $columns => [
+    syncDirty,
     id,
     choreId,
     dueDate,
@@ -2697,6 +2993,12 @@ class $ChoreOccurrencesTable extends ChoreOccurrences
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -2753,6 +3055,10 @@ class $ChoreOccurrencesTable extends ChoreOccurrences
   ChoreOccurrence map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ChoreOccurrence(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -2812,6 +3118,12 @@ class $ChoreOccurrencesTable extends ChoreOccurrences
 }
 
 class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -2839,6 +3151,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   /// ISO-8601 UTC timestamp of the last update.
   final String updatedAt;
   const ChoreOccurrence({
+    required this.syncDirty,
     required this.id,
     required this.choreId,
     required this.dueDate,
@@ -2852,6 +3165,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['chore_id'] = Variable<String>(choreId);
     {
@@ -2882,6 +3196,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
 
   ChoreOccurrencesCompanion toCompanion(bool nullToAbsent) {
     return ChoreOccurrencesCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       choreId: Value(choreId),
       dueDate: Value(dueDate),
@@ -2906,6 +3221,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChoreOccurrence(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       choreId: serializer.fromJson<String>(json['choreId']),
       dueDate: serializer.fromJson<PlainDate>(json['dueDate']),
@@ -2923,6 +3239,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'choreId': serializer.toJson<String>(choreId),
       'dueDate': serializer.toJson<PlainDate>(dueDate),
@@ -2938,6 +3255,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   }
 
   ChoreOccurrence copyWith({
+    bool? syncDirty,
     String? id,
     String? choreId,
     PlainDate? dueDate,
@@ -2948,6 +3266,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
     String? createdAt,
     String? updatedAt,
   }) => ChoreOccurrence(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     choreId: choreId ?? this.choreId,
     dueDate: dueDate ?? this.dueDate,
@@ -2962,6 +3281,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   );
   ChoreOccurrence copyWithCompanion(ChoreOccurrencesCompanion data) {
     return ChoreOccurrence(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       choreId: data.choreId.present ? data.choreId.value : this.choreId,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
@@ -2981,6 +3301,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   @override
   String toString() {
     return (StringBuffer('ChoreOccurrence(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('choreId: $choreId, ')
           ..write('dueDate: $dueDate, ')
@@ -2996,6 +3317,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
 
   @override
   int get hashCode => Object.hash(
+    syncDirty,
     id,
     choreId,
     dueDate,
@@ -3010,6 +3332,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChoreOccurrence &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.choreId == this.choreId &&
           other.dueDate == this.dueDate &&
@@ -3022,6 +3345,7 @@ class ChoreOccurrence extends DataClass implements Insertable<ChoreOccurrence> {
 }
 
 class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> choreId;
   final Value<PlainDate> dueDate;
@@ -3033,6 +3357,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
   final Value<String> updatedAt;
   final Value<int> rowid;
   const ChoreOccurrencesCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.choreId = const Value.absent(),
     this.dueDate = const Value.absent(),
@@ -3045,6 +3370,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
     this.rowid = const Value.absent(),
   });
   ChoreOccurrencesCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String choreId,
     required PlainDate dueDate,
@@ -3061,6 +3387,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<ChoreOccurrence> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? choreId,
     Expression<String>? dueDate,
@@ -3073,6 +3400,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (choreId != null) 'chore_id': choreId,
       if (dueDate != null) 'due_date': dueDate,
@@ -3087,6 +3415,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
   }
 
   ChoreOccurrencesCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? choreId,
     Value<PlainDate>? dueDate,
@@ -3099,6 +3428,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
     Value<int>? rowid,
   }) {
     return ChoreOccurrencesCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       choreId: choreId ?? this.choreId,
       dueDate: dueDate ?? this.dueDate,
@@ -3115,6 +3445,9 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -3157,6 +3490,7 @@ class ChoreOccurrencesCompanion extends UpdateCompanion<ChoreOccurrence> {
   @override
   String toString() {
     return (StringBuffer('ChoreOccurrencesCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('choreId: $choreId, ')
           ..write('dueDate: $dueDate, ')
@@ -3178,6 +3512,21 @@ class $ShoppingItemsTable extends ShoppingItems
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ShoppingItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncDirtyMeta = const VerificationMeta(
+    'syncDirty',
+  );
+  @override
+  late final GeneratedColumn<bool> syncDirty = GeneratedColumn<bool>(
+    'sync_dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("sync_dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -3295,6 +3644,7 @@ class $ShoppingItemsTable extends ShoppingItems
   );
   @override
   List<GeneratedColumn> get $columns => [
+    syncDirty,
     id,
     householdId,
     name,
@@ -3318,6 +3668,12 @@ class $ShoppingItemsTable extends ShoppingItems
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('sync_dirty')) {
+      context.handle(
+        _syncDirtyMeta,
+        syncDirty.isAcceptableOrUnknown(data['sync_dirty']!, _syncDirtyMeta),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -3400,6 +3756,10 @@ class $ShoppingItemsTable extends ShoppingItems
   ShoppingItem map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ShoppingItem(
+      syncDirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}sync_dirty'],
+      )!,
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -3450,6 +3810,12 @@ class $ShoppingItemsTable extends ShoppingItems
 }
 
 class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  final bool syncDirty;
+
   /// UUIDv4 primary key.
   final String id;
 
@@ -3480,6 +3846,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   /// ISO-8601 UTC soft-delete timestamp; `NULL` means active.
   final String? deletedAt;
   const ShoppingItem({
+    required this.syncDirty,
     required this.id,
     required this.householdId,
     required this.name,
@@ -3494,6 +3861,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['sync_dirty'] = Variable<bool>(syncDirty);
     map['id'] = Variable<String>(id);
     map['household_id'] = Variable<String>(householdId);
     map['name'] = Variable<String>(name);
@@ -3519,6 +3887,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
 
   ShoppingItemsCompanion toCompanion(bool nullToAbsent) {
     return ShoppingItemsCompanion(
+      syncDirty: Value(syncDirty),
       id: Value(id),
       householdId: Value(householdId),
       name: Value(name),
@@ -3548,6 +3917,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ShoppingItem(
+      syncDirty: serializer.fromJson<bool>(json['syncDirty']),
       id: serializer.fromJson<String>(json['id']),
       householdId: serializer.fromJson<String>(json['householdId']),
       name: serializer.fromJson<String>(json['name']),
@@ -3564,6 +3934,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'syncDirty': serializer.toJson<bool>(syncDirty),
       'id': serializer.toJson<String>(id),
       'householdId': serializer.toJson<String>(householdId),
       'name': serializer.toJson<String>(name),
@@ -3578,6 +3949,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   }
 
   ShoppingItem copyWith({
+    bool? syncDirty,
     String? id,
     String? householdId,
     String? name,
@@ -3589,6 +3961,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
     String? updatedAt,
     Value<String?> deletedAt = const Value.absent(),
   }) => ShoppingItem(
+    syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
     householdId: householdId ?? this.householdId,
     name: name ?? this.name,
@@ -3602,6 +3975,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   );
   ShoppingItem copyWithCompanion(ShoppingItemsCompanion data) {
     return ShoppingItem(
+      syncDirty: data.syncDirty.present ? data.syncDirty.value : this.syncDirty,
       id: data.id.present ? data.id.value : this.id,
       householdId: data.householdId.present
           ? data.householdId.value
@@ -3624,6 +3998,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   @override
   String toString() {
     return (StringBuffer('ShoppingItem(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('name: $name, ')
@@ -3640,6 +4015,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
 
   @override
   int get hashCode => Object.hash(
+    syncDirty,
     id,
     householdId,
     name,
@@ -3655,6 +4031,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ShoppingItem &&
+          other.syncDirty == this.syncDirty &&
           other.id == this.id &&
           other.householdId == this.householdId &&
           other.name == this.name &&
@@ -3668,6 +4045,7 @@ class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
 }
 
 class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
+  final Value<bool> syncDirty;
   final Value<String> id;
   final Value<String> householdId;
   final Value<String> name;
@@ -3680,6 +4058,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
   final Value<String?> deletedAt;
   final Value<int> rowid;
   const ShoppingItemsCompanion({
+    this.syncDirty = const Value.absent(),
     this.id = const Value.absent(),
     this.householdId = const Value.absent(),
     this.name = const Value.absent(),
@@ -3693,6 +4072,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
     this.rowid = const Value.absent(),
   });
   ShoppingItemsCompanion.insert({
+    this.syncDirty = const Value.absent(),
     required String id,
     required String householdId,
     required String name,
@@ -3710,6 +4090,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<ShoppingItem> custom({
+    Expression<bool>? syncDirty,
     Expression<String>? id,
     Expression<String>? householdId,
     Expression<String>? name,
@@ -3723,6 +4104,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (syncDirty != null) 'sync_dirty': syncDirty,
       if (id != null) 'id': id,
       if (householdId != null) 'household_id': householdId,
       if (name != null) 'name': name,
@@ -3738,6 +4120,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
   }
 
   ShoppingItemsCompanion copyWith({
+    Value<bool>? syncDirty,
     Value<String>? id,
     Value<String>? householdId,
     Value<String>? name,
@@ -3751,6 +4134,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
     Value<int>? rowid,
   }) {
     return ShoppingItemsCompanion(
+      syncDirty: syncDirty ?? this.syncDirty,
       id: id ?? this.id,
       householdId: householdId ?? this.householdId,
       name: name ?? this.name,
@@ -3768,6 +4152,9 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (syncDirty.present) {
+      map['sync_dirty'] = Variable<bool>(syncDirty.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -3807,6 +4194,7 @@ class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
   @override
   String toString() {
     return (StringBuffer('ShoppingItemsCompanion(')
+          ..write('syncDirty: $syncDirty, ')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
           ..write('name: $name, ')
@@ -3940,6 +4328,17 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _syncLastPulledAtMeta = const VerificationMeta(
+    'syncLastPulledAt',
+  );
+  @override
+  late final GeneratedColumn<String> syncLastPulledAt = GeneratedColumn<String>(
+    'sync_last_pulled_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3974,6 +4373,7 @@ class $SettingsTable extends Settings
     syncHouseholdId,
     syncLinkedAt,
     themeMode,
+    syncLastPulledAt,
     createdAt,
     updatedAt,
   ];
@@ -4069,6 +4469,15 @@ class $SettingsTable extends Settings
         themeMode.isAcceptableOrUnknown(data['theme_mode']!, _themeModeMeta),
       );
     }
+    if (data.containsKey('sync_last_pulled_at')) {
+      context.handle(
+        _syncLastPulledAtMeta,
+        syncLastPulledAt.isAcceptableOrUnknown(
+          data['sync_last_pulled_at']!,
+          _syncLastPulledAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4133,6 +4542,10 @@ class $SettingsTable extends Settings
       themeMode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}theme_mode'],
+      ),
+      syncLastPulledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_last_pulled_at'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4217,6 +4630,14 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// [locale]. Added in schemaVersion 7; see `AppDatabase.migration`.
   final String? themeMode;
 
+  /// The pull cursor (spec `docs/specs/sync-backend.md` §8.1/8.3): the
+  /// server-clock ISO timestamp fetched via the `server_now()` RPC in the
+  /// same round trip as the last successful pull, or `NULL` before this
+  /// device's first pull. NEVER the device clock -- see
+  /// `SupabaseSyncEngine.pullSince`. Added in schemaVersion 8; see
+  /// `AppDatabase.migration`.
+  final String? syncLastPulledAt;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4233,6 +4654,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.syncHouseholdId,
     this.syncLinkedAt,
     this.themeMode,
+    this.syncLastPulledAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4267,6 +4689,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     if (!nullToAbsent || themeMode != null) {
       map['theme_mode'] = Variable<String>(themeMode);
     }
+    if (!nullToAbsent || syncLastPulledAt != null) {
+      map['sync_last_pulled_at'] = Variable<String>(syncLastPulledAt);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4299,6 +4724,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       themeMode: themeMode == null && nullToAbsent
           ? const Value.absent()
           : Value(themeMode),
+      syncLastPulledAt: syncLastPulledAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncLastPulledAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4324,6 +4752,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncHouseholdId: serializer.fromJson<String?>(json['syncHouseholdId']),
       syncLinkedAt: serializer.fromJson<String?>(json['syncLinkedAt']),
       themeMode: serializer.fromJson<String?>(json['themeMode']),
+      syncLastPulledAt: serializer.fromJson<String?>(json['syncLastPulledAt']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4346,6 +4775,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'syncHouseholdId': serializer.toJson<String?>(syncHouseholdId),
       'syncLinkedAt': serializer.toJson<String?>(syncLinkedAt),
       'themeMode': serializer.toJson<String?>(themeMode),
+      'syncLastPulledAt': serializer.toJson<String?>(syncLastPulledAt),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4362,6 +4792,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> syncHouseholdId = const Value.absent(),
     Value<String?> syncLinkedAt = const Value.absent(),
     Value<String?> themeMode = const Value.absent(),
+    Value<String?> syncLastPulledAt = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4383,6 +4814,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         : this.syncHouseholdId,
     syncLinkedAt: syncLinkedAt.present ? syncLinkedAt.value : this.syncLinkedAt,
     themeMode: themeMode.present ? themeMode.value : this.themeMode,
+    syncLastPulledAt: syncLastPulledAt.present
+        ? syncLastPulledAt.value
+        : this.syncLastPulledAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4412,6 +4846,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ? data.syncLinkedAt.value
           : this.syncLinkedAt,
       themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
+      syncLastPulledAt: data.syncLastPulledAt.present
+          ? data.syncLastPulledAt.value
+          : this.syncLastPulledAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4430,6 +4867,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('syncHouseholdId: $syncHouseholdId, ')
           ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('themeMode: $themeMode, ')
+          ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4448,6 +4886,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     syncHouseholdId,
     syncLinkedAt,
     themeMode,
+    syncLastPulledAt,
     createdAt,
     updatedAt,
   );
@@ -4466,6 +4905,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.syncHouseholdId == this.syncHouseholdId &&
           other.syncLinkedAt == this.syncLinkedAt &&
           other.themeMode == this.themeMode &&
+          other.syncLastPulledAt == this.syncLastPulledAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4481,6 +4921,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> syncHouseholdId;
   final Value<String?> syncLinkedAt;
   final Value<String?> themeMode;
+  final Value<String?> syncLastPulledAt;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4495,6 +4936,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncHouseholdId = const Value.absent(),
     this.syncLinkedAt = const Value.absent(),
     this.themeMode = const Value.absent(),
+    this.syncLastPulledAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4510,6 +4952,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncHouseholdId = const Value.absent(),
     this.syncLinkedAt = const Value.absent(),
     this.themeMode = const Value.absent(),
+    this.syncLastPulledAt = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -4527,6 +4970,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? syncHouseholdId,
     Expression<String>? syncLinkedAt,
     Expression<String>? themeMode,
+    Expression<String>? syncLastPulledAt,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -4544,6 +4988,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (syncHouseholdId != null) 'sync_household_id': syncHouseholdId,
       if (syncLinkedAt != null) 'sync_linked_at': syncLinkedAt,
       if (themeMode != null) 'theme_mode': themeMode,
+      if (syncLastPulledAt != null) 'sync_last_pulled_at': syncLastPulledAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4561,6 +5006,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? syncHouseholdId,
     Value<String?>? syncLinkedAt,
     Value<String?>? themeMode,
+    Value<String?>? syncLastPulledAt,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -4578,6 +5024,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       syncHouseholdId: syncHouseholdId ?? this.syncHouseholdId,
       syncLinkedAt: syncLinkedAt ?? this.syncLinkedAt,
       themeMode: themeMode ?? this.themeMode,
+      syncLastPulledAt: syncLastPulledAt ?? this.syncLastPulledAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -4621,6 +5068,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (themeMode.present) {
       map['theme_mode'] = Variable<String>(themeMode.value);
     }
+    if (syncLastPulledAt.present) {
+      map['sync_last_pulled_at'] = Variable<String>(syncLastPulledAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -4646,6 +5096,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('syncHouseholdId: $syncHouseholdId, ')
           ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('themeMode: $themeMode, ')
+          ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -4695,6 +5146,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$HouseholdsTableCreateCompanionBuilder =
     HouseholdsCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String name,
       required String createdAt,
@@ -4703,6 +5155,7 @@ typedef $$HouseholdsTableCreateCompanionBuilder =
     });
 typedef $$HouseholdsTableUpdateCompanionBuilder =
     HouseholdsCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> name,
       Value<String> createdAt,
@@ -4798,6 +5251,11 @@ class $$HouseholdsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -4928,6 +5386,11 @@ class $$HouseholdsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -4958,6 +5421,9 @@ class $$HouseholdsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -5104,12 +5570,14 @@ class $$HouseholdsTableTableManager
               $$HouseholdsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HouseholdsCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 name: name,
                 createdAt: createdAt,
@@ -5118,12 +5586,14 @@ class $$HouseholdsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String name,
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => HouseholdsCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 name: name,
                 createdAt: createdAt,
@@ -5269,6 +5739,7 @@ typedef $$HouseholdsTableProcessedTableManager =
     >;
 typedef $$MembersTableCreateCompanionBuilder =
     MembersCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String householdId,
       required String name,
@@ -5281,6 +5752,7 @@ typedef $$MembersTableCreateCompanionBuilder =
     });
 typedef $$MembersTableUpdateCompanionBuilder =
     MembersCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> householdId,
       Value<String> name,
@@ -5378,6 +5850,11 @@ class $$MembersTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -5522,6 +5999,11 @@ class $$MembersTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -5590,6 +6072,9 @@ class $$MembersTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -5743,6 +6228,7 @@ class $$MembersTableTableManager
               $$MembersTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> householdId = const Value.absent(),
                 Value<String> name = const Value.absent(),
@@ -5753,6 +6239,7 @@ class $$MembersTableTableManager
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MembersCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 name: name,
@@ -5765,6 +6252,7 @@ class $$MembersTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String householdId,
                 required String name,
@@ -5775,6 +6263,7 @@ class $$MembersTableTableManager
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => MembersCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 name: name,
@@ -5929,6 +6418,7 @@ typedef $$MembersTableProcessedTableManager =
     >;
 typedef $$CategoriesTableCreateCompanionBuilder =
     CategoriesCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String householdId,
       required CategoryKind kind,
@@ -5943,6 +6433,7 @@ typedef $$CategoriesTableCreateCompanionBuilder =
     });
 typedef $$CategoriesTableUpdateCompanionBuilder =
     CategoriesCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> householdId,
       Value<CategoryKind> kind,
@@ -6024,6 +6515,11 @@ class $$CategoriesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -6153,6 +6649,11 @@ class $$CategoriesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -6231,6 +6732,9 @@ class $$CategoriesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -6364,6 +6868,7 @@ class $$CategoriesTableTableManager
               $$CategoriesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> householdId = const Value.absent(),
                 Value<CategoryKind> kind = const Value.absent(),
@@ -6376,6 +6881,7 @@ class $$CategoriesTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 kind: kind,
@@ -6390,6 +6896,7 @@ class $$CategoriesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String householdId,
                 required CategoryKind kind,
@@ -6402,6 +6909,7 @@ class $$CategoriesTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 kind: kind,
@@ -6539,6 +7047,7 @@ typedef $$CategoriesTableProcessedTableManager =
     >;
 typedef $$ChoresTableCreateCompanionBuilder =
     ChoresCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String householdId,
       required String title,
@@ -6556,6 +7065,7 @@ typedef $$ChoresTableCreateCompanionBuilder =
     });
 typedef $$ChoresTableUpdateCompanionBuilder =
     ChoresCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> householdId,
       Value<String> title,
@@ -6675,6 +7185,11 @@ class $$ChoresTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -6857,6 +7372,11 @@ class $$ChoresTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -6986,6 +7506,9 @@ class $$ChoresTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -7176,6 +7699,7 @@ class $$ChoresTableTableManager
               $$ChoresTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> householdId = const Value.absent(),
                 Value<String> title = const Value.absent(),
@@ -7191,6 +7715,7 @@ class $$ChoresTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChoresCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 title: title,
@@ -7208,6 +7733,7 @@ class $$ChoresTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String householdId,
                 required String title,
@@ -7223,6 +7749,7 @@ class $$ChoresTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChoresCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 title: title,
@@ -7390,6 +7917,7 @@ typedef $$ChoresTableProcessedTableManager =
     >;
 typedef $$ChoreAssigneesTableCreateCompanionBuilder =
     ChoreAssigneesCompanion Function({
+      Value<bool> syncDirty,
       required String choreId,
       required String memberId,
       required int position,
@@ -7397,6 +7925,7 @@ typedef $$ChoreAssigneesTableCreateCompanionBuilder =
     });
 typedef $$ChoreAssigneesTableUpdateCompanionBuilder =
     ChoreAssigneesCompanion Function({
+      Value<bool> syncDirty,
       Value<String> choreId,
       Value<String> memberId,
       Value<int> position,
@@ -7455,6 +7984,11 @@ class $$ChoreAssigneesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnFilters(column),
@@ -7516,6 +8050,11 @@ class $$ChoreAssigneesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get position => $composableBuilder(
     column: $table.position,
     builder: (column) => ColumnOrderings(column),
@@ -7577,6 +8116,9 @@ class $$ChoreAssigneesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
 
@@ -7657,11 +8199,13 @@ class $$ChoreAssigneesTableTableManager
               $$ChoreAssigneesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> choreId = const Value.absent(),
                 Value<String> memberId = const Value.absent(),
                 Value<int> position = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChoreAssigneesCompanion(
+                syncDirty: syncDirty,
                 choreId: choreId,
                 memberId: memberId,
                 position: position,
@@ -7669,11 +8213,13 @@ class $$ChoreAssigneesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String choreId,
                 required String memberId,
                 required int position,
                 Value<int> rowid = const Value.absent(),
               }) => ChoreAssigneesCompanion.insert(
+                syncDirty: syncDirty,
                 choreId: choreId,
                 memberId: memberId,
                 position: position,
@@ -7763,6 +8309,7 @@ typedef $$ChoreAssigneesTableProcessedTableManager =
     >;
 typedef $$ChoreOccurrencesTableCreateCompanionBuilder =
     ChoreOccurrencesCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String choreId,
       required PlainDate dueDate,
@@ -7776,6 +8323,7 @@ typedef $$ChoreOccurrencesTableCreateCompanionBuilder =
     });
 typedef $$ChoreOccurrencesTableUpdateCompanionBuilder =
     ChoreOccurrencesCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> choreId,
       Value<PlainDate> dueDate,
@@ -7858,6 +8406,11 @@ class $$ChoreOccurrencesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -7970,6 +8523,11 @@ class $$ChoreOccurrencesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -8079,6 +8637,9 @@ class $$ChoreOccurrencesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -8201,6 +8762,7 @@ class $$ChoreOccurrencesTableTableManager
               $$ChoreOccurrencesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> choreId = const Value.absent(),
                 Value<PlainDate> dueDate = const Value.absent(),
@@ -8212,6 +8774,7 @@ class $$ChoreOccurrencesTableTableManager
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ChoreOccurrencesCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 choreId: choreId,
                 dueDate: dueDate,
@@ -8225,6 +8788,7 @@ class $$ChoreOccurrencesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String choreId,
                 required PlainDate dueDate,
@@ -8236,6 +8800,7 @@ class $$ChoreOccurrencesTableTableManager
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => ChoreOccurrencesCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 choreId: choreId,
                 dueDate: dueDate,
@@ -8357,6 +8922,7 @@ typedef $$ChoreOccurrencesTableProcessedTableManager =
     >;
 typedef $$ShoppingItemsTableCreateCompanionBuilder =
     ShoppingItemsCompanion Function({
+      Value<bool> syncDirty,
       required String id,
       required String householdId,
       required String name,
@@ -8371,6 +8937,7 @@ typedef $$ShoppingItemsTableCreateCompanionBuilder =
     });
 typedef $$ShoppingItemsTableUpdateCompanionBuilder =
     ShoppingItemsCompanion Function({
+      Value<bool> syncDirty,
       Value<String> id,
       Value<String> householdId,
       Value<String> name,
@@ -8453,6 +9020,11 @@ class $$ShoppingItemsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -8567,6 +9139,11 @@ class $$ShoppingItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<bool> get syncDirty => $composableBuilder(
+    column: $table.syncDirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -8681,6 +9258,9 @@ class $$ShoppingItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<bool> get syncDirty =>
+      $composableBuilder(column: $table.syncDirty, builder: (column) => column);
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -8806,6 +9386,7 @@ class $$ShoppingItemsTableTableManager
               $$ShoppingItemsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> householdId = const Value.absent(),
                 Value<String> name = const Value.absent(),
@@ -8818,6 +9399,7 @@ class $$ShoppingItemsTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShoppingItemsCompanion(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 name: name,
@@ -8832,6 +9414,7 @@ class $$ShoppingItemsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<bool> syncDirty = const Value.absent(),
                 required String id,
                 required String householdId,
                 required String name,
@@ -8844,6 +9427,7 @@ class $$ShoppingItemsTableTableManager
                 Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShoppingItemsCompanion.insert(
+                syncDirty: syncDirty,
                 id: id,
                 householdId: householdId,
                 name: name,
@@ -8968,6 +9552,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> syncHouseholdId,
       Value<String?> syncLinkedAt,
       Value<String?> themeMode,
+      Value<String?> syncLastPulledAt,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -8984,6 +9569,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> syncHouseholdId,
       Value<String?> syncLinkedAt,
       Value<String?> themeMode,
+      Value<String?> syncLastPulledAt,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -9045,6 +9631,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get themeMode => $composableBuilder(
     column: $table.themeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncLastPulledAt => $composableBuilder(
+    column: $table.syncLastPulledAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9118,6 +9709,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncLastPulledAt => $composableBuilder(
+    column: $table.syncLastPulledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9182,6 +9778,11 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<String> get themeMode =>
       $composableBuilder(column: $table.themeMode, builder: (column) => column);
 
+  GeneratedColumn<String> get syncLastPulledAt => $composableBuilder(
+    column: $table.syncLastPulledAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9231,6 +9832,7 @@ class $$SettingsTableTableManager
                 Value<String?> syncHouseholdId = const Value.absent(),
                 Value<String?> syncLinkedAt = const Value.absent(),
                 Value<String?> themeMode = const Value.absent(),
+                Value<String?> syncLastPulledAt = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9245,6 +9847,7 @@ class $$SettingsTableTableManager
                 syncHouseholdId: syncHouseholdId,
                 syncLinkedAt: syncLinkedAt,
                 themeMode: themeMode,
+                syncLastPulledAt: syncLastPulledAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9262,6 +9865,7 @@ class $$SettingsTableTableManager
                 Value<String?> syncHouseholdId = const Value.absent(),
                 Value<String?> syncLinkedAt = const Value.absent(),
                 Value<String?> themeMode = const Value.absent(),
+                Value<String?> syncLastPulledAt = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -9276,6 +9880,7 @@ class $$SettingsTableTableManager
                 syncHouseholdId: syncHouseholdId,
                 syncLinkedAt: syncLinkedAt,
                 themeMode: themeMode,
+                syncLastPulledAt: syncLastPulledAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

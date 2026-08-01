@@ -448,4 +448,5 @@ Member _memberForAvatar(ClaimableMember member) => Member(
   role: MemberRole.member,
   createdAt: '',
   updatedAt: '',
+  syncDirty: false,
 );

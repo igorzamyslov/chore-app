@@ -57,6 +57,26 @@ enum OccurrenceStatus {
   missed,
 }
 
+/// Shared `syncDirty` column mixed into every synced table (schema v8, spec
+/// `docs/specs/sync-backend.md` §8.1): `households`, `members`,
+/// `categories`, `chores`, `chore_assignees`, `chore_occurrences`, and
+/// `shopping_items`. Every repository write to one of these tables sets it
+/// unconditionally to `true` (see `lib/data/db/sync_dirty.dart`'s shared
+/// `syncDirtyOnWrite` value) -- including while unlinked or signed out, so
+/// "link later" has an accurate dirty set to push. The ONLY writers that
+/// ever clear it (set `false`) are the P3 sync engine's post-push
+/// confirmation and its pull's row-replace.
+///
+/// `settings` is deliberately excluded -- it's device-scoped and never
+/// synced (spec §0).
+mixin SyncDirtyColumn on Table {
+  /// Whether this row has local changes not yet confirmed pushed to the
+  /// server. Default `false`: a linked device's existing rows are already
+  /// on the server (P2 uploaded/downloaded them), and an unlinked device
+  /// never pushes anyway.
+  BoolColumn get syncDirty => boolean().withDefault(const Constant(false))();
+}
+
 /// The household that owns every other row in the database.
 ///
 /// v1 note: there is exactly one local household per device (see
@@ -64,7 +84,7 @@ enum OccurrenceStatus {
 /// entity so a future multi-household / sync design doesn't require a
 /// schema rewrite.
 @DataClassName('Household')
-class Households extends Table {
+class Households extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 
@@ -86,7 +106,7 @@ class Households extends Table {
 /// v1 note: members are local profiles only — a family shares one
 /// device-local household until a sync layer lands.
 @DataClassName('Member')
-class Members extends Table {
+class Members extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 
@@ -118,7 +138,7 @@ class Members extends Table {
 
 /// A user-defined grouping for chores or shopping items.
 @DataClassName('Category')
-class Categories extends Table {
+class Categories extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 
@@ -231,6 +251,14 @@ class Settings extends Table {
   /// [locale]. Added in schemaVersion 7; see `AppDatabase.migration`.
   TextColumn get themeMode => text().nullable()();
 
+  /// The pull cursor (spec `docs/specs/sync-backend.md` §8.1/8.3): the
+  /// server-clock ISO timestamp fetched via the `server_now()` RPC in the
+  /// same round trip as the last successful pull, or `NULL` before this
+  /// device's first pull. NEVER the device clock -- see
+  /// `SupabaseSyncEngine.pullSince`. Added in schemaVersion 8; see
+  /// `AppDatabase.migration`.
+  TextColumn get syncLastPulledAt => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 
@@ -243,7 +271,7 @@ class Settings extends Table {
 
 /// A (possibly recurring) task assigned within a household.
 @DataClassName('Chore')
-class Chores extends Table {
+class Chores extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 
@@ -297,7 +325,7 @@ class Chores extends Table {
 /// [AssignmentMode.rotation]: 2 or more rows ordered by [position]. For
 /// [AssignmentMode.anyone]: zero rows.
 @DataClassName('ChoreAssignee')
-class ChoreAssignees extends Table {
+class ChoreAssignees extends Table with SyncDirtyColumn {
   /// The chore being assigned.
   TextColumn get choreId => text().references(Chores, #id)();
 
@@ -325,7 +353,7 @@ class ChoreAssignees extends Table {
   columns: {#status, #dueDate},
 )
 @DataClassName('ChoreOccurrence')
-class ChoreOccurrences extends Table {
+class ChoreOccurrences extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 
@@ -364,7 +392,7 @@ class ChoreOccurrences extends Table {
 
 /// A single entry on a household's shared shopping list.
 @DataClassName('ShoppingItem')
-class ShoppingItems extends Table {
+class ShoppingItems extends Table with SyncDirtyColumn {
   /// UUIDv4 primary key.
   TextColumn get id => text()();
 

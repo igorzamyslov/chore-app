@@ -214,6 +214,7 @@ class FakeHouseholdGateway implements HouseholdGateway {
         name: 'Downloaded household',
         createdAt: 't0',
         updatedAt: 't0',
+        syncDirty: false,
       ),
     );
   }

@@ -13,6 +13,10 @@
 /// [householdGatewayProvider] is a fifth -- alongside [authGatewayProvider],
 /// the two Settings/Members widget tests need on top of db/clock (spec
 /// `docs/specs/sync-backend.md` §7.2); see its own doc comment.
+/// [syncEngineProvider] defaults to [NoopSyncEngine] whenever
+/// [supabaseConfigured] is false or the device is unlinked -- true for
+/// every widget test and E2E run -- so no test needs to override it (spec
+/// `docs/specs/sync-backend.md` §8.2); see its own doc comment.
 library;
 
 import 'dart:async';
@@ -24,6 +28,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
+import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -244,6 +249,39 @@ final householdJoinServiceProvider = Provider<HouseholdJoinService>((ref) {
     settings: ref.watch(settingsRepositoryProvider),
     clock: ref.watch(clockProvider),
   );
+});
+
+/// The P3 ongoing sync engine (spec `docs/specs/sync-backend.md` §8.2): the
+/// real [SupabaseSyncEngine] whenever Supabase is configured
+/// ([supabaseConfigured]) AND this device is linked (`settingsProvider`'s
+/// `syncHouseholdId` is non-null), else the inert [NoopSyncEngine] -- which
+/// covers every widget test and E2E run (neither ever configures Supabase),
+/// keeping the offline suite free of the debounced-push timer and the
+/// realtime subscription [SupabaseSyncEngine.start] arms.
+///
+/// Re-evaluates on the linked state, per spec: whenever `syncHouseholdId`
+/// changes (unlinked -> linked, or a join-flow's household replace),
+/// Riverpod disposes the previous value -- calling [SyncEngine.stop] via
+/// `ref.onDispose` below -- and builds a fresh one, which [SyncEngine.start]s
+/// immediately. This is the entire "start()/stop() driven by linked state"
+/// requirement; [SyncEngineController] below only adds the app-resume
+/// trigger, mirroring [CatchUpController].
+final syncEngineProvider = Provider<SyncEngine>((ref) {
+  final linkedHouseholdId = ref
+      .watch(settingsProvider)
+      .valueOrNull
+      ?.syncHouseholdId;
+  if (!supabaseConfigured || linkedHouseholdId == null) {
+    return const NoopSyncEngine();
+  }
+  final engine = SupabaseSyncEngine(
+    db: ref.watch(appDatabaseProvider),
+    transport: const SupabaseSyncTransport(),
+    settings: ref.watch(settingsRepositoryProvider),
+    householdId: linkedHouseholdId,
+  )..start();
+  ref.onDispose(engine.stop);
+  return engine;
 });
 
 /// The bootstrap household's own row (currently just its `name`), kept in
@@ -688,4 +726,59 @@ final catchUpControllerProvider = Provider<CatchUpController>((ref) {
   final controller = CatchUpController(ref);
   ref.onDispose(controller.dispose);
   return controller;
+});
+
+/// Owns the P3 sync engine's app-resume trigger (spec
+/// `docs/specs/sync-backend.md` §8.3: "pull on ... app resume") --
+/// REUSES the exact same lifecycle-observer pattern as [CatchUpController]/
+/// [DigestRescheduleController] (`main.dart`'s single `_AppResumeObserver`
+/// calls all three; no second `WidgetsBindingObserver` is added) rather than
+/// owning start()/stop() itself: [syncEngineProvider] already does that
+/// reactively (see its own doc comment) purely from Riverpod watching the
+/// linked state, with no external trigger needed.
+///
+/// This controller's constructor only needs to keep [syncEngineProvider]
+/// "alive" (subscribed) for the app's lifetime, exactly like
+/// [CatchUpController]/[DigestRescheduleController] do for
+/// [bootstrapProvider] -- so it reactively rebuilds (and restarts) on every
+/// later linked-state change, not just the first one.
+///
+/// Deliberately NOT read anywhere in the `lib/app`/`lib/features` widget
+/// tree, for the same reason as [CatchUpController]/
+/// [DigestRescheduleController]: every widget test builds `ChoreApp`
+/// directly (never through `main()`), so [syncEngineProvider] is simply
+/// never constructed during a widget test at all (it always resolves to
+/// [NoopSyncEngine] there anyway, per its own doc comment, but never even
+/// building it is one less thing for a test to accidentally depend on).
+class SyncEngineController {
+  /// Starts listening immediately. The `ref` is retained for the lifetime
+  /// of this controller (i.e. of the [ProviderContainer] that created it
+  /// via [syncEngineControllerProvider]).
+  SyncEngineController(this._ref) {
+    _ref.listen(syncEngineProvider, (previous, next) {
+      // Nothing to do here: `syncEngineProvider`'s own body already
+      // start()s the new engine and (via `ref.onDispose`) stop()s the
+      // previous one. This listener exists purely to keep the provider
+      // subscribed -- see the class doc comment.
+    }, fireImmediately: true);
+  }
+
+  final Ref _ref;
+
+  /// Triggers a pull on the CURRENTLY active engine. Called externally on
+  /// app resume -- mirrors [CatchUpController.triggerOnResume]/
+  /// [DigestRescheduleController.triggerRecompute]'s external call site.
+  void triggerOnResume() {
+    unawaited(_ref.read(syncEngineProvider).pullSince());
+  }
+}
+
+/// Activates [SyncEngineController] the moment it's first read.
+///
+/// Read exactly once, from `main.dart`, before `runApp` — the same place
+/// [catchUpControllerProvider]/[digestRescheduleControllerProvider] are
+/// read; see [SyncEngineController]'s own doc comment for why it must never
+/// be read from inside the widget tree.
+final syncEngineControllerProvider = Provider<SyncEngineController>((ref) {
+  return SyncEngineController(ref);
 });

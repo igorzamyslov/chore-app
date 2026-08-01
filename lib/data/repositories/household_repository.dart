@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
 import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
@@ -111,6 +112,7 @@ class HouseholdRepository {
         name: 'My household',
         createdAt: now,
         updatedAt: now,
+        syncDirty: true,
       );
       await db
           .into(db.households)
@@ -120,6 +122,7 @@ class HouseholdRepository {
               name: household.name,
               createdAt: household.createdAt,
               updatedAt: household.updatedAt,
+              syncDirty: syncDirtyOnWrite,
             ),
           );
       await db
@@ -133,6 +136,7 @@ class HouseholdRepository {
               role: MemberRole.admin,
               createdAt: now,
               updatedAt: now,
+              syncDirty: syncDirtyOnWrite,
             ),
           );
       return household;
@@ -212,7 +216,11 @@ class HouseholdRepository {
     await (db.update(
       db.members,
     )..where((tbl) => tbl.id.equals(memberId))).write(
-      MembersCompanion(role: Value(role), updatedAt: Value(_isoNow())),
+      MembersCompanion(
+        role: Value(role),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 
@@ -236,6 +244,7 @@ class HouseholdRepository {
             role: role,
             createdAt: now,
             updatedAt: now,
+            syncDirty: syncDirtyOnWrite,
           ),
         );
     return Member(
@@ -246,6 +255,7 @@ class HouseholdRepository {
       role: role,
       createdAt: now,
       updatedAt: now,
+      syncDirty: true,
     );
   }
 
@@ -254,7 +264,11 @@ class HouseholdRepository {
     await (db.update(
       db.members,
     )..where((tbl) => tbl.id.equals(memberId))).write(
-      MembersCompanion(name: Value(name), updatedAt: Value(_isoNow())),
+      MembersCompanion(
+        name: Value(name),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 
@@ -265,7 +279,11 @@ class HouseholdRepository {
     await (db.update(
       db.members,
     )..where((tbl) => tbl.id.equals(memberId))).write(
-      MembersCompanion(color: Value(color), updatedAt: Value(_isoNow())),
+      MembersCompanion(
+        color: Value(color),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 

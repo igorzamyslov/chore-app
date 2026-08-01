@@ -53,14 +53,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v7) column set, so a fresh v1 -> v7 jump already
+      // *current* (here, v8) column set, so a fresh v1 -> v8 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then
@@ -105,6 +105,33 @@ class AppDatabase extends _$AppDatabase {
           // `NULL` (follow the OS theme) -- no data rewrite.
           await migrator.addColumn(settings, settings.themeMode);
         }
+        if (from < 8) {
+          // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): the
+          // nullable `settings.syncLastPulledAt` pull-cursor column,
+          // defaulting to `NULL` (no pull yet) -- no data rewrite.
+          await migrator.addColumn(settings, settings.syncLastPulledAt);
+        }
+      }
+      if (from < 8) {
+        // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
+        // table -- households, members, categories, chores,
+        // chore_assignees, chore_occurrences, shopping_items (NOT
+        // `settings`, which is device-scoped and never synced, spec §0) --
+        // gains `syncDirty`, defaulting to `false`. These 7 tables have
+        // all existed since schemaVersion 1, so (unlike `settings`'s own
+        // columns above, which `createTable` already covers for a v1 -> v8
+        // jump) this backfill runs unconditionally whenever `from < 8`,
+        // regardless of which branch above ran.
+        await migrator.addColumn(households, households.syncDirty);
+        await migrator.addColumn(members, members.syncDirty);
+        await migrator.addColumn(categories, categories.syncDirty);
+        await migrator.addColumn(chores, chores.syncDirty);
+        await migrator.addColumn(choreAssignees, choreAssignees.syncDirty);
+        await migrator.addColumn(
+          choreOccurrences,
+          choreOccurrences.syncDirty,
+        );
+        await migrator.addColumn(shoppingItems, shoppingItems.syncDirty);
       }
     },
     beforeOpen: (details) async {

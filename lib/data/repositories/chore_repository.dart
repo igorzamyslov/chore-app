@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:drift/drift.dart';
@@ -143,6 +144,7 @@ class ChoreRepository {
               createdBy: Value(createdBy),
               createdAt: now,
               updatedAt: now,
+              syncDirty: syncDirtyOnWrite,
             ),
           );
       await _insertAssignees(id, assigneeMemberIds);
@@ -158,6 +160,7 @@ class ChoreRepository {
         createdBy: createdBy,
         createdAt: now,
         updatedAt: now,
+        syncDirty: true,
       );
     });
   }
@@ -210,6 +213,7 @@ class ChoreRepository {
               ? Value(assignmentMode)
               : const Value.absent(),
           updatedAt: Value(_isoNow()),
+          syncDirty: syncDirtyOnWrite,
         ),
       );
 
@@ -229,7 +233,11 @@ class ChoreRepository {
     final now = _isoNow();
     await db.transaction(() async {
       await (db.update(db.chores)..where((tbl) => tbl.id.equals(id))).write(
-        ChoresCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+        ChoresCompanion(
+          deletedAt: Value(now),
+          updatedAt: Value(now),
+          syncDirty: syncDirtyOnWrite,
+        ),
       );
       await (db.delete(db.choreOccurrences)..where(
             (tbl) =>
@@ -247,6 +255,7 @@ class ChoreRepository {
       ChoresCompanion(
         pausedAt: Value(paused ? now : null),
         updatedAt: Value(now),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -338,6 +347,7 @@ class ChoreRepository {
             assignedMemberId: Value(assignedMemberId),
             createdAt: now,
             updatedAt: now,
+            syncDirty: syncDirtyOnWrite,
           ),
         );
     return ChoreOccurrence(
@@ -348,6 +358,7 @@ class ChoreRepository {
       assignedMemberId: assignedMemberId,
       createdAt: now,
       updatedAt: now,
+      syncDirty: true,
     );
   }
 
@@ -376,6 +387,7 @@ class ChoreRepository {
         closedOn: Value(closedOn),
         completedBy: Value(completedBy),
         updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -561,6 +573,7 @@ class ChoreRepository {
               choreId: choreId,
               memberId: assigneeMemberIds[i],
               position: i,
+              syncDirty: syncDirtyOnWrite,
             ),
           );
     }

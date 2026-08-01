@@ -75,6 +75,7 @@ void main() {
         name: 'Joined household',
         createdAt: 't0',
         updatedAt: 't0',
+        syncDirty: false,
       ),
       members: const [
         Member(
@@ -85,6 +86,7 @@ void main() {
           role: MemberRole.member,
           createdAt: 't0',
           updatedAt: 't0',
+          syncDirty: false,
         ),
       ],
       chores: [
@@ -96,6 +98,7 @@ void main() {
           assignmentMode: AssignmentMode.anyone,
           createdAt: 't0',
           updatedAt: 't0',
+          syncDirty: false,
         ),
       ],
       choreOccurrences: [
@@ -106,6 +109,7 @@ void main() {
           status: OccurrenceStatus.pending,
           createdAt: 't0',
           updatedAt: 't0',
+          syncDirty: false,
         ),
       ],
     );
@@ -228,6 +232,7 @@ void main() {
         name: 'Joined household',
         createdAt: 't0',
         updatedAt: 't0',
+        syncDirty: false,
       ),
     );
 
@@ -305,6 +310,7 @@ void main() {
         name: 'Joined household',
         createdAt: 't0',
         updatedAt: 't0',
+        syncDirty: false,
       ),
       members: [
         Member(
@@ -315,6 +321,7 @@ void main() {
           role: MemberRole.member,
           createdAt: 't0',
           updatedAt: 't0',
+          syncDirty: false,
         ),
       ],
     );

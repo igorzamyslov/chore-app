@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -304,6 +305,7 @@ class ShoppingRepository {
             addedBy: Value(addedBy),
             createdAt: now,
             updatedAt: now,
+            syncDirty: syncDirtyOnWrite,
           ),
         );
     return ShoppingItem(
@@ -315,6 +317,7 @@ class ShoppingRepository {
       addedBy: addedBy,
       createdAt: now,
       updatedAt: now,
+      syncDirty: true,
     );
   }
 
@@ -340,6 +343,7 @@ class ShoppingRepository {
         quantityNote: quantityNote,
         categoryId: categoryId,
         updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -353,6 +357,7 @@ class ShoppingRepository {
       ShoppingItemsCompanion(
         checkedAt: Value(checked ? now : null),
         updatedAt: Value(now),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -367,7 +372,11 @@ class ShoppingRepository {
     await (db.update(
       db.shoppingItems,
     )..where((tbl) => tbl.id.equals(id))).write(
-      ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+      ShoppingItemsCompanion(
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 
@@ -382,6 +391,7 @@ class ShoppingRepository {
       ShoppingItemsCompanion(
         deletedAt: const Value(null),
         updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
       ),
     );
   }
@@ -396,7 +406,11 @@ class ShoppingRepository {
               tbl.checkedAt.isNotNull(),
         ))
         .write(
-          ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+          ShoppingItemsCompanion(
+            deletedAt: Value(now),
+            updatedAt: Value(now),
+            syncDirty: syncDirtyOnWrite,
+          ),
         );
   }
 
@@ -418,6 +432,7 @@ class ShoppingRepository {
           ShoppingItemsCompanion(
             checkedAt: const Value(null),
             updatedAt: Value(now),
+            syncDirty: syncDirtyOnWrite,
           ),
         );
   }
@@ -456,7 +471,11 @@ class ShoppingRepository {
     await (db.update(
       db.shoppingItems,
     )..where((tbl) => tbl.id.isIn(staleIds))).write(
-      ShoppingItemsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
+      ShoppingItemsCompanion(
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 
