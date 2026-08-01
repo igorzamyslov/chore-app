@@ -11,6 +11,13 @@ tags:
 ---
 - launchApp:
     clearState: true
+# First-frame settle (README convention 8): on slow CI machines the
+# first frame after a clearState launch can lose the race against the
+# first tap — wait for the shell to exist before touching anything.
+- extendedWaitUntil:
+    visible:
+      id: "shell.tab.chores"
+    timeout: 60000
 - tapOn:
     id: "shell.tab.settings"
 - tapOn:
@@ -34,6 +41,12 @@ tags:
 # `settings.locale` survives, and confirm the same German string is still
 # there after switching back to Settings.
 - launchApp
+# Same first-frame settle as after the cold launch above -- a relaunch
+# still renders a fresh first frame that the next tap must not race.
+- extendedWaitUntil:
+    visible:
+      id: "shell.tab.chores"
+    timeout: 60000
 - tapOn:
     id: "shell.tab.settings"
 - assertVisible: "(?s).*Sprache.*"

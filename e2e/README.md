@@ -51,13 +51,23 @@ the candidate, then bump the pin and this note together. Keep the local
 
 ## Cold starts (convention 8)
 
-The FIRST element wait after a `launchApp` that clears state AND sets
-`permissions:` must be an `extendedWaitUntil` (60–90s), never a bare
-`assertVisible`: that combination produces the coldest possible app
-start (fresh ART verification, nothing cached), and on CI emulators the
-first Flutter frame can land after Maestro's default element window —
-observed 2026-08-01 (logcat showed the first frame at ~30s while the
-default window expired at ~19s; the Maestro version pin shifts the odds
-but does not remove the race). Later steps run against a live app and
-keep normal timeouts. CI uploads `~/.maestro/tests` as a debug artifact
-on failure — start every CI-only investigation from those screenshots.
+Two rules, both root-caused 2026-08-01 from CI debug artifacts (white
+first frame in the failure screenshots on BOTH platforms):
+
+1. **Every `launchApp` is followed by a first-frame settle** — an
+   `extendedWaitUntil` on `shell.tab.chores` (60s) before the first
+   interaction. On slow CI machines the first frame after a launch
+   (cold OR warm relaunch) can lose the race against the first tap;
+   the default element window is not enough headroom. Later steps run
+   against a live app and keep normal timeouts.
+2. **Permission overrides never ride inside `launchApp`.** Bundling
+   `permissions:` into the launch stanza lets the permission operations
+   race the process start — Android kills a process whose runtime
+   permission changes, which intermittently left the app permanently
+   blank. Sequence standalone steps instead:
+   `clearState` → `setPermissions` → `launchApp`
+   (see first_run_banners.yaml), so the permission state is settled
+   before the process exists.
+
+CI uploads `~/.maestro/tests` as a debug artifact on failure — start
+every CI-only investigation from those screenshots, never from theory.

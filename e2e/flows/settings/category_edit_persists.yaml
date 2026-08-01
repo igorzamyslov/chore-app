@@ -8,6 +8,13 @@ tags:
 ---
 - launchApp:
     clearState: true
+# First-frame settle (README convention 8): on slow CI machines the
+# first frame after a clearState launch can lose the race against the
+# first tap — wait for the shell to exist before touching anything.
+- extendedWaitUntil:
+    visible:
+      id: "shell.tab.chores"
+    timeout: 60000
 - tapOn:
     id: "shell.tab.settings"
 - tapOn:

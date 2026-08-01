@@ -9,22 +9,28 @@ appId: ${APP_ID}
 tags:
   - happy
 ---
-- launchApp:
-    clearState: true
-    # `notifications: unset` (root-caused 2026-07-31): Maestro's Android
-    # driver silently auto-grants every manifest-declared runtime
-    # permission on `launchApp` — including POST_NOTIFICATIONS — even
-    # with `clearState: true`, unlike iOS (where the OS prompt still
-    # appears and Maestro just auto-taps Allow). A real fresh install has
-    # NOT been asked yet, so without this override
-    # `notificationPermissionGrantedProvider` correctly resolves `true`
-    # on Android (verified via `adb shell dumpsys package`: POST_NOTIFICATIONS
-    # read `granted=true` immediately after a plain `clearState` launch)
-    # and this assertion below fails — not a product bug, a
-    # test-environment mismatch. `unset` leaves the permission genuinely
-    # un-granted, matching a real fresh install on both platforms.
+# Split into standalone steps, NOT a single launchApp stanza (CI
+# root-cause 2026-08-01, second iteration): bundling `permissions:` into
+# `launchApp` lets the permission operations race the app process start —
+# Android kills a process whose runtime permission changes, and on CI
+# emulators that race intermittently left the app permanently on a blank
+# first frame (debug artifacts show a white screen even after a 90s
+# wait, while every stanza-free flow on the same run launched fine).
+# Sequencing clearState → setPermissions → launchApp makes the permission
+# state settled BEFORE the process exists, removing the race by
+# construction.
+#
+# `notifications: unset` itself (root-caused 2026-07-31): Maestro's
+# Android driver silently auto-grants every manifest-declared runtime
+# permission — including POST_NOTIFICATIONS — unlike iOS. A real fresh
+# install has NOT been asked yet, so without this override the digest
+# pre-prompt assertions below fail — a test-environment mismatch, not a
+# product bug. `unset` matches a real fresh install on both platforms.
+- clearState
+- setPermissions:
     permissions:
       notifications: unset
+- launchApp
 # extendedWaitUntil, not assertVisible (root-caused 2026-08-01, README
 # "Cold starts"): this is the suite's only launchApp that BOTH clears
 # state AND sets permissions — the coldest possible start (fresh ART
