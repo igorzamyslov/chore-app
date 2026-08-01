@@ -15,8 +15,13 @@
 /// `docs/specs/sync-backend.md` §7.2); see its own doc comment.
 /// [syncEngineProvider] defaults to [NoopSyncEngine] whenever
 /// [supabaseConfigured] is false or the device is unlinked -- true for
-/// every widget test and E2E run -- so no test needs to override it (spec
-/// `docs/specs/sync-backend.md` §8.2); see its own doc comment.
+/// every widget test and E2E run -- so no test needs to override it for
+/// ordinary widget tests (spec `docs/specs/sync-backend.md` §8.2); see its
+/// own doc comment. [syncTransportProvider] is a sixth override point, used
+/// only by `test/app/sync_engine_provider_test.dart` to exercise
+/// [syncEngineProvider]'s own linked-state branching against a fake
+/// transport, bypassing the compile-time [supabaseConfigured] gate that a
+/// test binary can't otherwise flip; see its own doc comment.
 library;
 
 import 'dart:async';
@@ -279,32 +284,67 @@ final householdJoinServiceProvider = Provider<HouseholdJoinService>((ref) {
   );
 });
 
-/// The P3 ongoing sync engine (spec `docs/specs/sync-backend.md` §8.2): the
-/// real [SupabaseSyncEngine] whenever Supabase is configured
-/// ([supabaseConfigured]) AND this device is linked (`settingsProvider`'s
-/// `syncHouseholdId` is non-null), else the inert [NoopSyncEngine] -- which
-/// covers every widget test and E2E run (neither ever configures Supabase),
-/// keeping the offline suite free of the debounced-push timer and the
-/// realtime subscription [SupabaseSyncEngine.start] arms.
+/// The transport [syncEngineProvider] hands a real [SupabaseSyncEngine]
+/// (spec `docs/specs/sync-backend.md` §8.4) -- `null` means "Supabase isn't
+/// configured", which forces [NoopSyncEngine] regardless of linked state.
 ///
-/// Re-evaluates on the linked state, per spec: whenever `syncHouseholdId`
-/// changes (unlinked -> linked, or a join-flow's household replace),
-/// Riverpod disposes the previous value -- calling [SyncEngine.stop] via
-/// `ref.onDispose` below -- and builds a fresh one, which [SyncEngine.start]s
-/// immediately. This is the entire "start()/stop() driven by linked state"
-/// requirement; [SyncEngineController] below only adds the app-resume
-/// trigger, mirroring [CatchUpController].
+/// Defaults to the real [SupabaseSyncTransport], gated on
+/// [supabaseConfigured] (a compile-time constant that can't itself be
+/// overridden in a test binary). This extra indirection is what lets a
+/// bare-`ProviderContainer` test exercise [syncEngineProvider]'s OWN
+/// linked-state branching for real: `syncTransportProvider.overrideWithValue
+/// (fakeTransport)` (a non-null fake) makes the "linked" branch reachable
+/// even though `--dart-define=SUPABASE_URL=` is always empty under
+/// `flutter test` -- see `test/app/sync_engine_provider_test.dart`.
+final syncTransportProvider = Provider<SyncTransport?>((ref) {
+  return supabaseConfigured ? const SupabaseSyncTransport() : null;
+});
+
+/// The P3 ongoing sync engine (spec `docs/specs/sync-backend.md` §8.2): the
+/// real [SupabaseSyncEngine] whenever [syncTransportProvider] is non-null
+/// (Supabase configured) AND this device is linked (`syncHouseholdId` is
+/// non-null), else the inert [NoopSyncEngine] -- which covers every widget
+/// test and E2E run (neither ever configures Supabase), keeping the offline
+/// suite free of the debounced-push timer and the realtime subscription
+/// [SupabaseSyncEngine.start] arms.
+///
+/// Re-evaluates ONLY on the linked state, per spec: whenever
+/// `syncHouseholdId` changes (unlinked -> linked, or a join-flow's
+/// household replace), Riverpod disposes the previous value -- calling
+/// [SyncEngine.stop] via `ref.onDispose` below -- and builds a fresh one,
+/// which [SyncEngine.start]s immediately. This is the entire
+/// "start()/stop() driven by linked state" requirement;
+/// [SyncEngineController] below only adds the app-resume trigger, mirroring
+/// [CatchUpController].
+///
+/// **Live-repro'd bug (fixed 2026-08-01):** this MUST watch
+/// `settingsProvider.select(...)` scoped to `syncHouseholdId` alone, never
+/// the bare `settingsProvider` (the whole `DeviceSettings` row). A started
+/// engine's own `pullSince` unconditionally writes
+/// `settings.syncLastPulledAt` on every successful pull -- watching the
+/// whole row turned that write into a feedback loop: the write re-emitted
+/// `settingsProvider`, which rebuilt this provider (linked state
+/// unchanged, but Riverpod only compares the WATCHED value, and an
+/// unscoped watch sees every field), tearing down the just-started engine
+/// (cancelling its debounce `Timer` and `db.tableUpdates()`/realtime
+/// subscriptions) and replacing it with a brand-new one whose `start()`
+/// immediately pulled again -- an infinite restart loop that never let a
+/// debounced push survive to fire. `select` fixes it by only comparing the
+/// projected `syncHouseholdId` value, which the pull's own write never
+/// changes.
 final syncEngineProvider = Provider<SyncEngine>((ref) {
-  final linkedHouseholdId = ref
-      .watch(settingsProvider)
-      .valueOrNull
-      ?.syncHouseholdId;
-  if (!supabaseConfigured || linkedHouseholdId == null) {
+  final transport = ref.watch(syncTransportProvider);
+  final linkedHouseholdId = ref.watch(
+    settingsProvider.select(
+      (settings) => settings.valueOrNull?.syncHouseholdId,
+    ),
+  );
+  if (transport == null || linkedHouseholdId == null) {
     return const NoopSyncEngine();
   }
   final engine = SupabaseSyncEngine(
     db: ref.watch(appDatabaseProvider),
-    transport: const SupabaseSyncTransport(),
+    transport: transport,
     settings: ref.watch(settingsRepositoryProvider),
     householdId: linkedHouseholdId,
   )..start();
@@ -793,11 +833,19 @@ class SyncEngineController {
 
   final Ref _ref;
 
-  /// Triggers a pull on the CURRENTLY active engine. Called externally on
-  /// app resume -- mirrors [CatchUpController.triggerOnResume]/
+  /// Triggers a push (which itself pulls afterward on success) on the
+  /// CURRENTLY active engine. Called externally on app resume -- mirrors
+  /// [CatchUpController.triggerOnResume]/
   /// [DigestRescheduleController.triggerRecompute]'s external call site.
+  ///
+  /// `pushDirty`, not a bare `pullSince`: spec §8.3 lists app resume as a
+  /// PUSH trigger too ("push on: any local write while linked (debounced
+  /// ~2s), app resume, reconnect"), not just a pull trigger -- a write
+  /// made just before backgrounding may never have gotten a chance to push
+  /// (the OS can suspend/kill the debounce `Timer`), so resume must also
+  /// recover it, not only fetch what changed remotely.
   void triggerOnResume() {
-    unawaited(_ref.read(syncEngineProvider).pullSince());
+    unawaited(_ref.read(syncEngineProvider).pushDirty());
   }
 }
 
