@@ -8,7 +8,13 @@ nothing breaks if run twice. ~10 minutes.
 
 1. Dashboard → your project → **SQL Editor** → **New query**.
 2. Open `supabase/migrations/20260731120000_initial_schema.sql` from the
-   repo, copy the ENTIRE file, paste, **Run**.
+   repo, copy the ENTIRE file, paste, **Run**. Then do the same for EACH
+   later migration in `supabase/migrations/` in filename order — they add
+   the idempotent-claim retries, `server_now()`, pinned function
+   search_paths, and (important for live multi-device updates) the
+   **realtime publication** (`20260801160000_realtime_publication.sql`).
+   Without that last one, sync still works but changes only appear on the
+   other device when it's reopened, not live.
 3. Expected result: "Success. No rows returned". Re-running later would
    fail on "already exists" — that's fine, it means it's applied.
 4. Sanity check: **Table Editor** should now list `households`,

@@ -20,3 +20,18 @@ G4 adopt-local-data, G5 profile claiming, G6 account deletion).*
 - Planned auth: magic-link email (DESIGN.md); household isolation via
   RLS on every table; RLS covered by tests before any client code
   (docs/specs/testing-strategy.md).
+
+## Linter warnings — reviewed 2026-08-01
+
+- `function_search_path_mutable` (`set_updated_at`, `server_now`): FIXED
+  by migration `20260801150000_pin_function_search_paths.sql` (pinned
+  `search_path = public`, matching every other function).
+- `authenticated_security_definer_function_executable` (all six RPCs):
+  ACCEPTED, intentional. The RPCs are the deliberate signed-in API —
+  SECURITY DEFINER is required because invite redemption/claiming must
+  touch rows the caller isn't yet RLS-entitled to; each function
+  performs its own auth/validation internally (`auth.uid()` gates,
+  `_valid_invite`, membership checks), and the pgTAP suite proves the
+  misuse cases fail (anon rejected, cross-user claims rejected, expired
+  invites rejected). Re-evaluate only if an RPC is ever added WITHOUT
+  internal auth checks.

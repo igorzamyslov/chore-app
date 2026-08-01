@@ -103,7 +103,10 @@ Family-scale data (hundreds of rows) permits a simple, robust engine:
   at family scale; occurrences are mostly-append which limits real
   conflicts. Tombstones (`deleted_at`) replicate exactly like updates.
 - **Realtime**: `postgres_changes` subscription per household (filter on
-  the denormalized `household_id`), feeding the same apply path as pull;
+  the denormalized `household_id`), feeding the same apply path as pull.
+  REQUIRES the synced tables be in the `supabase_realtime` publication
+  (migration `20260801160000`; empty by default — found live 2026-08-01
+  when realtime silently no-op'd while push/pull worked);
   a realtime event just short-circuits the polling interval. Pull runs
   on: app resume, post-push, subscription (re)connect.
 - Engine lives behind an interface (`SyncEngine`) with a no-op local-only
