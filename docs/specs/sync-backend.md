@@ -341,3 +341,15 @@ provider `syncEngineProvider` re-evaluates on the linked state
   (deletedAt replicates), dirty-tombstone push.
 - The two-simulator live test (§6 P3 stretch) stays manual, following
   the §7.6 smoke-test method.
+
+### 8.5 Known limitations (P3, accepted)
+
+- `chore_assignees` has no tombstones (no `deleted_at` locally or on the
+  server, a P1 schema decision): removing an assignee deletes the local
+  row, which the push path cannot propagate — only inserts/replacements
+  sync. Practical impact is small (assignee edits regenerate the full
+  set, and the next full edit from any device converges it), but precise
+  removal propagation needs a schema change; revisit with P4.
+- `households` and `members` push via UPDATE/insert-ignore respectively
+  (their fail-closed grants forbid literal upserts) — an extension of
+  §7.2's members reasoning, applied engine-wide.
