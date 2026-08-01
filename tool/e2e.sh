@@ -28,7 +28,13 @@ cd "$ROOT"
 case "$PLATFORM" in
   ios)
     APP_ID="io.github.igorzamyslov.famdo"
-    flutter build ios --simulator --debug --dart-define=E2E_TODAY="$E2E_TODAY"
+    # SUPABASE_* defines empty: keeps the build fully offline
+    # (supabaseConfigured false, lib/app/supabase_config.dart), same as
+    # `flutter test` -- existing flows never touch the Settings Account
+    # section and must keep passing against its 'coming soon' state
+    # untouched (spec docs/specs/sync-backend.md §5, phasing P2).
+    flutter build ios --simulator --debug --dart-define=E2E_TODAY="$E2E_TODAY" \
+      --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
     if ! xcrun simctl list devices booted | grep -q "(Booted)"; then
       DEVICE_ID="$(xcrun simctl list devices available \
         | grep -oE "iPhone [^(]+\(([0-9A-F-]{36})\)" \
@@ -42,7 +48,9 @@ case "$PLATFORM" in
   android)
     APP_ID="io.github.igorzamyslov.famdo"
     ANDROID_SDK="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
-    flutter build apk --debug --dart-define=E2E_TODAY="$E2E_TODAY"
+    # SUPABASE_* defines empty -- see the iOS branch above for why.
+    flutter build apk --debug --dart-define=E2E_TODAY="$E2E_TODAY" \
+      --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
     if ! "$ANDROID_SDK/platform-tools/adb" devices | grep -q "emulator-.*device$"; then
       nohup "$ANDROID_SDK/emulator/emulator" -avd e2e_pixel -no-snapshot \
         -no-audio -no-boot-anim >/dev/null 2>&1 &

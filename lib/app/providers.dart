@@ -7,11 +7,15 @@
 /// fixed clock). [digestNotificationPluginProvider] is a third override
 /// point used only by scheduler/reschedule tests (spec
 /// `docs/specs/notifications.md`), swapping the real OS-level plugin for a
-/// fake; see that provider's doc comment.
+/// fake; see that provider's doc comment. [authGatewayProvider] is a
+/// fourth, used only by Settings Account-section tests (spec
+/// `docs/specs/sync-backend.md` §5); see its own doc comment.
 library;
 
 import 'dart:async';
 
+import 'package:chore_app/app/supabase_config.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -137,6 +141,31 @@ final localeOverrideProvider = Provider<Locale?>((ref) {
 /// which `PackageInfo.fromPlatform()` picks up automatically once called.
 final packageInfoProvider = FutureProvider<PackageInfo>((ref) {
   return PackageInfo.fromPlatform();
+});
+
+/// The client-auth gateway backing the Settings tab's Account section
+/// (spec `docs/specs/sync-backend.md` §5): the real [SupabaseAuthGateway]
+/// when Supabase is configured ([supabaseConfigured]), else the
+/// always-signed-out [NoopAuthGateway] -- keeping the app fully usable
+/// offline (spec §0) when Supabase is absent (tests, E2E, and F-Droid
+/// users who never sign in).
+///
+/// Widget tests override this directly with a fake (see
+/// `test/features/settings/fake_auth_gateway.dart`) -- or with the
+/// built-in [NoopAuthGateway] itself, to exercise the 'coming soon' state
+/// deterministically -- on top of the two standard database/clock
+/// overrides.
+final authGatewayProvider = Provider<AuthGateway>((ref) {
+  return supabaseConfigured
+      ? const SupabaseAuthGateway()
+      : const NoopAuthGateway();
+});
+
+/// The currently signed-in [AuthUser] per [authGatewayProvider]'s
+/// [AuthGateway.watchUser] stream, or `null` while signed out (or always,
+/// under [NoopAuthGateway]).
+final currentAuthUserProvider = StreamProvider<AuthUser?>((ref) {
+  return ref.watch(authGatewayProvider).watchUser();
 });
 
 /// The OS-level notification plugin (or fake), wrapped by

@@ -878,6 +878,84 @@ abstract class AppLocalizations {
   /// **'Deutsch'**
   String get settingsLanguageDeutsch;
 
+  /// Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsAccountSectionTitle;
+
+  /// Intro line shown above the email field in the Account section's signed-out state.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to sync your household across your devices.'**
+  String get settingsAccountIntro;
+
+  /// Label of the Account section's signed-out email TextField.
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get settingsAccountEmailLabel;
+
+  /// Label of the Account section's signed-out submit button, before it has been tapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Send sign-in link'**
+  String get settingsAccountSendLink;
+
+  /// Label the Account section's submit button switches to after a magic-link email has been sent at least once.
+  ///
+  /// In en, this message translates to:
+  /// **'Send again'**
+  String get settingsAccountSendAgain;
+
+  /// Inline confirmation shown after a magic-link email is sent, naming the address it was sent to.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your email at {email} for your sign-in link.'**
+  String settingsAccountCheckEmail(String email);
+
+  /// Snackbar shown when sending the magic-link email fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send the sign-in link. Please try again.'**
+  String get settingsAccountSendError;
+
+  /// Label of the Account section's signed-in sign-out button.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get settingsAccountSignOut;
+
+  /// Title of the sign-out confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out?'**
+  String get settingsAccountSignOutConfirmTitle;
+
+  /// Body of the sign-out confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'You can sign in again anytime with your email.'**
+  String get settingsAccountSignOutConfirmBody;
+
+  /// Confirm button of the sign-out confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get settingsAccountSignOutConfirmAction;
+
+  /// Snackbar shown when signing out fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t sign out. Please try again.'**
+  String get settingsAccountSignOutError;
+
+  /// Label of the Account section's single disabled row shown when Supabase isn't configured (NoopAuthGateway) -- e.g. tests, E2E, and F-Droid builds without sync wired up.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync — coming soon'**
+  String get settingsAccountComingSoonTitle;
+
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///
   /// In en, this message translates to:

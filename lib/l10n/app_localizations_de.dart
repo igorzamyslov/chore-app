@@ -497,6 +497,52 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsLanguageDeutsch => 'Deutsch';
 
   @override
+  String get settingsAccountSectionTitle => 'Konto';
+
+  @override
+  String get settingsAccountIntro =>
+      'Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.';
+
+  @override
+  String get settingsAccountEmailLabel => 'E-Mail-Adresse';
+
+  @override
+  String get settingsAccountSendLink => 'Anmeldelink senden';
+
+  @override
+  String get settingsAccountSendAgain => 'Erneut senden';
+
+  @override
+  String settingsAccountCheckEmail(String email) {
+    return 'Sieh in deinem Postfach unter $email nach deinem Anmeldelink.';
+  }
+
+  @override
+  String get settingsAccountSendError =>
+      'Der Anmeldelink konnte nicht gesendet werden. Versuch es noch mal.';
+
+  @override
+  String get settingsAccountSignOut => 'Abmelden';
+
+  @override
+  String get settingsAccountSignOutConfirmTitle => 'Abmelden?';
+
+  @override
+  String get settingsAccountSignOutConfirmBody =>
+      'Du kannst dich jederzeit wieder mit deiner E-Mail-Adresse anmelden.';
+
+  @override
+  String get settingsAccountSignOutConfirmAction => 'Abmelden';
+
+  @override
+  String get settingsAccountSignOutError =>
+      'Abmelden hat nicht geklappt. Versuch es noch mal.';
+
+  @override
+  String get settingsAccountComingSoonTitle =>
+      'Synchronisierung — bald verfügbar';
+
+  @override
   String get settingsAboutSectionTitle => 'Über die App';
 
   @override

@@ -2,11 +2,24 @@ import 'dart:async';
 
 import 'package:chore_app/app/app.dart';
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/app/supabase_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Only ever called here, before `runApp` -- never from a widget, never in
+  // tests (spec `docs/specs/sync-backend.md` §5). `supabaseConfigured`
+  // false (the empty-dart-define escape hatch -- see
+  // `lib/app/supabase_config.dart`) keeps the app fully offline, which is
+  // exactly what every test and E2E run does.
+  if (supabaseConfigured) {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabaseAnonKey,
+    );
+  }
   final container = ProviderContainer();
   // Activates the digest reschedule-on-mutation wiring and the chore
   // catch-up resume/day-change wiring immediately, before the widget tree

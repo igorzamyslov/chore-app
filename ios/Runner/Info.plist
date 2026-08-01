@@ -49,6 +49,20 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Supabase magic-link auth callback (spec docs/specs/sync-backend.md
+	     §5): supabase_flutter listens for this scheme and completes the
+	     sign-in itself once the deep link reaches the app. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.igorzamyslov.famdo.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>famdo</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

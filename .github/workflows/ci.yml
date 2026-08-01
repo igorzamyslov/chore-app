@@ -19,4 +19,7 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --fatal-infos --fatal-warnings
-      - run: flutter test
+      # SUPABASE_* defines empty: keeps `supabaseConfigured` false for the
+      # whole suite (see lefthook.yml's `test` job for why this is
+      # required, not just tidy).
+      - run: flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=

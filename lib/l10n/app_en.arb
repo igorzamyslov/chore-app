@@ -678,6 +678,65 @@
     "description": "Language picker option for German. A proper name: shown as 'Deutsch' regardless of the app's current UI locale, so this value is identical in every arb file."
   },
 
+  "settingsAccountSectionTitle": "Account",
+  "@settingsAccountSectionTitle": {
+    "description": "Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section."
+  },
+  "settingsAccountIntro": "Sign in to sync your household across your devices.",
+  "@settingsAccountIntro": {
+    "description": "Intro line shown above the email field in the Account section's signed-out state."
+  },
+  "settingsAccountEmailLabel": "Email address",
+  "@settingsAccountEmailLabel": {
+    "description": "Label of the Account section's signed-out email TextField."
+  },
+  "settingsAccountSendLink": "Send sign-in link",
+  "@settingsAccountSendLink": {
+    "description": "Label of the Account section's signed-out submit button, before it has been tapped."
+  },
+  "settingsAccountSendAgain": "Send again",
+  "@settingsAccountSendAgain": {
+    "description": "Label the Account section's submit button switches to after a magic-link email has been sent at least once."
+  },
+  "settingsAccountCheckEmail": "Check your email at {email} for your sign-in link.",
+  "@settingsAccountCheckEmail": {
+    "description": "Inline confirmation shown after a magic-link email is sent, naming the address it was sent to.",
+    "placeholders": {
+      "email": {
+        "type": "String",
+        "example": "me@example.com"
+      }
+    }
+  },
+  "settingsAccountSendError": "Couldn't send the sign-in link. Please try again.",
+  "@settingsAccountSendError": {
+    "description": "Snackbar shown when sending the magic-link email fails."
+  },
+  "settingsAccountSignOut": "Sign out",
+  "@settingsAccountSignOut": {
+    "description": "Label of the Account section's signed-in sign-out button."
+  },
+  "settingsAccountSignOutConfirmTitle": "Sign out?",
+  "@settingsAccountSignOutConfirmTitle": {
+    "description": "Title of the sign-out confirmation dialog."
+  },
+  "settingsAccountSignOutConfirmBody": "You can sign in again anytime with your email.",
+  "@settingsAccountSignOutConfirmBody": {
+    "description": "Body of the sign-out confirmation dialog."
+  },
+  "settingsAccountSignOutConfirmAction": "Sign out",
+  "@settingsAccountSignOutConfirmAction": {
+    "description": "Confirm button of the sign-out confirmation dialog."
+  },
+  "settingsAccountSignOutError": "Couldn't sign out. Please try again.",
+  "@settingsAccountSignOutError": {
+    "description": "Snackbar shown when signing out fails."
+  },
+  "settingsAccountComingSoonTitle": "Sync — coming soon",
+  "@settingsAccountComingSoonTitle": {
+    "description": "Label of the Account section's single disabled row shown when Supabase isn't configured (NoopAuthGateway) -- e.g. tests, E2E, and F-Droid builds without sync wired up."
+  },
+
   "settingsAboutSectionTitle": "About",
   "@settingsAboutSectionTitle": {
     "description": "Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style."

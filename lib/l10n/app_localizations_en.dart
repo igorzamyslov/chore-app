@@ -491,6 +491,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageDeutsch => 'Deutsch';
 
   @override
+  String get settingsAccountSectionTitle => 'Account';
+
+  @override
+  String get settingsAccountIntro =>
+      'Sign in to sync your household across your devices.';
+
+  @override
+  String get settingsAccountEmailLabel => 'Email address';
+
+  @override
+  String get settingsAccountSendLink => 'Send sign-in link';
+
+  @override
+  String get settingsAccountSendAgain => 'Send again';
+
+  @override
+  String settingsAccountCheckEmail(String email) {
+    return 'Check your email at $email for your sign-in link.';
+  }
+
+  @override
+  String get settingsAccountSendError =>
+      'Couldn\'t send the sign-in link. Please try again.';
+
+  @override
+  String get settingsAccountSignOut => 'Sign out';
+
+  @override
+  String get settingsAccountSignOutConfirmTitle => 'Sign out?';
+
+  @override
+  String get settingsAccountSignOutConfirmBody =>
+      'You can sign in again anytime with your email.';
+
+  @override
+  String get settingsAccountSignOutConfirmAction => 'Sign out';
+
+  @override
+  String get settingsAccountSignOutError =>
+      'Couldn\'t sign out. Please try again.';
+
+  @override
+  String get settingsAccountComingSoonTitle => 'Sync — coming soon';
+
+  @override
   String get settingsAboutSectionTitle => 'About';
 
   @override
