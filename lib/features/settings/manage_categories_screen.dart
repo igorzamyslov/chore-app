@@ -20,8 +20,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// The chore and shopping lists both already sort by `sort_order`, so a
 /// drag reorder here is reflected there without any further wiring.
 class ManageCategoriesScreen extends ConsumerStatefulWidget {
-  /// Creates the manage-categories screen, defaulting to chore categories.
-  const ManageCategoriesScreen({super.key});
+  /// Creates the manage-categories screen, opening on [initialKind]
+  /// (defaulting to chore categories — the Settings entry point never
+  /// passes one). The category pickers (feedback round 3) pass their own
+  /// kind so the screen opens already showing the relevant section.
+  const ManageCategoriesScreen({
+    this.initialKind = CategoryKind.chore,
+    super.key,
+  });
+
+  /// The [CategoryKind] section shown first; the segmented control still
+  /// lets the user switch to the other one from there.
+  final CategoryKind initialKind;
 
   @override
   ConsumerState<ManageCategoriesScreen> createState() =>
@@ -30,7 +40,13 @@ class ManageCategoriesScreen extends ConsumerStatefulWidget {
 
 class _ManageCategoriesScreenState
     extends ConsumerState<ManageCategoriesScreen> {
-  CategoryKind _kind = CategoryKind.chore;
+  late CategoryKind _kind;
+
+  @override
+  void initState() {
+    super.initState();
+    _kind = widget.initialKind;
+  }
 
   StreamProvider<List<Category>> get _activeProvider =>
       _kind == CategoryKind.chore

@@ -176,6 +176,12 @@ abstract class AppLocalizations {
   /// **'None'**
   String get categoryPickerNone;
 
+  /// Tooltip for the category picker's trailing icon button (chore form and shopping item edit sheet), which pushes the manage-categories screen filtered to the picker's kind (feedback round 3: an in-context entry point alongside the existing Settings one).
+  ///
+  /// In en, this message translates to:
+  /// **'Edit categories'**
+  String get categoryPickerManageTooltip;
+
   /// Chore occurrence action-sheet entry: skip the pending occurrence.
   ///
   /// In en, this message translates to:

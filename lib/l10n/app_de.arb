@@ -17,6 +17,7 @@
   "settingsTabLabel": "Einstellungen",
 
   "categoryPickerNone": "Keine",
+  "categoryPickerManageTooltip": "Kategorien bearbeiten",
 
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",

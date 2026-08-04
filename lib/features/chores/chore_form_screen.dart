@@ -139,6 +139,28 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     final members = ref.watch(membersProvider).value ?? const [];
     final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
 
+    // The category picker's "edit categories" entry point (feedback round
+    // 3) can push the manage-categories screen and come back having
+    // deleted the currently-selected category. `choreCategoriesProvider`
+    // only ever lists active categories, so if the selected id drops out
+    // of it, fall back to 'None' — the same end state a persisted chore
+    // already lands in, since `CategoryRepository.softDeleteCategory`
+    // clears `categoryId` on every chore referencing it in the same
+    // transaction; this covers the in-memory, not-yet-saved case that
+    // cascade can't reach.
+    ref.listen<AsyncValue<List<Category>>>(choreCategoriesProvider, (
+      _,
+      next,
+    ) {
+      final active = next.value;
+      if (active == null) {
+        return;
+      }
+      if (_categoryId != null && !active.any((c) => c.id == _categoryId)) {
+        setState(() => _categoryId = null);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: Text(formTitle)),
       body: ListView(
@@ -160,6 +182,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
               selectedCategoryId: _categoryId,
               onChanged: (value) => setState(() => _categoryId = value),
               idPrefix: 'chore_form.category',
+              kind: CategoryKind.chore,
             ),
           ),
           const SizedBox(height: 16),

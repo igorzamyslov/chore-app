@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/categories/category_picker.dart';
 import 'package:chore_app/features/shopping/shopping_edit_validation.dart';
@@ -65,6 +66,24 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final l10n = AppLocalizations.of(context);
 
+    // Same fallback as the chore form's picker (feedback round 3): the
+    // picker's "edit categories" button can push the manage-categories
+    // screen and come back having deleted the item's currently-selected
+    // category. `shoppingCategoriesProvider` only lists active categories,
+    // so drop back to 'None' when the selected id is no longer among them.
+    ref.listen<AsyncValue<List<Category>>>(shoppingCategoriesProvider, (
+      _,
+      next,
+    ) {
+      final active = next.value;
+      if (active == null) {
+        return;
+      }
+      if (_categoryId != null && !active.any((c) => c.id == _categoryId)) {
+        setState(() => _categoryId = null);
+      }
+    });
+
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
       child: Column(
@@ -100,6 +119,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
               selectedCategoryId: _categoryId,
               onChanged: (value) => setState(() => _categoryId = value),
               idPrefix: 'shopping.edit.category',
+              kind: CategoryKind.shopping,
             ),
           ),
           const SizedBox(height: 24),
