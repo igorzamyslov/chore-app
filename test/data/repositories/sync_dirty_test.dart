@@ -105,10 +105,10 @@ void main() {
   tearDown(() => db.close());
 
   group('HouseholdRepository', () {
-    test('ensureLocalHousehold marks the household and its bootstrap '
+    test('createLocalHousehold marks the household and its admin '
         'member dirty', () async {
       final repo = HouseholdRepository(db, newId: _IdGen().call);
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
 
       expect(household.syncDirty, isTrue);
       expect(await _householdDirty(db, household.id), isTrue);
@@ -118,7 +118,7 @@ void main() {
 
     test('addMember marks the new member dirty', () async {
       final repo = HouseholdRepository(db, newId: _IdGen().call);
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
 
       final member = await repo.addMember(
         household.id,
@@ -132,7 +132,7 @@ void main() {
 
     test('setMemberRole marks the member dirty', () async {
       final repo = HouseholdRepository(db, newId: _IdGen().call);
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
       final member = await repo.addMember(
         household.id,
         name: 'Jo',
@@ -148,7 +148,7 @@ void main() {
 
     test('renameMember marks the member dirty', () async {
       final repo = HouseholdRepository(db, newId: _IdGen().call);
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
       final member = await repo.addMember(
         household.id,
         name: 'Jo',
@@ -163,7 +163,7 @@ void main() {
 
     test('recolorMember marks the member dirty', () async {
       final repo = HouseholdRepository(db, newId: _IdGen().call);
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
       final member = await repo.addMember(
         household.id,
         name: 'Jo',
@@ -185,7 +185,7 @@ void main() {
     setUp(() async {
       households = HouseholdRepository(db, newId: _IdGen().call);
       repo = CategoryRepository(db, newId: _IdGen().call);
-      householdId = (await households.ensureLocalHousehold()).id;
+      householdId = (await households.createLocalHousehold('Me')).id;
     });
 
     test('seedDefaults marks every seeded category dirty', () async {
@@ -298,7 +298,7 @@ void main() {
     setUp(() async {
       households = HouseholdRepository(db, newId: _IdGen().call);
       repo = ChoreRepository(db, newId: _IdGen().call);
-      householdId = (await households.ensureLocalHousehold()).id;
+      householdId = (await households.createLocalHousehold('Me')).id;
       memberId = (await households.addMember(
         householdId,
         name: 'Jo',
@@ -413,7 +413,7 @@ void main() {
     setUp(() async {
       final households = HouseholdRepository(db, newId: _IdGen().call);
       repo = ShoppingRepository(db, newId: _IdGen().call);
-      householdId = (await households.ensureLocalHousehold()).id;
+      householdId = (await households.createLocalHousehold('Me')).id;
     });
 
     test('addItem marks the new item dirty', () async {
@@ -503,7 +503,7 @@ void main() {
     setUp(() async {
       final households = HouseholdRepository(db, newId: _IdGen().call);
       chores = ChoreRepository(db, newId: _IdGen().call);
-      householdId = (await households.ensureLocalHousehold()).id;
+      householdId = (await households.createLocalHousehold('Me')).id;
       memberId = (await db.select(db.members).getSingle()).id;
       service = ChoreService(
         database: db,

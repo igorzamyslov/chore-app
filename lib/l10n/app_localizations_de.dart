@@ -180,6 +180,42 @@ class AppLocalizationsDe extends AppLocalizations {
       'Deine Aufgaben konnten nicht geladen werden.';
 
   @override
+  String get welcomeTagline =>
+      'Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.';
+
+  @override
+  String get welcomeCreateTitle => 'Neuen Haushalt einrichten';
+
+  @override
+  String get welcomeCreateSubtitle =>
+      'Bleibt erst mal auf diesem Gerät — du kannst später synchronisieren.';
+
+  @override
+  String get welcomeCreateNameLabel => 'Dein Name';
+
+  @override
+  String get welcomeCreateConfirm => 'Los geht\'s';
+
+  @override
+  String get welcomeCreateError =>
+      'Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.';
+
+  @override
+  String get welcomeJoinTitle => 'Meinem Haushalt beitreten';
+
+  @override
+  String get welcomeJoinSubtitle =>
+      'Melde dich an und nutze einen Einladungscode vom Gerät eines Familienmitglieds.';
+
+  @override
+  String get welcomeJoinReconnectSubtitle =>
+      'Dieses Gerät ist noch nicht damit verbunden.';
+
+  @override
+  String get welcomeOffline =>
+      'Kein Konto nötig — alles bleibt auf deinem Gerät, außer du meldest dich an.';
+
+  @override
   String get onboardingNameBannerMessage => 'Wer erledigt hier die Aufgaben?';
 
   @override

@@ -8,11 +8,14 @@ tags:
     clearState: true
 # First-frame settle (README convention 8): on slow CI machines the
 # first frame after a clearState launch can lose the race against the
-# first tap — wait for the shell to exist before touching anything.
+# first tap — wait for the welcome gate to exist before touching anything
+# (a cold launch now lands there, spec docs/specs/onboarding-v2.md, not on
+# the shell directly).
 - extendedWaitUntil:
     visible:
-      id: "shell.tab.chores"
+      id: "welcome.create"
     timeout: 60000
+- runFlow: ../common/onboard_fresh.yaml
 - tapOn:
     id: "chores.add"
 - tapOn:

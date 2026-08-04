@@ -113,6 +113,12 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      // bootstrapProvider no longer creates a household (spec
+      // docs/specs/onboarding-v2.md §2) -- seed one directly so
+      // _awaitBootstrap below actually resolves instead of erroring.
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
 
       // Mirrors main.dart's activation order: read the controller before
       // anything links, exactly like the app does before runApp.

@@ -338,6 +338,66 @@ abstract class AppLocalizations {
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
 
+  /// One-line purpose statement under the app name on the welcome screen (spec docs/specs/onboarding-v2.md §1), shown full-screen before any household exists locally.
+  ///
+  /// In en, this message translates to:
+  /// **'Share chores and a shopping list with your household.'**
+  String get welcomeTagline;
+
+  /// Title of the welcome screen's primary card (id welcome.create): starts a brand-new local household, no account needed.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a new household'**
+  String get welcomeCreateTitle;
+
+  /// Subtitle of the welcome screen's primary create card, stating up front that no account/network is required.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it on this device — you can sync later.'**
+  String get welcomeCreateSubtitle;
+
+  /// Label of the inline name field (id welcome.create.name) shown after tapping the create card -- this becomes the sole admin member's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get welcomeCreateNameLabel;
+
+  /// Label of the inline create form's confirm button (id welcome.create.confirm): creates the household with the typed name and lands on the chores tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get welcomeCreateConfirm;
+
+  /// Inline error shown under the create form's name field if HouseholdCreateService.create throws (e.g. a local database error).
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong setting up your household. Please try again.'**
+  String get welcomeCreateError;
+
+  /// Title of the welcome screen's secondary card (id welcome.join), and the app bar title of the welcome-join subpage it opens. Hidden entirely when Supabase isn't configured (offline/F-Droid builds, tests).
+  ///
+  /// In en, this message translates to:
+  /// **'Join my family\'s household'**
+  String get welcomeJoinTitle;
+
+  /// Subtitle of the welcome screen's secondary join card.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in and use an invite code from a family member\'s device.'**
+  String get welcomeJoinSubtitle;
+
+  /// Subtitle under the welcome-join subpage's reconnect offer (id welcome.join.reconnect, spec docs/specs/onboarding-v2.md §1/sync-backend.md §7.6), shown when findMyMembership finds the signed-in account already has a membership -- unlike the Settings Account section's equivalent copy (settingsAccountReconnectIntro), this never mentions replacing local data: nothing local exists yet on the welcome path.
+  ///
+  /// In en, this message translates to:
+  /// **'This device isn\'t connected to it yet.'**
+  String get welcomeJoinReconnectSubtitle;
+
+  /// Small print at the bottom of the welcome screen (id welcome.offline), under both cards. Links nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No account needed — everything stays on your device unless you sign in.'**
+  String get welcomeOffline;
+
   /// First-run name-prompt banner copy at the top of the chores list (spec docs/specs/polish-round-1.md A2), shown while the household still consists of just the bootstrap 'Me' member.
   ///
   /// In en, this message translates to:

@@ -206,27 +206,9 @@ class HouseholdJoinService {
     );
 
     // Step 2 -- deliberately after the archive; see the class doc comment.
-    final String joinedHouseholdId;
-    final String actingMemberId;
-    switch (choice) {
-      case ClaimMemberChoice(:final memberId):
-        actingMemberId = memberId;
-        joinedHouseholdId = await gateway.claimMember(code!, memberId);
-      case NewMemberChoice(:final memberId, :final name, :final color):
-        actingMemberId = memberId;
-        joinedHouseholdId = await gateway.joinAsNewMember(
-          code: code!,
-          memberId: memberId,
-          memberName: name,
-          memberColor: color,
-        );
-      case ReconnectChoice(:final householdId, :final memberId):
-        // Spec §7.6: already claimed server-side -- no RPC call at all,
-        // straight into the shared download/replace machinery below with
-        // the membership's own ids.
-        actingMemberId = memberId;
-        joinedHouseholdId = householdId;
-    }
+    final resolved = await _resolveChoice(choice, code);
+    final joinedHouseholdId = resolved.householdId;
+    final actingMemberId = resolved.memberId;
 
     // Step 3.
     final downloaded = await gateway.downloadHousehold(joinedHouseholdId);
@@ -290,6 +272,63 @@ class HouseholdJoinService {
       householdId: joinedHouseholdId,
       archiveFileName: archiveFile.uri.pathSegments.last,
     );
+  }
+
+  /// Runs the P2c join flow (and, via [ReconnectChoice], P2d reconnect) for
+  /// the WELCOME screen's "Join my family's household" path (spec
+  /// `docs/specs/onboarding-v2.md` §1), where NO local household exists
+  /// yet -- unlike [join], there is nothing local to preserve, so this
+  /// skips the archive write and the import offer entirely (both are
+  /// meaningless with no old household to export from or copy chores out
+  /// of), and skips deleting/replacing an old household (there isn't one).
+  ///
+  /// Otherwise identical to [join]'s steps 2-4: resolve [choice] (claim/
+  /// join-as-new/reconnect), download the joined household, insert it, and
+  /// repoint `settings` (acting member + linked state). Resolves to the
+  /// joined household's id -- there is no archive file name to report,
+  /// unlike [HouseholdJoinResult].
+  Future<String> joinFresh({required JoinChoice choice, String? code}) async {
+    final resolved = await _resolveChoice(choice, code);
+    final joinedHouseholdId = resolved.householdId;
+    final actingMemberId = resolved.memberId;
+
+    final downloaded = await gateway.downloadHousehold(joinedHouseholdId);
+
+    await database.transaction(() async {
+      await _insertSnapshot(downloaded);
+      await settings.setActingMember(actingMemberId);
+      await settings.setSyncLinked(
+        householdId: joinedHouseholdId,
+        linkedAt: clock.now(),
+      );
+    });
+
+    return joinedHouseholdId;
+  }
+
+  /// Resolves [choice] to the joined household id and the acting member id,
+  /// via the claim/join-as-new/reconnect RPC branch -- shared by [join]
+  /// (its step 2) and [joinFresh].
+  Future<({String householdId, String memberId})> _resolveChoice(
+    JoinChoice choice,
+    String? code,
+  ) async {
+    switch (choice) {
+      case ClaimMemberChoice(:final memberId):
+        final householdId = await gateway.claimMember(code!, memberId);
+        return (householdId: householdId, memberId: memberId);
+      case NewMemberChoice(:final memberId, :final name, :final color):
+        final householdId = await gateway.joinAsNewMember(
+          code: code!,
+          memberId: memberId,
+          memberName: name,
+          memberColor: color,
+        );
+        return (householdId: householdId, memberId: memberId);
+      case ReconnectChoice(:final householdId, :final memberId):
+        // Spec §7.6: already claimed server-side -- no RPC call at all.
+        return (householdId: householdId, memberId: memberId);
+    }
   }
 
   /// Deletes every row of [householdId] from the local database, in the
