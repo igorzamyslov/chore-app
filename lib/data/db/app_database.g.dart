@@ -477,6 +477,17 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<String> deletedAt = GeneratedColumn<String>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     syncDirty,
@@ -488,6 +499,7 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
     userId,
     createdAt,
     updatedAt,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -561,6 +573,12 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -608,6 +626,10 @@ class $MembersTable extends Members with TableInfo<$MembersTable, Member> {
         DriftSqlType.string,
         data['${effectivePrefix}updated_at'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -650,6 +672,19 @@ class Member extends DataClass implements Insertable<Member> {
 
   /// ISO-8601 UTC timestamp of the last update.
   final String updatedAt;
+
+  /// ISO-8601 UTC soft-delete timestamp; `NULL` means active. Added in
+  /// schemaVersion 9 (spec `docs/feedback/2026-08-01-ux-audit.md` A1): the
+  /// server column (`members.deleted_at`) has existed since P1 and is
+  /// already UPDATE-granted -- this just catches the client up so a member
+  /// can finally be removed. Roster queries (`HouseholdRepository
+  /// .watchMembers` and everything built on it) exclude soft-deleted rows;
+  /// history-display joins (done-today, occurrence assignee avatars,
+  /// `completedBy`) deliberately keep resolving them so past attribution
+  /// stays readable. See `MemberService.deleteMember`
+  /// (`lib/application/member_service.dart`) for the referential cleanup
+  /// that runs alongside the soft delete.
+  final String? deletedAt;
   const Member({
     required this.syncDirty,
     required this.id,
@@ -660,6 +695,7 @@ class Member extends DataClass implements Insertable<Member> {
     this.userId,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -677,6 +713,9 @@ class Member extends DataClass implements Insertable<Member> {
     }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<String>(deletedAt);
+    }
     return map;
   }
 
@@ -693,6 +732,9 @@ class Member extends DataClass implements Insertable<Member> {
           : Value(userId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -713,6 +755,7 @@ class Member extends DataClass implements Insertable<Member> {
       userId: serializer.fromJson<String?>(json['userId']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
+      deletedAt: serializer.fromJson<String?>(json['deletedAt']),
     );
   }
   @override
@@ -730,6 +773,7 @@ class Member extends DataClass implements Insertable<Member> {
       'userId': serializer.toJson<String?>(userId),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
+      'deletedAt': serializer.toJson<String?>(deletedAt),
     };
   }
 
@@ -743,6 +787,7 @@ class Member extends DataClass implements Insertable<Member> {
     Value<String?> userId = const Value.absent(),
     String? createdAt,
     String? updatedAt,
+    Value<String?> deletedAt = const Value.absent(),
   }) => Member(
     syncDirty: syncDirty ?? this.syncDirty,
     id: id ?? this.id,
@@ -753,6 +798,7 @@ class Member extends DataClass implements Insertable<Member> {
     userId: userId.present ? userId.value : this.userId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   Member copyWithCompanion(MembersCompanion data) {
     return Member(
@@ -767,6 +813,7 @@ class Member extends DataClass implements Insertable<Member> {
       userId: data.userId.present ? data.userId.value : this.userId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -781,7 +828,8 @@ class Member extends DataClass implements Insertable<Member> {
           ..write('role: $role, ')
           ..write('userId: $userId, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -797,6 +845,7 @@ class Member extends DataClass implements Insertable<Member> {
     userId,
     createdAt,
     updatedAt,
+    deletedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -810,7 +859,8 @@ class Member extends DataClass implements Insertable<Member> {
           other.role == this.role &&
           other.userId == this.userId &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class MembersCompanion extends UpdateCompanion<Member> {
@@ -823,6 +873,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
   final Value<String?> userId;
   final Value<String> createdAt;
   final Value<String> updatedAt;
+  final Value<String?> deletedAt;
   final Value<int> rowid;
   const MembersCompanion({
     this.syncDirty = const Value.absent(),
@@ -834,6 +885,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     this.userId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MembersCompanion.insert({
@@ -846,6 +898,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     this.userId = const Value.absent(),
     required String createdAt,
     required String updatedAt,
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        householdId = Value(householdId),
@@ -864,6 +917,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     Expression<String>? userId,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
+    Expression<String>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -876,6 +930,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
       if (userId != null) 'user_id': userId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -890,6 +945,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
     Value<String?>? userId,
     Value<String>? createdAt,
     Value<String>? updatedAt,
+    Value<String?>? deletedAt,
     Value<int>? rowid,
   }) {
     return MembersCompanion(
@@ -902,6 +958,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
       userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -938,6 +995,9 @@ class MembersCompanion extends UpdateCompanion<Member> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<String>(updatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<String>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -956,6 +1016,7 @@ class MembersCompanion extends UpdateCompanion<Member> {
           ..write('userId: $userId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5748,6 +5809,7 @@ typedef $$MembersTableCreateCompanionBuilder =
       Value<String?> userId,
       required String createdAt,
       required String updatedAt,
+      Value<String?> deletedAt,
       Value<int> rowid,
     });
 typedef $$MembersTableUpdateCompanionBuilder =
@@ -5761,6 +5823,7 @@ typedef $$MembersTableUpdateCompanionBuilder =
       Value<String?> userId,
       Value<String> createdAt,
       Value<String> updatedAt,
+      Value<String?> deletedAt,
       Value<int> rowid,
     });
 
@@ -5888,6 +5951,11 @@ class $$MembersTableFilterComposer
 
   ColumnFilters<String> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6039,6 +6107,11 @@ class $$MembersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$HouseholdsTableOrderingComposer get householdId {
     final $$HouseholdsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6095,6 +6168,9 @@ class $$MembersTableAnnotationComposer
 
   GeneratedColumn<String> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   $$HouseholdsTableAnnotationComposer get householdId {
     final $$HouseholdsTableAnnotationComposer composer = $composerBuilder(
@@ -6237,6 +6313,7 @@ class $$MembersTableTableManager
                 Value<String?> userId = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
+                Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MembersCompanion(
                 syncDirty: syncDirty,
@@ -6248,6 +6325,7 @@ class $$MembersTableTableManager
                 userId: userId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6261,6 +6339,7 @@ class $$MembersTableTableManager
                 Value<String?> userId = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
+                Value<String?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MembersCompanion.insert(
                 syncDirty: syncDirty,
@@ -6272,6 +6351,7 @@ class $$MembersTableTableManager
                 userId: userId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

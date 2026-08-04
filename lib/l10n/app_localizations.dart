@@ -884,6 +884,12 @@ abstract class AppLocalizations {
   /// **'Could not load your members.'**
   String get manageMembersErrorMessage;
 
+  /// Subtitle of the editable household-name row at the top of the Members screen (spec docs/feedback/2026-08-01-ux-audit.md A2).
+  ///
+  /// In en, this message translates to:
+  /// **'Household name'**
+  String get manageMembersHouseholdSubtitle;
+
   /// Member edit sheet heading when adding a new member.
   ///
   /// In en, this message translates to:
@@ -907,6 +913,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Color'**
   String get memberEditColorLabel;
+
+  /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {memberName}?'**
+  String memberDeleteDialogTitle(String memberName);
+
+  /// Body of the member delete-confirmation dialog, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior).
+  ///
+  /// In en, this message translates to:
+  /// **'This removes {memberName} from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to {memberName} open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.'**
+  String memberDeleteDialogBody(String memberName);
+
+  /// Title of the household-rename bottom sheet (spec docs/feedback/2026-08-01-ux-audit.md A2), opened from the Members screen's household-name row.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename household'**
+  String get householdRenameTitle;
+
+  /// Label of the household-rename sheet's required name text field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get householdRenameNameLabel;
 
   /// Settings screen list entry that opens category management (spec ux-round-2 B1).
   ///
@@ -1088,6 +1118,12 @@ abstract class AppLocalizations {
   /// **'Check your email at {email} for your sign-in link.'**
   String settingsAccountCheckEmail(String email);
 
+  /// One-line hint shown under the signed-out sign-in form when this device is linked but no user is currently signed in (spec docs/feedback/2026-08-01-ux-audit.md A5) -- explains why syncing has silently stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone is linked to {householdName} — sign in to keep syncing.'**
+  String settingsAccountSignedOutLinked(String householdName);
+
   /// Snackbar shown when sending the magic-link email fails.
   ///
   /// In en, this message translates to:
@@ -1136,10 +1172,10 @@ abstract class AppLocalizations {
   /// **'Reconnect to {householdName}'**
   String settingsAccountReconnectTitle(String householdName);
 
-  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same archive guarantee as join).
+  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same backup-file guarantee as join). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
   ///
   /// In en, this message translates to:
-  /// **'Replaces your local data — it\'s kept only in an archive file on this device.'**
+  /// **'Replaces your local data — it\'s saved to a backup file on this device.'**
   String get settingsAccountReconnectIntro;
 
   /// Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked.
@@ -1256,10 +1292,10 @@ abstract class AppLocalizations {
   /// **'Bring over your open chores?'**
   String get joinHouseholdImportTitle;
 
-  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and survives only in the archive file (spec §4).
+  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and saved to a backup file (spec §4). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
   ///
   /// In en, this message translates to:
-  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept only in an archive file on this device.'**
+  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.'**
   String get joinHouseholdImportBody;
 
   /// Accept button of the import-offer step.
@@ -1346,11 +1382,17 @@ abstract class AppLocalizations {
   /// **'Reset app data?'**
   String get settingsResetConfirm1Title;
 
-  /// Body of the first reset confirmation dialog, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
+  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
   /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.'**
   String get settingsResetConfirm1Body;
+
+  /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.'**
+  String get settingsResetConfirm1BodyLinked;
 
   /// Confirm button of the first reset dialog; advances to the second, final confirmation rather than deleting anything yet.
   ///

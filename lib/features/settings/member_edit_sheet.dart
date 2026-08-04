@@ -1,7 +1,7 @@
-/// The member add/edit bottom sheet: rename, recolor, save. No delete
-/// affordance (spec `docs/specs/members-management.md` §3: member deletion
-/// is out of scope until a reassignment story exists for chores
-/// referencing the member).
+/// The member add/edit bottom sheet: rename, recolor, save, delete (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A1). Delete is visible only when
+/// the member is deletable: unclaimed (no `userId`) AND not the
+/// household's last active member.
 library;
 
 import 'package:chore_app/app/color_swatch_picker.dart';
@@ -9,6 +9,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/features/settings/member_delete_dialog.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,6 +69,22 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
   List<Member> get _currentMembers =>
       ref.read(membersProvider).value ?? const <Member>[];
 
+  /// Whether the delete action should be shown at all (spec: HIDDEN, not
+  /// disabled, for a claimed or last-remaining member).
+  ///
+  /// [membersProvider] is already the roster query (soft-deleted members
+  /// excluded, `HouseholdRepository.watchMembers`), so its current length
+  /// already reflects "active members" -- if the member being edited is
+  /// one of only one, deleting it would leave zero.
+  bool get _canDelete {
+    final member = widget.member;
+    if (member == null || member.userId != null) {
+      return false;
+    }
+    final activeMembers = ref.watch(membersProvider).value ?? const <Member>[];
+    return activeMembers.length > 1;
+  }
+
   int _firstFreeColor() {
     final usedColors = _currentMembers.map((m) => m.color).toSet();
     const seedColors = CategoryRepository.seedColors;
@@ -113,6 +130,17 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
           const SizedBox(height: 24),
           Row(
             children: [
+              if (_canDelete)
+                semantic(
+                  'members.edit.delete',
+                  child: TextButton(
+                    onPressed: _delete,
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                    ),
+                    child: Text(l10n.commonDelete),
+                  ),
+                ),
               const Spacer(),
               semantic(
                 'members.edit.save',
@@ -139,6 +167,31 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
       final householdId = ref.read(bootstrapProvider).requireValue;
       await repo.addMember(householdId, name: name, color: _color);
     }
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _delete() async {
+    final existing = widget.member;
+    if (existing == null) {
+      return;
+    }
+    final confirmed = await showMemberDeleteDialog(
+      context,
+      memberName: existing.name,
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+    // Unreachable in practice: `_canDelete` above already hides this action
+    // for a claimed or last-remaining member, so `MemberService.deleteMember`
+    // throwing here would be a genuine bug (or an exceedingly rare
+    // cross-device race), not an expected runtime failure -- left to crash
+    // rather than folded into an inline error state, mirroring
+    // `_AdoptRow._adopt` (`account_section.dart`)'s identical reasoning.
+    await ref.read(memberServiceProvider).deleteMember(existing.id);
     if (!mounted) {
       return;
     }

@@ -1,23 +1,32 @@
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:clock/clock.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
+import 'fake_auth_gateway.dart';
 import 'fake_household_gateway.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the manage-members screen (spec
-/// `docs/specs/members-management.md` §3, §6): bootstrap-only state, the
+/// `docs/specs/members-management.md` §3, §6; extended by spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A1/A2): bootstrap-only state, the
 /// add flow (including the disabled-save guard and cross-screen
 /// propagation into the chore form's assignee chips), rename, recolor, the
 /// "duplicate names are allowed" invariant shared with chores (see
-/// `test/features/chores/duplicate_names_widget_test.dart`), and the P2b
-/// 'Invite' row (spec `docs/specs/sync-backend.md` §7.3).
+/// `test/features/chores/duplicate_names_widget_test.dart`), the P2b
+/// 'Invite' row (spec `docs/specs/sync-backend.md` §7.3), household rename
+/// (A2), and member deletion (A1).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -29,15 +38,17 @@ void main() {
   }
 
   testChoreApp(
-    'bootstrap-only state: Settings -> Members shows exactly one row, "Me"',
+    'bootstrap-only state: Settings -> Members shows the household-name row '
+    'plus exactly one member row, "Me"',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
 
       await openManageMembers(tester);
 
+      expect(find.text('My household'), findsOneWidget);
       expect(find.text('Me'), findsOneWidget);
-      expect(find.byType(ListTile), findsOneWidget);
+      expect(find.byType(ListTile), findsNWidgets(2));
 
       handle.dispose();
     },
@@ -243,8 +254,9 @@ void main() {
         find.bySemanticsIdentifier('settings.members.invite'),
         findsNothing,
       );
-      // The bootstrap-only row is still the only one.
-      expect(find.byType(ListTile), findsOneWidget);
+      // The household-name row and the bootstrap-only member row are still
+      // the only ones.
+      expect(find.byType(ListTile), findsNWidgets(2));
 
       handle.dispose();
     },
@@ -281,6 +293,214 @@ void main() {
       );
       expect(find.text('AB3D7XQ9'), findsOneWidget);
       expect(inviteGateway.createInviteCalls, [householdId]);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'household rename (spec A2): tapping the household-name row opens a '
+    'prefilled sheet; saving updates the row and the linked account '
+    'subtitle',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openManageMembers(tester);
+      expect(find.text('My household'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsIdentifier('members.household.rename'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('members.household.rename.name'),
+          matching: find.text('My household'),
+        ),
+        findsOneWidget,
+      );
+
+      final nameField = find.descendant(
+        of: find.bySemanticsIdentifier('members.household.rename.name'),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(nameField, 'The Smiths');
+      await tester.tap(
+        find.bySemanticsIdentifier('members.household.rename.save'),
+      );
+      await tester.pumpAndSettle();
+
+      // Members screen row reflects it immediately.
+      expect(find.text('The Smiths'), findsOneWidget);
+      expect(find.text('My household'), findsNothing);
+
+      final updated = await (database.select(
+        database.households,
+      )..where((tbl) => tbl.id.equals(householdId))).getSingle();
+      expect(updated.name, 'The Smiths');
+      expect(updated.syncDirty, isTrue);
+
+      // The linked Account section subtitle (existing stream) reflects it
+      // too.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Synced with The Smiths'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'member delete action (spec A1) is hidden, not disabled, for the '
+    "household's last remaining member",
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'member delete action (spec A1) is hidden, not disabled, for a '
+    'claimed member',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+      final householdId = await currentHouseholdId(database);
+      await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      // Claim 'Me' directly (no local claim flow exists offline) so the
+      // "claimed members are undeletable" guard is exercised even though
+      // two members now exist.
+      await (database.update(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(userId: Value('u1')),
+      );
+      await tester.pumpAndSettle();
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'member delete flow (spec A1): deleting a member removes them from the '
+    'roster, the chore-form assignee chips, and the acting-member switcher '
+    '-- but done-today history still names them',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final me = await soleBootstrapMember(database);
+      await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      await tester.pumpAndSettle();
+
+      // Give 'Me' some done-today history before deleting them.
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'One-off chore',
+        startDate: PlainDate(2026, 7, 24),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await ChoreRepository(
+        database,
+      ).pendingOccurrenceOf(chore.id);
+      await service.completeOccurrence(pending!.id, completedBy: me.id);
+      await tester.pumpAndSettle();
+
+      await openManageMembers(tester);
+      expect(find.text('Me'), findsOneWidget);
+      expect(find.text('Anna'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('members.edit.delete'));
+      await tester.pumpAndSettle();
+
+      // Confirm dialog states the referential consequences; confirm it.
+      expect(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      // Gone from the members screen roster.
+      expect(find.text('Me'), findsNothing);
+      expect(find.text('Anna'), findsOneWidget);
+
+      final deleted = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(deleted.deletedAt, isNotNull);
+
+      // Gone from the acting-member switcher (on the Chores tab).
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chores.actingMember'));
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('actingMember.sheet.row.${me.id}'),
+        findsNothing,
+      );
+      expect(find.text('Anna'), findsOneWidget);
+      await tester.tap(find.text('Anna'));
+      await tester.pumpAndSettle();
+
+      // Gone from the chore-form assignee chips.
+      await tester.tap(find.bySemanticsIdentifier('chores.add'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('chore_form.assignment.fixed'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilterChip, 'Me'), findsNothing);
+      expect(find.widgetWithText(FilterChip, 'Anna'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      // Done-today history still names the deleted member.
+      await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
+      await tester.pumpAndSettle();
+      expect(find.text('by Me'), findsOneWidget);
 
       handle.dispose();
     },

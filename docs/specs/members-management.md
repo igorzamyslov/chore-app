@@ -9,9 +9,15 @@ is attributed to the bootstrap admin.*
 
 In scope: list/add/rename members, member color, acting-member switcher,
 persistence of the acting member, attribution correctness.
-Out of scope (deferred): member deletion (needs a reassignment story for
-chores referencing the member), roles UI (roles become meaningful with
-sync), multi-household.
+Out of scope (deferred): roles UI (roles become meaningful with sync),
+multi-household.
+
+**Amendment (2026-08-01, UX audit A1):** member deletion — deferred here
+pending "a reassignment story for chores referencing the member" — shipped
+in `docs/feedback/2026-08-01-ux-audit.md` A1 (schema v9 soft delete +
+`MemberService.deleteMember`'s referential cleanup is exactly that
+reassignment story). §3's "no delete affordance" note below is
+superseded; see that spec for the current behavior.
 
 ## 2. Data & providers
 
@@ -54,7 +60,9 @@ sync), multi-household.
 - Rename / recolor: tapping a row opens the same sheet pre-filled
   (`members.edit.name`, `members.edit.save` ids per the category sheet's
   id scheme).
-- No delete affordance anywhere in this version.
+- Delete: superseded by `docs/feedback/2026-08-01-ux-audit.md` A1 -- see
+  that spec for the current delete affordance (visibility guards,
+  referential cleanup) and `lib/application/member_service.dart`.
 
 ## 4. Acting-member switcher
 

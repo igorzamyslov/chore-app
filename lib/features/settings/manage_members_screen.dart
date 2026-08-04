@@ -1,9 +1,9 @@
 /// The member management screen (spec
-/// `docs/specs/members-management.md` §3): list, add, rename, and recolor
-/// household members. No delete affordance in this version — see the
-/// spec's §1 scope note (deletion needs a reassignment story for chores
-/// referencing the member). Once linked (spec `docs/specs/sync-backend.md`
-/// §7.3), also gains an 'Invite' row above the member list.
+/// `docs/specs/members-management.md` §3, extended by spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A1/A2): list, add, rename,
+/// recolor, and delete household members; an editable household-name row
+/// at the top. Once linked (spec `docs/specs/sync-backend.md` §7.3), also
+/// gains an 'Invite' row above the member list.
 library;
 
 import 'package:chore_app/app/providers.dart';
@@ -11,15 +11,17 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/features/settings/household_rename_sheet.dart';
 import 'package:chore_app/features/settings/invite_code_sheet.dart';
 import 'package:chore_app/features/settings/member_edit_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Lists every household member (creation-time order — see
-/// `HouseholdRepository.watchMembers`), each tappable to rename/recolor,
-/// plus a FAB to add a new one.
+/// Lists the household name (tappable to rename, spec A2), then every
+/// household member (creation-time order — see
+/// `HouseholdRepository.watchMembers`), each tappable to rename/recolor/
+/// delete, plus a FAB to add a new one.
 class ManageMembersScreen extends ConsumerWidget {
   /// Creates the manage-members screen.
   const ManageMembersScreen({super.key});
@@ -36,12 +38,16 @@ class ManageMembersScreen extends ConsumerWidget {
       body: membersAsync.when(
         data: (members) => ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: members.length + (linked ? 1 : 0),
+          itemCount: members.length + 1 + (linked ? 1 : 0),
           itemBuilder: (context, index) {
-            if (linked && index == 0) {
+            if (index == 0) {
+              return const _HouseholdNameRow();
+            }
+            final afterHeader = index - 1;
+            if (linked && afterHeader == 0) {
               return const _InviteRow();
             }
-            final member = members[linked ? index - 1 : index];
+            final member = members[linked ? afterHeader - 1 : afterHeader];
             return _MemberRow(
               member: member,
               onTap: () => showMemberEditSheet(context, member: member),
@@ -58,6 +64,33 @@ class ManageMembersScreen extends ConsumerWidget {
           onPressed: () => showMemberEditSheet(context),
           child: const Icon(Icons.add),
         ),
+      ),
+    );
+  }
+}
+
+/// The editable household-name row (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A2), always shown first: tapping
+/// it opens [showHouseholdRenameSheet]. Disabled (no `onTap`) while the
+/// household name hasn't loaded yet -- `currentHouseholdProvider` awaits
+/// `bootstrapProvider` first, so this is only ever momentary.
+class _HouseholdNameRow extends ConsumerWidget {
+  const _HouseholdNameRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final name = ref.watch(currentHouseholdProvider).valueOrNull?.name;
+    return semantic(
+      'members.household.rename',
+      child: ListTile(
+        leading: const Icon(Icons.home_outlined),
+        title: Text(name ?? ''),
+        subtitle: Text(l10n.manageMembersHouseholdSubtitle),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: name == null
+            ? null
+            : () => showHouseholdRenameSheet(context, currentName: name),
       ),
     );
   }

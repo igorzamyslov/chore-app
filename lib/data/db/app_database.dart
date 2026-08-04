@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -132,6 +132,14 @@ class AppDatabase extends _$AppDatabase {
           choreOccurrences.syncDirty,
         );
         await migrator.addColumn(shoppingItems, shoppingItems.syncDirty);
+      }
+      if (from < 9) {
+        // v8 -> v9 (spec `docs/feedback/2026-08-01-ux-audit.md` A1): adds
+        // the nullable `members.deletedAt` soft-delete column, defaulting
+        // to `NULL` (active) -- no data rewrite. `members` has existed
+        // since schemaVersion 1, so this backfill runs unconditionally
+        // whenever `from < 9`, mirroring the `syncDirty` backfill above.
+        await migrator.addColumn(members, members.deletedAt);
       }
     },
     beforeOpen: (details) async {

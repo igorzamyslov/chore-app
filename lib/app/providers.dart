@@ -14,11 +14,12 @@
 /// the two Settings/Members widget tests need on top of db/clock (spec
 /// `docs/specs/sync-backend.md` §7.2); see its own doc comment.
 /// [syncEngineProvider] defaults to [NoopSyncEngine] whenever
-/// [supabaseConfigured] is false or the device is unlinked -- true for
-/// every widget test and E2E run -- so no test needs to override it for
-/// ordinary widget tests (spec `docs/specs/sync-backend.md` §8.2); see its
-/// own doc comment. [syncTransportProvider] is a sixth override point, used
-/// only by `test/app/sync_engine_provider_test.dart` to exercise
+/// [supabaseConfigured] is false, the device is unlinked, or no user is
+/// currently signed in (spec `docs/feedback/2026-08-01-ux-audit.md` A5) --
+/// true for every widget test and E2E run -- so no test needs to override
+/// it for ordinary widget tests (spec `docs/specs/sync-backend.md` §8.2);
+/// see its own doc comment. [syncTransportProvider] is a sixth override
+/// point, used only by `test/app/sync_engine_provider_test.dart` to exercise
 /// [syncEngineProvider]'s own linked-state branching against a fake
 /// transport, bypassing the compile-time [supabaseConfigured] gate that a
 /// test binary can't otherwise flip; see its own doc comment.
@@ -33,6 +34,7 @@ import 'package:chore_app/application/household_create_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
+import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -326,17 +328,29 @@ final syncTransportProvider = Provider<SyncTransport?>((ref) {
 /// The P3 ongoing sync engine (spec `docs/specs/sync-backend.md` §8.2): the
 /// real [SupabaseSyncEngine] whenever [syncTransportProvider] is non-null
 /// (Supabase configured) AND this device is linked (`syncHouseholdId` is
-/// non-null), else the inert [NoopSyncEngine] -- which covers every widget
-/// test and E2E run (neither ever configures Supabase), keeping the offline
-/// suite free of the debounced-push timer and the realtime subscription
+/// non-null) AND a user is currently signed in (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A5), else the inert
+/// [NoopSyncEngine] -- which covers every widget test and E2E run (neither
+/// ever configures Supabase), keeping the offline suite free of the
+/// debounced-push timer and the realtime subscription
 /// [SupabaseSyncEngine.start] arms.
 ///
-/// Re-evaluates ONLY on the linked state, per spec: whenever
+/// **A5 (2026-08-01):** gating on linked state alone let a signed-out,
+/// still-linked device spin forever on 401s (every push/pull silently
+/// failing, per spec §8.3's swallow-everything failure posture) -- no data
+/// harm, but battery/log noise, and Account section showed a bare sign-in
+/// form with no hint the phone was still linked (see
+/// `AccountSectionBody`'s `_SignedOutForm` hint, `lib/features/settings/
+/// account_section.dart`). Fixed by also requiring
+/// [currentAuthUserProvider] to resolve to a non-null user.
+///
+/// Re-evaluates on the linked state AND the auth state, per spec: whenever
 /// `syncHouseholdId` changes (unlinked -> linked, or a join-flow's
-/// household replace), Riverpod disposes the previous value -- calling
-/// [SyncEngine.stop] via `ref.onDispose` below -- and builds a fresh one,
-/// which [SyncEngine.start]s immediately. This is the entire
-/// "start()/stop() driven by linked state" requirement;
+/// household replace) OR the signed-in user changes (sign-in/sign-out),
+/// Riverpod disposes the previous value -- calling [SyncEngine.stop] via
+/// `ref.onDispose` below -- and builds a fresh one, which
+/// [SyncEngine.start]s immediately (when both conditions now hold). This is
+/// the entire "start()/stop() driven by linked+auth state" requirement;
 /// [SyncEngineController] below only adds the app-resume trigger, mirroring
 /// [CatchUpController].
 ///
@@ -354,7 +368,13 @@ final syncTransportProvider = Provider<SyncTransport?>((ref) {
 /// immediately pulled again -- an infinite restart loop that never let a
 /// debounced push survive to fire. `select` fixes it by only comparing the
 /// projected `syncHouseholdId` value, which the pull's own write never
-/// changes.
+/// changes. **CRITICAL for the A5 gate above:** the same discipline
+/// applies to the auth watch -- [currentAuthUserProvider] is watched
+/// DIRECTLY (not the bare `authGatewayProvider`/some broader auth stream),
+/// because its own emissions are already auth-state-only (it maps
+/// `AuthGateway.watchUser()`, which only ever emits on sign-in/sign-out --
+/// never as a side effect of anything the sync engine itself does). Watch
+/// it, never the raw settings stream, and never anything coarser.
 final syncEngineProvider = Provider<SyncEngine>((ref) {
   final transport = ref.watch(syncTransportProvider);
   final linkedHouseholdId = ref.watch(
@@ -362,7 +382,8 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
       (settings) => settings.valueOrNull?.syncHouseholdId,
     ),
   );
-  if (transport == null || linkedHouseholdId == null) {
+  final signedIn = ref.watch(currentAuthUserProvider).valueOrNull != null;
+  if (transport == null || linkedHouseholdId == null || !signedIn) {
     return const NoopSyncEngine();
   }
   final engine = SupabaseSyncEngine(
@@ -423,6 +444,18 @@ final notificationPermissionGrantedProvider = StateProvider<bool>(
 /// [choreRepositoryProvider], and [clockProvider].
 final choreServiceProvider = Provider<ChoreService>((ref) {
   return ChoreService(
+    database: ref.watch(appDatabaseProvider),
+    chores: ref.watch(choreRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
+/// The member-deletion service (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A1), built on
+/// [appDatabaseProvider], [choreRepositoryProvider], and [clockProvider] --
+/// mirrors [choreServiceProvider]'s shape.
+final memberServiceProvider = Provider<MemberService>((ref) {
+  return MemberService(
     database: ref.watch(appDatabaseProvider),
     chores: ref.watch(choreRepositoryProvider),
     clock: ref.watch(clockProvider),

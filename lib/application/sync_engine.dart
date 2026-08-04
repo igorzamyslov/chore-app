@@ -131,10 +131,11 @@ abstract class SyncTransport {
   /// empty.
   Future<void> insertMembersIgnoringConflicts(List<Map<String, Object?>> rows);
 
-  /// Members-only: updates the granted columns (name, color, role) of one
-  /// already-existing member row -- the update half of the members push
-  /// (spec §8.3), needed because [insertMembersIgnoringConflicts] alone
-  /// never touches an existing row's changed fields.
+  /// Members-only: updates the granted columns (name, color, role,
+  /// deleted_at) of one already-existing member row -- the update half of
+  /// the members push (spec §8.3), needed because
+  /// [insertMembersIgnoringConflicts] alone never touches an existing row's
+  /// changed fields.
   Future<void> updateMemberGrantedColumns(
     String id,
     Map<String, Object?> columns,
@@ -362,9 +363,13 @@ class SupabaseSyncEngine implements SyncEngine {
 
   /// Members-only push (spec §8.3): insert-with-ignore for every dirty row
   /// (covers brand-new members), THEN a granted-columns-only update for
-  /// every dirty row (covers a changed name/color/role on an
+  /// every dirty row (covers a changed name/color/role/deleted_at on an
   /// already-existing member, which the insert-ignore step alone would
-  /// silently skip).
+  /// silently skip). `deleted_at` travels here too (spec
+  /// `docs/feedback/2026-08-01-ux-audit.md` A1) -- it's one of the four
+  /// granted columns (name, color, role, deleted_at), so a local soft
+  /// delete (`MemberService.deleteMember`) propagates as a tombstone
+  /// exactly like every other field change.
   Future<void> _pushMembers() async {
     final dirty = await _sync.dirtyMembers();
     if (dirty.isEmpty) {
@@ -378,6 +383,7 @@ class SupabaseSyncEngine implements SyncEngine {
         'name': member.name,
         'color': member.color,
         'role': member.role.name,
+        'deleted_at': member.deletedAt,
       });
       await _sync.clearMemberDirty(member.id, member.updatedAt);
     }

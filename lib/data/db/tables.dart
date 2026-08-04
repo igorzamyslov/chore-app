@@ -132,6 +132,19 @@ class Members extends Table with SyncDirtyColumn {
   /// ISO-8601 UTC timestamp of the last update.
   TextColumn get updatedAt => text()();
 
+  /// ISO-8601 UTC soft-delete timestamp; `NULL` means active. Added in
+  /// schemaVersion 9 (spec `docs/feedback/2026-08-01-ux-audit.md` A1): the
+  /// server column (`members.deleted_at`) has existed since P1 and is
+  /// already UPDATE-granted -- this just catches the client up so a member
+  /// can finally be removed. Roster queries (`HouseholdRepository
+  /// .watchMembers` and everything built on it) exclude soft-deleted rows;
+  /// history-display joins (done-today, occurrence assignee avatars,
+  /// `completedBy`) deliberately keep resolving them so past attribution
+  /// stays readable. See `MemberService.deleteMember`
+  /// (`lib/application/member_service.dart`) for the referential cleanup
+  /// that runs alongside the soft delete.
+  TextColumn get deletedAt => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
