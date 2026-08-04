@@ -270,7 +270,8 @@ void main() {
   );
 
   testChoreApp(
-    'unlinked+signed-out: shows no adopt row and no join row',
+    'unlinked+signed-out: shows no adopt row and no join row, and no A5 '
+    'linked hint',
     today: today,
     overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
     (tester, database) async {
@@ -287,6 +288,45 @@ void main() {
       );
       expect(
         find.bySemanticsIdentifier('settings.account.email'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.signedOutLinked'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'signed-out+LINKED (spec docs/feedback/2026-08-01-ux-audit.md A5): '
+    'shows the one-line hint naming the linked household, under the '
+    'sign-in form',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+
+      // Still the signed-out form (not signed in), but now with the hint.
+      expect(
+        find.bySemanticsIdentifier('settings.account.email'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.signedOutLinked'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'This phone is linked to My household — sign in to keep syncing.',
+        ),
         findsOneWidget,
       );
 

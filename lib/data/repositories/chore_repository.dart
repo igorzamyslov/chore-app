@@ -402,6 +402,31 @@ class ChoreRepository {
         .getSingleOrNull();
   }
 
+  /// Clears `assignedMemberId` on every PENDING occurrence currently
+  /// assigned to [memberId], across every chore (member-deletion
+  /// referential cleanup, spec `docs/feedback/2026-08-01-ux-audit.md` A1;
+  /// see `MemberService.deleteMember`, `lib/application/member_service.dart`,
+  /// which calls this alongside the chore-level assignee cleanup those
+  /// methods don't retroactively apply to an already-inserted occurrence).
+  ///
+  /// Closed occurrences (their own `assignedMemberId`, and `completedBy`)
+  /// are deliberately untouched -- history keeps pointing at the
+  /// soft-deleted member row.
+  Future<void> unassignPendingOccurrencesForMember(String memberId) async {
+    await (db.update(db.choreOccurrences)..where(
+          (tbl) =>
+              tbl.assignedMemberId.equals(memberId) &
+              tbl.status.equalsValue(OccurrenceStatus.pending),
+        ))
+        .write(
+          ChoreOccurrencesCompanion(
+            assignedMemberId: const Value(null),
+            updatedAt: Value(_isoNow()),
+            syncDirty: syncDirtyOnWrite,
+          ),
+        );
+  }
+
   /// Hard-deletes every pending occurrence of [choreId].
   Future<void> deletePendingOccurrences(String choreId) async {
     await (db.delete(db.choreOccurrences)..where(
@@ -436,6 +461,14 @@ class ChoreRepository {
   /// Watches pending occurrences of active, unpaused chores in
   /// [householdId], joined with their chore, category, and assigned
   /// member, ordered by due date then chore title.
+  ///
+  /// This is a DISPLAY join (spec `docs/feedback/2026-08-01-ux-audit.md`
+  /// A1's members-query classification): the `members` join deliberately
+  /// does NOT filter on `deletedAt` -- an occurrence tile's assignee
+  /// avatar/name should still resolve if the assigned member is ever
+  /// soft-deleted (in practice `MemberService.deleteMember` already clears
+  /// `assignedMemberId` on every pending occurrence of a deleted member, so
+  /// this mostly matters as a defensive default, not a normally-hit path).
   Stream<List<OccurrenceWithChore>> watchPendingOccurrences(
     String householdId,
   ) {
@@ -486,7 +519,11 @@ class ChoreRepository {
   /// title.
   ///
   /// Backs the chores list's collapsed 'Done today' section (see
-  /// `docs/specs/ux-round-2.md` A3); the caller passes today's date.
+  /// `docs/specs/ux-round-2.md` A3); the caller passes today's date. This is
+  /// also a DISPLAY join (see `watchPendingOccurrences`'s doc comment): the
+  /// `members`/`completedByMember` joins never filter on `deletedAt`, so
+  /// "done today, by {name}" keeps naming a since-deleted member — history
+  /// stays readable (spec `docs/feedback/2026-08-01-ux-audit.md` A1).
   Stream<List<ClosedOccurrenceWithChore>> watchClosedOnDate(
     String householdId,
     PlainDate date,

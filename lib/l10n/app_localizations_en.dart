@@ -515,6 +515,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get manageMembersErrorMessage => 'Could not load your members.';
 
   @override
+  String get manageMembersHouseholdSubtitle => 'Household name';
+
+  @override
   String get memberEditNewTitle => 'New member';
 
   @override
@@ -525,6 +528,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberEditColorLabel => 'Color';
+
+  @override
+  String memberDeleteDialogTitle(String memberName) {
+    return 'Delete $memberName?';
+  }
+
+  @override
+  String memberDeleteDialogBody(String memberName) {
+    return 'This removes $memberName from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to $memberName open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.';
+  }
+
+  @override
+  String get householdRenameTitle => 'Rename household';
+
+  @override
+  String get householdRenameNameLabel => 'Name';
 
   @override
   String get settingsCategoriesEntry => 'Categories';
@@ -622,6 +641,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String settingsAccountSignedOutLinked(String householdName) {
+    return 'This phone is linked to $householdName — sign in to keep syncing.';
+  }
+
+  @override
   String get settingsAccountSendError =>
       'Couldn\'t send the sign-in link. Please try again.';
 
@@ -652,7 +676,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Replaces your local data — it\'s kept only in an archive file on this device.';
+      'Replaces your local data — it\'s saved to a backup file on this device.';
 
   @override
   String get settingsAccountAdoptTitle => 'Put my household online';
@@ -724,7 +748,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept only in an archive file on this device.';
+      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.';
 
   @override
   String get joinHouseholdImportAccept => 'Bring them over';
@@ -774,6 +798,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsResetConfirm1Body =>
       'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.';
+
+  @override
+  String get settingsResetConfirm1BodyLinked =>
+      'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.';
 
   @override
   String get settingsResetConfirm1Action => 'Continue';

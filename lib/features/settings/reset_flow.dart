@@ -3,6 +3,12 @@
 /// under the Data section header (`DataSectionHeader`, `export_row.dart`)
 /// alongside the export row (spec
 /// `docs/feedback/2026-08-01-field-feedback.md` B4/F7).
+///
+/// The first dialog's body is state-aware (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A6): a linked device's "there is
+/// no cloud backup" claim was FALSE (the household lives on the server;
+/// signing in again reconnects it) -- [ResetDataTile] reads
+/// [settingsProvider]'s `syncHouseholdId` to pick the right copy.
 library;
 
 import 'package:chore_app/app/providers.dart';
@@ -29,6 +35,8 @@ class ResetDataTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final errorColor = Theme.of(context).colorScheme.error;
+    final linked =
+        ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
     return semantic(
       'settings.reset',
       child: ListTile(
@@ -37,13 +45,17 @@ class ResetDataTile extends ConsumerWidget {
           l10n.settingsResetEntry,
           style: TextStyle(color: errorColor),
         ),
-        onTap: () => _confirmAndReset(context, ref),
+        onTap: () => _confirmAndReset(context, ref, linked: linked),
       ),
     );
   }
 
-  Future<void> _confirmAndReset(BuildContext context, WidgetRef ref) async {
-    final firstConfirmed = await _showFirstDialog(context);
+  Future<void> _confirmAndReset(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool linked,
+  }) async {
+    final firstConfirmed = await _showFirstDialog(context, linked: linked);
     if (!firstConfirmed || !context.mounted) {
       return;
     }
@@ -59,7 +71,10 @@ class ResetDataTile extends ConsumerWidget {
       ..invalidate(settingsProvider);
   }
 
-  Future<bool> _showFirstDialog(BuildContext context) async {
+  Future<bool> _showFirstDialog(
+    BuildContext context, {
+    required bool linked,
+  }) async {
     final errorColor = Theme.of(context).colorScheme.error;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -67,7 +82,11 @@ class ResetDataTile extends ConsumerWidget {
         final l10n = AppLocalizations.of(dialogContext);
         return AlertDialog(
           title: Text(l10n.settingsResetConfirm1Title),
-          content: Text(l10n.settingsResetConfirm1Body),
+          content: Text(
+            linked
+                ? l10n.settingsResetConfirm1BodyLinked
+                : l10n.settingsResetConfirm1Body,
+          ),
           actions: [
             semantic(
               'settings.reset.cancel1',

@@ -143,13 +143,25 @@ class HouseholdRepository {
     });
   }
 
-  /// Watches every member of [householdId], ordered by creation time (spec
-  /// `docs/specs/members-management.md` §2: stable, and consistent with the
-  /// chore-form assignee chips, the members screen, and the acting-member
-  /// switcher — all of which read this same order).
+  /// Watches every ACTIVE (non-soft-deleted) member of [householdId],
+  /// ordered by creation time (spec `docs/specs/members-management.md` §2:
+  /// stable, and consistent with the chore-form assignee chips, the
+  /// members screen, and the acting-member switcher — all of which read
+  /// this same order).
+  ///
+  /// This is the roster query (spec `docs/feedback/2026-08-01-ux-audit.md`
+  /// A1): every provider built on it (`membersProvider`,
+  /// `lib/app/providers.dart`) is a "who can I pick/act as/manage" listing,
+  /// so a soft-deleted member must disappear from it. History-display
+  /// joins (done-today "by {name}", occurrence assignee avatars,
+  /// `completedBy`) live in `ChoreRepository` instead and deliberately do
+  /// NOT filter on `deletedAt` — see that class's `watchPendingOccurrences`
+  /// / `watchClosedOnDate`.
   Stream<List<Member>> watchMembers(String householdId) {
     final query = db.select(db.members)
-      ..where((tbl) => tbl.householdId.equals(householdId))
+      ..where(
+        (tbl) => tbl.householdId.equals(householdId) & tbl.deletedAt.isNull(),
+      )
       ..orderBy([(tbl) => OrderingTerm(expression: tbl.createdAt)]);
     return query.watch();
   }
@@ -206,6 +218,23 @@ class HouseholdRepository {
       choreAssignees: choreAssignees,
       choreOccurrences: choreOccurrences,
       shoppingItems: shoppingItems,
+    );
+  }
+
+  /// Renames [householdId] (spec `docs/feedback/2026-08-01-ux-audit.md`
+  /// A2): the household name row at the top of the Members screen. Marks
+  /// `syncDirty` per the shared write-time helper -- the server `UPDATE` on
+  /// `households` is already granted (spec `docs/specs/sync-backend.md`
+  /// §2), so a linked device's rename propagates on the next push.
+  Future<void> renameHousehold(String householdId, String name) async {
+    await (db.update(
+      db.households,
+    )..where((tbl) => tbl.id.equals(householdId))).write(
+      HouseholdsCompanion(
+        name: Value(name),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
     );
   }
 

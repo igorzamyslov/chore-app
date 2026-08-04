@@ -9,6 +9,11 @@
 /// enough to fire. Fixed by narrowing the watch to
 /// `settingsProvider.select((s) => s.valueOrNull?.syncHouseholdId)`.
 ///
+/// Also covers the A5 auth gate (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A5): `syncEngineProvider` must
+/// stay [NoopSyncEngine] while signed out, even on an otherwise-linked
+/// device -- see the second test below.
+///
 /// Exercises the REAL provider chain (`syncEngineProvider`,
 /// `syncEngineControllerProvider`, `main.dart`'s activation order) rather
 /// than constructing `SupabaseSyncEngine` directly -- the bug lived
@@ -21,6 +26,7 @@
 library;
 
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:clock/clock.dart';
@@ -30,6 +36,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../application/fake_sync_transport.dart';
+import '../features/settings/fake_auth_gateway.dart';
 
 /// Mirrors `test/app/digest_reschedule_test.dart`'s `_awaitBootstrap` --
 /// see its doc comment for why a bare `await
@@ -110,6 +117,15 @@ void main() {
           appDatabaseProvider.overrideWithValue(database),
           clockProvider.overrideWithValue(Clock.fixed(DateTime.utc(2026))),
           syncTransportProvider.overrideWithValue(transport),
+          // The A5 gate (spec docs/feedback/2026-08-01-ux-audit.md) also
+          // requires a signed-in user -- this test is about the debounce/
+          // churn regression, not the auth gate, so it signs in up front
+          // (see the second test below for the auth gate itself).
+          authGatewayProvider.overrideWithValue(
+            FakeAuthGateway(
+              currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+            ),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -157,6 +173,58 @@ void main() {
         ),
         isTrue,
       );
+
+      await database.close();
+    },
+  );
+
+  testWidgets(
+    'syncEngineProvider stays Noop when signed out, even on an '
+    'otherwise-linked device (spec docs/feedback/2026-08-01-ux-audit.md '
+    'A5)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final transport = FakeSyncTransport();
+      final authGateway = FakeAuthGateway(); // signed out
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock.fixed(DateTime.utc(2026))),
+          syncTransportProvider.overrideWithValue(transport),
+          authGatewayProvider.overrideWithValue(authGateway),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(syncEngineControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+
+      await container
+          .read(settingsRepositoryProvider)
+          .setSyncLinked(
+            householdId: householdId,
+            linkedAt: container.read(clockProvider).now(),
+          );
+      // Give the linked-state write every chance to propagate.
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        container.read(syncEngineProvider),
+        isA<NoopSyncEngine>(),
+        reason:
+            'linked but signed out must still resolve to the inert '
+            'engine -- gating on linked state alone is exactly the bug '
+            'A5 fixes',
+      );
+
+      // Signing in now flips it to a real, started engine.
+      authGateway.signIn(const AuthUser(id: 'u1', email: 'me@example.com'));
+      await _awaitLinkedEngine(tester, container);
+
+      // Signing back out flips it right back to Noop.
+      await authGateway.signOut();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(container.read(syncEngineProvider), isA<NoopSyncEngine>());
 
       await database.close();
     },

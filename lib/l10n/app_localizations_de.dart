@@ -519,6 +519,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Deine Mitglieder konnten nicht geladen werden.';
 
   @override
+  String get manageMembersHouseholdSubtitle => 'Haushaltsname';
+
+  @override
   String get memberEditNewTitle => 'Neues Mitglied';
 
   @override
@@ -529,6 +532,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get memberEditColorLabel => 'Farbe';
+
+  @override
+  String memberDeleteDialogTitle(String memberName) {
+    return '$memberName löschen?';
+  }
+
+  @override
+  String memberDeleteDialogBody(String memberName) {
+    return 'Damit entfernst du $memberName aus dem Haushalt. Bei Aufgaben im Wechsel fällt $memberName aus der Reihenfolge — wenn zu wenige Personen übrig bleiben, wird die Aufgabe auf eine feste Person oder \"jeden\" umgestellt. Aufgaben, die fest $memberName zugewiesen sind, stehen danach allen offen, und alles, was $memberName gerade zugewiesen ist, wird nicht mehr zugewiesen. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.';
+  }
+
+  @override
+  String get householdRenameTitle => 'Haushalt umbenennen';
+
+  @override
+  String get householdRenameNameLabel => 'Name';
 
   @override
   String get settingsCategoriesEntry => 'Kategorien';
@@ -627,6 +646,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String settingsAccountSignedOutLinked(String householdName) {
+    return 'Dieses Gerät ist mit $householdName verbunden — melde dich an, um weiter zu synchronisieren.';
+  }
+
+  @override
   String get settingsAccountSendError =>
       'Der Anmeldelink konnte nicht gesendet werden. Versuch es noch mal.';
 
@@ -658,7 +682,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Ersetzt deine lokalen Daten — sie bleiben nur in einer Archivdatei auf diesem Gerät erhalten.';
+      'Ersetzt deine lokalen Daten — sie werden in einer Sicherungsdatei auf diesem Gerät gespeichert.';
 
   @override
   String get settingsAccountAdoptTitle => 'Meinen Haushalt online stellen';
@@ -730,7 +754,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt bleibt nur in einer Archivdatei auf diesem Gerät erhalten.';
+      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt wird in einer Sicherungsdatei auf diesem Gerät gespeichert.';
 
   @override
   String get joinHouseholdImportAccept => 'Mitnehmen';
@@ -780,6 +804,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsResetConfirm1Body =>
       'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.';
+
+  @override
+  String get settingsResetConfirm1BodyLinked =>
+      'Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät.';
 
   @override
   String get settingsResetConfirm1Action => 'Weiter';

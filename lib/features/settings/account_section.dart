@@ -185,9 +185,11 @@ class _SignedInTile extends ConsumerWidget {
   }
 }
 
-/// The signed-out form: an intro line, an email field, and a submit button
-/// that sends a magic-link email and switches into an inline confirmation
-/// state.
+/// The signed-out form: an intro line, an email field, a submit button that
+/// sends a magic-link email and switches into an inline confirmation
+/// state, and -- while this device is linked (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A5) -- a one-line hint under the
+/// form explaining that syncing is paused until sign-in.
 class _SignedOutForm extends ConsumerStatefulWidget {
   const _SignedOutForm();
 
@@ -227,6 +229,16 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
     final email = _emailController.text.trim();
     final canSend = !_sending && isPlausibleEmail(email);
     final sentToEmail = _sentToEmail;
+    // A5 hint (spec `docs/feedback/2026-08-01-ux-audit.md`): only rendered
+    // once BOTH this device is linked AND the linked household's name has
+    // resolved -- `currentHouseholdProvider` awaits `bootstrapProvider`
+    // first, so `householdName` is momentarily `null` right after sign-out
+    // on a linked device; the hint simply appears a frame later, mirroring
+    // `_SignedInTile`'s own linked-subtitle timing.
+    final linkedHouseholdName =
+        ref.watch(settingsProvider).valueOrNull?.syncHouseholdId == null
+        ? null
+        : ref.watch(currentHouseholdProvider).valueOrNull?.name;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -268,6 +280,16 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
               ),
             ),
           ),
+          if (linkedHouseholdName != null) ...[
+            const SizedBox(height: 12),
+            semantic(
+              'settings.account.signedOutLinked',
+              child: Text(
+                l10n.settingsAccountSignedOutLinked(linkedHouseholdName),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -172,4 +172,38 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'linked device (spec docs/feedback/2026-08-01-ux-audit.md A6): the '
+    "first dialog's body states the household stays online instead of the "
+    "unlinked device's false 'no cloud backup' claim",
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.reset'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Your household stays online — this phone just disconnects '
+          'from it. You can reconnect by signing in again. This still '
+          "permanently deletes this phone's local members, chores, and "
+          'shopping list.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('There is no cloud backup'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
 }

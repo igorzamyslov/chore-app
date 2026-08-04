@@ -26,6 +26,13 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/converters.dart';
 
 /// Maps a local [Member] to the server's `members` row shape (push).
+///
+/// Includes `deleted_at` (schema v9, spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A1): the server column has
+/// existed since P1 and is already UPDATE-granted alongside `name`/
+/// `color`/`role` (spec `docs/specs/sync-backend.md` §8.3) -- carrying it
+/// on push is what lets a local soft-delete (`MemberService.deleteMember`)
+/// actually propagate as a tombstone.
 Map<String, Object?> memberRow(Member member) => {
   'id': member.id,
   'household_id': member.householdId,
@@ -35,6 +42,7 @@ Map<String, Object?> memberRow(Member member) => {
   'user_id': member.userId,
   'created_at': member.createdAt,
   'updated_at': member.updatedAt,
+  'deleted_at': member.deletedAt,
 };
 
 /// Maps a server `members` row to a local [Member] (pull), always
@@ -48,6 +56,7 @@ Member memberFromRow(Map<String, Object?> row) => Member(
   userId: row['user_id'] as String?,
   createdAt: row['created_at']! as String,
   updatedAt: row['updated_at']! as String,
+  deletedAt: row['deleted_at'] as String?,
   syncDirty: false,
 );
 

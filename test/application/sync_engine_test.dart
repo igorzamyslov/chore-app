@@ -6,6 +6,7 @@
 /// FK ordering, and the start()/stop() triggers.
 library;
 
+import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
@@ -316,6 +317,32 @@ void main() {
         await engine.pushDirty();
 
         expect(transport.serverRows['members']!.single['name'], 'Renamed');
+      },
+    );
+
+    test(
+      'members push: a soft-deleted member (MemberService.deleteMember, '
+      'spec docs/feedback/2026-08-01-ux-audit.md A1) propagates '
+      'deleted_at via the granted-columns update',
+      () async {
+        final second = await households.addMember(
+          household.id,
+          name: 'Jo',
+          color: 1,
+        );
+        await engine.pushDirty();
+        expect(transport.serverRows['members'], hasLength(2));
+
+        await MemberService(
+          database: db,
+          chores: ChoreRepository(db),
+        ).deleteMember(second.id);
+        await engine.pushDirty();
+
+        final serverRow = transport.serverRows['members']!.singleWhere(
+          (row) => row['id'] == second.id,
+        );
+        expect(serverRow['deleted_at'], isNotNull);
       },
     );
 
