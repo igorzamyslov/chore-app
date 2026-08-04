@@ -276,3 +276,37 @@ excludes. Updated the fixture to check each item before deleting it
 (mirroring a real `clearChecked` trip), which is what the test always
 intended to simulate; behavior asserted by the test (cleared items stay
 suggested) is unchanged, only the seeding got more precise.
+
+## Round 3 (2026-08-01, evening) — first-time-user onboarding
+
+Source: a NEW user (not Igor) trying the app cold. Complaints: (1) not
+clear how to register; (2) after registering you have "two local users",
+which makes no sense when an online household exists; (3) categories are
+managed in Settings, far from where they're used; (4) onboarding + some
+day-to-day flows feel clunky (specifics pending).
+
+Analysis: (1) and (2) share one structural cause — the silent local
+bootstrap. A fresh install creates a household + "Me" member before the
+user chose anything; sign-in/join hides at the bottom of Settings; the
+join path then REPLACES everything the app just made the user create
+(name banner → archive → import dance). For the second-phone persona —
+the most common onboarding after the first — every step of that is
+waste, and mistapping the equally-weighted "Put my household online"
+instead of "Join" forks the family into two disconnected households.
+
+DECISION — onboarding v2 (binding spec:
+docs/specs/onboarding-v2.md): a first-run welcome gate replaces the
+silent bootstrap. Two primary paths: "Set up a new household" (asks the
+member's name up front — the name banner becomes upgrade-only) and
+"Join my family" (sign-in + invite code FIRST; no local household is
+ever created, so no archive/import dance for fresh installs; reconnect
+auto-surfaces when the account already has a household). Existing
+installs (a household already exists) never see the gate.
+
+DECISION — categories in context: the category pickers (chore form,
+shopping edit sheet) gain an inline "edit categories" entry point
+pushing the existing management screen, kind-filtered. Settings entry
+stays.
+
+(4) is not actionable as stated — concrete moments requested from Igor
+(which interactions, how many taps, what felt wrong).
