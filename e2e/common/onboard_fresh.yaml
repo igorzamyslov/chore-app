@@ -5,6 +5,12 @@
 # Included via `runFlow` right after each flow's own launch + first-frame
 # settle, which now waits for `welcome.create` (not `shell.tab.chores`) on a
 # cold `clearState` launch (README convention 8).
+#
+# Maestro (2.7.0) requires the config section below even in
+# runFlow-included sub-flows; the file lives OUTSIDE e2e/flows/ so the
+# suite's directory scan never runs it standalone.
+appId: ${APP_ID}
+---
 - tapOn:
     id: "welcome.create"
 - tapOn:

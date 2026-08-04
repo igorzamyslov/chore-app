@@ -201,7 +201,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.';
 
   @override
-  String get welcomeJoinTitle => 'Meinem Haushalt beitreten';
+  String get welcomeJoinTitle => 'Dem Haushalt meiner Familie beitreten';
 
   @override
   String get welcomeJoinSubtitle =>

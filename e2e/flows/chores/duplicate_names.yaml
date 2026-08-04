@@ -18,7 +18,7 @@ tags:
     visible:
       id: "welcome.create"
     timeout: 60000
-- runFlow: ../common/onboard_fresh.yaml
+- runFlow: ../../common/onboard_fresh.yaml
 # First "Water plants" chore, due today (E2E_TODAY, see tool/e2e.sh).
 - tapOn:
     id: "chores.add"

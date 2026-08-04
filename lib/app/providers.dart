@@ -485,15 +485,34 @@ final memberServiceProvider = Provider<MemberService>((ref) {
 /// [pendingOccurrencesProvider] / [membersProvider] /
 /// [choreCategoriesProvider]) waits on this future first.
 final bootstrapProvider = FutureProvider<String>((ref) async {
-  final household = await ref.watch(householdRepositoryProvider).getHousehold();
-  if (household == null) {
-    throw StateError(
-      'bootstrapProvider requires an existing household -- it is only '
-      'reachable once householdGateProvider has confirmed one exists.',
-    );
+  // Gate-aware, not gate-ASSUMING (live-E2E regression, 2026-08-05):
+  // main.dart's controllers (`catchUpControllerProvider` etc.) listen to
+  // this provider BEFORE runApp -- on a fresh install that used to cache
+  // a StateError here, which `_Bootstrapped` then dutifully displayed as
+  // a startup-error screen right after the user created their household
+  // on the welcome gate. Widget tests never caught it because they either
+  // pre-seed a household or pump `ChoreApp` without main()'s controller
+  // activation. Instead of throwing, park on the gate.
+  //
+  // The watch is SELECT-scoped to the household's ID -- the same
+  // discipline `syncEngineProvider` documents for its linked-state watch:
+  // the gate stream re-emits on EVERY households-row change (a RENAME
+  // re-emits it too), and an unscoped watch would re-run this provider's
+  // side effects on each of those. Only existence/identity transitions
+  // matter here: null -> id (welcome create / join) and id -> other id
+  // (join's household replace).
+  final householdId = ref.watch(
+    householdGateProvider.select((gate) => gate.valueOrNull?.id),
+  );
+  if (householdId == null) {
+    // Pre-gate (or gate still loading): never resolve. The controllers
+    // listening to this provider simply keep waiting; the id appearing
+    // rebuilds this provider (the select above) and the fresh execution
+    // resolves. Nothing ever awaits this future while the gate shows.
+    return Completer<String>().future;
   }
-  await ref.watch(categoryRepositoryProvider).seedDefaults(household.id);
-  await ref.watch(choreServiceProvider).catchUpOverdue(household.id);
+  await ref.watch(categoryRepositoryProvider).seedDefaults(householdId);
+  await ref.watch(choreServiceProvider).catchUpOverdue(householdId);
   final cutoffUtc = ref
       .watch(clockProvider)
       .now()
@@ -501,8 +520,8 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
       .subtract(const Duration(hours: 24));
   await ref
       .watch(shoppingRepositoryProvider)
-      .clearCheckedOlderThan(household.id, cutoffUtc: cutoffUtc);
-  return household.id;
+      .clearCheckedOlderThan(householdId, cutoffUtc: cutoffUtc);
+  return householdId;
 });
 
 /// Pending chore occurrences of the bootstrap household, each joined with

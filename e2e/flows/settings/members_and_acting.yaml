@@ -19,7 +19,7 @@ tags:
     visible:
       id: "welcome.create"
     timeout: 60000
-- runFlow: ../common/onboard_fresh.yaml
+- runFlow: ../../common/onboard_fresh.yaml
 # Seed a chore due today, left unassigned ("anyone" mode, the form's
 # default) so its completion later falls back to whoever is currently
 # acting -- exactly the attribution path this journey exercises.

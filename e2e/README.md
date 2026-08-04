@@ -67,9 +67,9 @@ Three rules:
    A warm relaunch (no `clearState`) still targets `shell.tab.chores`,
    since the household created earlier in the same flow already exists.
 2. **Every flow clears the welcome gate right after that settle.**
-   `e2e/flows/common/onboard_fresh.yaml` taps `welcome.create`, types the
+   `e2e/common/onboard_fresh.yaml` taps `welcome.create`, types the
    name "Me", and confirms — every flow prepends
-   `- runFlow: ../common/onboard_fresh.yaml` (path-relative) directly
+   `- runFlow: ../../common/onboard_fresh.yaml` (path-relative) directly
    after its cold-launch settle wait, landing on the tab shell exactly
    where every flow used to assume it started. `first_run_banners.yaml`
    is the one exception: it needs a distinctive name ("Jordan") to keep
