@@ -80,6 +80,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryPickerNone => 'None';
 
   @override
+  String get categoryPickerManageTooltip => 'Edit categories';
+
+  @override
   String get choresMenuSkip => 'Skip';
 
   @override

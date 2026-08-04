@@ -84,6 +84,10 @@
   "@categoryPickerNone": {
     "description": "The category picker's chip for 'no category selected', shown in both the chore form and the shopping item edit sheet."
   },
+  "categoryPickerManageTooltip": "Edit categories",
+  "@categoryPickerManageTooltip": {
+    "description": "Tooltip for the category picker's trailing icon button (chore form and shopping item edit sheet), which pushes the manage-categories screen filtered to the picker's kind (feedback round 3: an in-context entry point alongside the existing Settings one)."
+  },
 
   "choresMenuSkip": "Skip",
   "@choresMenuSkip": {
