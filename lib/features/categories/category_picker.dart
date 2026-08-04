@@ -61,44 +61,56 @@ class CategoryPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          semantic(
-            '$idPrefix.none',
-            child: ChoiceChip(
-              label: Text(AppLocalizations.of(context).categoryPickerNone),
-              selected: selectedCategoryId == null,
-              onSelected: (_) => onChanged(null),
-            ),
-          ),
-          for (final category in categories) ...[
-            const SizedBox(width: 8),
-            semantic(
-              '$idPrefix.${category.id}',
-              child: ChoiceChip(
-                avatar: Icon(
-                  categoryIcon(category.icon),
-                  color: Color(category.color),
-                  size: 18,
+    // The manage button is PINNED outside the scrollable chip row (review
+    // hardening of the round-3 fix): its whole purpose is an
+    // always-visible in-context entry point, and inside the scroll area
+    // it disappears behind 7-8 seeded chips on narrow screens.
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                semantic(
+                  '$idPrefix.none',
+                  child: ChoiceChip(
+                    label: Text(
+                      AppLocalizations.of(context).categoryPickerNone,
+                    ),
+                    selected: selectedCategoryId == null,
+                    onSelected: (_) => onChanged(null),
+                  ),
                 ),
-                label: Text(category.name),
-                selected: selectedCategoryId == category.id,
-                onSelected: (_) => onChanged(category.id),
-              ),
-            ),
-          ],
-          semantic(
-            'category_picker.manage',
-            child: IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: AppLocalizations.of(context).categoryPickerManageTooltip,
-              onPressed: () => _openManageCategories(context),
+                for (final category in categories) ...[
+                  const SizedBox(width: 8),
+                  semantic(
+                    '$idPrefix.${category.id}',
+                    child: ChoiceChip(
+                      avatar: Icon(
+                        categoryIcon(category.icon),
+                        color: Color(category.color),
+                        size: 18,
+                      ),
+                      label: Text(category.name),
+                      selected: selectedCategoryId == category.id,
+                      onSelected: (_) => onChanged(category.id),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        semantic(
+          'category_picker.manage',
+          child: IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: AppLocalizations.of(context).categoryPickerManageTooltip,
+            onPressed: () => _openManageCategories(context),
+          ),
+        ),
+      ],
     );
   }
 
