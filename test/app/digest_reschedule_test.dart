@@ -73,6 +73,12 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly so
+    // _awaitBootstrap below actually resolves instead of erroring.
+    await container
+        .read(householdRepositoryProvider)
+        .createLocalHousehold('Me');
 
     container.read(digestRescheduleControllerProvider);
     await _awaitBootstrap(tester, container);
@@ -99,6 +105,12 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      // bootstrapProvider no longer creates a household (spec
+      // docs/specs/onboarding-v2.md §2) -- seed one directly so
+      // _awaitBootstrap below actually resolves instead of erroring.
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
 
       container.read(digestRescheduleControllerProvider);
       final householdId = await _awaitBootstrap(tester, container);
@@ -146,6 +158,12 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly so
+    // _awaitBootstrap below actually resolves instead of erroring.
+    await container
+        .read(householdRepositoryProvider)
+        .createLocalHousehold('Me');
 
     container.read(digestRescheduleControllerProvider);
     final householdId = await _awaitBootstrap(tester, container);
@@ -202,6 +220,12 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly so
+    // _awaitBootstrap below actually resolves instead of erroring.
+    await container
+        .read(householdRepositoryProvider)
+        .createLocalHousehold('Me');
 
     container.read(digestRescheduleControllerProvider);
     final householdId = await _awaitBootstrap(tester, container);

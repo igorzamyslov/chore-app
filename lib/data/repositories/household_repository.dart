@@ -3,6 +3,8 @@ library;
 
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
+import 'package:chore_app/data/repositories/category_repository.dart'
+    show CategoryRepository;
 import 'package:drift/drift.dart';
 import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
@@ -64,9 +66,11 @@ class HouseholdSnapshot {
 
 /// Repository for the household bootstrap and its member roster.
 ///
-/// v1 note: a household is created lazily on first access via
-/// [ensureLocalHousehold] and there is exactly one per device until a sync
-/// layer lands.
+/// Spec `docs/specs/onboarding-v2.md` §0/§2: a household is never created
+/// silently -- it exists only once the user explicitly chooses "start
+/// fresh" ([createLocalHousehold], called from the welcome screen's create
+/// card) or "join" (`HouseholdJoinService.joinFresh`). There is exactly one
+/// household per device until a sync layer lands.
 class HouseholdRepository {
   /// Creates a repository backed by [db].
   ///
@@ -79,9 +83,6 @@ class HouseholdRepository {
     this.nowUtc = _defaultNowUtc,
   });
 
-  /// The ARGB color assigned to the bootstrap 'Me' member.
-  static const int bootstrapMemberColor = 0xFF26A69A;
-
   /// The database this repository reads from and writes to.
   final AppDatabase db;
 
@@ -91,12 +92,38 @@ class HouseholdRepository {
   /// Returns the current UTC time, used for `created_at` / `updated_at`.
   final DateTime Function() nowUtc;
 
-  /// Returns the single existing household, creating one (named `'My
-  /// household'`, with one admin member named `'Me'`) if none exists yet.
+  /// Returns the single existing household, or `null` if none exists yet
+  /// (spec `docs/specs/onboarding-v2.md` §2: a plain read, alongside
+  /// [createLocalHousehold], replacing the old lazy-creating
+  /// `ensureLocalHousehold`). `bootstrapProvider` (`lib/app/providers.dart`)
+  /// calls this ASSUMING a non-null result -- it's only reachable once
+  /// [watchHouseholdOrNull] (the welcome gate) has already confirmed one
+  /// exists.
+  Future<Household?> getHousehold() {
+    return db.select(db.households).getSingleOrNull();
+  }
+
+  /// Watches whether ANY household row exists locally (spec
+  /// `docs/specs/onboarding-v2.md` §2): `householdGateProvider`
+  /// (`lib/app/providers.dart`) shows `WelcomeScreen` while this emits
+  /// `null` (nothing local yet) and the tab shell once it emits a
+  /// household. An existing install's very first emission is already
+  /// non-null, so the gate never appears for it.
+  Stream<Household?> watchHouseholdOrNull() {
+    return db.select(db.households).watchSingleOrNull();
+  }
+
+  /// Creates the household (named `'My household'`) with ONE admin member
+  /// named [name] (first seed color) -- the welcome screen's explicit
+  /// "Set up a new household" action (spec `docs/specs/onboarding-v2.md`
+  /// §1/§2). Replaces the old lazy-creating `ensureLocalHousehold`: a fresh
+  /// install now has NO household until the user chooses this (or joins).
   ///
-  /// Idempotent: calling this repeatedly never creates more than one
-  /// household. This is the v1 bootstrap entry point.
-  Future<Household> ensureLocalHousehold() async {
+  /// Idempotent, keeping the same race guard `ensureLocalHousehold` had: if
+  /// a household already exists (e.g. a second, redundant call racing the
+  /// first) the existing row is returned untouched -- [name] is only used
+  /// the FIRST time this actually creates something.
+  Future<Household> createLocalHousehold(String name) async {
     final existing = await db.select(db.households).getSingleOrNull();
     if (existing != null) {
       return existing;
@@ -131,8 +158,8 @@ class HouseholdRepository {
             MembersCompanion.insert(
               id: newId(),
               householdId: household.id,
-              name: 'Me',
-              color: bootstrapMemberColor,
+              name: name,
+              color: CategoryRepository.seedColors.first,
               role: MemberRole.admin,
               createdAt: now,
               updatedAt: now,

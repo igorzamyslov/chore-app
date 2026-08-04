@@ -52,6 +52,17 @@
   "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
 
+  "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",
+  "welcomeCreateTitle": "Neuen Haushalt einrichten",
+  "welcomeCreateSubtitle": "Bleibt erst mal auf diesem Gerät — du kannst später synchronisieren.",
+  "welcomeCreateNameLabel": "Dein Name",
+  "welcomeCreateConfirm": "Los geht's",
+  "welcomeCreateError": "Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.",
+  "welcomeJoinTitle": "Dem Haushalt meiner Familie beitreten",
+  "welcomeJoinSubtitle": "Melde dich an und nutze einen Einladungscode vom Gerät eines Familienmitglieds.",
+  "welcomeJoinReconnectSubtitle": "Dieses Gerät ist noch nicht damit verbunden.",
+  "welcomeOffline": "Kein Konto nötig — alles bleibt auf deinem Gerät, außer du meldest dich an.",
+
   "onboardingNameBannerMessage": "Wer erledigt hier die Aufgaben?",
   "onboardingNameBannerSetAction": "Meinen Namen festlegen",
   "onboardingNameBannerDismissTooltip": "Schließen",

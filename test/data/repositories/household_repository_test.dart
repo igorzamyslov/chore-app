@@ -1,4 +1,5 @@
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,9 +29,11 @@ void main() {
 
   tearDown(() => db.close());
 
-  test('ensureLocalHousehold is idempotent', () async {
-    final first = await repo.ensureLocalHousehold();
-    final second = await repo.ensureLocalHousehold();
+  test('createLocalHousehold is idempotent', () async {
+    final first = await repo.createLocalHousehold('Me');
+    // The second call's name argument is ignored: a household already
+    // exists, so the existing row (and its member) is returned untouched.
+    final second = await repo.createLocalHousehold('Someone else');
 
     expect(first.id, second.id);
     expect(first.name, 'My household');
@@ -42,7 +45,7 @@ void main() {
     expect(members, hasLength(1));
     expect(members.single.name, 'Me');
     expect(members.single.role, MemberRole.admin);
-    expect(members.single.color, HouseholdRepository.bootstrapMemberColor);
+    expect(members.single.color, CategoryRepository.seedColors.first);
   });
 
   // Ordering changed from name to creation time by
@@ -51,7 +54,7 @@ void main() {
   test(
     'watchMembers orders by creation time and reacts to additions',
     () async {
-      final household = await repo.ensureLocalHousehold();
+      final household = await repo.createLocalHousehold('Me');
       final emissions = <List<String>>[];
       final sub = repo
           .watchMembers(household.id)
@@ -70,7 +73,7 @@ void main() {
   );
 
   test('addMember defaults to the member role', () async {
-    final household = await repo.ensureLocalHousehold();
+    final household = await repo.createLocalHousehold('Me');
     final member = await repo.addMember(
       household.id,
       name: 'Bo',
@@ -80,7 +83,7 @@ void main() {
   });
 
   test('renameMember updates the name and bumps updated_at', () async {
-    final household = await repo.ensureLocalHousehold();
+    final household = await repo.createLocalHousehold('Me');
     final member = await repo.addMember(
       household.id,
       name: 'Bo',
@@ -98,7 +101,7 @@ void main() {
   });
 
   test('recolorMember updates the color and bumps updated_at', () async {
-    final household = await repo.ensureLocalHousehold();
+    final household = await repo.createLocalHousehold('Me');
     final member = await repo.addMember(
       household.id,
       name: 'Bo',
@@ -115,4 +118,36 @@ void main() {
     expect(updated.name, 'Bo');
     expect(updated.updatedAt, isNot(member.updatedAt));
   });
+
+  test('getHousehold returns null before any household is created', () async {
+    expect(await repo.getHousehold(), isNull);
+  });
+
+  test('getHousehold returns the existing household once created', () async {
+    final created = await repo.createLocalHousehold('Me');
+
+    final found = await repo.getHousehold();
+
+    expect(found, isNotNull);
+    expect(found!.id, created.id);
+  });
+
+  test(
+    'watchHouseholdOrNull emits null then the household once created',
+    () async {
+      final emissions = <String?>[];
+      final sub = repo.watchHouseholdOrNull().listen(
+        (household) => emissions.add(household?.id),
+      );
+      addTearDown(sub.cancel);
+
+      await pumpEventQueue();
+      expect(emissions, [null]);
+
+      final created = await repo.createLocalHousehold('Me');
+      await pumpEventQueue();
+
+      expect(emissions.last, created.id);
+    },
+  );
 }

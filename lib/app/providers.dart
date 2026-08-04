@@ -29,6 +29,7 @@ import 'dart:async';
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/household_create_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
@@ -98,6 +99,16 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
 /// The household repository, built on [appDatabaseProvider].
 final householdRepositoryProvider = Provider<HouseholdRepository>((ref) {
   return HouseholdRepository(ref.watch(appDatabaseProvider));
+});
+
+/// The welcome gate (spec `docs/specs/onboarding-v2.md` §1/§2): whether any
+/// household row exists locally yet. `ChoreApp` (`lib/app/app.dart`) shows
+/// `WelcomeScreen` while this resolves to `null` (a fresh install -- no
+/// household until the user explicitly creates or joins one) and the tab
+/// shell once it resolves to a household. An existing install's very first
+/// emission is already non-null, so the gate never appears for it.
+final householdGateProvider = StreamProvider<Household?>((ref) {
+  return ref.watch(householdRepositoryProvider).watchHouseholdOrNull();
 });
 
 /// The shopping repository, built on [appDatabaseProvider].
@@ -284,6 +295,18 @@ final householdJoinServiceProvider = Provider<HouseholdJoinService>((ref) {
   );
 });
 
+/// The welcome screen's "Set up a new household" service (spec
+/// `docs/specs/onboarding-v2.md` §1/§2), built on [householdRepositoryProvider],
+/// [categoryRepositoryProvider], and [settingsRepositoryProvider].
+final householdCreateServiceProvider = Provider<HouseholdCreateService>((ref) {
+  return HouseholdCreateService(
+    database: ref.watch(appDatabaseProvider),
+    households: ref.watch(householdRepositoryProvider),
+    categories: ref.watch(categoryRepositoryProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+  );
+});
+
 /// The transport [syncEngineProvider] hands a real [SupabaseSyncEngine]
 /// (spec `docs/specs/sync-backend.md` §8.4) -- `null` means "Supabase isn't
 /// configured", which forces [NoopSyncEngine] regardless of linked state.
@@ -406,10 +429,21 @@ final choreServiceProvider = Provider<ChoreService>((ref) {
   );
 });
 
-/// Runs once at startup: ensures the local household exists, seeds its
-/// default categories, catches up any missed recurring occurrences,
+/// Runs once at startup (once the welcome gate -- [householdGateProvider]
+/// -- has already confirmed a household exists): seeds default categories
+/// if somehow still missing, catches up any missed recurring occurrences,
 /// auto-clears shopping items checked more than 24h ago, and resolves to
-/// that household's id.
+/// the household's id.
+///
+/// Spec `docs/specs/onboarding-v2.md` §2: this no longer CREATES the
+/// household itself (that's [householdCreateServiceProvider]'s /
+/// `HouseholdJoinService.joinFresh`'s job now, both explicit, user-chosen
+/// actions on the welcome screen) -- it ASSUMES one exists, since `ChoreApp`
+/// (`lib/app/app.dart`) only ever builds the subtree that reads this
+/// provider once [householdGateProvider] has resolved to non-null. A `null`
+/// household here is therefore a programming-bug-level surprise, not a
+/// normal startup state, and throws rather than silently bootstrapping one
+/// (the old lazy-create behavior the welcome gate spec explicitly retires).
 ///
 /// The 24h shopping auto-clear (spec `docs/specs/ux-round-2.md` B4) uses
 /// [clockProvider] so it stays deterministic under a fixed test/E2E clock.
@@ -418,9 +452,13 @@ final choreServiceProvider = Provider<ChoreService>((ref) {
 /// [pendingOccurrencesProvider] / [membersProvider] /
 /// [choreCategoriesProvider]) waits on this future first.
 final bootstrapProvider = FutureProvider<String>((ref) async {
-  final household = await ref
-      .watch(householdRepositoryProvider)
-      .ensureLocalHousehold();
+  final household = await ref.watch(householdRepositoryProvider).getHousehold();
+  if (household == null) {
+    throw StateError(
+      'bootstrapProvider requires an existing household -- it is only '
+      'reachable once householdGateProvider has confirmed one exists.',
+    );
+  }
   await ref.watch(categoryRepositoryProvider).seedDefaults(household.id);
   await ref.watch(choreServiceProvider).catchUpOverdue(household.id);
   final cutoffUtc = ref

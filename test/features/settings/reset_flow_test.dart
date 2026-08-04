@@ -113,8 +113,9 @@ void main() {
   );
 
   testChoreApp(
-    'confirming both dialogs wipes every table and re-bootstraps to the '
-    'fresh-install state',
+    'confirming both dialogs wipes every table and returns to the welcome '
+    'gate -- no silent re-bootstrap (spec docs/specs/onboarding-v2.md §0: '
+    "'no household exists until the user chooses')",
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -129,45 +130,31 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('settings.reset.confirm2'));
       await tester.pumpAndSettle();
 
-      // households: exactly one, freshly re-bootstrapped (a new row, since
-      // the old one was deleted).
-      final households = await database.select(database.households).get();
-      expect(households, hasLength(1));
-      final newHouseholdId = households.single.id;
-
-      // members: exactly the bootstrap 'Me' admin, in the new household.
-      final members = await database.select(database.members).get();
-      expect(members, hasLength(1));
-      expect(members.single.name, 'Me');
-      expect(members.single.role, MemberRole.admin);
-      expect(members.single.householdId, newHouseholdId);
-
-      // categories: the default seed set reappears (7 chore + 8 shopping).
-      final categories = await database.select(database.categories).get();
-      expect(categories, hasLength(15));
-
-      // Everything else is gone.
+      // Nothing household-scoped is silently recreated: the app is back at
+      // the TRUE fresh-install state (the welcome gate), not a new
+      // 'My household'/'Me' pair.
+      expect(await database.select(database.households).get(), isEmpty);
+      expect(await database.select(database.members).get(), isEmpty);
+      expect(await database.select(database.categories).get(), isEmpty);
       expect(await database.select(database.chores).get(), isEmpty);
       expect(await database.select(database.choreAssignees).get(), isEmpty);
       expect(await database.select(database.choreOccurrences).get(), isEmpty);
       expect(await database.select(database.shoppingItems).get(), isEmpty);
 
-      // settings: a fresh row, shown-once flags NULL again (so the A2/A3
-      // banners can show once more, per the spec).
+      // settings: a fresh row, shown-once flags NULL again -- still needed
+      // regardless of household state (ChoreApp watches settingsProvider
+      // unconditionally for locale/theme).
       final settings = await database.select(database.settings).getSingle();
       expect(settings.onboardingNamePromptShownAt, null);
       expect(settings.digestPrepromptShownAt, null);
       expect(settings.digestEnabled, true);
       expect(settings.digestMinutes, 480);
 
-      // The app is usable again, not stuck on an error state: the digest
-      // section (which watches settingsProvider, whose underlying row this
-      // reset also deleted) is still rendering correctly.
-      expect(
-        find.bySemanticsIdentifier('settings.digest.toggle'),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsIdentifier('settings.reset'), findsOneWidget);
+      // The whole tab shell (including Settings) is torn down along with
+      // the household -- the welcome gate's create card is what's showing
+      // now.
+      expect(find.bySemanticsIdentifier('settings.reset'), findsNothing);
+      expect(find.bySemanticsIdentifier('welcome.create'), findsOneWidget);
 
       handle.dispose();
     },

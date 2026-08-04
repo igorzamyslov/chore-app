@@ -51,16 +51,33 @@ the candidate, then bump the pin and this note together. Keep the local
 
 ## Cold starts (convention 8)
 
-Two rules, both root-caused 2026-08-01 from CI debug artifacts (white
-first frame in the failure screenshots on BOTH platforms):
+Three rules:
 
 1. **Every `launchApp` is followed by a first-frame settle** — an
-   `extendedWaitUntil` on `shell.tab.chores` (60s) before the first
-   interaction. On slow CI machines the first frame after a launch
-   (cold OR warm relaunch) can lose the race against the first tap;
-   the default element window is not enough headroom. Later steps run
-   against a live app and keep normal timeouts.
-2. **Permission overrides ride inside EVERY `launchApp` that needs
+   `extendedWaitUntil` (60s) before the first interaction. On slow CI
+   machines the first frame after a launch (cold OR warm relaunch) can
+   lose the race against the first tap; the default element window is
+   not enough headroom. Later steps run against a live app and keep
+   normal timeouts. Root-caused 2026-08-01 from CI debug artifacts
+   (white first frame in the failure screenshots on BOTH platforms).
+   **On a COLD (`clearState: true`) launch the target is `welcome.create`,
+   not `shell.tab.chores`** (spec `docs/specs/onboarding-v2.md`): there is
+   no household — and so no tab shell — until one is explicitly created
+   or joined, so a fresh install always lands on the welcome gate first.
+   A warm relaunch (no `clearState`) still targets `shell.tab.chores`,
+   since the household created earlier in the same flow already exists.
+2. **Every flow clears the welcome gate right after that settle.**
+   `e2e/flows/common/onboard_fresh.yaml` taps `welcome.create`, types the
+   name "Me", and confirms — every flow prepends
+   `- runFlow: ../common/onboard_fresh.yaml` (path-relative) directly
+   after its cold-launch settle wait, landing on the tab shell exactly
+   where every flow used to assume it started. `first_run_banners.yaml`
+   is the one exception: it needs a distinctive name ("Jordan") to keep
+   its own final assert meaningful, and its permission-stanza recovery
+   dance (rule 3 below) is already intertwined with the cold-start wait,
+   so it inlines the same three steps instead of calling the shared
+   sub-flow.
+3. **Permission overrides ride inside EVERY `launchApp` that needs
    them — there is no other way.** Proven empirically via dumpsys
    (2026-08-01): Maestro's Android driver auto-grants all manifest
    runtime permissions on every launchApp, so standalone

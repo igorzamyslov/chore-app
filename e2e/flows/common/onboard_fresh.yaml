@@ -1,0 +1,17 @@
+# Shared sub-flow (spec docs/specs/onboarding-v2.md): fresh-install welcome
+# gate, cleared via the "Set up a new household" card, naming the sole
+# admin member "Me" -- the exact bootstrap shape every flow in this suite
+# already assumed before the welcome gate replaced the silent bootstrap.
+# Included via `runFlow` right after each flow's own launch + first-frame
+# settle, which now waits for `welcome.create` (not `shell.tab.chores`) on a
+# cold `clearState` launch (README convention 8).
+- tapOn:
+    id: "welcome.create"
+- tapOn:
+    id: "welcome.create.name"
+- inputText: "Me"
+- pressKey: Enter
+- tapOn:
+    id: "welcome.create.confirm"
+- assertVisible:
+    id: "shell.tab.chores"

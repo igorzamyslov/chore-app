@@ -31,7 +31,7 @@ class SettingsRepository {
   /// (`digestEnabled: true`, `digestMinutes: 480`) if it doesn't exist yet.
   ///
   /// Idempotent and race-safe, mirroring
-  /// `HouseholdRepository.ensureLocalHousehold`.
+  /// `HouseholdRepository.createLocalHousehold`.
   Future<DeviceSettings> ensureSettings() async {
     final existing = await _find();
     if (existing != null) {

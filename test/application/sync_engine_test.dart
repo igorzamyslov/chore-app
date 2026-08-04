@@ -65,7 +65,7 @@ void main() {
       db = AppDatabase(NativeDatabase.memory());
       households = HouseholdRepository(db);
       categories = CategoryRepository(db);
-      household = await households.ensureLocalHousehold();
+      household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
       engine = SupabaseSyncEngine(
         db: db,
@@ -289,7 +289,7 @@ void main() {
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       households = HouseholdRepository(db);
-      household = await households.ensureLocalHousehold();
+      household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
       engine = SupabaseSyncEngine(
         db: db,
@@ -435,7 +435,7 @@ void main() {
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       households = HouseholdRepository(db);
-      household = await households.ensureLocalHousehold();
+      household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
       engine = SupabaseSyncEngine(
         db: db,

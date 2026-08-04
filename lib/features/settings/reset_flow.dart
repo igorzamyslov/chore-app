@@ -18,9 +18,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Tapping it runs the spec's double-confirm (two chained dialogs; a
 /// cancel anywhere is a no-op and leaves the database untouched). Only
 /// after both confirms does it call [resetAppData] and invalidate
-/// [bootstrapProvider] (and [settingsProvider], whose device-settings row
-/// the reset just deleted out from under its already-running watch
-/// stream) so the app re-bootstraps to the fresh-install state.
+/// [settingsProvider] (whose device-settings row the reset just deleted out
+/// from under its already-running watch stream, needed regardless of
+/// household state since `ChoreApp` watches it unconditionally for
+/// locale/theme). [bootstrapProvider] itself needs no explicit invalidation
+/// (spec `docs/specs/onboarding-v2.md` §2): wiping the `households` table
+/// flips [householdGateProvider]'s stream to `null` on its own, and
+/// `ChoreApp` reacts by swapping straight back to `WelcomeScreen` -- the
+/// TRUE fresh-install state post-onboarding-v2, not a silently
+/// re-bootstrapped household.
 class ResetDataTile extends ConsumerWidget {
   /// Creates the reset row.
   const ResetDataTile({super.key});
@@ -54,9 +60,7 @@ class ResetDataTile extends ConsumerWidget {
 
     final database = ref.read(appDatabaseProvider);
     await resetAppData(database);
-    ref
-      ..invalidate(bootstrapProvider)
-      ..invalidate(settingsProvider);
+    ref.invalidate(settingsProvider);
   }
 
   Future<bool> _showFirstDialog(BuildContext context) async {

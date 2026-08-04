@@ -176,6 +176,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresErrorMessage => 'Could not load your chores.';
 
   @override
+  String get welcomeTagline =>
+      'Share chores and a shopping list with your household.';
+
+  @override
+  String get welcomeCreateTitle => 'Set up a new household';
+
+  @override
+  String get welcomeCreateSubtitle =>
+      'Keep it on this device — you can sync later.';
+
+  @override
+  String get welcomeCreateNameLabel => 'Your name';
+
+  @override
+  String get welcomeCreateConfirm => 'Get started';
+
+  @override
+  String get welcomeCreateError =>
+      'Something went wrong setting up your household. Please try again.';
+
+  @override
+  String get welcomeJoinTitle => 'Join my family\'s household';
+
+  @override
+  String get welcomeJoinSubtitle =>
+      'Sign in and use an invite code from a family member\'s device.';
+
+  @override
+  String get welcomeJoinReconnectSubtitle =>
+      'This device isn\'t connected to it yet.';
+
+  @override
+  String get welcomeOffline =>
+      'No account needed — everything stays on your device unless you sign in.';
+
+  @override
   String get onboardingNameBannerMessage => 'Who\'s doing the chores here?';
 
   @override

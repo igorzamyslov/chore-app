@@ -20,9 +20,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
-import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/repositories/category_repository.dart';
-import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/features/settings/join_flow_steps.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,53 +143,11 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   // Step 1: code entry.
 
   Widget _buildCodeStep(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final canContinue = !_busy && _codeController.text.trim().isNotEmpty;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l10n.joinHouseholdCodeTitle, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Text(l10n.joinHouseholdCodeBody),
-        const SizedBox(height: 16),
-        semantic(
-          'settings.account.join.code',
-          child: TextField(
-            controller: _codeController,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              labelText: l10n.joinHouseholdCodeLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-        ),
-        if (_inlineError != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            _inlineError!,
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: semantic(
-            'settings.account.join.continue',
-            child: FilledButton(
-              onPressed: canContinue ? _submitCode : null,
-              child: _busy
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(l10n.joinHouseholdContinue),
-            ),
-          ),
-        ),
-      ],
+    return JoinCodeStep(
+      controller: _codeController,
+      busy: _busy,
+      inlineError: _inlineError,
+      onContinue: _submitCode,
     );
   }
 
@@ -229,40 +185,10 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   // Step 2: chooser ("Are you Anna?" + "I'm new here").
 
   Widget _buildChooserStep(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.joinHouseholdChooserTitle,
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        for (final member in _claimableMembers)
-          semantic(
-            'settings.account.join.claim.${member.memberId}',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: MemberAvatar(
-                member: _memberForAvatar(member),
-                radius: 16,
-              ),
-              title: Text(l10n.joinHouseholdChooserAreYou(member.name)),
-              onTap: () => _chooseExistingMember(member),
-            ),
-          ),
-        semantic(
-          'settings.account.join.newMember',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const CircleAvatar(child: Icon(Icons.person_add_outlined)),
-            title: Text(l10n.joinHouseholdChooserNewMember),
-            onTap: () => setState(() => _step = _Step.newMemberName),
-          ),
-        ),
-      ],
+    return JoinChooserStep(
+      claimableMembers: _claimableMembers,
+      onClaim: _chooseExistingMember,
+      onNewMember: () => setState(() => _step = _Step.newMemberName),
     );
   }
 
@@ -277,40 +203,9 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   // Step 2b: "I'm new here" name prompt.
 
   Widget _buildNewMemberNameStep(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final canContinue = _nameController.text.trim().isNotEmpty;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.joinHouseholdNewMemberTitle,
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 16),
-        semantic(
-          'settings.account.join.newMember.name',
-          child: TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: l10n.joinHouseholdNewMemberNameLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: semantic(
-            'settings.account.join.newMember.continue',
-            child: FilledButton(
-              onPressed: canContinue ? _confirmNewMember : null,
-              child: Text(l10n.joinHouseholdContinue),
-            ),
-          ),
-        ),
-      ],
+    return JoinNewMemberNameStep(
+      controller: _nameController,
+      onContinue: _confirmNewMember,
     );
   }
 
@@ -325,24 +220,10 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
       _choice = NewMemberChoice(
         memberId: const Uuid().v4(),
         name: name,
-        color: _autoColor(),
+        color: autoJoinColor(_claimableMembers),
       );
       _step = _Step.importOffer;
     });
-  }
-
-  /// The first of [CategoryRepository.seedColors] not already used by a
-  /// claimable member -- the same "first free color" pattern
-  /// `_MemberEditSheetState._firstFreeColor` uses, applied to the only
-  /// roster this client can see before downloading the joined household
-  /// (spec §7.4: "auto color").
-  int _autoColor() {
-    final usedColors = _claimableMembers.map((m) => m.color).toSet();
-    const seedColors = CategoryRepository.seedColors;
-    return seedColors.firstWhere(
-      (color) => !usedColors.contains(color),
-      orElse: () => seedColors[_claimableMembers.length % seedColors.length],
-    );
   }
 
   // -------------------------------------------------------------------
@@ -434,55 +315,11 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   }
 
   Widget _buildWorkingStep(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    if (_busy) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: SizedBox(
-            height: 32,
-            width: 32,
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _inlineError ?? '',
-          style: TextStyle(color: theme.colorScheme.error),
-        ),
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: semantic(
-            'settings.account.join.retry',
-            child: FilledButton(
-              onPressed: () => _startJoin(importAccepted: _importAccepted),
-              child: Text(l10n.commonRetry),
-            ),
-          ),
-        ),
-      ],
+    return JoinWorkingStep(
+      busy: _busy,
+      inlineError: _inlineError,
+      retrySemanticId: 'settings.account.join.retry',
+      onRetry: () => _startJoin(importAccepted: _importAccepted),
     );
   }
 }
-
-/// [MemberAvatar] takes a full [Member]; the chooser step only has a
-/// [ClaimableMember] (id/name/color). [MemberAvatar] only ever reads
-/// `name`/`color`, so this fills every other field with an inert
-/// placeholder purely to satisfy [Member]'s constructor.
-Member _memberForAvatar(ClaimableMember member) => Member(
-  id: member.memberId,
-  householdId: '',
-  name: member.name,
-  color: member.color,
-  role: MemberRole.member,
-  createdAt: '',
-  updatedAt: '',
-  syncDirty: false,
-);

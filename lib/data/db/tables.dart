@@ -80,7 +80,7 @@ mixin SyncDirtyColumn on Table {
 /// The household that owns every other row in the database.
 ///
 /// v1 note: there is exactly one local household per device (see
-/// `HouseholdRepository.ensureLocalHousehold`); the table exists as its own
+/// `HouseholdRepository.createLocalHousehold`); the table exists as its own
 /// entity so a future multi-household / sync design doesn't require a
 /// schema rewrite.
 @DataClassName('Household')

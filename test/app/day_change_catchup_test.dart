@@ -18,6 +18,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
@@ -143,6 +144,18 @@ void main() {
       (tester) async {
         var currentTime = DateTime(2026, 1, 5, 9);
         final database = AppDatabase(NativeDatabase.memory());
+        // bootstrapProvider no longer creates a household (spec
+        // docs/specs/onboarding-v2.md §2) -- seed one directly on the
+        // database BEFORE the container exists, so _awaitBootstrap below
+        // actually resolves instead of erroring. This must happen before
+        // ANY provider read: DigestRescheduleController's constructor
+        // (armed by the `..read(digestRescheduleControllerProvider)`
+        // cascade below) eagerly `ref.listen`s bootstrapProvider, which
+        // would otherwise capture the "no household" error the moment the
+        // container is built, before a later seed could take effect
+        // (FutureProviders don't re-run just because underlying data
+        // changed after the fact).
+        await HouseholdRepository(database).createLocalHousehold('Me');
         final plugin = FakeDigestNotificationPlugin();
         final container = ProviderContainer(
           overrides: [
@@ -204,6 +217,10 @@ void main() {
       (tester) async {
         final currentTime = DateTime(2026, 1, 5, 9);
         final database = AppDatabase(NativeDatabase.memory());
+        // See the identical comment in the test above: seed the household
+        // BEFORE the container (and its eager
+        // DigestRescheduleController/bootstrapProvider listen) exists.
+        await HouseholdRepository(database).createLocalHousehold('Me');
         final plugin = FakeDigestNotificationPlugin();
         final container = ProviderContainer(
           overrides: [
@@ -254,6 +271,10 @@ void main() {
       (tester) async {
         var currentTime = DateTime(2026, 1, 5, 23, 59, 50);
         final database = AppDatabase(NativeDatabase.memory());
+        // See the identical comment further up this file: seed the
+        // household BEFORE the container (and its eager
+        // DigestRescheduleController/bootstrapProvider listen) exists.
+        await HouseholdRepository(database).createLocalHousehold('Me');
         final plugin = FakeDigestNotificationPlugin();
         final container =
             ProviderContainer(

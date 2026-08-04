@@ -1,5 +1,6 @@
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -36,6 +37,10 @@ void main() {
 
   testWidgets("maps a stored 'de' to Locale('de')", (tester) async {
     final database = AppDatabase(NativeDatabase.memory());
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly on the database
+    // BEFORE the container exists.
+    await HouseholdRepository(database).createLocalHousehold('Me');
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -58,6 +63,10 @@ void main() {
 
   testWidgets("maps a stored 'en' to Locale('en')", (tester) async {
     final database = AppDatabase(NativeDatabase.memory());
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly on the database
+    // BEFORE the container exists.
+    await HouseholdRepository(database).createLocalHousehold('Me');
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -82,6 +91,10 @@ void main() {
     tester,
   ) async {
     final database = AppDatabase(NativeDatabase.memory());
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly on the database
+    // BEFORE the container exists.
+    await HouseholdRepository(database).createLocalHousehold('Me');
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -107,6 +120,10 @@ void main() {
     "an unknown stored value ('fr') maps to null (future-proofing)",
     (tester) async {
       final database = AppDatabase(NativeDatabase.memory());
+      // bootstrapProvider no longer creates a household (spec
+      // docs/specs/onboarding-v2.md §2) -- seed one directly on the
+      // database BEFORE the container exists.
+      await HouseholdRepository(database).createLocalHousehold('Me');
       final container = ProviderContainer(
         overrides: [
           appDatabaseProvider.overrideWithValue(database),
