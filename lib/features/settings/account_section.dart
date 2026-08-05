@@ -3,8 +3,10 @@
 /// signed out; when signed in, the account email + sign-out, plus (while
 /// unlinked) the P2d reconnect row (only when this account is already a
 /// claimed member elsewhere), the P2b adopt row, and the P2c join row, or
-/// (once linked) a subtitle naming the household; and a static 'coming
-/// soon' row when Supabase isn't configured ([NoopAuthGateway]).
+/// (once linked) a subtitle naming the household plus the B3 'Invite a
+/// member' row (spec `docs/feedback/2026-08-01-ux-audit.md` B3); and a
+/// static 'coming soon' row when Supabase isn't configured
+/// ([NoopAuthGateway]).
 library;
 
 import 'package:chore_app/app/providers.dart';
@@ -14,6 +16,7 @@ import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -81,7 +84,13 @@ class AccountSectionBody extends ConsumerWidget {
       );
     }
     final householdName = ref.watch(currentHouseholdProvider).valueOrNull?.name;
-    return _SignedInTile(user: user, householdName: householdName);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SignedInTile(user: user, householdName: householdName),
+        _InviteRow(householdId: householdId),
+      ],
+    );
   }
 }
 
@@ -182,6 +191,34 @@ class _SignedInTile extends ConsumerWidget {
         );
       }
     }
+  }
+}
+
+/// The B3 'Invite a member' row (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` B3), shown below the signed-in
+/// tile once linked: after adopting/joining, inviting the rest of the
+/// household is the natural next step, but the only affordance used to be
+/// buried in Settings -> Members. Runs the exact same create-invite flow as
+/// that Members-screen row -- both share [runInviteFlow]
+/// (`lib/features/settings/invite_flow.dart`), which also revokes any
+/// previously active invite first (spec A3).
+class _InviteRow extends ConsumerWidget {
+  const _InviteRow({required this.householdId});
+
+  /// The linked household's id, to create the invite for.
+  final String householdId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.invite',
+      child: ListTile(
+        leading: const Icon(Icons.person_add_alt_outlined),
+        title: Text(l10n.settingsAccountInvite),
+        onTap: () => runInviteFlow(context, ref, householdId),
+      ),
+    );
   }
 }
 

@@ -84,6 +84,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                 onOpenMenu: _openMenu,
                 onReopen: _reopen,
                 onResume: _resume,
+                onClearFilters: _clearFilters,
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stackTrace) => _ErrorState(
@@ -222,6 +223,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   Future<void> _resume(ChoreWithDetails details) {
     return ref.read(choreServiceProvider).unpauseChore(details.chore.id);
   }
+
+  /// Resets both filters (spec `docs/feedback/2026-08-01-ux-audit.md` B1's
+  /// "Show everything" action).
+  void _clearFilters() {
+    setState(() {
+      _memberFilter = null;
+      _categoryFilter = null;
+    });
+  }
 }
 
 class _Body extends StatelessWidget {
@@ -237,6 +247,7 @@ class _Body extends StatelessWidget {
     required this.onOpenMenu,
     required this.onReopen,
     required this.onResume,
+    required this.onClearFilters,
   });
 
   final List<OccurrenceWithChore> occurrences;
@@ -255,6 +266,10 @@ class _Body extends StatelessWidget {
   final ValueChanged<OccurrenceWithChore> onOpenMenu;
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
   final ValueChanged<ChoreWithDetails> onResume;
+
+  /// Resets both filters (spec `docs/feedback/2026-08-01-ux-audit.md` B1's
+  /// "Show everything" action, wired to the filtered-empty state below).
+  final VoidCallback onClearFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -302,6 +317,21 @@ class _Body extends StatelessWidget {
         filteredPaused.isNotEmpty || filteredClosedToday.isNotEmpty;
 
     if (filtered.isEmpty && !hasCollapsedSections) {
+      // B1 (spec docs/feedback/2026-08-01-ux-audit.md): a filter hiding
+      // EVERYTHING is not the same as genuinely nothing pending -- the
+      // unfiltered lists above (occurrences/closedToday/paused) are the
+      // "would something show without the filter" signal; only when a
+      // filter is active AND clearing it would actually reveal something
+      // does the honest "nothing here for this filter" state replace the
+      // fresh/done praise copy.
+      final filterActive = memberFilter != null || categoryFilter != null;
+      final hasUnfilteredContent =
+          occurrences.isNotEmpty || closedToday.isNotEmpty || paused.isNotEmpty;
+      if (filterActive && hasUnfilteredContent) {
+        return Center(
+          child: _ChoresEmptyFilteredState(onClear: onClearFilters),
+        );
+      }
       return Center(
         child: _ChoresEmptyState(fresh: !hasActiveChores),
       );
@@ -397,6 +427,49 @@ class _ChoresEmptyState extends StatelessWidget {
               fresh ? l10n.choresEmptyFresh : l10n.choresEmptyState,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The B1 filtered-empty state (spec
+/// `docs/feedback/2026-08-01-ux-audit.md`): shown instead of
+/// [_ChoresEmptyState] when a member/category filter is the reason nothing
+/// is visible -- distinct copy plus a "Show everything" action, rather than
+/// the unqualified "No chores pending" praise, which used to read as "my
+/// chores are gone".
+class _ChoresEmptyFilteredState extends StatelessWidget {
+  const _ChoresEmptyFilteredState({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+
+    return semantic(
+      'chores.empty.filtered',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.filter_alt_off_outlined, size: 48, color: color),
+          const SizedBox(height: 8),
+          Text(
+            l10n.choresEmptyFiltered,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 8),
+          semantic(
+            'chores.filter.clear',
+            child: TextButton(
+              onPressed: onClear,
+              child: Text(l10n.choresFilterClear),
             ),
           ),
         ],

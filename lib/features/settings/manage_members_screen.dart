@@ -8,11 +8,10 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
-import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/features/settings/household_rename_sheet.dart';
-import 'package:chore_app/features/settings/invite_code_sheet.dart';
+import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/member_edit_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -97,9 +96,9 @@ class _HouseholdNameRow extends ConsumerWidget {
 }
 
 /// The 'Invite' row (spec `docs/specs/sync-backend.md` §7.3), shown only
-/// once linked: creates an invite code via [householdGatewayProvider] and
-/// opens [showInviteCodeSheet] with it, or a generic error snackbar on
-/// failure.
+/// once linked: runs [runInviteFlow] (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` A3/B3 -- shared with the Account
+/// section's equivalent row).
 class _InviteRow extends ConsumerWidget {
   const _InviteRow();
 
@@ -121,21 +120,7 @@ class _InviteRow extends ConsumerWidget {
     if (householdId == null) {
       return;
     }
-    try {
-      final code = await ref
-          .read(householdGatewayProvider)
-          .createInvite(householdId);
-      if (context.mounted) {
-        await showInviteCodeSheet(context, code: code);
-      }
-    } on Exception catch (_) {
-      if (context.mounted) {
-        showAppSnackbar(
-          context,
-          message: AppLocalizations.of(context).settingsMembersInviteError,
-        );
-      }
-    }
+    await runInviteFlow(context, ref, householdId);
   }
 }
 

@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'All categories'**
   String get choresFilterCategoryAll;
 
+  /// Button in the filtered-empty state (spec docs/feedback/2026-08-01-ux-audit.md B1) that resets both the member and category filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Show everything'**
+  String get choresFilterClear;
+
   /// Tooltip for the chores app bar's leading acting-member avatar button (spec members-management §4).
   ///
   /// In en, this message translates to:
@@ -320,6 +326,12 @@ abstract class AppLocalizations {
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
 
+  /// Final row of the acting-member switcher sheet (spec docs/feedback/2026-08-01-ux-audit.md B2), pushing the Members management screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage members'**
+  String get actingManageMembers;
+
   /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done').
   ///
   /// In en, this message translates to:
@@ -331,6 +343,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add your first chore with +'**
   String get choresEmptyFresh;
+
+  /// Chores list empty-state message shown instead of choresEmptyState/choresEmptyFresh when a member/category filter hides every occurrence that would otherwise be visible (spec docs/feedback/2026-08-01-ux-audit.md B1).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here for this filter.'**
+  String get choresEmptyFiltered;
 
   /// Chores list load-error message.
   ///
@@ -692,6 +710,12 @@ abstract class AppLocalizations {
   /// **'Pick at least two'**
   String get choreFormAssignmentNeedsTwoError;
 
+  /// Trailing chip in the chore form's assignee picker (spec docs/feedback/2026-08-01-ux-audit.md B2), opening the new-member sheet inline so a missing person can be added without abandoning the form.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member…'**
+  String get choreFormAddMember;
+
   /// Label of the chore form's start-date field.
   ///
   /// In en, this message translates to:
@@ -848,10 +872,10 @@ abstract class AppLocalizations {
   /// **'Invite a household member'**
   String get settingsMembersInviteSheetTitle;
 
-  /// One-line explanatory copy in the invite-code sheet, stating the code's expiry (spec docs/specs/sync-backend.md §1: invites default to a 7-day expiry).
+  /// One-line explanatory copy in the invite-code sheet, stating the code's expiry (spec docs/specs/sync-backend.md §1: invites default to a 7-day expiry) AND that creating it revoked any previously active code (spec docs/feedback/2026-08-01-ux-audit.md A3: one live code per household).
   ///
   /// In en, this message translates to:
-  /// **'Share this code with them — it expires in 7 days.'**
+  /// **'Share this code — it replaces any earlier code and expires in 7 days.'**
   String get settingsMembersInviteSheetBody;
 
   /// Label of the invite-code sheet's share button (share_plus).
@@ -1207,6 +1231,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Synced with {householdName}'**
   String settingsAccountLinkedSubtitle(String householdName);
+
+  /// Title of the Account section's 'Invite a member' row (spec docs/feedback/2026-08-01-ux-audit.md B3), shown below the signed-in tile once linked -- runs the same create-invite flow as the Members screen's Invite row.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a member'**
+  String get settingsAccountInvite;
 
   /// Title of the Account section's P2c join row (spec docs/specs/sync-backend.md §7.4), shown below the adopt row while signed in and unlinked.
   ///

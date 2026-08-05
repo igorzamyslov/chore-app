@@ -164,16 +164,25 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresFilterCategoryAll => 'Alle Kategorien';
 
   @override
+  String get choresFilterClear => 'Alles anzeigen';
+
+  @override
   String get actingMemberButtonTooltip => 'Aktives Mitglied wechseln';
 
   @override
   String get actingMemberSheetTitle => 'Wer ist gerade dran?';
 
   @override
+  String get actingManageMembers => 'Mitglieder verwalten';
+
+  @override
   String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
 
   @override
   String get choresEmptyFresh => 'Füge mit + deine erste Aufgabe hinzu';
+
+  @override
+  String get choresEmptyFiltered => 'Für diesen Filter gibt es nichts.';
 
   @override
   String get choresErrorMessage =>
@@ -443,6 +452,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormAssignmentNeedsTwoError => 'Wähle mindestens zwei aus';
 
   @override
+  String get choreFormAddMember => 'Mitglied hinzufügen…';
+
+  @override
   String get choreFormStartDateLabel => 'Startdatum';
 
   @override
@@ -533,7 +545,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsMembersInviteSheetBody =>
-      'Teile diesen Code — er ist 7 Tage gültig.';
+      'Teile diesen Code — er ersetzt jeden früheren Code und ist 7 Tage gültig.';
 
   @override
   String get settingsMembersInviteShare => 'Teilen';
@@ -738,6 +750,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String settingsAccountLinkedSubtitle(String householdName) {
     return 'Synchronisiert mit $householdName';
   }
+
+  @override
+  String get settingsAccountInvite => 'Mitglied einladen';
 
   @override
   String get settingsAccountJoinTitle => 'Einem bestehenden Haushalt beitreten';

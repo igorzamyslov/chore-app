@@ -4,6 +4,7 @@ library;
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/features/settings/member_edit_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -14,7 +15,13 @@ import 'package:flutter/material.dart';
 /// chip carries a visible order badge reflecting tap order (at least two
 /// members must be picked); `anyone` shows no assignee chips. Every
 /// assignee chip leads with the member's `MemberAvatar` (field feedback
-/// F3, `docs/feedback/2026-08-01-field-feedback.md`).
+/// F3, `docs/feedback/2026-08-01-field-feedback.md`). A trailing 'Add
+/// member…' chip (spec `docs/feedback/2026-08-01-ux-audit.md` B2) closes
+/// the assignee row, opening the new-member sheet inline so a missing
+/// person can be added without abandoning the form -- the chip row
+/// refreshes automatically once they're saved, since the caller
+/// (`ChoreFormScreen`) watches `membersProvider` and passes the live
+/// [members] list down.
 class AssignmentFields extends StatelessWidget {
   /// Creates the assignment fields.
   const AssignmentFields({
@@ -88,6 +95,14 @@ class AssignmentFields extends StatelessWidget {
                     onSelected: (_) => onMemberTap(member.id),
                   ),
                 ),
+              semantic(
+                'chore_form.assignee.add',
+                child: ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: Text(AppLocalizations.of(context).choreFormAddMember),
+                  onPressed: () => showMemberEditSheet(context),
+                ),
+              ),
             ],
           ),
         ],

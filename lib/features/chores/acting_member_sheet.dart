@@ -2,10 +2,13 @@
 /// (spec `docs/specs/members-management.md` §4).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/features/settings/manage_members_screen.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,6 +93,30 @@ class _ActingMemberSheet extends ConsumerWidget {
                   },
                 ),
               ),
+            semantic(
+              'acting.manage',
+              child: ListTile(
+                leading: const Icon(Icons.people_outline),
+                title: Text(l10n.actingManageMembers),
+                onTap: () {
+                  // Close the sheet first, then push -- both calls resolve
+                  // against the same underlying Navigator (a modal bottom
+                  // sheet route lives on it, not a separate one), and this
+                  // context stays valid across the pair since nothing
+                  // `await`s in between (spec
+                  // docs/feedback/2026-08-01-ux-audit.md B2's "Manage
+                  // members" row).
+                  Navigator.of(context).pop();
+                  unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const ManageMembersScreen(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

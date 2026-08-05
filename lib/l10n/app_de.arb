@@ -45,12 +45,15 @@
   "choresFilterMemberAll": "Alle Mitglieder",
   "choresFilterCategoryTooltip": "Nach Kategorie filtern",
   "choresFilterCategoryAll": "Alle Kategorien",
+  "choresFilterClear": "Alles anzeigen",
 
   "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
   "actingMemberSheetTitle": "Wer ist gerade dran?",
+  "actingManageMembers": "Mitglieder verwalten",
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
   "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
+  "choresEmptyFiltered": "Für diesen Filter gibt es nichts.",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
 
   "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",
@@ -120,6 +123,7 @@
   "choreFormAssigneeOrderLabel": "{order}. {name}",
   "choreFormAssignmentNeedsOneError": "Wähle ein Mitglied aus",
   "choreFormAssignmentNeedsTwoError": "Wähle mindestens zwei aus",
+  "choreFormAddMember": "Mitglied hinzufügen…",
 
   "choreFormStartDateLabel": "Startdatum",
 
@@ -157,7 +161,7 @@
 
   "settingsMembersInviteEntry": "Einladen",
   "settingsMembersInviteSheetTitle": "Haushaltsmitglied einladen",
-  "settingsMembersInviteSheetBody": "Teile diesen Code — er ist 7 Tage gültig.",
+  "settingsMembersInviteSheetBody": "Teile diesen Code — er ersetzt jeden früheren Code und ist 7 Tage gültig.",
   "settingsMembersInviteShare": "Teilen",
   "settingsMembersInviteShareText": "Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code {code} ein.",
   "settingsMembersInviteError": "Die Einladung konnte nicht erstellt werden. Versuch es noch mal.",
@@ -226,6 +230,7 @@
   "settingsAccountAdoptRetry": "Erneut versuchen",
   "settingsAccountAdoptError": "Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.",
   "settingsAccountLinkedSubtitle": "Synchronisiert mit {householdName}",
+  "settingsAccountInvite": "Mitglied einladen",
   "settingsAccountJoinTitle": "Einem bestehenden Haushalt beitreten",
   "settingsAccountJoinIntro": "Nutze einen Einladungscode von einem anderen Gerät — das ersetzt deine lokalen Daten.",
   "settingsAccountJoinSuccessSnackbar": "Deine alten Daten wurden in {fileName} gespeichert.",

@@ -746,4 +746,50 @@ void main() {
       handle.dispose();
     },
   );
+
+  final accountInviteGateway = FakeHouseholdGateway();
+  testChoreApp(
+    'B3 (spec docs/feedback/2026-08-01-ux-audit.md): linked shows the '
+    "Account section's 'Invite a member' row; tapping it revokes any "
+    'previous invite THEN creates a new one (spec A3), and shows the '
+    "invite sheet with the fake's code",
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(accountInviteGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.invite'),
+        findsOneWidget,
+      );
+      expect(find.text('Invite a member'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsIdentifier('settings.account.invite'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.sheet'),
+        findsOneWidget,
+      );
+      expect(find.text('AB3D7XQ9'), findsOneWidget);
+      expect(accountInviteGateway.createInviteCalls, [householdId]);
+      expect(accountInviteGateway.revokeActiveInvitesCalls, [householdId]);
+      expect(accountInviteGateway.inviteCallOrder, ['revoke', 'create']);
+
+      handle.dispose();
+    },
+  );
 }

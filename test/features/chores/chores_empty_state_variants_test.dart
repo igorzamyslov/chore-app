@@ -1,6 +1,7 @@
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
@@ -8,10 +9,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 
-/// Widget coverage for the two distinct chores-list empty states (spec
-/// `docs/specs/polish-round-1.md` A1): 'fresh install' (zero non-deleted
+/// Widget coverage for the chores-list empty states: the two from spec
+/// `docs/specs/polish-round-1.md` A1 -- 'fresh install' (zero non-deleted
 /// chores in the household) vs 'all done' (chores exist, none pending),
-/// both sharing the same outer `chores.empty` container id.
+/// both sharing the same outer `chores.empty` container id -- plus the B1
+/// filtered-empty state (spec `docs/feedback/2026-08-01-ux-audit.md`),
+/// which has its own top-level `chores.empty.filtered` id (not nested
+/// under `chores.empty` -- no E2E flow filters, so nothing depends on
+/// nesting).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -147,6 +152,100 @@ void main() {
 
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty.fresh'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'B1 (spec docs/feedback/2026-08-01-ux-audit.md): filtering to a member '
+    'with no matching occurrence at all shows the honest filtered-empty '
+    "state instead of the unqualified praise copy, and 'Show everything' "
+    'resets the filter',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      // Unassigned ("anyone" mode): never matches ANY specific member
+      // filter, so filtering to Anna hides it -- she has no occurrence of
+      // any kind (pending, paused, or done-today).
+      await service.createChore(
+        householdId: householdId,
+        title: 'My chore',
+        startDate: PlainDate(2026, 7, 24),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('My chore'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PopupMenuItem<String?>),
+          matching: find.text('Anna'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('My chore'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('chores.empty.filtered'),
+        findsOneWidget,
+      );
+      // Neither of the genuinely-empty variants renders alongside it.
+      expect(find.bySemanticsIdentifier('chores.empty'), findsNothing);
+      expect(find.text('Nothing here for this filter.'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsIdentifier('chores.filter.clear'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('My chore'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('chores.empty.filtered'),
+        findsNothing,
+      );
+      // Both filter icons are back to their unbadged state.
+      expect(find.byType(Badge), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'B1 guard: a filter set on a fresh install (zero chores in the '
+    'household at all) keeps the fresh-install copy rather than the '
+    "filtered-empty state -- clearing the filter wouldn't reveal anything "
+    'either',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      expect(find.bySemanticsIdentifier('chores.empty.fresh'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PopupMenuItem<String?>),
+          matching: find.text('Me'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('chores.empty.fresh'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('chores.empty.filtered'),
+        findsNothing,
+      );
 
       handle.dispose();
     },

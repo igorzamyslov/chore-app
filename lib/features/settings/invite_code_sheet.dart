@@ -1,6 +1,9 @@
 /// The invite-code bottom sheet (spec `docs/specs/sync-backend.md` §7.3),
-/// opened from the Members screen's 'Invite' row once a code has been
-/// created: shows the 8-char code in large type, plus a share button.
+/// opened from either the Members screen's 'Invite' row or the Account
+/// section's 'Invite a member' row (spec
+/// `docs/feedback/2026-08-01-ux-audit.md` B3) once a code has been created
+/// via `runInviteFlow` (`lib/features/settings/invite_flow.dart`): shows
+/// the 8-char code in large type, plus a share button.
 library;
 
 import 'package:chore_app/app/semantics.dart';

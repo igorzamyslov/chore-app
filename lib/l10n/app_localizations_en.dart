@@ -164,16 +164,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresFilterCategoryAll => 'All categories';
 
   @override
+  String get choresFilterClear => 'Show everything';
+
+  @override
   String get actingMemberButtonTooltip => 'Switch who\'s acting';
 
   @override
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
 
   @override
+  String get actingManageMembers => 'Manage members';
+
+  @override
   String get choresEmptyState => 'No chores pending — nice work!';
 
   @override
   String get choresEmptyFresh => 'Add your first chore with +';
+
+  @override
+  String get choresEmptyFiltered => 'Nothing here for this filter.';
 
   @override
   String get choresErrorMessage => 'Could not load your chores.';
@@ -441,6 +450,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAssignmentNeedsTwoError => 'Pick at least two';
 
   @override
+  String get choreFormAddMember => 'Add member…';
+
+  @override
   String get choreFormStartDateLabel => 'Start date';
 
   @override
@@ -530,7 +542,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMembersInviteSheetBody =>
-      'Share this code with them — it expires in 7 days.';
+      'Share this code — it replaces any earlier code and expires in 7 days.';
 
   @override
   String get settingsMembersInviteShare => 'Share';
@@ -732,6 +744,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsAccountLinkedSubtitle(String householdName) {
     return 'Synced with $householdName';
   }
+
+  @override
+  String get settingsAccountInvite => 'Invite a member';
 
   @override
   String get settingsAccountJoinTitle => 'Join an existing household';
