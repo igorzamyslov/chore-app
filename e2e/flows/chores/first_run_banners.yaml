@@ -61,9 +61,10 @@ tags:
 - tapOn:
     id: "welcome.create.name"
 - inputText: "Jordan"
+# Enter IS the submit: the name field's onSubmitted runs the create
+# action directly (good product UX), so the confirm button can unmount
+# before a follow-up tap would land — never press Enter AND tap confirm.
 - pressKey: Enter
-- tapOn:
-    id: "welcome.create.confirm"
 - assertVisible:
     id: "shell.tab.chores"
 - assertNotVisible:

@@ -37,6 +37,14 @@ tags:
 - assertNotVisible: "Produce"
 # Restart WITHOUT clearState: the rename must survive.
 - launchApp
+# Warm-relaunch first-frame settle (README convention 8): the household
+# already exists, so the relaunch lands on the shell — but its first
+# frame can still lose the race against the tap below on slow machines
+# (missed here originally; failed exactly this way 2026-08-05).
+- extendedWaitUntil:
+    visible:
+      id: "shell.tab.chores"
+    timeout: 60000
 - tapOn:
     id: "shell.tab.settings"
 - tapOn:
