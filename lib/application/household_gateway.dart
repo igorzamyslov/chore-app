@@ -134,6 +134,15 @@ abstract class HouseholdGateway {
   /// [householdId] (member-only).
   Future<String> createInvite(String householdId);
 
+  /// PostgREST update of `household_invites`: stamps `revoked_at` (a
+  /// client-authored ISO timestamp -- acceptable for an audit column like
+  /// this one) on every currently-active invite (`revoked_at is null`) for
+  /// [householdId]. Spec `docs/feedback/2026-08-01-ux-audit.md` A3's
+  /// "minimal and sufficient" decision -- one live code per household --
+  /// is enforced by calling this BEFORE every [createInvite] call, not by
+  /// any server-side constraint.
+  Future<void> revokeActiveInvites(String householdId);
+
   /// RPC `list_claimable_members`: the unclaimed member profiles [code]'s
   /// household offers for the P2c "Are you Anna?" claiming step.
   Future<List<ClaimableMember>> listClaimableMembers(String code);
@@ -191,6 +200,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
 
   @override
   Future<String> createInvite(String householdId) => _unreachable();
+
+  @override
+  Future<void> revokeActiveInvites(String householdId) => _unreachable();
 
   @override
   Future<List<ClaimableMember>> listClaimableMembers(String code) =>
@@ -318,6 +330,15 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       params: {'p_household_id': householdId},
     );
     return result as String;
+  }
+
+  @override
+  Future<void> revokeActiveInvites(String householdId) async {
+    await _client
+        .from('household_invites')
+        .update({'revoked_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('household_id', householdId)
+        .isFilter('revoked_at', null);
   }
 
   @override

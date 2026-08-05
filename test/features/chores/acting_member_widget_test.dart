@@ -250,4 +250,31 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'B2 (spec docs/feedback/2026-08-01-ux-audit.md): the acting-member '
+    "sheet's final 'Manage members' row closes the sheet and pushes the "
+    'Members screen',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('chores.actingMember'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('acting.manage'), findsOneWidget);
+      expect(find.text('Manage members'), findsOneWidget);
+
+      await tester.tap(find.bySemanticsIdentifier('acting.manage'));
+      await tester.pumpAndSettle();
+
+      // The sheet is gone and the Members screen (household-name row +
+      // the bootstrap 'Me' row) is what's showing now.
+      expect(find.bySemanticsIdentifier('actingMember.sheet'), findsNothing);
+      expect(find.text('My household'), findsOneWidget);
+      expect(find.text('Me'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
 }

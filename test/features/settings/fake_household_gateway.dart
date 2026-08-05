@@ -42,6 +42,10 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// The code [createInvite] returns unless [createInviteError] is set.
   String inviteCode;
 
+  /// Set to make the next [revokeActiveInvites] call throw this instead of
+  /// succeeding.
+  Exception? revokeActiveInvitesError;
+
   /// Set to make the next [createHousehold] call throw this instead of
   /// succeeding.
   Exception? createHouseholdError;
@@ -74,6 +78,16 @@ class FakeHouseholdGateway implements HouseholdGateway {
 
   /// Every [createInvite] call's household id, in call order.
   final List<String> createInviteCalls = [];
+
+  /// Every [revokeActiveInvites] call's household id, in call order.
+  final List<String> revokeActiveInvitesCalls = [];
+
+  /// Records 'revoke' / 'create' entries in call order, shared between
+  /// [revokeActiveInvites] and [createInvite] — lets a test assert A3's
+  /// revoke-then-create ordering directly (spec
+  /// `docs/feedback/2026-08-01-ux-audit.md` A3), independent of the two
+  /// per-method call lists above.
+  final List<String> inviteCallOrder = [];
 
   /// Every [downloadHousehold] call's household id, in call order.
   final List<String> downloadHouseholdCalls = [];
@@ -162,11 +176,22 @@ class FakeHouseholdGateway implements HouseholdGateway {
   @override
   Future<String> createInvite(String householdId) async {
     createInviteCalls.add(householdId);
+    inviteCallOrder.add('create');
     final error = createInviteError;
     if (error != null) {
       throw error;
     }
     return inviteCode;
+  }
+
+  @override
+  Future<void> revokeActiveInvites(String householdId) async {
+    revokeActiveInvitesCalls.add(householdId);
+    inviteCallOrder.add('revoke');
+    final error = revokeActiveInvitesError;
+    if (error != null) {
+      throw error;
+    }
   }
 
   @override

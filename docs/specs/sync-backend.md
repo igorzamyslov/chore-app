@@ -193,6 +193,11 @@ fake. Methods mirror the P1 RPCs and the two bulk paths:
   UPDATE privilege on an upsert's whole SET list at plan time — a full-row
   members upsert is rejected (42501) even when no conflict occurs.
 - `createInvite(householdId)` → code (8 chars).
+- `revokeActiveInvites(householdId)` — PostgREST update stamping
+  `revoked_at` (client-authored ISO timestamp) on every currently-active
+  invite (`revoked_at is null`); called BEFORE `createInvite` at both
+  entry points (spec `docs/feedback/2026-08-01-ux-audit.md` A3: one live
+  code per household).
 - `listClaimableMembers(code)` → `[(memberId, name, color)]`.
 - `claimMember(code, memberId)` → householdId.
 - `joinAsNewMember(code, memberId, name, color)` → householdId.
@@ -221,9 +226,15 @@ rerunning is safe (RPC failure on rerun after a half-success: treat
 continue with 2).
 
 Invite: once linked, the Members screen gains an "Invite" row
-(`settings.members.invite`): tap → `createInvite` → bottom sheet with the
-code in large type + a share button (share_plus). Account section's
-signed-in tile gains a "linked" subtitle (household name).
+(`settings.members.invite`), and the Account section's signed-in tile
+gains a "linked" subtitle (household name) plus its own "Invite a
+member" row (`settings.account.invite`, spec
+`docs/feedback/2026-08-01-ux-audit.md` B3) right below it -- both share
+one handler (`runInviteFlow`,
+`lib/features/settings/invite_flow.dart`): `revokeActiveInvites` (spec
+A3 -- one live code per household, so creating a new one is how you
+revoke the old one) → `createInvite` → bottom sheet with the code in
+large type + a share button (share_plus).
 
 ### 7.4 P2c — join ("Join an existing household")
 

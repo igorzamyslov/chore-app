@@ -20,13 +20,13 @@ import 'settings_test_utils.dart';
 
 /// Widget-level tests for the manage-members screen (spec
 /// `docs/specs/members-management.md` §3, §6; extended by spec
-/// `docs/feedback/2026-08-01-ux-audit.md` A1/A2): bootstrap-only state, the
-/// add flow (including the disabled-save guard and cross-screen
+/// `docs/feedback/2026-08-01-ux-audit.md` A1/A2/A3): bootstrap-only state,
+/// the add flow (including the disabled-save guard and cross-screen
 /// propagation into the chore form's assignee chips), rename, recolor, the
 /// "duplicate names are allowed" invariant shared with chores (see
 /// `test/features/chores/duplicate_names_widget_test.dart`), the P2b
-/// 'Invite' row (spec `docs/specs/sync-backend.md` §7.3), household rename
-/// (A2), and member deletion (A1).
+/// 'Invite' row (spec `docs/specs/sync-backend.md` §7.3, revoke-then-create
+/// per A3), household rename (A2), and member deletion (A1).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -264,8 +264,8 @@ void main() {
 
   final inviteGateway = FakeHouseholdGateway();
   testChoreApp(
-    'invite row visible once linked; tap creates an invite and shows the '
-    "sheet with the fake's code",
+    'invite row visible once linked; tap revokes any previous invite THEN '
+    "creates a new one (spec A3), and shows the sheet with the fake's code",
     today: today,
     overrides: [
       householdGatewayProvider.overrideWithValue(inviteGateway),
@@ -293,6 +293,8 @@ void main() {
       );
       expect(find.text('AB3D7XQ9'), findsOneWidget);
       expect(inviteGateway.createInviteCalls, [householdId]);
+      expect(inviteGateway.revokeActiveInvitesCalls, [householdId]);
+      expect(inviteGateway.inviteCallOrder, ['revoke', 'create']);
 
       handle.dispose();
     },
