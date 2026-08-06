@@ -43,7 +43,8 @@ tags:
 - assertVisible: "Skipped — next due tomorrow"
 # ...and Undo restores it to Today.
 - tapOn: "Undo"
-- assertVisible: "Today"
+- assertVisible:
+    id: "chores.section.today"
 - assertVisible: "(?s).*Mop kitchen.*"
 # The Done-today section is gone again (the skip was undone).
 - assertNotVisible:

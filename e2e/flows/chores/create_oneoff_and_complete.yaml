@@ -24,7 +24,8 @@ tags:
 - tapOn:
     id: "chore_form.save"
 - assertVisible: "(?s).*Water plants.*"
-- assertVisible: "Today"
+- assertVisible:
+    id: "chores.section.today"
 - tapOn:
     id: 'chores\.occurrence\..*\.complete'
 - assertVisible:

@@ -446,29 +446,53 @@ class _SectionHeader extends StatelessWidget {
         ? theme.colorScheme.error
         : theme.colorScheme.onSurfaceVariant;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Row(
-        children: [
-          Text(
-            section.label(AppLocalizations.of(context)).toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(color: labelColor),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              height: 1,
-              color: theme.colorScheme.outlineVariant,
+    final label = section.label(AppLocalizations.of(context));
+
+    // Addressable by id, not by text: the header's own label and its count
+    // merge into ONE accessibility node ("Today\n1"), and Maestro matches
+    // node text exactly -- so a text assertion on a section header breaks
+    // the moment the header gains (or loses) anything alongside the label.
+    // Proven live 2026-08-06 when the count landed. Ids are this suite's
+    // contract; text is presentation.
+    return semantic(
+      'chores.section.${section.name}',
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Row(
+          children: [
+            // Uppercase is TYPOGRAPHY, not content: the accessibility label
+            // keeps the natural-case string, so TalkBack announces "Today"
+            // rather than shouting/spelling "TODAY", and so the Maestro flows
+            // keep matching meaning instead of casing (Maestro's text
+            // matching is case-sensitive -- proven live 2026-08-06, when
+            // uppercasing alone broke four chores flows).
+            Semantics(
+              label: label,
+              child: ExcludeSemantics(
+                child: Text(
+                  label.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: labelColor,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '$count',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                height: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              '$count',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

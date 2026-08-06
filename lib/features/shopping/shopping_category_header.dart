@@ -40,13 +40,21 @@ class ShoppingCategoryHeader extends StatelessWidget {
           Icon(icon, color: color, size: 16),
           const SizedBox(width: 8),
           Flexible(
-            child: Text(
-              // Uppercased here (never by an already-uppercase ARB string --
-              // German capitalization rules differ, spec theme-v2.md §2).
-              name.toUpperCase(),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: theme.textTheme.labelSmall?.copyWith(color: color),
+            // Uppercased here (never by an already-uppercase ARB string --
+            // German capitalization rules differ, spec theme-v2.md §2), and
+            // the natural-case name stays as the accessibility label:
+            // uppercase is typography, not content, so TalkBack announces
+            // "Produce", not "PRODUCE".
+            child: Semantics(
+              label: name,
+              child: ExcludeSemantics(
+                child: Text(
+                  name.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: theme.textTheme.labelSmall?.copyWith(color: color),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 8),

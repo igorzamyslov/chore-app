@@ -65,9 +65,12 @@ class ChoreProgressCard extends StatelessWidget {
     final remaining = total - completedToday;
     final progress = completedToday / total;
 
-    final dateLabel = DateFormat.MMMMEEEEd(
+    // Natural case for the accessibility label, uppercase only for display:
+    // uppercase is typography, not content.
+    final dateNatural = DateFormat.MMMMEEEEd(
       localeName,
-    ).format(DateTime.utc(today.year, today.month, today.day)).toUpperCase();
+    ).format(DateTime.utc(today.year, today.month, today.day));
+    final dateLabel = dateNatural.toUpperCase();
     final title = l10n.choresProgressTitle(completedToday, total);
     final subline = remaining == 0
         ? l10n.choresProgressAllDoneToday
@@ -76,7 +79,7 @@ class ChoreProgressCard extends StatelessWidget {
     return semantic(
       'chores.progress',
       child: Semantics(
-        label: '$title. $subline',
+        label: '$dateNatural. $title. $subline',
         child: DepthCard(
           shadow: true,
           child: Padding(

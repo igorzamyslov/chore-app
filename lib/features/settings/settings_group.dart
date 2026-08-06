@@ -39,10 +39,18 @@ class SettingsGroup extends StatelessWidget {
           // content padding) lines the header text up with the row titles
           // below it, rather than with the card's outer edge.
           padding: const EdgeInsets.fromLTRB(28, 24, 16, 8),
-          child: Text(
-            label.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          // Uppercase is typography, not content: the natural-case label
+          // stays as the accessibility label so TalkBack announces
+          // "Household", not "HOUSEHOLD".
+          child: Semantics(
+            label: label,
+            child: ExcludeSemantics(
+              child: Text(
+                label.toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
         ),

@@ -34,7 +34,8 @@ tags:
 # Reopen it from the section.
 - tapOn:
     id: 'chores\.done\..*\.reopen'
-- assertVisible: "Today"
+- assertVisible:
+    id: "chores.section.today"
 - assertVisible: "(?s).*Dust shelves.*"
 - assertNotVisible:
     id: "chores.done.header"

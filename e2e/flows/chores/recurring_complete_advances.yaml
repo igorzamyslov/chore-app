@@ -30,10 +30,13 @@ tags:
     id: "chore_form.repeat.unit.day"
 - tapOn:
     id: "chore_form.save"
-- assertVisible: "Today"
+- assertVisible:
+    id: "chores.section.today"
 - tapOn:
     id: 'chores\.occurrence\..*\.complete'
 # Not gone — moved to Tomorrow.
-- assertVisible: "Tomorrow"
+- assertVisible:
+    id: "chores.section.tomorrow"
 - assertVisible: "(?s).*Feed the cat.*"
-- assertNotVisible: "Today"
+- assertNotVisible:
+    id: "chores.section.today"
