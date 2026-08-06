@@ -69,6 +69,18 @@ abstract class SyncEngine {
 
   /// Disarms everything [start] armed (timers, subscriptions). Idempotent.
   void stop();
+
+  /// Suspends the periodic safety-net poll while the app is backgrounded
+  /// (spec `docs/specs/sync-freshness.md` §2.2) -- a backgrounded app must
+  /// not hold a network wakeup every minute. Everything else [start] armed
+  /// (the write listener, the realtime subscription) stays live, because
+  /// the OS, not this engine, decides whether those still deliver.
+  /// Idempotent.
+  void pauseBackgroundWork();
+
+  /// Resumes what [pauseBackgroundWork] suspended. Idempotent, and a no-op
+  /// when the engine was never [start]ed.
+  void resumeBackgroundWork();
 }
 
 /// The inert [SyncEngine] used whenever Supabase is unconfigured or the
@@ -90,6 +102,12 @@ class NoopSyncEngine implements SyncEngine {
 
   @override
   void stop() {}
+
+  @override
+  void pauseBackgroundWork() {}
+
+  @override
+  void resumeBackgroundWork() {}
 }
 
 /// The narrow network seam [SupabaseSyncEngine] depends on (spec §8.4)
@@ -172,6 +190,7 @@ class SupabaseSyncEngine implements SyncEngine {
     required this.settings,
     required this.householdId,
     this.pushDebounce = const Duration(seconds: 2),
+    this.pollInterval = const Duration(seconds: 60),
   }) : _sync = SyncRepository(db);
 
   /// The local database this engine reads from and writes to.
@@ -190,12 +209,20 @@ class SupabaseSyncEngine implements SyncEngine {
   /// before calling [pushDirty] (spec §8.3: "debounced ~2s").
   final Duration pushDebounce;
 
+  /// How often the foreground safety-net poll calls [pullSince] (spec
+  /// `docs/specs/sync-freshness.md` §2.2: 60s). Realtime is the fast path;
+  /// this only bounds worst-case staleness when realtime is degraded in a
+  /// way the re-subscribe trigger cannot see. Tests pass a shorter value.
+  final Duration pollInterval;
+
   final SyncRepository _sync;
 
   StreamSubscription<Set<TableUpdate>>? _writeSubscription;
   StreamSubscription<void>? _realtimeSubscription;
   Timer? _pushTimer;
+  Timer? _pollTimer;
   bool _started = false;
+  bool _foreground = true;
 
   @override
   void start() {
@@ -216,6 +243,12 @@ class SupabaseSyncEngine implements SyncEngine {
           ]),
         )
         .listen((_) => _scheduleDebouncedPush());
+    // Every event on this stream means "something may have changed on the
+    // server, or we may have MISSED something that did" -- the transport
+    // emits both on a live postgres_changes payload and on every
+    // (re)subscribe (spec `docs/specs/sync-freshness.md` §2.1). Mapping
+    // both to the same pull is what closes the gap a dropped-and-restored
+    // socket used to leave open indefinitely.
     _realtimeSubscription = transport
         .householdChanges(householdId)
         .listen((_) => unawaited(pullSince()));
@@ -225,6 +258,7 @@ class SupabaseSyncEngine implements SyncEngine {
     // start" too, so a bare pullSince() call here is not enough on its
     // own.
     unawaited(pushDirty());
+    _armPoll();
   }
 
   @override
@@ -232,10 +266,38 @@ class SupabaseSyncEngine implements SyncEngine {
     _started = false;
     _pushTimer?.cancel();
     _pushTimer = null;
+    _pollTimer?.cancel();
+    _pollTimer = null;
     unawaited(_writeSubscription?.cancel());
     _writeSubscription = null;
     unawaited(_realtimeSubscription?.cancel());
     _realtimeSubscription = null;
+  }
+
+  @override
+  void pauseBackgroundWork() {
+    _foreground = false;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  @override
+  void resumeBackgroundWork() {
+    _foreground = true;
+    _armPoll();
+  }
+
+  /// (Re)arms the foreground safety-net poll, but only while the engine is
+  /// started AND the app is foregrounded -- so a resume that arrives before
+  /// the engine exists, or after it was stopped, never leaves a stray timer
+  /// behind.
+  void _armPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!_started || !_foreground) {
+      return;
+    }
+    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(pullSince()));
   }
 
   void _scheduleDebouncedPush() {
@@ -615,7 +677,29 @@ class SupabaseSyncTransport implements SyncTransport {
             callback: notify,
           );
         }
-        ch.subscribe();
+        // Spec `docs/specs/sync-freshness.md` §2.1 -- the fix for the
+        // field-reported "the other phone takes very long to see my
+        // change". A `subscribed` status is not just the FIRST connect: the
+        // Supabase client reconnects on its own after a socket drop (Wi-Fi
+        // to cell, a doze window, a proxy timeout) and re-emits it. Every
+        // change the other device made DURING that outage was broadcast to
+        // nobody, and nothing else would ever have told this engine it
+        // missed them -- so a (re)subscribe must itself trigger a pull.
+        //
+        // Errors are logged and otherwise ignored: the client retries on
+        // its own, and that retry produces the `subscribed` tick that
+        // recovers the gap.
+        ch.subscribe((status, error) {
+          if (status == supabase.RealtimeSubscribeStatus.subscribed) {
+            if (!controller.isClosed) {
+              controller.add(null);
+            }
+            return;
+          }
+          if (error != null) {
+            debugPrint('SyncTransport.householdChanges($status): $error');
+          }
+        });
       },
       onCancel: () {
         final ch = channel;

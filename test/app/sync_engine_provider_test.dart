@@ -180,6 +180,20 @@ void main() {
         isTrue,
       );
 
+      // Stop the engine INSIDE the test body: this test starts a REAL one,
+      // which since spec `docs/specs/sync-freshness.md` §2.2 owns a
+      // periodic safety-net poll `Timer`, and `flutter_test` asserts "no
+      // Timer still pending" as soon as the body returns — too early for
+      // the `addTearDown(container.dispose)` above to have run.
+      //
+      // `stop()`, not `container.dispose()`: disposing the whole graph here
+      // cancels the drift stream subscriptions that `database.close()`
+      // below then waits on, and that await never completes under
+      // `flutter test`'s fake clock (this project's documented
+      // bare-await-deadlock class). Stopping just the engine cancels its
+      // timers and subscriptions and nothing else.
+      container.read(syncEngineProvider).stop();
+
       await database.close();
     },
   );

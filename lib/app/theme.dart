@@ -170,11 +170,15 @@ const TextTheme _textTheme = TextTheme(
     fontWeight: FontWeight.w600,
     letterSpacing: -1,
   ),
+  // Larger than headlineMedium on purpose: spec §2 pins headlineMedium at
+  // 32 (the Welcome wordmark), so an unnamed headlineLarge has to sit
+  // ABOVE it or a caller reaching for "large" would silently get smaller
+  // text than "medium".
   headlineLarge: TextStyle(
     fontFamily: _interFontFamily,
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: FontWeight.w600,
-    letterSpacing: -0.7,
+    letterSpacing: -1,
   ),
   headlineMedium: TextStyle(
     fontFamily: _interFontFamily,

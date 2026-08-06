@@ -538,4 +538,98 @@ void main() {
       },
     );
   });
+
+  // Spec `docs/specs/sync-freshness.md` §2.2: the foreground safety-net
+  // poll. §2.1's re-subscribe pull needs no test of its own here -- the
+  // transport emits a re-subscribe on the SAME stream as a live change
+  // (that is the whole design), so the realtime test above already covers
+  // the engine half; the Supabase-side `subscribe` callback is the part
+  // this suite has no seam for.
+  group('SupabaseSyncEngine foreground poll', () {
+    late AppDatabase db;
+    late FakeSyncTransport transport;
+    late Household household;
+    late SupabaseSyncEngine engine;
+
+    setUp(() async {
+      db = AppDatabase(NativeDatabase.memory());
+      household = await HouseholdRepository(db).createLocalHousehold('Home');
+      transport = FakeSyncTransport();
+      engine = SupabaseSyncEngine(
+        db: db,
+        transport: transport,
+        settings: SettingsRepository(db),
+        householdId: household.id,
+        pushDebounce: const Duration(milliseconds: 20),
+        pollInterval: const Duration(milliseconds: 30),
+      );
+    });
+
+    tearDown(() async {
+      engine.stop();
+      await db.close();
+    });
+
+    /// Pulls STARTED during [duration] -- every `pullSince` reads the
+    /// server clock first. Measured as a delta, not an absolute: `start()`'s
+    /// own push-then-pull and the debounced write-listener push (fired by
+    /// the household rows `setUp` seeds) pull too.
+    Future<int> pullsDuring(Duration duration) async {
+      final before = transport.serverNowCalls;
+      await Future<void>.delayed(duration);
+      return transport.serverNowCalls - before;
+    }
+
+    /// Waits out `start()`'s initial push/pull AND the debounced push the
+    /// seeded rows trigger, so afterwards only the poll is still moving.
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 150));
+
+    test('polls pullSince repeatedly while started and foregrounded', () async {
+      engine.start();
+      await settle();
+
+      // 100ms at a 30ms interval is 3 ticks nominally; assert the floor so
+      // scheduler jitter on a loaded CI machine cannot flake this.
+      expect(
+        await pullsDuring(const Duration(milliseconds: 100)),
+        greaterThanOrEqualTo(2),
+      );
+    });
+
+    test('pauseBackgroundWork stops the poll; resume re-arms it', () async {
+      engine.start();
+      await settle();
+
+      engine.pauseBackgroundWork();
+      // Let a tick already in flight when pause landed finish first.
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(
+        await pullsDuring(const Duration(milliseconds: 100)),
+        0,
+        reason: 'a backgrounded app must not keep waking the network',
+      );
+
+      engine.resumeBackgroundWork();
+      expect(
+        await pullsDuring(const Duration(milliseconds: 100)),
+        greaterThanOrEqualTo(2),
+      );
+    });
+
+    test('stop() cancels the poll', () async {
+      engine.start();
+      await settle();
+      engine.stop();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      expect(await pullsDuring(const Duration(milliseconds: 100)), 0);
+    });
+
+    test('resumeBackgroundWork before start() leaves no stray timer', () async {
+      engine.resumeBackgroundWork();
+
+      expect(await pullsDuring(const Duration(milliseconds: 100)), 0);
+    });
+  });
 }

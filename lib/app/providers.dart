@@ -937,6 +937,17 @@ class SyncEngineController {
   void triggerOnResume() {
     unawaited(_ref.read(syncEngineProvider).pushDirty());
   }
+
+  /// Suspends the CURRENTLY active engine's foreground safety-net poll when
+  /// the app leaves the screen (spec `docs/specs/sync-freshness.md` §2.2).
+  void pauseBackgroundWork() {
+    _ref.read(syncEngineProvider).pauseBackgroundWork();
+  }
+
+  /// Resumes what [pauseBackgroundWork] suspended, on app resume.
+  void resumeBackgroundWork() {
+    _ref.read(syncEngineProvider).resumeBackgroundWork();
+  }
 }
 
 /// Activates [SyncEngineController] the moment it's first read.

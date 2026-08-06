@@ -85,7 +85,16 @@ class _AppResumeObserver extends WidgetsBindingObserver {
       unawaited(_digestController.refreshPermissionState());
       _digestController.triggerRecompute();
       _catchUpController.triggerOnResume();
-      _syncEngineController.triggerOnResume();
+      _syncEngineController
+        ..triggerOnResume()
+        ..resumeBackgroundWork();
+      return;
     }
+    // Anything that is not `resumed` means the app is not on screen, so the
+    // engine's 60s safety-net poll must not keep waking the network (spec
+    // `docs/specs/sync-freshness.md` §2.2). Only the poll pauses; the
+    // realtime subscription and the write listener stay armed, because the
+    // OS — not this app — decides whether those still deliver.
+    _syncEngineController.pauseBackgroundWork();
   }
 }

@@ -37,8 +37,17 @@ class FakeSyncTransport implements SyncTransport {
   /// "mid-push re-dirty stays dirty").
   Future<void> Function()? beforeUpsert;
 
+  /// How many times [serverNow] has been called -- i.e. how many pulls the
+  /// engine has STARTED, since every `pullSince` reads the server clock
+  /// first. Lets a test count pulls without inspecting the database (spec
+  /// `docs/specs/sync-freshness.md` §2.2's foreground poll).
+  int serverNowCalls = 0;
+
   @override
-  Future<DateTime> serverNow() async => now;
+  Future<DateTime> serverNow() async {
+    serverNowCalls++;
+    return now;
+  }
 
   @override
   Future<List<Map<String, Object?>>> pullTable(
