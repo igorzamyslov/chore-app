@@ -12,23 +12,22 @@ import 'package:chore_app/features/settings/language_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
 import 'package:chore_app/features/settings/reset_flow.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// The Settings tab (spec `docs/specs/ux-round-2.md` B1: "Manage
-/// categories"; spec `docs/specs/notifications.md`: the 'Daily summary'
-/// section; spec `docs/next-session-plan.md` #5: the Language row and the
-/// About section at the bottom; spec `docs/specs/sync-backend.md` §5: the
-/// Account section, above About; spec
+/// The Settings tab (spec `docs/specs/theme-v2.md` §4.2: labelled groups --
+/// Household, Preferences, Account, Data, About, in that order -- each a
+/// card of hairline-separated [SettingsRow]s with the current value visible
+/// on the right; spec `docs/specs/ux-round-2.md` B1: "Manage categories";
+/// spec `docs/specs/notifications.md`: the 'Daily summary' rows; spec
+/// `docs/next-session-plan.md` #5: the Language row and the About group;
+/// spec `docs/specs/sync-backend.md` §5: the Account group; spec
 /// `docs/feedback/2026-08-01-field-feedback.md` G2: the Appearance row,
-/// directly below Language; B4/F7: the Data section -- one shared header,
-/// the export row, then the destructive reset row -- grouped at the very
-/// bottom).
-///
-/// A plain [ListView] of entries/sections, leaving room for further
-/// settings beyond category management, language, digest, and About.
+/// directly below Language; B4/F7: the Data group -- the export row, then
+/// the destructive reset row).
 class SettingsScreen extends ConsumerWidget {
   /// Creates the settings screen.
   const SettingsScreen({super.key});
@@ -43,68 +42,85 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTabLabel)),
       body: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
-          semantic(
-            'settings.members',
-            child: ListTile(
-              leading: const Icon(Icons.people_outline),
-              title: Text(l10n.settingsMembersEntry),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ManageMembersScreen(),
+          SettingsGroup(
+            label: l10n.settingsHouseholdSectionTitle,
+            children: [
+              semantic(
+                'settings.members',
+                child: SettingsRow(
+                  icon: Icons.people_outline,
+                  label: l10n.settingsMembersEntry,
+                  showChevron: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ManageMembersScreen(),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          semantic(
-            'settings.categories',
-            child: ListTile(
-              leading: const Icon(Icons.label_outlined),
-              title: Text(l10n.settingsCategoriesEntry),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ManageCategoriesScreen(),
+              semantic(
+                'settings.categories',
+                child: SettingsRow(
+                  icon: Icons.label_outlined,
+                  label: l10n.settingsCategoriesEntry,
+                  showChevron: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ManageCategoriesScreen(),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          const LanguageRow(),
-          const AppearanceRow(),
-          const DigestSectionHeader(),
-          ...settingsAsync.when(
-            data: (settings) => [
-              DigestToggleTile(
-                value: settings.digestEnabled,
-                onChanged: (enabled) =>
-                    settingsRepository.setDigestEnabled(enabled: enabled),
-              ),
-              if (settings.digestEnabled)
-                DigestTimeTile(
-                  minutesSinceMidnight: settings.digestMinutes,
-                  onChanged: settingsRepository.setDigestTime,
-                ),
-              if (settings.digestEnabled && !permissionGranted)
-                const DigestPermissionHint(onOpenSettings: openAppSettings),
-            ],
-            loading: () => const [
-              Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
               ),
             ],
-            error: (error, stackTrace) => const [],
           ),
-          const AccountSectionHeader(),
-          const AccountSectionBody(),
-          const AboutSectionHeader(),
-          const AboutVersionTile(),
-          const AboutLicensesTile(),
-          const AboutDonateTile(),
-          const DataSectionHeader(),
-          const ExportDataTile(),
-          const ResetDataTile(),
+          SettingsGroup(
+            label: l10n.settingsPreferencesSectionTitle,
+            children: [
+              const LanguageRow(),
+              const AppearanceRow(),
+              ...settingsAsync.when(
+                data: (settings) => [
+                  DigestToggleTile(
+                    value: settings.digestEnabled,
+                    onChanged: (enabled) =>
+                        settingsRepository.setDigestEnabled(enabled: enabled),
+                  ),
+                  if (settings.digestEnabled)
+                    DigestTimeTile(
+                      minutesSinceMidnight: settings.digestMinutes,
+                      onChanged: settingsRepository.setDigestTime,
+                    ),
+                  if (settings.digestEnabled && !permissionGranted)
+                    const DigestPermissionHint(onOpenSettings: openAppSettings),
+                ],
+                loading: () => const [
+                  Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
+                error: (error, stackTrace) => const [],
+              ),
+            ],
+          ),
+          SettingsGroup(
+            label: l10n.settingsAccountSectionTitle,
+            children: const [AccountSectionBody()],
+          ),
+          SettingsGroup(
+            label: l10n.settingsDataSectionTitle,
+            children: const [ExportDataTile(), ResetDataTile()],
+          ),
+          SettingsGroup(
+            label: l10n.settingsAboutSectionTitle,
+            children: const [
+              AboutVersionTile(),
+              AboutLicensesTile(),
+              AboutDonateTile(),
+            ],
+          ),
         ],
       ),
     );

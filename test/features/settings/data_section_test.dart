@@ -18,7 +18,10 @@ void main() {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
 
-      final header = find.text('Data');
+      // The group header is uppercased by `SettingsGroup` (spec
+      // docs/specs/theme-v2.md §4.2: `Text(label.toUpperCase())`), so the
+      // rendered text is 'DATA', not the ARB source's natural-case 'Data'.
+      final header = find.text('DATA');
       expect(header, findsOneWidget);
       final exportRow = find.bySemanticsIdentifier('settings.export');
       final resetRow = find.bySemanticsIdentifier('settings.reset');

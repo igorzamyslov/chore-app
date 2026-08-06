@@ -1,4 +1,5 @@
-/// The Settings tab's 'Data' section header and 'Export data' row (spec
+/// The Settings tab's 'Export data' row, the first row in the Data group
+/// (spec `docs/specs/theme-v2.md` §4.2; spec
 /// `docs/specs/polish-round-1.md` B1; spec
 /// `docs/feedback/2026-08-01-field-feedback.md` B4/F7): builds a full JSON
 /// backup of every table and hands it to the OS share sheet.
@@ -10,36 +11,14 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/data_export.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// Section header above the Data section's rows -- the export row
-/// ([ExportDataTile]) followed by the destructive reset row
-/// (`ResetDataTile`, `reset_flow.dart`) -- at the very bottom of Settings
-/// (spec `docs/feedback/2026-08-01-field-feedback.md` B4/F7). Matches every
-/// other Settings section header's style.
-class DataSectionHeader extends StatelessWidget {
-  /// Creates the section header.
-  const DataSectionHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        AppLocalizations.of(context).settingsDataSectionTitle,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-/// The 'Export data' row, the first row under [DataSectionHeader].
+/// The 'Export data' row, the first row in the Data group, above the
+/// destructive reset row (`ResetDataTile`, `reset_flow.dart`).
 ///
 /// Tapping it builds the backup document via [buildExportDocument] (the
 /// pure, share_plus-free half of this feature) and shares the encoded bytes
@@ -58,9 +37,9 @@ class ExportDataTile extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     return semantic(
       'settings.export',
-      child: ListTile(
-        leading: const Icon(Icons.ios_share_outlined),
-        title: Text(l10n.settingsExportEntry),
+      child: SettingsRow(
+        icon: Icons.ios_share_outlined,
+        label: l10n.settingsExportEntry,
         onTap: () => _export(context, ref),
       ),
     );

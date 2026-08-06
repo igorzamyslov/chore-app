@@ -535,6 +535,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Deine Daten konnten nicht exportiert werden. Versuch es noch mal.';
 
   @override
+  String get settingsHouseholdSectionTitle => 'Haushalt';
+
+  @override
   String get settingsMembersEntry => 'Mitglieder';
 
   @override
@@ -641,6 +644,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String categoryDeleteDialogBody(String categoryName) {
     return 'Damit löschst du \'$categoryName\'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.';
   }
+
+  @override
+  String get settingsPreferencesSectionTitle => 'Präferenzen';
 
   @override
   String get settingsLanguageEntry => 'Sprache';

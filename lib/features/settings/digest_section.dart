@@ -1,32 +1,12 @@
-/// The settings screen's 'Daily summary' section: digest on/off toggle,
-/// time row, and OS-permission hint (spec `docs/specs/notifications.md`).
+/// The settings screen's 'Daily summary' rows, inside the Preferences group
+/// (spec `docs/specs/theme-v2.md` §4.2): digest on/off toggle, time row, and
+/// OS-permission hint (spec `docs/specs/notifications.md`).
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-
-/// Section header above the digest rows, matching the design-language
-/// spec's section-header treatment (labelLarge, onSurfaceVariant, 24/8
-/// padding, no divider line).
-class DigestSectionHeader extends StatelessWidget {
-  /// Creates the section header.
-  const DigestSectionHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        AppLocalizations.of(context).settingsDigestSectionTitle,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
 
 /// The 'Daily summary' on/off switch row.
 class DigestToggleTile extends StatelessWidget {
@@ -47,11 +27,11 @@ class DigestToggleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return semantic(
       'settings.digest.toggle',
-      child: SwitchListTile(
-        secondary: const Icon(Icons.notifications_outlined),
-        title: Text(AppLocalizations.of(context).settingsDigestToggleTitle),
-        value: value,
-        onChanged: onChanged,
+      child: SettingsRow(
+        icon: Icons.notifications_outlined,
+        label: AppLocalizations.of(context).settingsDigestToggleTitle,
+        switchValue: value,
+        onSwitchChanged: onChanged,
       ),
     );
   }
@@ -81,13 +61,10 @@ class DigestTimeTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return semantic(
       'settings.digest.time',
-      child: ListTile(
-        leading: const SizedBox(width: 24),
-        title: Text(l10n.settingsDigestTimeLabel),
-        trailing: Text(
-          time.format(context),
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
+      child: SettingsRow(
+        icon: Icons.schedule_outlined,
+        label: l10n.settingsDigestTimeLabel,
+        value: time.format(context),
         onTap: () => _pick(context),
       ),
     );

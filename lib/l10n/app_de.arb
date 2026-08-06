@@ -157,6 +157,7 @@
   "settingsExportEntry": "Daten exportieren",
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
 
+  "settingsHouseholdSectionTitle": "Haushalt",
   "settingsMembersEntry": "Mitglieder",
 
   "settingsMembersInviteEntry": "Einladen",
@@ -197,6 +198,7 @@
   "categoryDeleteDialogTitle": "Kategorie löschen?",
   "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.",
 
+  "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",
   "settingsLanguageSheetTitle": "Sprache wählen",
   "settingsLanguageSystem": "Systemsprache",

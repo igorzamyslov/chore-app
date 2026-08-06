@@ -15,11 +15,14 @@ void main() {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
 
-      final toggle = tester.widget<SwitchListTile>(
+      // `DigestToggleTile` renders as a `SettingsRow` with a trailing
+      // `Switch` (spec docs/specs/theme-v2.md §4.2), not the old
+      // `SwitchListTile`.
+      final toggle = tester.widget<Switch>(
         find
             .descendant(
               of: find.bySemanticsIdentifier('settings.digest.toggle'),
-              matching: find.byType(SwitchListTile),
+              matching: find.byType(Switch),
             )
             .first,
       );
