@@ -8,6 +8,8 @@
 /// it.
 library;
 
+import 'package:chore_app/app/famdo_colors.dart';
+import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:flutter/material.dart';
 
@@ -29,7 +31,11 @@ class MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(member.color);
+    // categoryTone (spec docs/specs/theme-v2.md §1.3) already guarantees a
+    // legible pairing with FamdoColors.onMemberColor, so unlike before this
+    // wave, the ink is no longer re-derived per-avatar via
+    // ThemeData.estimateBrightnessForColor.
+    final color = categoryTone(context, member.color);
     final trimmedName = member.name.trim();
     final initial = trimmedName.isEmpty
         ? '?'
@@ -43,9 +49,7 @@ class MemberAvatar extends StatelessWidget {
         style: TextStyle(
           fontSize: radius * 1.1,
           fontWeight: FontWeight.w600,
-          color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
-              ? Colors.white
-              : Colors.black,
+          color: famdoColors(context).onMemberColor,
         ),
       ),
     );

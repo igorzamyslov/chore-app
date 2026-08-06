@@ -23,7 +23,9 @@ class ShoppingCategoryHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
     final category = this.category;
-    final color = category != null ? Color(category.color) : onSurfaceVariant;
+    final color = category != null
+        ? categoryTone(context, category.color)
+        : onSurfaceVariant;
     final icon = category != null
         ? categoryIcon(category.icon)
         : Icons.label_outlined;

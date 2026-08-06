@@ -187,7 +187,7 @@ class _CategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(category.color);
+    final color = categoryTone(context, category.color);
     return semantic(
       'settings.categories.${category.id}',
       child: Row(

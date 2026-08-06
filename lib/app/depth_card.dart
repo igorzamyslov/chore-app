@@ -1,11 +1,15 @@
-/// The standard list-card container (see `docs/specs/design-language.md`
-/// "Depth / cards").
+/// The standard list-card container (spec `docs/specs/theme-v2.md` §3,
+/// amending `docs/specs/design-language.md` "Depth / cards").
 library;
 
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:flutter/material.dart';
 
 /// Wraps [child] in a solid, flat (elevation 0) M3 card:
-/// `colorScheme.surfaceContainerLow`, 12dp corner radius, no elevation.
+/// `colorScheme.surfaceContainerLow`, 16dp corner radius, a 1px
+/// `outlineVariant` border, no elevation -- depth here is the border plus
+/// (when [shadow] is true) an ambient [FamdoColors.lift] shadow, never M3's
+/// elevation/surface-tint math (spec §7.7).
 ///
 /// Used for occurrence/item tiles and rows so the underlying widget tree
 /// (and every finder/semantic id it carries) is preserved — this only adds
@@ -18,7 +22,15 @@ class DepthCard extends StatelessWidget {
   /// `colorScheme.surfaceContainerLow`; the first-run banner cards (spec
   /// `docs/specs/polish-round-1.md` A2/A3) pass `colorScheme.
   /// secondaryContainer` instead so they read as banners, not chores.
-  const DepthCard({required this.child, this.margin, this.color, super.key});
+  /// [shadow] defaults to false (plain list cards get no shadow); pass true
+  /// for a raised card (progress card, quick-add, welcome create card).
+  const DepthCard({
+    required this.child,
+    this.margin,
+    this.color,
+    this.shadow = false,
+    super.key,
+  });
 
   /// The content to render inside the card.
   final Widget child;
@@ -30,17 +42,32 @@ class DepthCard extends StatelessWidget {
   /// The card's fill color. Defaults to `colorScheme.surfaceContainerLow`.
   final Color? color;
 
+  /// Whether to apply `FamdoColors.lift`'s ambient shadow (spec §3: raised
+  /// cards only -- progress card, quick-add, welcome create card).
+  final bool shadow;
+
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final colorScheme = Theme.of(context).colorScheme;
+    const radius = BorderRadius.all(Radius.circular(16));
+    final card = Card(
       elevation: 0,
-      color: color ?? Theme.of(context).colorScheme.surfaceContainerLow,
-      margin: margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
+      color: color ?? colorScheme.surfaceContainerLow,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
+    );
+    return Container(
+      margin: margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: shadow ? famdoColors(context).lift : null,
+      ),
+      child: card,
     );
   }
 }

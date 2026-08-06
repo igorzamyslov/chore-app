@@ -1,4 +1,5 @@
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -195,13 +196,19 @@ void main() {
       );
       expect(avatar.member.color, newColor);
 
-      final circleAvatar = tester.widget<CircleAvatar>(
-        find.descendant(
-          of: find.bySemanticsIdentifier('members.row.${me.id}'),
-          matching: find.byType(CircleAvatar),
-        ),
+      final avatarFinder = find.descendant(
+        of: find.bySemanticsIdentifier('members.row.${me.id}'),
+        matching: find.byType(CircleAvatar),
       );
-      expect(circleAvatar.backgroundColor, Color(newColor));
+      final circleAvatar = tester.widget<CircleAvatar>(avatarFinder);
+      // Theme v2 (spec docs/specs/theme-v2.md §1.3): the avatar fill is the
+      // seed color's theme-rendered tone, not the raw stored ARGB -- assert
+      // via categoryTone rather than the literal `Color(newColor)` this
+      // asserted before that wave.
+      expect(
+        circleAvatar.backgroundColor,
+        categoryTone(tester.element(avatarFinder), newColor),
+      );
 
       handle.dispose();
     },

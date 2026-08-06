@@ -91,6 +91,10 @@ class ColorSwatchPicker extends StatelessWidget {
           semantic(
             '$semanticIdPrefix.$index',
             child: _ColorSwatch(
+              // Deliberately the raw stored swatch, NOT `categoryTone` (spec
+              // `docs/specs/theme-v2.md` §1.3 explicitly exempts the swatch
+              // picker itself): the user must see and pick the value that is
+              // actually stored, not its theme-rendered stand-in.
               color: Color(colors[index]),
               isSelected: colors[index] == selected,
               ringColor: onSurface,
