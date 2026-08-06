@@ -2,7 +2,11 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
+import 'package:chore_app/features/chores/chore_form/labelled_field_card.dart';
+import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
+import 'package:chore_app/features/chores/chore_form/repeat_radio_card.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -46,19 +50,20 @@ class IntervalField extends StatelessWidget {
   Widget build(BuildContext context) {
     return semantic(
       'chore_form.repeat.interval',
-      child: TextField(
+      child: LabelledFieldCard(
+        label: AppLocalizations.of(context).choreFormRepeatEveryLabel,
         controller: controller,
+        errorText: errorText,
         keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          labelText: AppLocalizations.of(context).choreFormRepeatEveryLabel,
-          errorText: errorText,
-        ),
       ),
     );
   }
 }
 
-/// The day/week/month unit chip row.
+/// The day/week/month unit segmented control (spec `docs/specs/theme-v2.md`
+/// §4.4 item 2): a `surfaceContainerHigh` track, selected segment =
+/// `surfaceContainerLow` fill + `primary` ink (both from the app-wide
+/// `SegmentedButtonThemeData`, `lib/app/theme.dart`).
 ///
 /// Labels are pluralized by [interval] (field feedback G3 stage 1,
 /// `docs/feedback/2026-08-01-field-feedback.md`): this row sits directly
@@ -79,7 +84,7 @@ class UnitRow extends StatelessWidget {
 
   /// The current repeat interval, used only to pick the right plural form
   /// of the unit noun (e.g. 'Day' vs 'Days'); it does not change which
-  /// chip is selected.
+  /// segment is selected.
   final int interval;
 
   /// Called when a different unit is picked.
@@ -87,19 +92,21 @@ class UnitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      children: [
+    return SegmentedButton<RecurrenceUnit>(
+      expandedInsets: EdgeInsets.zero,
+      showSelectedIcon: false,
+      segments: [
         for (final unit in RecurrenceUnit.values)
-          semantic(
-            'chore_form.repeat.unit.${unit.name}',
-            child: ChoiceChip(
-              label: Text(_label(context, unit)),
-              selected: value == unit,
-              onSelected: (_) => onChanged(unit),
+          ButtonSegment(
+            value: unit,
+            label: semantic(
+              'chore_form.repeat.unit.${unit.name}',
+              child: Text(_label(context, unit)),
             ),
           ),
       ],
+      selected: {value},
+      onSelectionChanged: (selection) => onChanged(selection.first),
     );
   }
 
@@ -116,17 +123,24 @@ class UnitRow extends StatelessWidget {
   }
 }
 
-/// The schedule/completion anchor choice, each with a subtitle hint.
+/// The schedule/completion anchor choice, rendered as two explanatory radio
+/// cards (spec `docs/specs/theme-v2.md` §4.4 item 4).
 ///
-/// The after-last-completion subtitle names the actual current [interval]
-/// and [unit] (field feedback G3 stage 1) instead of a generic example, so
-/// it reads as a concrete sentence, e.g. '3 days after last done'.
+/// Both subtitles name the actual configured interval instead of a generic
+/// example (field feedback G3 stage 1): the after-last-completion subtitle
+/// reads e.g. '3 days after last done'; the fixed-schedule subtitle reads
+/// e.g. 'Every Saturday' or 'Every month on the 15th', computed from
+/// [weekdays]/[monthlyMode]/[startDate] exactly like `MonthlyModeRow`'s own
+/// chip labels are.
 class AnchorRow extends StatelessWidget {
   /// Creates the anchor row.
   const AnchorRow({
     required this.value,
     required this.interval,
     required this.unit,
+    required this.weekdays,
+    required this.monthlyMode,
+    required this.startDate,
     required this.onChanged,
     super.key,
   });
@@ -134,13 +148,26 @@ class AnchorRow extends StatelessWidget {
   /// The currently-selected anchor.
   final RecurrenceAnchor value;
 
-  /// The current repeat interval, used to make the after-last-completion
-  /// subtitle concrete.
+  /// The current repeat interval, used to make both subtitles concrete.
   final int interval;
 
   /// The current repeat unit, used to pick which concrete subtitle message
   /// (day/week/month) to render.
   final RecurrenceUnit unit;
+
+  /// The currently-selected ISO weekdays (week unit only), used to name the
+  /// fixed-schedule subtitle's actual weekday(s). Empty means "derive from
+  /// [startDate]'s weekday", mirroring the engine's own rule.
+  final Set<int> weekdays;
+
+  /// The currently-selected monthly mode (month unit only), used to pick
+  /// which fixed-schedule subtitle (day-of-month vs. nth/last weekday) to
+  /// render.
+  final MonthlyMode monthlyMode;
+
+  /// The chore's start date, used to compute the fixed-schedule subtitle's
+  /// concrete day/weekday, exactly like `MonthlyModeRow`'s labels are.
+  final PlainDate startDate;
 
   /// Called when a different anchor is picked.
   final ValueChanged<RecurrenceAnchor> onChanged;
@@ -152,15 +179,10 @@ class AnchorRow extends StatelessWidget {
         for (final anchor in RecurrenceAnchor.values)
           semantic(
             'chore_form.repeat.anchor.${anchor.name}',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                value == anchor
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-              ),
-              title: Text(_title(context, anchor)),
-              subtitle: Text(_subtitle(context, anchor)),
+            child: RepeatRadioCard(
+              selected: value == anchor,
+              title: _title(context, anchor),
+              subtitle: _subtitle(context, anchor),
               onTap: () => onChanged(anchor),
             ),
           ),
@@ -177,16 +199,54 @@ class AnchorRow extends StatelessWidget {
 
   String _subtitle(BuildContext context, RecurrenceAnchor anchor) {
     final l10n = AppLocalizations.of(context);
-    if (anchor == RecurrenceAnchor.schedule) {
-      return l10n.choreFormAnchorScheduleSubtitle;
+    if (anchor == RecurrenceAnchor.completion) {
+      switch (unit) {
+        case RecurrenceUnit.day:
+          return l10n.choreFormAnchorCompletionSubtitleDay(interval);
+        case RecurrenceUnit.week:
+          return l10n.choreFormAnchorCompletionSubtitleWeek(interval);
+        case RecurrenceUnit.month:
+          return l10n.choreFormAnchorCompletionSubtitleMonth(interval);
+      }
     }
+    return _scheduleSubtitle(context);
+  }
+
+  /// Names the actual configured fixed-schedule interval (spec
+  /// `docs/specs/theme-v2.md` §4.4 item 4), replacing the old generic
+  /// "e.g. every Tuesday" example.
+  String _scheduleSubtitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final localeName = Localizations.localeOf(context).toString();
     switch (unit) {
       case RecurrenceUnit.day:
-        return l10n.choreFormAnchorCompletionSubtitleDay(interval);
+        return l10n.choreFormAnchorScheduleSubtitleDay(interval);
       case RecurrenceUnit.week:
-        return l10n.choreFormAnchorCompletionSubtitleWeek(interval);
+        final effective = weekdays.isEmpty ? {startDate.weekday} : weekdays;
+        final names = (effective.toList()..sort())
+            .map((weekday) => weekdayName(weekday, localeName))
+            .join(', ');
+        return l10n.choreFormAnchorScheduleSubtitleWeek(interval, names);
       case RecurrenceUnit.month:
-        return l10n.choreFormAnchorCompletionSubtitleMonth(interval);
+        if (monthlyMode == MonthlyMode.dayOfMonth) {
+          final ordinalDay = localizedOrdinal(startDate.day, localeName);
+          return l10n.choreFormAnchorScheduleSubtitleMonthDayOfMonth(
+            interval,
+            ordinalDay,
+          );
+        }
+        final ordinal = nthWeekdayOrdinalOf(startDate);
+        final weekday = weekdayName(startDate.weekday, localeName);
+        return ordinal == -1
+            ? l10n.choreFormAnchorScheduleSubtitleMonthLastWeekday(
+                interval,
+                weekday,
+              )
+            : l10n.choreFormAnchorScheduleSubtitleMonthNthWeekday(
+                interval,
+                localizedOrdinal(ordinal, localeName),
+                weekday,
+              );
     }
   }
 }

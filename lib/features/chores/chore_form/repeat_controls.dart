@@ -86,6 +86,9 @@ class RepeatControls extends StatelessWidget {
           value: anchor,
           interval: interval,
           unit: unit,
+          weekdays: weekdays,
+          monthlyMode: monthlyMode,
+          startDate: startDate,
           onChanged: onAnchorChanged,
         ),
         if (unit == RecurrenceUnit.week) ...[

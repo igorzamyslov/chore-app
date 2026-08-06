@@ -2,6 +2,7 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/features/chores/chore_form/labelled_field_card.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -20,12 +21,16 @@ class TitleField extends StatelessWidget {
   Widget build(BuildContext context) {
     return semantic(
       'chore_form.title',
-      child: TextField(
+      child: LabelledFieldCard(
+        label: AppLocalizations.of(context).choreFormTitleLabel,
         controller: controller,
-        decoration: InputDecoration(
-          labelText: AppLocalizations.of(context).choreFormTitleLabel,
-          errorText: errorText,
-        ),
+        errorText: errorText,
+        // C7 (conventions audit): chain to the notes field. TextField
+        // handles `next` itself (EditableText calls nextFocus on submit),
+        // so no onSubmitted is needed. The notes field below is the last
+        // text input and is multiline, where the platform action is a
+        // newline -- NOT `done` -- so the chain deliberately stops there.
+        textInputAction: TextInputAction.next,
       ),
     );
   }
@@ -43,11 +48,9 @@ class NotesField extends StatelessWidget {
   Widget build(BuildContext context) {
     return semantic(
       'chore_form.notes',
-      child: TextField(
+      child: LabelledFieldCard(
+        label: AppLocalizations.of(context).choreFormNotesLabel,
         controller: controller,
-        decoration: InputDecoration(
-          labelText: AppLocalizations.of(context).choreFormNotesLabel,
-        ),
         maxLines: 3,
         minLines: 3,
       ),

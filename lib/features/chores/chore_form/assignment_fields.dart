@@ -8,7 +8,8 @@ import 'package:chore_app/features/settings/member_edit_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-/// The assignment mode segmented row plus its dependent assignee chips.
+/// The assignment mode segmented control (spec `docs/specs/theme-v2.md`
+/// §4.4 item 2) plus its dependent assignee chips.
 ///
 /// `fixed` shows a single-select chip row (exactly one member must be
 /// picked); `rotation` shows a multi-select chip row where each selected
@@ -59,19 +60,21 @@ class AssignmentFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          children: [
+        SegmentedButton<AssignmentMode>(
+          expandedInsets: EdgeInsets.zero,
+          showSelectedIcon: false,
+          segments: [
             for (final entry in AssignmentMode.values)
-              semantic(
-                'chore_form.assignment.${entry.name}',
-                child: ChoiceChip(
-                  label: Text(_modeLabel(context, entry)),
-                  selected: mode == entry,
-                  onSelected: (_) => onModeChanged(entry),
+              ButtonSegment(
+                value: entry,
+                label: semantic(
+                  'chore_form.assignment.${entry.name}',
+                  child: Text(_modeLabel(context, entry)),
                 ),
               ),
           ],
+          selected: {mode},
+          onSelectionChanged: (selection) => onModeChanged(selection.first),
         ),
         if (mode != AssignmentMode.anyone) ...[
           const SizedBox(height: 8),

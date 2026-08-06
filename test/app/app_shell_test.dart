@@ -59,4 +59,41 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'the active tab shows a primaryContainer pill behind its filled icon; '
+    'inactive tabs show no pill (spec docs/specs/theme-v2.md §4.5)',
+    today: DateTime(2026, 7, 24, 9),
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      Color? pillColorFor(String tabId) {
+        final container = tester.widget<Container>(
+          find.descendant(
+            of: find.bySemanticsIdentifier(tabId),
+            matching: find.byType(Container),
+          ),
+        );
+        return (container.decoration! as BoxDecoration).color;
+      }
+
+      final primaryContainer = Theme.of(
+        tester.element(find.bySemanticsIdentifier('shell.tab.chores')),
+      ).colorScheme.primaryContainer;
+
+      // Chores is the default tab: it carries the pill, the others don't.
+      expect(pillColorFor('shell.tab.chores'), primaryContainer);
+      expect(pillColorFor('shell.tab.shopping'), Colors.transparent);
+      expect(pillColorFor('shell.tab.settings'), Colors.transparent);
+
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.shopping'));
+      await tester.pumpAndSettle();
+
+      // The pill moved with the selection.
+      expect(pillColorFor('shell.tab.shopping'), primaryContainer);
+      expect(pillColorFor('shell.tab.chores'), Colors.transparent);
+
+      handle.dispose();
+    },
+  );
 }

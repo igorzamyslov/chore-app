@@ -5,6 +5,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
+import 'package:chore_app/features/chores/chore_form/repeat_radio_card.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -37,14 +38,9 @@ class MonthlyModeRow extends StatelessWidget {
         for (final mode in MonthlyMode.values)
           semantic(
             'chore_form.repeat.monthly_mode.${monthlyModeId(mode)}',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                value == mode
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-              ),
-              title: Text(_label(context, mode)),
+            child: RepeatRadioCard(
+              selected: value == mode,
+              title: _label(context, mode),
               onTap: () => onChanged(mode),
             ),
           ),
