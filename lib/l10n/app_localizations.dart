@@ -338,11 +338,23 @@ abstract class AppLocalizations {
   /// **'No chores pending — nice work!'**
   String get choresEmptyState;
 
+  /// Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyState when the household has chores but none are currently pending.
+  ///
+  /// In en, this message translates to:
+  /// **'All done for today'**
+  String get choresEmptyDoneHeadline;
+
   /// Chores list empty-state message shown instead of choresEmptyState on a fresh install (zero non-deleted chores in the household yet) — spec docs/specs/polish-round-1.md A1.
   ///
   /// In en, this message translates to:
   /// **'Add your first chore with +'**
   String get choresEmptyFresh;
+
+  /// Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyFresh on a fresh install.
+  ///
+  /// In en, this message translates to:
+  /// **'No chores yet'**
+  String get choresEmptyFreshHeadline;
 
   /// Chores list empty-state message shown instead of choresEmptyState/choresEmptyFresh when a member/category filter hides every occurrence that would otherwise be visible (spec docs/feedback/2026-08-01-ux-audit.md B1).
   ///
@@ -350,11 +362,35 @@ abstract class AppLocalizations {
   /// **'Nothing here for this filter.'**
   String get choresEmptyFiltered;
 
+  /// Chores list filtered-empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyFiltered.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get choresEmptyFilteredHeadline;
+
   /// Chores list load-error message.
   ///
   /// In en, this message translates to:
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
+
+  /// Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences due today, overdue, or already completed today. The whole card is hidden when m is 0.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} of {m} done today'**
+  String choresProgressTitle(int n, int m);
+
+  /// Day-progress card's bodySmall sub-line shown when at least one of today's counted occurrences is still open: how many remain.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
+  String choresProgressRemainingToday(int count);
+
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s everything — nice work'**
+  String get choresProgressAllDoneToday;
 
   /// One-line purpose statement under the app name on the welcome screen (spec docs/specs/onboarding-v2.md §1), shown full-screen before any household exists locally.
   ///

@@ -43,25 +43,36 @@ class ChoreDoneSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     // Whole-section card (not per-row): the ExpansionTile already groups
     // these rows visually, so a card per row would double up with the
     // section's own chrome once expanded — one card wrapping the header +
     // rows reads cleaner (judgment call, see the #6 plan report).
+    // surfaceContainerHigh ground + a leading icon (spec
+    // docs/specs/theme-v2.md §4.1 item 5); the trailing chevron is
+    // ExpansionTile's own default.
     return DepthCard(
+      color: theme.colorScheme.surfaceContainerHigh,
       child: ExpansionTile(
+        leading: Icon(
+          Icons.check_circle_outline,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
         title: semantic(
           'chores.done.header',
           child: Text(l10n.choresDoneHeader(occurrences.length)),
         ),
         children: [
-          for (final occurrence in occurrences)
+          for (var i = 0; i < occurrences.length; i++) ...[
+            if (i > 0) const Divider(height: 1, thickness: 1),
             _DoneRow(
-              occurrence: occurrence,
+              occurrence: occurrences[i],
               showReopen: reopenableOccurrenceIds.contains(
-                occurrence.occurrence.id,
+                occurrences[i].occurrence.id,
               ),
-              onReopen: () => onReopen(occurrence),
+              onReopen: () => onReopen(occurrences[i]),
             ),
+          ],
         ],
       ),
     );

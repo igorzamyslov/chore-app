@@ -35,13 +35,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Due today: shows under the "Today" section header, and the tile's
+      // Due today: shows under the "TODAY" section header, and the tile's
       // own due text also reads "Today" (A1: due text on every tile) — two
-      // matches, not "Later".
-      // Refined A1: tiles under Today show no due text, so 'Today' appears
-      // exactly once — as the section header.
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Later'), findsNothing);
+      // matches, not "LATER".
+      // Refined A1: tiles under Today show no due text, so 'TODAY' appears
+      // exactly once — as the section header. Section headers render
+      // uppercase (theme-v2.md §2/§4.1 item 2), produced by the widget via
+      // .toUpperCase(), so the rendered text is 'TODAY', not 'Today'.
+      expect(find.text('TODAY'), findsOneWidget);
+      expect(find.text('LATER'), findsNothing);
 
       await tester.tap(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
@@ -50,9 +52,9 @@ void main() {
 
       // Weekly, schedule-anchored, closed on its due date: the next pending
       // occurrence is due exactly 7 days later (2026-07-29) — still in
-      // July, so it falls under "This month", not "Today".
-      expect(find.text('Today'), findsNothing);
-      expect(find.text('This month'), findsOneWidget);
+      // July, so it falls under "THIS MONTH", not "TODAY".
+      expect(find.text('TODAY'), findsNothing);
+      expect(find.text('THIS MONTH'), findsOneWidget);
       expect(find.text('Weekly chore'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),

@@ -22,12 +22,15 @@ class DepthCard extends StatelessWidget {
   /// `colorScheme.surfaceContainerLow`; the first-run banner cards (spec
   /// `docs/specs/polish-round-1.md` A2/A3) pass `colorScheme.
   /// secondaryContainer` instead so they read as banners, not chores.
-  /// [shadow] defaults to false (plain list cards get no shadow); pass true
-  /// for a raised card (progress card, quick-add, welcome create card).
+  /// [borderColor] defaults to `colorScheme.outlineVariant`; the overdue
+  /// occurrence tile passes `FamdoColors.errorOutline` instead. [shadow]
+  /// defaults to false (plain list cards get no shadow); pass true for a
+  /// raised card (progress card, quick-add, welcome create card).
   const DepthCard({
     required this.child,
     this.margin,
     this.color,
+    this.borderColor,
     this.shadow = false,
     super.key,
   });
@@ -41,6 +44,11 @@ class DepthCard extends StatelessWidget {
 
   /// The card's fill color. Defaults to `colorScheme.surfaceContainerLow`.
   final Color? color;
+
+  /// The card's 1px border color. Defaults to `colorScheme.outlineVariant`;
+  /// the overdue occurrence tile (spec `docs/specs/theme-v2.md` §4.1 item 4,
+  /// design option C) passes `FamdoColors.errorOutline` instead.
+  final Color? borderColor;
 
   /// Whether to apply `FamdoColors.lift`'s ambient shadow (spec §3: raised
   /// cards only -- progress card, quick-add, welcome create card).
@@ -56,7 +64,7 @@ class DepthCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
-        side: BorderSide(color: colorScheme.outlineVariant),
+        side: BorderSide(color: borderColor ?? colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,

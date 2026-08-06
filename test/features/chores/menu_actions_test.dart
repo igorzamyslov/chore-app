@@ -31,11 +31,12 @@ void main() {
         recurrence: Recurrence.weekly(),
       );
       await tester.pumpAndSettle();
-      // The "Today" section header, plus the tile's own due text (A1: due
+      // The "TODAY" section header, plus the tile's own due text (A1: due
       // text on every tile) — two matches.
-      // Refined A1: tiles under Today show no due text, so 'Today' appears
-      // exactly once — as the section header.
-      expect(find.text('Today'), findsOneWidget);
+      // Refined A1: tiles under Today show no due text, so 'TODAY' appears
+      // exactly once — as the section header. Section headers render
+      // uppercase (theme-v2.md §2/§4.1 item 2).
+      expect(find.text('TODAY'), findsOneWidget);
 
       await tester.tap(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
@@ -45,9 +46,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Skipping today's occurrence inserts the next weekly slot, 7 days
-      // out (2026-07-29) — still in July, so "This month", not "Today".
-      expect(find.text('Today'), findsNothing);
-      expect(find.text('This month'), findsOneWidget);
+      // out (2026-07-29) — still in July, so "THIS MONTH", not "TODAY".
+      expect(find.text('TODAY'), findsNothing);
+      expect(find.text('THIS MONTH'), findsOneWidget);
       expect(find.text('Weekly chore'), findsOneWidget);
 
       handle.dispose();

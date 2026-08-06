@@ -55,13 +55,14 @@ void main() {
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
 
-      // Restored: back under "Today", the "This month"/"Done today"
-      // sections it briefly created/populated are gone.
+      // Restored: back under "TODAY", the "THIS MONTH"/"Done today"
+      // sections it briefly created/populated are gone. Section headers
+      // render uppercase (theme-v2.md §2/§4.1 item 2).
       expect(find.bySemanticsIdentifier('chores.done.header'), findsNothing);
-      expect(find.text('This month'), findsNothing);
-      // Refined A1: tiles under Today show no due text, so 'Today' appears
+      expect(find.text('THIS MONTH'), findsNothing);
+      // Refined A1: tiles under Today show no due text, so 'TODAY' appears
       // exactly once — as the section header.
-      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('TODAY'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
         findsOneWidget,
