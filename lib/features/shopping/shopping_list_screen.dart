@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
@@ -184,23 +185,42 @@ class _Body extends StatelessWidget {
     return ListView(children: children);
   }
 
-  /// Builds a category header before every run of same-category items,
-  /// preserving [unchecked]'s existing (repository-sorted) order — never
-  /// re-sorting client-side.
+  /// Builds a category header followed by one card per run of same-category
+  /// items (spec `docs/specs/theme-v2.md` §4.3: "one card per category", not
+  /// one card per item), preserving [unchecked]'s existing
+  /// (repository-sorted) order — never re-sorting client-side.
   List<Widget> _groupedTiles(List<ShoppingItemWithCategory> unchecked) {
     final children = <Widget>[];
-    String? previousCategoryId;
-    var isFirstGroup = true;
-    for (final item in unchecked) {
-      final categoryId = item.item.categoryId;
-      if (isFirstGroup || categoryId != previousCategoryId) {
-        children.add(ShoppingCategoryHeader(category: item.category));
-        previousCategoryId = categoryId;
-        isFirstGroup = false;
+    var index = 0;
+    while (index < unchecked.length) {
+      final categoryId = unchecked[index].item.categoryId;
+      final group = <ShoppingItemWithCategory>[];
+      while (index < unchecked.length &&
+          unchecked[index].item.categoryId == categoryId) {
+        group.add(unchecked[index]);
+        index++;
       }
-      children.add(_tileFor(item));
+      children
+        ..add(ShoppingCategoryHeader(category: group.first.category))
+        ..add(_aisleCard(group));
     }
     return children;
+  }
+
+  /// One [DepthCard] holding every item in [group] as a hairline-separated
+  /// row — never a hairline after the last row.
+  Widget _aisleCard(List<ShoppingItemWithCategory> group) {
+    return DepthCard(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < group.length; i++) ...[
+            _tileFor(group[i]),
+            if (i < group.length - 1) const Divider(height: 1, thickness: 1),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _tileFor(ShoppingItemWithCategory item) {

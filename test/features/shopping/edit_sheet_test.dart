@@ -71,7 +71,9 @@ void main() {
       expect(find.bySemanticsIdentifier('shopping.edit.save'), findsNothing);
       expect(find.text('Oat milk'), findsOneWidget);
       expect(find.text('2 bottles'), findsOneWidget);
-      expect(find.text('Produce'), findsOneWidget);
+      // The aisle header renders the category name uppercased (spec
+      // `docs/specs/theme-v2.md` §4.3).
+      expect(find.text('PRODUCE'), findsOneWidget);
 
       // Re-open: quantity is prefilled; clear it back to null.
       await tester.tap(find.text('Oat milk'));

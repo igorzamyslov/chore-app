@@ -46,13 +46,16 @@ void main() {
       await openShoppingTab(tester);
       await tester.pumpAndSettle();
 
+      // Aisle headers render their category name uppercased at the widget
+      // level (spec `docs/specs/theme-v2.md` §4.3); item names are
+      // untouched.
       const expectedOrder = [
-        'Uncategorized',
+        'UNCATEGORIZED',
         'Bread',
-        'Produce',
+        'PRODUCE',
         'Apples',
         'Zucchini',
-        'Dairy',
+        'DAIRY',
         'Milk',
       ];
 

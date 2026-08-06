@@ -21,7 +21,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('Uncategorized'), findsOneWidget);
+      // Aisle headers render their category name uppercased at the widget
+      // level (spec `docs/specs/theme-v2.md` §4.3) -- never in the ARB
+      // source, since German capitalization rules differ.
+      expect(find.text('UNCATEGORIZED'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('shopping.checked.header'),
         findsNothing,
@@ -36,7 +39,7 @@ void main() {
       // sheet (the checkbox tap must not fall through to the tile's onTap).
       expect(find.text('In the cart (1)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('shopping.edit.save'), findsNothing);
-      expect(find.text('Uncategorized'), findsNothing);
+      expect(find.text('UNCATEGORIZED'), findsNothing);
       // Everything unchecked is gone, so the empty message shows above the
       // (still-visible) checked section.
       expect(find.bySemanticsIdentifier('shopping.empty'), findsOneWidget);
@@ -55,7 +58,7 @@ void main() {
         find.bySemanticsIdentifier('shopping.checked.header'),
         findsNothing,
       );
-      expect(find.text('Uncategorized'), findsOneWidget);
+      expect(find.text('UNCATEGORIZED'), findsOneWidget);
       expect(find.text('Milk'), findsOneWidget);
       expect(find.bySemanticsIdentifier('shopping.empty'), findsNothing);
 

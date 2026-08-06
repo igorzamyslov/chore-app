@@ -1,16 +1,21 @@
 /// The collapsed-by-default 'In the cart' checked-items section.
 library;
 
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-/// The checked-items section: a controlled [ExpansionTile] headed
-/// 'In the cart (N)', holding [tiles] (already-built tile widgets for every
-/// checked item), with 'Put all back' and 'Clear checked' buttons — neither
-/// gated behind a confirmation dialog (spec `docs/specs/ux-round-2.md` B4:
-/// items are soft-deleted and suggestions make recovery one keystroke away,
-/// so a confirm here would fail design-language rule 3).
+/// The checked-items section: collapses to one `surfaceContainerHigh` row
+/// (spec `docs/specs/theme-v2.md` §4.3) -- a `shopping_basket` glyph, the
+/// 'In the cart (N)' count, and the 'Put all back'/'Clear checked' actions --
+/// which expands (a controlled [ExpansionTile]) to reveal [tiles]
+/// (already-built row widgets for every checked item) gathered into one
+/// hairline-separated card, matching the aisle cards above it. Neither
+/// action is gated behind a confirmation dialog (spec
+/// `docs/specs/ux-round-2.md` B4: items are soft-deleted and suggestions
+/// make recovery one keystroke away, so a confirm here would fail
+/// design-language rule 3).
 ///
 /// [expanded] and [onExpansionChanged] hoist the expand/collapse state to
 /// the caller (field feedback G1,
@@ -67,38 +72,72 @@ class ShoppingCheckedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // Wrap, not Row: at accessibility text sizes the header text and the
-    // action buttons don't fit side by side — buttons flow to their own
-    // line instead of squeezing the title into an awkward two-line wrap
-    // (visual QA finding at AX2).
-    return ExpansionTile(
-      initiallyExpanded: expanded,
-      onExpansionChanged: onExpansionChanged,
-      title: Wrap(
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          semantic(
-            'shopping.checked.header',
-            child: Text(l10n.shoppingCartHeader(count)),
-          ),
-          semantic(
-            'shopping.uncheckAll',
-            child: TextButton(
-              onPressed: onUncheckAll,
-              child: Text(l10n.shoppingUncheckAll),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        backgroundColor: Colors.transparent,
+        collapsedBackgroundColor: Colors.transparent,
+        shape: const Border.fromBorderSide(BorderSide.none),
+        collapsedShape: const Border.fromBorderSide(BorderSide.none),
+        leading: Icon(
+          Icons.shopping_basket_outlined,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        initiallyExpanded: expanded,
+        onExpansionChanged: onExpansionChanged,
+        // Wrap, not Row: at accessibility text sizes the header text and
+        // the action buttons don't fit side by side — buttons flow to
+        // their own line instead of squeezing the title into an awkward
+        // two-line wrap (visual QA finding at AX2).
+        title: Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            semantic(
+              'shopping.checked.header',
+              child: Text(l10n.shoppingCartHeader(count)),
             ),
-          ),
-          semantic(
-            'shopping.clear',
-            child: TextButton(
-              onPressed: onClear,
-              child: Text(l10n.shoppingClearButton),
+            semantic(
+              'shopping.uncheckAll',
+              child: TextButton(
+                onPressed: onUncheckAll,
+                child: Text(l10n.shoppingUncheckAll),
+              ),
+            ),
+            semantic(
+              'shopping.clear',
+              child: TextButton(
+                onPressed: onClear,
+                child: Text(l10n.shoppingClearButton),
+              ),
+            ),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: DepthCard(
+              margin: EdgeInsets.zero,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < tiles.length; i++) ...[
+                    tiles[i],
+                    if (i < tiles.length - 1)
+                      const Divider(height: 1, thickness: 1),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
       ),
-      children: tiles,
     );
   }
 }

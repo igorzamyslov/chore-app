@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
@@ -74,41 +75,102 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final famdo = famdoColors(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: semantic(
-                  'shopping.add.input',
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(hintText: l10n.shoppingAddHint),
-                    onSubmitted: (_) => _submit(),
-                    // Bug 2 (field feedback round 2,
-                    // docs/feedback/2026-08-01-field-feedback.md): focus-gain
-                    // only fires on a focus CHANGE, so returning to this tab
-                    // with the field still focused, or tapping an
-                    // already-focused field, fired nothing. An explicit
-                    // onTap covers both.
-                    onTap: () => unawaited(_updateSuggestions()),
+          // The quick-add pill (spec `docs/specs/theme-v2.md` §4.3): a
+          // raised card -- `surfaceContainerLow` ground, `primaryOutline`
+          // border, `lift` shadow -- containing a leading search glyph, the
+          // borderless text field (the card itself is the border), and the
+          // trailing filled submit square. Built by hand rather than via
+          // `DepthCard` because that shared widget hardcodes an
+          // `outlineVariant` border; this card needs the accent
+          // `primaryOutline` one instead.
+          child: Container(
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
+              border: Border.all(color: famdo.primaryOutline),
+              boxShadow: famdo.lift,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: semantic(
+                    'shopping.add.input',
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      textInputAction: TextInputAction.done,
+                      style: theme.textTheme.bodyLarge,
+                      decoration: InputDecoration(
+                        hintText: l10n.shoppingAddHint,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
+                      ),
+                      onSubmitted: (_) => _submit(),
+                      // Bug 2 (field feedback round 2,
+                      // docs/feedback/2026-08-01-field-feedback.md):
+                      // focus-gain only fires on a focus CHANGE, so
+                      // returning to this tab with the field still
+                      // focused, or tapping an already-focused field,
+                      // fired nothing. An explicit onTap covers both.
+                      onTap: () => unawaited(_updateSuggestions()),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              semantic(
-                'shopping.add.submit',
-                child: IconButton(
-                  icon: const Icon(Icons.add),
-                  tooltip: l10n.shoppingAddTooltip,
-                  onPressed: _submit,
+                Semantics(
+                  identifier: 'shopping.add.submit',
+                  container: true,
+                  button: true,
+                  label: l10n.shoppingAddTooltip,
+                  child: Tooltip(
+                    message: l10n.shoppingAddTooltip,
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Material(
+                        color: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _submit,
+                          child: Center(
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.add,
+                                color: colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (_suggestions.isNotEmpty)

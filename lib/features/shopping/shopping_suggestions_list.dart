@@ -7,11 +7,15 @@ import 'package:chore_app/features/categories/category_badge.dart';
 import 'package:flutter/material.dart';
 
 /// Renders [suggestions] (already ranked and limited by
-/// `ShoppingRepository.suggestions`) as tappable rows below the quick-add
-/// field: each shows the item's name and, when its most recent history row
-/// set one, its category (icon + name in the category's own color).
+/// `ShoppingRepository.suggestions`) as a wrap of tappable pill chips below
+/// the quick-add field (spec `docs/specs/theme-v2.md` §3/§4.3: pill radius
+/// 20, unselected style -- the app's shared `ChipThemeData` already gives
+/// any [ActionChip] that look, so this widget only had to change container
+/// from a column of full-width rows to a wrap of chips): each shows the
+/// item's name and, when its most recent history row set one, its category
+/// (icon + name in the category's own color).
 ///
-/// Tapping a row calls [onTap] with that suggestion; the caller (the
+/// Tapping a chip calls [onTap] with that suggestion; the caller (the
 /// quick-add row) adds it immediately, subject to the same duplicate
 /// prevention as a typed submit. See `docs/specs/ux-round-2.md` B2/B3.
 class ShoppingSuggestionsList extends StatelessWidget {
@@ -30,21 +34,26 @@ class ShoppingSuggestionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < suggestions.length; i++)
-          _SuggestionTile(
-            index: i,
-            suggestion: suggestions[i],
-            onTap: () => onTap(suggestions[i]),
-          ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (var i = 0; i < suggestions.length; i++)
+            _SuggestionChip(
+              index: i,
+              suggestion: suggestions[i],
+              onTap: () => onTap(suggestions[i]),
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _SuggestionTile extends StatelessWidget {
-  const _SuggestionTile({
+class _SuggestionChip extends StatelessWidget {
+  const _SuggestionChip({
     required this.index,
     required this.suggestion,
     required this.onTap,
@@ -59,11 +68,18 @@ class _SuggestionTile extends StatelessWidget {
     final category = suggestion.category;
     return semantic(
       'shopping.suggestion.$index',
-      child: ListTile(
-        dense: true,
-        title: Text(suggestion.name),
-        trailing: category == null ? null : CategoryBadge(category: category),
-        onTap: onTap,
+      child: ActionChip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(suggestion.name),
+            if (category != null) ...[
+              const SizedBox(width: 6),
+              CategoryBadge(category: category),
+            ],
+          ],
+        ),
+        onPressed: onTap,
       ),
     );
   }
