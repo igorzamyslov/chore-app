@@ -328,13 +328,28 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         // reachable no matter how long the form grows (design-language rule
         // 1) — and on a real phone the bottom of this form is below the
         // fold, which E2E caught as an unreachable save button.
-        bottomNavigationBar: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: semantic(
-            'chore_form.save',
-            child: FilledButton(
-              onPressed: _save,
-              child: Text(l10n.commonSave),
+        //
+        // C15 (docs/feedback/2026-08-06-conventions-audit.md): the outer
+        // Padding lifts the bar above the on-screen keyboard. `Scaffold`
+        // only applies `resizeToAvoidBottomInset` to its BODY — it lays
+        // `bottomNavigationBar` out at the bottom of the SCREEN, so with the
+        // keyboard up this button sat behind it and was absent from the
+        // accessibility tree entirely (verified on a Pixel emulator
+        // 2026-08-06: keyboard y1517-2274, form content ended y1480, no
+        // `chore_form.save` node). A user who typed a title simply could not
+        // see how to save.
+        bottomNavigationBar: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SafeArea(
+            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: semantic(
+              'chore_form.save',
+              child: FilledButton(
+                onPressed: _save,
+                child: Text(l10n.commonSave),
+              ),
             ),
           ),
         ),
