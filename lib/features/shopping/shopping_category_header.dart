@@ -6,10 +6,11 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-/// The header shown above a run of items sharing the same category:
-/// [category]'s icon and name, both in the category's own color; a neutral
-/// 'Uncategorized' label (icon + text in [ColorScheme.onSurfaceVariant])
-/// when [category] is `null`.
+/// The header shown above a run of items sharing the same category (spec
+/// `docs/specs/theme-v2.md` §4.3): [category]'s icon and uppercase name,
+/// both in the category's own color, followed by a 1px `outlineVariant`
+/// rule filling the remaining width; a neutral 'Uncategorized' label (icon +
+/// text in [ColorScheme.onSurfaceVariant]) when [category] is `null`.
 class ShoppingCategoryHeader extends StatelessWidget {
   /// Creates a header for [category] (`null` for the uncategorized run).
   const ShoppingCategoryHeader({required this.category, super.key});
@@ -36,13 +37,24 @@ class ShoppingCategoryHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              // Uppercased here (never by an already-uppercase ARB string --
+              // German capitalization rules differ, spec theme-v2.md §2).
+              name.toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: theme.textTheme.labelSmall?.copyWith(color: color),
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              name,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(color: color),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: theme.colorScheme.outlineVariant,
             ),
           ),
         ],

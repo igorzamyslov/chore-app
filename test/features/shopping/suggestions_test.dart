@@ -143,7 +143,10 @@ void main() {
       // Added immediately with the inherited category; suggestions gone,
       // input cleared, focus kept for the next entry.
       expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('Dairy'), findsOneWidget);
+      // The aisle header renders the category name uppercased (spec
+      // `docs/specs/theme-v2.md` §4.3) -- unlike the suggestion chip's own
+      // `CategoryBadge`, which stays natural-case (asserted above).
+      expect(find.text('DAIRY'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('shopping.suggestion.0'),
         findsNothing,

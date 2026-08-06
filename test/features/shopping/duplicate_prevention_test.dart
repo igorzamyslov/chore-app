@@ -119,7 +119,9 @@ void main() {
       expect(find.text('Already on the list'), findsNothing);
       expect(find.text('Moved back to the list'), findsNothing);
       expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('Dairy'), findsOneWidget);
+      // The aisle header renders the category name uppercased (spec
+      // `docs/specs/theme-v2.md` §4.3).
+      expect(find.text('DAIRY'), findsOneWidget);
       expect(
         tester.widget<TextField>(quickAddInput()).controller?.text,
         isEmpty,

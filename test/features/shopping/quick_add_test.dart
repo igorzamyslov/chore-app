@@ -25,7 +25,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('Uncategorized'), findsOneWidget);
+      // The aisle header renders the category name uppercased (spec
+      // `docs/specs/theme-v2.md` §4.3).
+      expect(find.text('UNCATEGORIZED'), findsOneWidget);
       expect(tester.widget<TextField>(inputField).controller?.text, isEmpty);
       expect(tester.testTextInput.isVisible, isTrue);
 
@@ -44,7 +46,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('shopping.empty'), findsOneWidget);
-      expect(find.text('Uncategorized'), findsNothing);
+      expect(find.text('UNCATEGORIZED'), findsNothing);
 
       handle.dispose();
     },

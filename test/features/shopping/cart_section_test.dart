@@ -56,7 +56,10 @@ void main() {
       expect(find.text('Bread'), findsOneWidget);
       // The unchecked item moved back to the main list.
       expect(find.text('Milk'), findsOneWidget);
-      expect(find.text('Uncategorized'), findsOneWidget);
+      // Aisle headers render their category name uppercased at the widget
+      // level (spec `docs/specs/theme-v2.md` §4.3) -- never in the ARB
+      // source, since German capitalization rules differ.
+      expect(find.text('UNCATEGORIZED'), findsOneWidget);
 
       handle.dispose();
     },
@@ -150,7 +153,7 @@ void main() {
       expect(find.text('Milk'), findsOneWidget);
       expect(find.text('Bread'), findsOneWidget);
       expect(find.text('Eggs'), findsOneWidget);
-      expect(find.text('Uncategorized'), findsOneWidget);
+      expect(find.text('UNCATEGORIZED'), findsOneWidget);
 
       handle.dispose();
     },
