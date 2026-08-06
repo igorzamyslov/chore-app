@@ -12,15 +12,24 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
 
 ## Foundations
 
-- **Material 3**, `ColorScheme.fromSeed(0xFF26A69A)` (calm teal-green),
-  light + dark from the same seed, `ThemeMode.system`.
-- **Typography**: M3 defaults only, referenced via `Theme.of(context)
-  .textTheme` — never hardcoded font sizes. Hierarchy through style roles
-  (titleMedium for tile titles, bodySmall for metadata), not through bold
-  everywhere.
+*Color source, typography and shape below are amended by
+`docs/specs/theme-v2.md` §7 (amendments 1, 3, 2) — that spec's §1–§3 are now
+the binding detail; the bullets here are kept for context and for the rules
+theme-v2 does NOT touch.*
+
+- ~~**Material 3**, `ColorScheme.fromSeed(0xFF26A69A)` (calm teal-green),
+  light + dark from the same seed~~ — **retired** (spec `theme-v2.md` §7.1):
+  two hand-authored warm light/dark `ColorScheme`s (spec `theme-v2.md` §1),
+  `ThemeMode.system` unchanged.
+- **Typography**: ~~M3 defaults only~~ — **Inter**, bundled, with an
+  explicit type scale (spec `theme-v2.md` §2, §7.3), referenced via
+  `Theme.of(context).textTheme` — still never hardcoded font sizes.
+  Hierarchy through style roles (titleMedium for tile titles, bodySmall for
+  metadata), not through bold everywhere.
 - **Spacing**: 4dp grid. Allowed values: 4, 8, 12, 16, 24, 32. Screen edge
   padding 16. Vertical rhythm between sections 24.
-- **Shape**: M3 defaults (12dp cards/sheets). No custom radii.
+- **Shape**: ~~M3 defaults (12dp cards/sheets). No custom radii.~~ — cards
+  16dp, FAB 20dp squircle, sheets/dialogs 24dp (spec `theme-v2.md` §3, §7.2).
 - **Motion**: standard M3 transitions ONLY (also mandated by
   testing-strategy determinism). No custom animation code.
 - **Icons**: Material Symbols outlined style throughout (`Icons.*_outlined`
@@ -30,11 +39,18 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
 
 ## Color usage rules
 
+*The overdue bullet below is amended by `docs/specs/theme-v2.md` §7.4 — see
+that spec for the current binding rule.*
+
 - The seed palette does the work; **category color is an accent, not a
   background** — used for the category icon + chip text/outline, never for
   whole tiles (keeps the list calm and readable).
-- Overdue = `colorScheme.error` for the due-label text only — signal, not
-  alarm. No red tiles, no badges with counts screaming at the user.
+- ~~Overdue = `colorScheme.error` for the due-label text only — signal, not
+  alarm. No red tiles, no badges with counts screaming at the user.~~ —
+  **relaxed** (spec `theme-v2.md` §7.4, design option C): overdue MAY tint
+  its tile's container (`errorContainer` ground, `error` left edge, `error`
+  due-chip) — still signal, not alarm: no counts, no shouting, and color is
+  still never the only carrier (see the next bullet).
 - Color is never the only carrier of meaning: overdue also says
   'Overdue · Tue' in text; categories also show name; checked items also
   strikethrough.
@@ -84,13 +100,24 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
 
 ## Component patterns
 
+*Section headers and chips below are amended by `docs/specs/theme-v2.md`
+§7.5, §7.6 — see that spec's §3–§4 for the current binding detail.*
+
 - **Occurrence tile**: [48dp complete-circle] Title (titleMedium) /
   metadata row (bodySmall, onSurfaceVariant): category chip · assignee ·
   due text (error color when overdue). Trailing overflow menu (44dp+).
 - **Section headers**: labelLarge, onSurfaceVariant, 24 top / 8 bottom
-  padding. No divider lines — whitespace separates.
+  padding. ~~No divider lines — whitespace separates.~~ — **amended** (spec
+  `theme-v2.md` §7.5): headers gain a 1px `outlineVariant` hairline rule
+  filling the remaining width, plus an item count; the "no divider lines"
+  rule still holds for rows, just not for headers, which now need to read
+  as structure rather than as more list items.
 - **Chips** (categories, weekdays, members): M3 FilterChip/ChoiceChip
-  defaults; selected state uses secondaryContainer, not custom colors.
+  defaults; ~~selected state uses secondaryContainer, not custom colors~~ —
+  **amended** (spec `theme-v2.md` §7.6): selected state uses
+  `primaryContainer` fill + `primaryOutline` border (this design has no
+  secondary accent); unselected uses `surfaceContainerLow` fill +
+  `outlineVariant` border.
 - **Sheets**: modal bottom sheets with a drag handle, 16 padding, actions
   right-aligned; the sheet's primary action is a FilledButton.
 - **Dialogs**: only for destructive confirms. Title = the consequence
@@ -99,10 +126,17 @@ seconds, sees what matters (what's due, what to buy), acts, leaves.
 
 ## Depth / cards
 
+*Amended by `docs/specs/theme-v2.md` §7.2, §7.7 — see that spec's §3 for the
+current binding detail.*
+
 - List content sits in solid cards, not directly on the plain background:
-  `DepthCard` wraps each row/tile in an M3 `surfaceContainerLow` card, 12dp
-  radius, elevation 0, `EdgeInsets.symmetric(horizontal: 12, vertical: 4)`
-  margins.
+  `DepthCard` wraps each row/tile in an M3 `surfaceContainerLow` card,
+  ~~12dp~~ **16dp** radius (spec `theme-v2.md` §7.2), elevation 0, a 1px
+  `outlineVariant` border, `EdgeInsets.symmetric(horizontal: 12, vertical:
+  4)` margins. Elevation is edge (that border) plus an ambient shadow
+  (`FamdoColors.lift`, on raised cards only) — never M3's surface-tint
+  elevation (spec `theme-v2.md` §7.7): every card/sheet/dialog stays
+  `elevation: 0`.
 - Done/paused sections get one card around the whole `ExpansionTile`
   (header + rows together), not one card per row — the tile already groups
   those rows visually, so per-row cards would double up.

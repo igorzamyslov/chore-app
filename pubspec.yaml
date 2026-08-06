@@ -103,3 +103,23 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  # Inter (spec docs/specs/theme-v2.md §2): the app's only typeface, bundled
+  # as static TTFs so the offline-first promise and F-Droid's reproducibility
+  # both hold (no google_fonts runtime fetch). SIL OFL 1.1 -- the license
+  # text is also declared as an asset below so it's bundled for
+  # LicenseRegistry (see lib/main.dart) to surface on the About screen.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+
+  assets:
+    - assets/fonts/Inter-LICENSE.txt

@@ -89,7 +89,7 @@ class CategoryPicker extends StatelessWidget {
                     child: ChoiceChip(
                       avatar: Icon(
                         categoryIcon(category.icon),
-                        color: Color(category.color),
+                        color: categoryTone(context, category.color),
                         size: 18,
                       ),
                       label: Text(category.name),

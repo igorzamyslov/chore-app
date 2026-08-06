@@ -3,12 +3,27 @@ import 'dart:async';
 import 'package:chore_app/app/app.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/supabase_config.dart';
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Registers Inter's bundled OFL license text (spec
+  // `docs/specs/theme-v2.md` §2) so it surfaces on the About screen's
+  // existing licenses page. `LicenseRegistry.addLicense` takes a *stream
+  // factory*, not the license itself, so the `rootBundle.loadString` read
+  // only actually happens when the licenses page is opened and the stream
+  // is listened to -- this line does not block startup on it.
+  LicenseRegistry.addLicense(() async* {
+    final license = await rootBundle.loadString(
+      'assets/fonts/Inter-LICENSE.txt',
+    );
+    yield LicenseEntryWithLineBreaks(['Inter'], license);
+  });
   // Only ever called here, before `runApp` -- never from a widget, never in
   // tests (spec `docs/specs/sync-backend.md` §5). `supabaseConfigured`
   // false (the empty-dart-define escape hatch -- see

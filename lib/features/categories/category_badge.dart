@@ -19,7 +19,7 @@ class CategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(category.color);
+    final color = categoryTone(context, category.color);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
