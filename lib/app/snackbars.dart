@@ -37,11 +37,23 @@ void showAppSnackbar(
   required String message,
   SnackBarAction? action,
 }) {
+  // Style (spec docs/specs/theme-v2.md §4.5): a leading check_circle glyph
+  // in `inversePrimary` ahead of the message. Ground color, radius, and
+  // floating-above-the-tab-bar placement all come from the app-wide
+  // `SnackBarThemeData` (`lib/app/theme.dart`) plus the behavior/margin
+  // below -- never hardcoded here beyond this icon.
+  final inversePrimary = Theme.of(context).colorScheme.inversePrimary;
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: inversePrimary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
         // Matches SnackBar's own default — spelled out because it's a
         // deliberate choice this helper documents, not an incidental one.
         // ignore: avoid_redundant_argument_values

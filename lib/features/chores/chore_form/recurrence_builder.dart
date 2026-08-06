@@ -89,6 +89,20 @@ String weekdayShortName(int weekday, String localeName) {
   ).format(_referenceMonday.add(Duration(days: weekday - 1)));
 }
 
+/// The narrow (single- or double-letter) display name of ISO [weekday]
+/// (1 = Monday .. 7 = Sunday) in [localeName], e.g. `'T'` (en) or `'D'` (de)
+/// — sourced from `package:intl`, never a hardcoded weekday list. Used by
+/// the weekday circular toggles (spec `docs/specs/theme-v2.md` §4.4 item 3),
+/// which are too small for the abbreviated 3-letter form; the full weekday
+/// name still carries the accessibility label, so the narrow glyph's
+/// occasional ambiguity (e.g. 'T' for both Tuesday and Thursday) never
+/// reaches a screen reader.
+String weekdayNarrowName(int weekday, String localeName) {
+  return DateFormat.EEEEE(
+    localeName,
+  ).format(_referenceMonday.add(Duration(days: weekday - 1)));
+}
+
 /// The already-localized ordinal text for [n] (e.g. `'15th'` in en,
 /// `'15.'` in de), used by the monthly-mode chip labels.
 ///

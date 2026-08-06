@@ -9,9 +9,11 @@
 library;
 
 import 'package:chore_app/app/depth_card.dart';
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/features/chores/chore_form/labelled_field_card.dart';
 import 'package:chore_app/features/onboarding/welcome_join_page.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -83,10 +85,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            Icons.checklist_rounded,
-            size: 56,
-            color: theme.colorScheme.primary,
+          // The accent app tile (spec docs/specs/theme-v2.md §4.5) sits
+          // above the wordmark; `Center` keeps it from being stretched to
+          // the column's full width by the `stretch` cross-axis alignment
+          // above (unlike `Icon`, a fixed-size `Container` has no built-in
+          // self-centering under a tight incoming width constraint).
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                Icons.checklist_rounded,
+                size: 32,
+                color: theme.colorScheme.primary,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -108,6 +126,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             icon: Icons.home_outlined,
             title: l10n.welcomeCreateTitle,
             subtitle: l10n.welcomeCreateSubtitle,
+            emphasized: true,
             onTap: () => setState(() => _creatingHousehold = true),
           ),
           if (joinEnabled) ...[
@@ -144,9 +163,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Widget _buildCreateNameForm(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final famdo = famdoColors(context);
     final canConfirm = !_saving && _nameController.text.trim().isNotEmpty;
 
-    return Padding(
+    return SingleChildScrollView(
       key: const ValueKey('createName'),
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
@@ -165,39 +185,68 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(l10n.welcomeCreateTitle, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 24),
-          semantic(
-            'welcome.create.name',
-            child: TextField(
-              controller: _nameController,
-              autofocus: true,
-              textInputAction: TextInputAction.done,
-              onSubmitted: canConfirm ? (_) => _confirm() : null,
-              decoration: InputDecoration(
-                labelText: l10n.welcomeCreateNameLabel,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-          ],
-          const SizedBox(height: 24),
-          Align(
-            alignment: Alignment.centerRight,
-            child: semantic(
-              'welcome.create.confirm',
-              child: FilledButton(
-                onPressed: canConfirm ? _confirm : null,
-                child: _saving
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.welcomeCreateConfirm),
+          // Raised primaryOutline card (spec docs/specs/theme-v2.md §4.5):
+          // heading, sub-line, the always-visible (permanently-labelled,
+          // never floating) name field, and a filled 48dp submit.
+          DepthCard(
+            margin: EdgeInsets.zero,
+            shadow: true,
+            borderColor: famdo.primaryOutline,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.welcomeCreateTitle,
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.welcomeCreateSubtitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  semantic(
+                    'welcome.create.name',
+                    child: LabelledFieldCard(
+                      label: l10n.welcomeCreateNameLabel,
+                      controller: _nameController,
+                      autofocus: true,
+                      textInputAction: TextInputAction.done,
+                      // Enter is the SOLE submit path here (spec
+                      // docs/specs/onboarding-v2.md; E2E
+                      // e2e/common/onboard_fresh.yaml): the field's
+                      // onSubmitted runs create directly, and the confirm
+                      // button below never also fires from this callback.
+                      onSubmitted: canConfirm ? (_) => _confirm() : null,
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  semantic(
+                    'welcome.create.confirm',
+                    child: FilledButton(
+                      onPressed: canConfirm ? _confirm : null,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(l10n.welcomeCreateConfirm),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -234,6 +283,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 /// and a trailing chevron, matching the app's `DepthCard` list-tile
 /// language (spec `docs/specs/design-language.md`) rather than bespoke
 /// chrome.
+///
+/// [emphasized] makes this the raised, `primaryOutline`-bordered primary
+/// card (spec `docs/specs/theme-v2.md` §4.5: "create is a raised
+/// primaryOutline card"); otherwise it renders as the quiet secondary row
+/// the join option calls for.
 class _WelcomeCard extends StatelessWidget {
   const _WelcomeCard({
     required this.id,
@@ -241,6 +295,7 @@ class _WelcomeCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final String id;
@@ -248,12 +303,16 @@ class _WelcomeCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final famdo = famdoColors(context);
     return DepthCard(
       margin: EdgeInsets.zero,
+      shadow: emphasized,
+      borderColor: emphasized ? famdo.primaryOutline : null,
       child: semantic(
         id,
         child: InkWell(

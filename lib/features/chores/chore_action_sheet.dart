@@ -23,6 +23,11 @@ enum ChoreMenuAction {
 
 /// Shows the tile-level bottom sheet offering skip/edit/pause/delete, and
 /// resolves to the chosen [ChoreMenuAction] (or `null` if dismissed).
+///
+/// Rows are full-width with 22dp icons and a ≥48dp height (spec
+/// `docs/specs/theme-v2.md` §4.5); delete sits last, in `error`. The drag
+/// handle comes from the app-wide `BottomSheetThemeData`
+/// (`lib/app/theme.dart`) -- never hand-rolled here.
 Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
   return showModalBottomSheet<ChoreMenuAction>(
     context: context,
@@ -36,7 +41,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
             semantic(
               'chores.menu.skip',
               child: ListTile(
-                leading: const Icon(Icons.skip_next_outlined),
+                leading: const Icon(Icons.skip_next_outlined, size: 22),
                 title: Text(l10n.choresMenuSkip),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.skip);
@@ -46,7 +51,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
             semantic(
               'chores.menu.edit',
               child: ListTile(
-                leading: const Icon(Icons.edit_outlined),
+                leading: const Icon(Icons.edit_outlined, size: 22),
                 title: Text(l10n.choresMenuEdit),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.edit);
@@ -56,7 +61,7 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
             semantic(
               'chores.menu.pause',
               child: ListTile(
-                leading: const Icon(Icons.pause_circle_outlined),
+                leading: const Icon(Icons.pause_circle_outlined, size: 22),
                 title: Text(l10n.choresMenuPause),
                 onTap: () {
                   Navigator.pop(sheetContext, ChoreMenuAction.pause);
@@ -66,7 +71,11 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
             semantic(
               'chores.menu.delete',
               child: ListTile(
-                leading: Icon(Icons.delete_outline, color: errorColor),
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: errorColor,
+                  size: 22,
+                ),
                 title: Text(
                   l10n.commonDelete,
                   style: TextStyle(color: errorColor),

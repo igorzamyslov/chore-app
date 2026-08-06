@@ -662,11 +662,51 @@ abstract class AppLocalizations {
   /// **'After last completion'**
   String get choreFormAnchorCompletionTitle;
 
-  /// Example hint under the fixed-days anchor option.
+  /// Retired 2026-08-06 (spec docs/specs/theme-v2.md §4.4 item 4): the fixed-days anchor option's subtitle now names the actual configured interval (see choreFormAnchorScheduleSubtitleDay/Week/MonthDayOfMonth/MonthNthWeekday/MonthLastWeekday) instead of this generic example. Key kept, never deleted, per that spec's §0.
   ///
   /// In en, this message translates to:
   /// **'e.g. every Tuesday'**
   String get choreFormAnchorScheduleSubtitle;
+
+  /// Concrete hint under the fixed-days anchor option when the repeat unit is day, naming the actual current interval instead of a generic example.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Every day} other{Every {count} days}}'**
+  String choreFormAnchorScheduleSubtitleDay(int count);
+
+  /// Concrete hint under the fixed-days anchor option when the repeat unit is week, naming the actual configured weekday(s). {weekdays} is already locale-formatted via intl (comma-joined weekday names), never hardcoded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Every week on {weekdays}} other{Every {count} weeks on {weekdays}}}'**
+  String choreFormAnchorScheduleSubtitleWeek(int count, String weekdays);
+
+  /// Concrete hint under the fixed-days anchor option for a month-unit, day-of-month rule, naming the actual configured day. {ordinalDay} is the already locale-formatted ordinal day (e.g. '15th').
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Every month on the {ordinalDay}} other{Every {count} months on the {ordinalDay}}}'**
+  String choreFormAnchorScheduleSubtitleMonthDayOfMonth(
+    int count,
+    String ordinalDay,
+  );
+
+  /// Concrete hint under the fixed-days anchor option for a month-unit, nth-weekday rule, naming the actual configured ordinal + weekday, e.g. 'Every month on the 4th Friday'. {ordinal} and {weekday} are already locale-formatted, never hardcoded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Every month on the {ordinal} {weekday}} other{Every {count} months on the {ordinal} {weekday}}}'**
+  String choreFormAnchorScheduleSubtitleMonthNthWeekday(
+    int count,
+    String ordinal,
+    String weekday,
+  );
+
+  /// Concrete hint under the fixed-days anchor option for a month-unit, last-weekday-of-month rule, naming the actual configured weekday, e.g. 'Every month on the last Friday'. {weekday} is already locale-formatted, never hardcoded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Every month on the last {weekday}} other{Every {count} months on the last {weekday}}}'**
+  String choreFormAnchorScheduleSubtitleMonthLastWeekday(
+    int count,
+    String weekday,
+  );
 
   /// Concrete hint under the after-last-completion anchor option when the repeat unit is day, naming the actual current interval instead of a generic example.
   ///

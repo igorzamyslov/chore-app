@@ -1,6 +1,7 @@
 /// The app's three-tab bottom navigation shell.
 library;
 
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
 import 'package:chore_app/features/settings/settings_screen.dart';
@@ -123,36 +124,46 @@ class _BottomTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surfaceContainer,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            children: [
-              for (final tab in _AppTab.values)
-                Expanded(
-                  child: semantic(
-                    'shell.tab.${tab.name}',
-                    // The hand-rolled bar must carry the traits
-                    // NavigationBar would have provided: without
-                    // `selected`, screen readers can't tell which tab is
-                    // active (the visual cue is color/icon only).
-                    child: Semantics(
-                      button: true,
-                      selected: tab == selected,
-                      child: InkWell(
-                        onTap: () => onSelected(tab),
-                        child: _TabContent(
-                          tab: tab,
-                          isSelected: tab == selected,
+    final famdo = famdoColors(context);
+    return Container(
+      // A 1px top hairline (spec docs/specs/theme-v2.md §4.5) sits on this
+      // outer Container so the inner Material can keep filling its bounds
+      // with `navBarBackground` -- Material's own `shape` has no clean way
+      // to draw a single-edge border.
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+      ),
+      child: Material(
+        color: famdo.navBarBackground,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 72,
+            child: Row(
+              children: [
+                for (final tab in _AppTab.values)
+                  Expanded(
+                    child: semantic(
+                      'shell.tab.${tab.name}',
+                      // The hand-rolled bar must carry the traits
+                      // NavigationBar would have provided: without
+                      // `selected`, screen readers can't tell which tab is
+                      // active (the visual cue is color/icon only).
+                      child: Semantics(
+                        button: true,
+                        selected: tab == selected,
+                        child: InkWell(
+                          onTap: () => onSelected(tab),
+                          child: _TabContent(
+                            tab: tab,
+                            isSelected: tab == selected,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -175,7 +186,22 @@ class _TabContent extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(isSelected ? tab.filled : tab.outlined, color: color),
+        // The active destination's 62x30 pill (spec
+        // docs/specs/theme-v2.md §4.5); inactive tabs get an equivalent
+        // transparent slot so the icon doesn't jump vertically when
+        // selection changes.
+        Container(
+          width: 62,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? theme.colorScheme.primaryContainer
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(isSelected ? tab.filled : tab.outlined, color: color),
+        ),
         const SizedBox(height: 2),
         Text(
           _tabLabel(context, tab),

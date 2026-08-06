@@ -408,6 +408,71 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormAnchorScheduleSubtitle => 'z. B. jeden Dienstag';
 
   @override
+  String choreFormAnchorScheduleSubtitleDay(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Tage',
+      one: 'Jeden Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorScheduleSubtitleWeek(int count, String weekdays) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Wochen am $weekdays',
+      one: 'Jede Woche am $weekdays',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorScheduleSubtitleMonthDayOfMonth(
+    int count,
+    String ordinalDay,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate am $ordinalDay',
+      one: 'Jeden Monat am $ordinalDay',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorScheduleSubtitleMonthNthWeekday(
+    int count,
+    String ordinal,
+    String weekday,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate am $ordinal $weekday',
+      one: 'Jeden Monat am $ordinal $weekday',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String choreFormAnchorScheduleSubtitleMonthLastWeekday(
+    int count,
+    String weekday,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate am letzten $weekday',
+      one: 'Jeden Monat am letzten $weekday',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String choreFormAnchorCompletionSubtitleDay(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

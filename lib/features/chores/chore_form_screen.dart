@@ -8,8 +8,8 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
-import 'package:chore_app/features/categories/category_picker.dart';
 import 'package:chore_app/features/chores/chore_form/assignment_fields.dart';
+import 'package:chore_app/features/chores/chore_form/category_chips.dart';
 import 'package:chore_app/features/chores/chore_form/form_validation.dart';
 import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_controls.dart';
@@ -177,12 +177,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
           const SizedBox(height: 16),
           semantic(
             'chore_form.category',
-            child: CategoryPicker(
+            child: ChoreFormCategoryChips(
               categories: categories,
               selectedCategoryId: _categoryId,
               onChanged: (value) => setState(() => _categoryId = value),
-              idPrefix: 'chore_form.category',
-              kind: CategoryKind.chore,
             ),
           ),
           const SizedBox(height: 16),
