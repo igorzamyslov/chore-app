@@ -34,6 +34,26 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    and it failed to pop a pushed route on the simulator. Pop screens by
    tapping the app bar's BackButton instead — Flutter gives it the
    semantics label `Back` (MaterialLocalizations) on both platforms.
+8. **A text assertion is an assertion about a whole MERGED accessibility
+   node.** Flutter merges related widgets into one node, and Maestro
+   matches that node's text EXACTLY — so a label sitting next to anything
+   else is not matchable on its own. This bit three times on 2026-08-06
+   alone: a section header plus its new count became `"Today\n1"`; a form
+   field plus its inline error became `"Title\nTitle is required"`; chore
+   tiles merge title + metadata (the reason for the older `"(?s).*Foo.*"`
+   asserts). The merges are all CORRECT for screen readers — an error
+   should be announced with its field — so the app stays and the assertion
+   adapts:
+   - content doesn't matter → **assert the semantic id** (e.g.
+     `chores.section.today`). Preferred: immune to copy and layout changes.
+   - content matters → **`"(?s).*substring.*"`**, and say in a comment
+     what it is sharing a node with.
+
+   When an assertion fails with "is visible" on text you can plainly see
+   on screen, do NOT theorise — Maestro already dumped the answer. Read
+   `~/.maestro/tests/<run>/<flow>/screen-hierarchy/<last step>.json` and
+   look at `text`, `accessibilityText` AND `hintText` (a `TextField`'s
+   label/error land in `hintText`, not the other two).
 
 ## Maestro version (pinned)
 

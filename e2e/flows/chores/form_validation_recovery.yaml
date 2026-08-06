@@ -19,7 +19,14 @@ tags:
     id: "chores.add"
 - tapOn:
     id: "chore_form.save"
-- assertVisible: "Title is required"
+# Regex, not a bare string: the inline error and the field's own label
+# merge into ONE accessibility node ("Title\nTitle is required" — verified
+# in the captured hierarchy 2026-08-06), and Maestro matches node text
+# exactly. That merge is deliberate and good for screen readers, which
+# announce the error together with the field it belongs to, so the
+# assertion adapts rather than the app. Same pattern as the title asserts
+# below.
+- assertVisible: "(?s).*Title is required.*"
 # Recovery: the same form session must succeed after fixing the input.
 - tapOn:
     id: "chore_form.title"

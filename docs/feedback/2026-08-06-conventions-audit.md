@@ -38,6 +38,7 @@ Every finding below was verified against the source, not assumed.
 | C12 | **Share-to-app** ("add to shopping list" from any app's share sheet) | No share intent filter | Medium | L |
 | C13 | **Home-screen widget** for the shopping list | None | Medium | XL |
 | C14 | **Search in long lists** | None; fine at family scale | Low | M |
+| C15 | **Primary action reachable with the keyboard open** | **Broken on the chore form.** Save lives in the Scaffold's `bottomNavigationBar`; with the keyboard up it is not in the accessibility tree at all — verified 2026-08-06 on a Pixel emulator (keyboard y1517–2274, form content ends y1480, no `chore_form.save` node). The user must dismiss the keyboard to find Save, with nothing telling them so | High | M |
 
 Already correct, for the record: empty / loading / error states exist on
 both list screens; optimistic local writes are inherent to the local-first
@@ -55,7 +56,13 @@ already committed to:
 - **C4** — `design-language.md` interaction rule 7 already says *"never
   lose user input"*. The form violates it today; this is a bug against an
   existing binding rule, not a new feature.
-- **C7**, **C8** — two-line fixes.
+- **C8** — a two-line fix.
+- **C7 was attempted and deliberately reverted.** Chaining title → notes
+  made Enter jump into an optional 3-line field and keep the keyboard up,
+  which strands the user because of C15 below. It also broke eight E2E
+  flows, which is how C15 was found at all: they had been passing only
+  because Enter's default `done` action dismissed the keyboard. Chaining
+  is right for sequential *required* fields; this form is title-then-save.
 
 **Do next**, as one wave:
 
