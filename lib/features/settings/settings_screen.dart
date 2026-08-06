@@ -43,6 +43,10 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(l10n.settingsTabLabel)),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
+        // C8 (conventions audit): dismisses the keyboard on a scroll drag --
+        // the Account section's sign-in email field is the one text input
+        // reachable from this scroll view.
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           SettingsGroup(
             label: l10n.settingsHouseholdSectionTitle,

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
@@ -14,6 +15,7 @@ import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Lists the household's shared shopping list: a pinned quick-add row above
@@ -45,6 +47,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(shoppingItemsProvider);
+    // C1 (spec docs/specs/sync-freshness.md §2.3): same linked-AND-signed-in
+    // gate as the chores list -- see chores_list_screen.dart's matching
+    // comment and syncEngineProvider's own doc comment
+    // (lib/app/providers.dart) for why.
+    final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
 
     return Scaffold(
       appBar: AppBar(
@@ -81,7 +88,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     // time (documented behavior above).
                     _cartExpanded = false;
                   }
-                  return _Body(
+                  final body = _Body(
                     items: items,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
@@ -99,6 +106,18 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     onClear: () => _clearChecked(ref),
                     onUncheckAll: () => _uncheckAll(ref),
                   );
+                  if (!syncLinked) {
+                    return body;
+                  }
+                  // Success is silent (spec §2.3): the list simply updates,
+                  // which is the platform convention -- no snackbar here.
+                  return semantic(
+                    'shopping.refresh',
+                    child: RefreshIndicator(
+                      onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
+                      child: body,
+                    ),
+                  );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => _ErrorState(
@@ -112,10 +131,19 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     );
   }
 
-  Future<void> _setChecked(WidgetRef ref, String id, {required bool checked}) {
-    return ref
-        .read(shoppingRepositoryProvider)
-        .setChecked(id, checked: checked);
+  Future<void> _setChecked(
+    WidgetRef ref,
+    String id, {
+    required bool checked,
+  }) async {
+    await ref.read(shoppingRepositoryProvider).setChecked(id, checked: checked);
+    // C3 (conventions audit, docs/feedback/2026-08-06-conventions-audit.md):
+    // haptic feedback, not animation -- doesn't touch the "no custom
+    // animation" rule (design-language.md's Motion bullet) or E2E
+    // determinism, so a future reader shouldn't "fix" this away. Fired here,
+    // once the write is confirmed, rather than in the tile's onTap, so it
+    // fires exactly once per real check/uncheck.
+    unawaited(HapticFeedback.selectionClick());
   }
 
   Future<void> _clearChecked(WidgetRef ref) {
@@ -160,7 +188,13 @@ class _Body extends StatelessWidget {
     ];
 
     if (unchecked.isEmpty && checked.isEmpty) {
-      return const Center(child: _EmptyMessage());
+      // Scrollable (not a bare Center): a RefreshIndicator higher up the
+      // tree (C1, spec docs/specs/sync-freshness.md §2.3) needs a
+      // Scrollable descendant to detect the pull gesture, and that must
+      // hold even when the list is empty -- an indicator that only "works"
+      // on a populated list would be exactly the kind of
+      // provably-does-nothing affordance waves M and R removed.
+      return const _ScrollableEmptyState(child: _EmptyMessage());
     }
 
     final children = <Widget>[
@@ -182,7 +216,14 @@ class _Body extends StatelessWidget {
         ),
     ];
 
-    return ListView(children: children);
+    return ListView(
+      // C8 (conventions audit): dismisses the keyboard on a scroll drag --
+      // the quick-add field above stays focused after a submit, so scrolling
+      // the list underneath is exactly the "working the list" gesture Bug 3
+      // (field feedback round 2) already dismisses the suggestions list for.
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: children,
+    );
   }
 
   /// Builds a category header followed by one card per run of same-category
@@ -230,6 +271,29 @@ class _Body extends StatelessWidget {
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onTap: () => onTapItem(item),
+    );
+  }
+}
+
+/// Wraps an empty-state [child] in a scrollable that fills the available
+/// height (`SliverFillRemaining(hasScrollBody: false)`), so the
+/// [RefreshIndicator] wrapping this screen's list (C1, spec
+/// `docs/specs/sync-freshness.md` §2.3) still has a `Scrollable` descendant
+/// to detect a pull gesture even when the list is empty -- otherwise the
+/// indicator would silently do nothing on the empty state, exactly the
+/// dishonest affordance waves M and R removed.
+class _ScrollableEmptyState extends StatelessWidget {
+  const _ScrollableEmptyState({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      slivers: [
+        SliverFillRemaining(hasScrollBody: false, child: Center(child: child)),
+      ],
     );
   }
 }

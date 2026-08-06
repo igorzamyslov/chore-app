@@ -503,7 +503,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.widgetWithText(FilterChip, 'Me'), findsNothing);
       expect(find.widgetWithText(FilterChip, 'Anna'), findsOneWidget);
+      // Picking a non-default assignment mode is enough to dirty the form
+      // (C4, docs/feedback/2026-08-06-conventions-audit.md), so backing out
+      // now surfaces the discard-changes guard rather than popping
+      // straight away -- confirm discarding to leave, since this test
+      // doesn't care about the half-filled form itself.
       await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('chore_form.discard.confirm'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('chore_form.discard.confirm'),
+      );
       await tester.pumpAndSettle();
 
       // Done-today history still names the deleted member.

@@ -444,6 +444,22 @@
   "@choreFormTitleRequiredError": {
     "description": "Inline validation error shown under the chore title field when it's left empty."
   },
+  "choreFormDiscardDialogTitle": "Discard changes?",
+  "@choreFormDiscardDialogTitle": {
+    "description": "Title of the confirmation dialog shown when backing out of a dirty chore form (C4, docs/feedback/2026-08-06-conventions-audit.md; design-language.md interaction rule 7, 'never lose user input')."
+  },
+  "choreFormDiscardDialogBody": "Your edits to this chore won't be saved.",
+  "@choreFormDiscardDialogBody": {
+    "description": "Body of the discard-changes confirmation dialog shown when backing out of a dirty chore form."
+  },
+  "choreFormDiscardKeepEditing": "Keep editing",
+  "@choreFormDiscardKeepEditing": {
+    "description": "Discard-changes dialog's safe action: dismisses the dialog and stays on the chore form with every entered value intact."
+  },
+  "choreFormDiscardConfirm": "Discard",
+  "@choreFormDiscardConfirm": {
+    "description": "Discard-changes dialog's destructive action: confirms leaving the chore form, losing every unsaved change."
+  },
   "choreFormRepeatToggleLabel": "Repeat",
   "@choreFormRepeatToggleLabel": {
     "description": "Label of the chore form's repeat on/off switch."
@@ -1043,6 +1059,40 @@
       "householdName": {
         "type": "String",
         "example": "My household"
+      }
+    }
+  },
+  "settingsAccountLastSyncedJustNow": "Last synced just now",
+  "@settingsAccountLastSyncedJustNow": {
+    "description": "Settings -> Account: relative last-sync line under the linked-household subtitle (spec docs/specs/sync-freshness.md §2.4), shown when the last successful pull was under a minute ago."
+  },
+  "settingsAccountLastSyncedMinutes": "{count, plural, one{Last synced 1 minute ago} other{Last synced {count} minutes ago}}",
+  "@settingsAccountLastSyncedMinutes": {
+    "description": "Settings -> Account: relative last-sync line shown when the last successful pull was under an hour ago. {count} is whole minutes elapsed.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
+  "settingsAccountLastSyncedHours": "{count, plural, one{Last synced 1 hour ago} other{Last synced {count} hours ago}}",
+  "@settingsAccountLastSyncedHours": {
+    "description": "Settings -> Account: relative last-sync line shown when the last successful pull was under 24 hours ago. {count} is whole hours elapsed.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "settingsAccountLastSyncedOn": "Last synced {date}",
+  "@settingsAccountLastSyncedOn": {
+    "description": "Settings -> Account: relative last-sync line shown when the last successful pull was 24+ hours ago. {date} is a locale-formatted weekday+month+day string (package:intl DateFormat.MMMEd), e.g. 'Fri, Jul 31'.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Fri, Jul 31"
       }
     }
   },
