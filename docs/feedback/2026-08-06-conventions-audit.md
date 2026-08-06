@@ -38,7 +38,7 @@ Every finding below was verified against the source, not assumed.
 | C12 | **Share-to-app** ("add to shopping list" from any app's share sheet) | No share intent filter | Medium | L |
 | C13 | **Home-screen widget** for the shopping list | None | Medium | XL |
 | C14 | **Search in long lists** | None; fine at family scale | Low | M |
-| C15 | **Primary action reachable with the keyboard open** | **Broken on the chore form.** Save lives in the Scaffold's `bottomNavigationBar`; with the keyboard up it is not in the accessibility tree at all — verified 2026-08-06 on a Pixel emulator (keyboard y1517–2274, form content ends y1480, no `chore_form.save` node). The user must dismiss the keyboard to find Save, with nothing telling them so | High | M |
+| C15 | **Primary action reachable with the keyboard open** | **FIXED 2026-08-06.** The chore form's Save lives in the Scaffold's `bottomNavigationBar`, which `resizeToAvoidBottomInset` does NOT lift (it insets the body only) — so with the keyboard up it sat behind it, absent from the accessibility tree entirely. A user who typed a title had no visible way to save. Fixed by padding the bar with `MediaQuery.viewInsetsOf(context).bottom`; Save now renders at y1349–1475 against a keyboard at y1517–2274 | High | M |
 
 Already correct, for the record: empty / loading / error states exist on
 both list screens; optimistic local writes are inherent to the local-first

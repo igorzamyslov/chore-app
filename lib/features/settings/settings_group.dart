@@ -144,8 +144,17 @@ class SettingsRow extends StatelessWidget {
     final labelColor = destructive ? colorScheme.error : colorScheme.onSurface;
     final switchChanged = onSwitchChanged;
 
+    // At large text scales a trailing value takes so much of the row that
+    // `ListTile` squeezes the label into a column narrower than one word --
+    // visual QA at text scale 2.0 rendered "Language" as "Langu / age"
+    // (spec `docs/specs/theme-v2.md` §5 makes 2.0 a release gate). Above
+    // 1.3x the value moves BELOW the label instead, which is the ordinary
+    // responsive answer and keeps both readable.
+    final stackValueUnderLabel =
+        value != null && MediaQuery.textScalerOf(context).scale(1) > 1.3;
+
     Widget? trailing;
-    if (value != null) {
+    if (value != null && !stackValueUnderLabel) {
       trailing = Text(
         value!,
         style: theme.textTheme.bodyLarge?.copyWith(
@@ -167,14 +176,36 @@ class SettingsRow extends StatelessWidget {
         label,
         style: theme.textTheme.titleSmall?.copyWith(color: labelColor),
       ),
-      subtitle: sublabel == null
-          ? null
-          : Text(
-              sublabel!,
-              style: theme.textTheme.bodySmall?.copyWith(
+      subtitle: switch ((sublabel, stackValueUnderLabel)) {
+        (null, false) => null,
+        (final String sub, false) => Text(
+          sub,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        // Value stacked under the label (see stackValueUnderLabel above);
+        // when the row also has a sub-line, both stack, sub-line first.
+        (final String? sub, true) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (sub != null)
+              Text(
+                sub,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            Text(
+              value!,
+              style: theme.textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
+          ],
+        ),
+      },
       trailing: trailing,
       onTap: switchChanged != null
           ? () => switchChanged(!(switchValue ?? false))

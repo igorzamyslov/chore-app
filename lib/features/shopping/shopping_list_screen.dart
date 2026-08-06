@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:chore_app/app/depth_card.dart';
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/application/sync_engine.dart';
@@ -304,23 +305,42 @@ class _EmptyMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.shopping_cart_outlined,
-          size: 48,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(height: 8),
-        semantic(
-          'shopping.empty',
-          child: Text(
-            AppLocalizations.of(context).shoppingEmptyState,
-            style: theme.textTheme.bodyLarge,
+    // The accent icon tile mirrors the chores list's empty state (spec
+    // `docs/specs/theme-v2.md` §4.1 item 6). Wave T4's scope (§4.3) never
+    // named this widget, so shopping was left with the old lone grey glyph
+    // while chores got the new treatment — visual QA caught the two tabs
+    // disagreeing with each other.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 44),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: famdoColors(context).primaryOutline),
+            ),
+            child: Icon(
+              Icons.add_shopping_cart_outlined,
+              size: 36,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          semantic(
+            'shopping.empty',
+            child: Text(
+              AppLocalizations.of(context).shoppingEmptyState,
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
