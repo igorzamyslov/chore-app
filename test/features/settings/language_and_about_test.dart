@@ -171,14 +171,14 @@ void main() {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
 
-      final tile = tester.widget<ListTile>(
-        find.descendant(
-          of: find.bySemanticsIdentifier('settings.about.donate'),
-          matching: find.byType(ListTile),
-        ),
+      // `AboutDonateTile` renders as a `SettingsRow` (spec
+      // docs/specs/theme-v2.md §4.2), not the old `ListTile` -- its own
+      // `onTap` isn't publicly inspectable, so assert the tap actually
+      // opens the sheet below instead of reading a widget field.
+      expect(
+        find.bySemanticsIdentifier('settings.about.donate'),
+        findsOneWidget,
       );
-      expect(tile.enabled, isTrue);
-      expect(tile.onTap, isNotNull);
 
       await tester.tap(find.bySemanticsIdentifier('settings.about.donate'));
       await tester.pumpAndSettle();

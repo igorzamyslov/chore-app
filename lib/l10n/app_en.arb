@@ -685,6 +685,11 @@
     "description": "Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1)."
   },
 
+  "settingsHouseholdSectionTitle": "Household",
+  "@settingsHouseholdSectionTitle": {
+    "description": "Settings screen section header above the Members and Categories rows (spec docs/specs/theme-v2.md §4.2), the first group on the screen."
+  },
+
   "settingsMembersEntry": "Members",
   "@settingsMembersEntry": {
     "description": "Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry."
@@ -843,6 +848,11 @@
         "example": "Produce"
       }
     }
+  },
+
+  "settingsPreferencesSectionTitle": "Preferences",
+  "@settingsPreferencesSectionTitle": {
+    "description": "Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2)."
   },
 
   "settingsLanguageEntry": "Language",

@@ -854,6 +854,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t export your data. Please try again.'**
   String get settingsExportError;
 
+  /// Settings screen section header above the Members and Categories rows (spec docs/specs/theme-v2.md §4.2), the first group on the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Household'**
+  String get settingsHouseholdSectionTitle;
+
   /// Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry.
   ///
   /// In en, this message translates to:
@@ -1045,6 +1051,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
   String categoryDeleteDialogBody(String categoryName);
+
+  /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get settingsPreferencesSectionTitle;
 
   /// Settings screen list entry that opens the language picker sheet (spec docs/next-session-plan.md #5), shown below the Categories entry. Its subtitle shows the current choice (System default / English / Deutsch).
   ///

@@ -5,37 +5,16 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Section header above the About rows, matching the digest section
-/// header's style (design-language: labelLarge, onSurfaceVariant, 24/8
-/// padding, no divider line).
-class AboutSectionHeader extends StatelessWidget {
-  /// Creates the section header.
-  const AboutSectionHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        AppLocalizations.of(context).settingsAboutSectionTitle,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-/// Non-tappable row showing the app's (localized) name and 'Version
-/// {version} ({buildNumber})', sourced from [packageInfoProvider]. Shows an
-/// em dash in place of the version/build number while that provider is
-/// still loading.
+/// Non-tappable row showing the app's (localized) name and, as its
+/// `bodySmall` sub-line, 'Version {version} ({buildNumber})', sourced from
+/// [packageInfoProvider]. Shows an em dash in place of the version/build
+/// number while that provider is still loading.
 class AboutVersionTile extends ConsumerWidget {
   /// Creates the version row.
   const AboutVersionTile({super.key});
@@ -49,10 +28,10 @@ class AboutVersionTile extends ConsumerWidget {
 
     return semantic(
       'settings.about.version',
-      child: ListTile(
-        leading: const Icon(Icons.info_outline),
-        title: Text(l10n.appTitle),
-        subtitle: Text(l10n.settingsAboutVersionLabel(version, buildNumber)),
+      child: SettingsRow(
+        icon: Icons.info_outline,
+        label: l10n.appTitle,
+        sublabel: l10n.settingsAboutVersionLabel(version, buildNumber),
       ),
     );
   }
@@ -70,10 +49,10 @@ class AboutLicensesTile extends ConsumerWidget {
 
     return semantic(
       'settings.about.licenses',
-      child: ListTile(
-        leading: const Icon(Icons.description_outlined),
-        title: Text(l10n.settingsAboutLicensesEntry),
-        trailing: const Icon(Icons.chevron_right),
+      child: SettingsRow(
+        icon: Icons.description_outlined,
+        label: l10n.settingsAboutLicensesEntry,
+        showChevron: true,
         onTap: () => showLicensePage(
           context: context,
           applicationName: l10n.appTitle,
@@ -101,11 +80,11 @@ class AboutDonateTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return semantic(
       'settings.about.donate',
-      child: ListTile(
-        leading: const Icon(Icons.volunteer_activism_outlined),
-        title: Text(l10n.settingsAboutDonateTitle),
-        subtitle: Text(l10n.settingsAboutDonateSubtitle),
-        trailing: const Icon(Icons.chevron_right),
+      child: SettingsRow(
+        icon: Icons.volunteer_activism_outlined,
+        label: l10n.settingsAboutDonateTitle,
+        sublabel: l10n.settingsAboutDonateSubtitle,
+        showChevron: true,
         onTap: () => showDonateSheet(context),
       ),
     );

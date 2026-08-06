@@ -22,28 +22,6 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Section header above the Account rows, matching every other Settings
-/// section header's style (labelLarge, onSurfaceVariant, 24/8 padding, no
-/// divider line), placed above the About section.
-class AccountSectionHeader extends StatelessWidget {
-  /// Creates the section header.
-  const AccountSectionHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        AppLocalizations.of(context).settingsAccountSectionTitle,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
 /// The Account section's body: a static disabled row when
 /// [authGatewayProvider] resolves to [NoopAuthGateway] (Supabase not
 /// configured); the signed-out form or, when signed in, the signed-in tile

@@ -6,12 +6,13 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The Settings tab's 'Language' row: shows the current choice (System
-/// default / English / Deutsch) as its subtitle; tapping opens
+/// default / English / Deutsch) as its trailing value; tapping opens
 /// [showLanguageSheet].
 class LanguageRow extends ConsumerWidget {
   /// Creates the language row.
@@ -21,7 +22,7 @@ class LanguageRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final locale = ref.watch(settingsProvider).valueOrNull?.locale;
-    final subtitle = switch (locale) {
+    final value = switch (locale) {
       'en' => l10n.settingsLanguageEnglish,
       'de' => l10n.settingsLanguageDeutsch,
       _ => l10n.settingsLanguageSystem,
@@ -29,11 +30,10 @@ class LanguageRow extends ConsumerWidget {
 
     return semantic(
       'settings.language',
-      child: ListTile(
-        leading: const Icon(Icons.language_outlined),
-        title: Text(l10n.settingsLanguageEntry),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+      child: SettingsRow(
+        icon: Icons.language_outlined,
+        label: l10n.settingsLanguageEntry,
+        value: value,
         onTap: () => showLanguageSheet(context),
       ),
     );

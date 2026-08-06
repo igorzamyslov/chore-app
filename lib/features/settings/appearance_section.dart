@@ -6,12 +6,13 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The Settings tab's 'Appearance' row, directly below the Language row:
-/// shows the current choice (System / Light / Dark) as its subtitle;
+/// shows the current choice (System / Light / Dark) as its trailing value;
 /// tapping opens [showAppearanceSheet].
 class AppearanceRow extends ConsumerWidget {
   /// Creates the appearance row.
@@ -21,7 +22,7 @@ class AppearanceRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final themeMode = ref.watch(settingsProvider).valueOrNull?.themeMode;
-    final subtitle = switch (themeMode) {
+    final value = switch (themeMode) {
       'light' => l10n.settingsAppearanceLight,
       'dark' => l10n.settingsAppearanceDark,
       _ => l10n.settingsAppearanceSystem,
@@ -29,11 +30,10 @@ class AppearanceRow extends ConsumerWidget {
 
     return semantic(
       'settings.appearance',
-      child: ListTile(
-        leading: const Icon(Icons.dark_mode_outlined),
-        title: Text(l10n.settingsAppearanceEntry),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+      child: SettingsRow(
+        icon: Icons.dark_mode_outlined,
+        label: l10n.settingsAppearanceEntry,
+        value: value,
         onTap: () => showAppearanceSheet(context),
       ),
     );
