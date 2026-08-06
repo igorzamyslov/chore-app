@@ -17,8 +17,10 @@ import 'package:chore_app/features/chores/chore_form/repeat_section.dart'
     show RepeatToggle;
 import 'package:chore_app/features/chores/chore_form/start_date_field.dart';
 import 'package:chore_app/features/chores/chore_form/title_notes_fields.dart';
+import 'package:chore_app/features/chores/chore_form_discard_dialog.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -61,7 +63,67 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   IntervalError? _intervalError;
   AssignmentError? _assignmentError;
 
+  // C4 (conventions audit, docs/feedback/2026-08-06-conventions-audit.md):
+  // the form's field values at the moment they were last known-saved --
+  // immediately, for a new chore, or once `_loadExisting` resolves, for an
+  // edit -- compared against the live values by `_isDirty` below to decide
+  // whether a pop needs the discard-confirm guard (design-language.md
+  // interaction rule 7: "never lose user input").
+  late String _initialTitle;
+  late String _initialNotes;
+  String? _initialCategoryId;
+  late bool _initialRepeatEnabled;
+  late RecurrenceUnit _initialUnit;
+  late RecurrenceAnchor _initialAnchor;
+  late Set<int> _initialWeekdays;
+  late MonthlyMode _initialMonthlyMode;
+  late String _initialInterval;
+  late PlainDate _initialStartDate;
+  late AssignmentMode _initialAssignmentMode;
+  late List<String> _initialSelectedMemberIds;
+
   bool get _isEditing => widget.choreId != null;
+
+  /// Whether any field's live value has diverged from the snapshot
+  /// [_captureInitialSnapshot] took -- gates the PopScope discard-confirm
+  /// below. Recurrence sub-fields only count while repeat is (or was)
+  /// actually enabled, so toggling it on and back off without touching
+  /// anything else doesn't read as dirty.
+  bool get _isDirty {
+    if (_titleController.text != _initialTitle ||
+        _notesController.text != _initialNotes ||
+        _categoryId != _initialCategoryId ||
+        _repeatEnabled != _initialRepeatEnabled ||
+        _startDate != _initialStartDate ||
+        _assignmentMode != _initialAssignmentMode ||
+        !listEquals(_selectedMemberIds, _initialSelectedMemberIds)) {
+      return true;
+    }
+    if (_repeatEnabled &&
+        (_unit != _initialUnit ||
+            _anchor != _initialAnchor ||
+            _monthlyMode != _initialMonthlyMode ||
+            _intervalController.text != _initialInterval ||
+            !setEquals(_weekdays, _initialWeekdays))) {
+      return true;
+    }
+    return false;
+  }
+
+  void _captureInitialSnapshot() {
+    _initialTitle = _titleController.text;
+    _initialNotes = _notesController.text;
+    _initialCategoryId = _categoryId;
+    _initialRepeatEnabled = _repeatEnabled;
+    _initialUnit = _unit;
+    _initialAnchor = _anchor;
+    _initialWeekdays = Set.of(_weekdays);
+    _initialMonthlyMode = _monthlyMode;
+    _initialInterval = _intervalController.text;
+    _initialStartDate = _startDate;
+    _initialAssignmentMode = _assignmentMode;
+    _initialSelectedMemberIds = List.of(_selectedMemberIds);
+  }
 
   @override
   void initState() {
@@ -72,17 +134,30 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     // G3 stage 1); typing into the field doesn't otherwise trigger a
     // rebuild, so this keeps that reading in sync as the user types.
     _intervalController.addListener(_onIntervalTextChanged);
+    // C4: title/notes are plain TextEditingControllers with no listener of
+    // their own, so without this, typing a few characters and immediately
+    // backing out (no OTHER field touched to force a rebuild) would leave
+    // the PopScope below holding a stale `canPop` from before the edit --
+    // `canPop` is only as fresh as the widget's last build.
+    _titleController.addListener(_onDirtyTrackedFieldChanged);
+    _notesController.addListener(_onDirtyTrackedFieldChanged);
     final choreId = widget.choreId;
     if (choreId != null) {
       _loading = true;
       unawaited(_loadExisting(choreId));
+    } else {
+      _captureInitialSnapshot();
     }
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _notesController.dispose();
+    _titleController
+      ..removeListener(_onDirtyTrackedFieldChanged)
+      ..dispose();
+    _notesController
+      ..removeListener(_onDirtyTrackedFieldChanged)
+      ..dispose();
     _intervalController
       ..removeListener(_onIntervalTextChanged)
       ..dispose();
@@ -93,6 +168,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     setState(() {});
   }
 
+  void _onDirtyTrackedFieldChanged() {
+    setState(() {});
+  }
+
   Future<void> _loadExisting(String choreId) async {
     final details = await ref.read(choreRepositoryProvider).getChore(choreId);
     if (!mounted) {
@@ -100,6 +179,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     }
     if (details == null) {
       setState(() => _loading = false);
+      _captureInitialSnapshot();
       return;
     }
     final chore = details.chore;
@@ -121,6 +201,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       }
       _loading = false;
     });
+    _captureInitialSnapshot();
   }
 
   @override
@@ -161,79 +242,100 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(title: Text(formTitle)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TitleField(
-            controller: _titleController,
-            errorText: _titleError == null
-                ? null
-                : l10n.choreFormTitleRequiredError,
-          ),
-          const SizedBox(height: 16),
-          NotesField(controller: _notesController),
-          const SizedBox(height: 16),
-          semantic(
-            'chore_form.category',
-            child: CategoryPicker(
-              categories: categories,
-              selectedCategoryId: _categoryId,
-              onChanged: (value) => setState(() => _categoryId = value),
-              idPrefix: 'chore_form.category',
-              kind: CategoryKind.chore,
-            ),
-          ),
-          const SizedBox(height: 16),
-          RepeatToggle(
-            value: _repeatEnabled,
-            onChanged: (value) => setState(() => _repeatEnabled = value),
-          ),
-          if (_repeatEnabled)
-            RepeatControls(
-              intervalController: _intervalController,
-              intervalError: _intervalError == null
+    // C4 (conventions audit, docs/feedback/2026-08-06-conventions-audit.md):
+    // a dirty form intercepts the pop and confirms via
+    // showChoreFormDiscardDialog; a pristine one pops immediately, same as
+    // before this wave. `Navigator.pop()` inside the confirmed branch always
+    // pops regardless of `canPop` -- that flag only gates the SYSTEM back
+    // gesture/button this PopScope intercepts.
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        final discard = await showChoreFormDiscardDialog(context);
+        if (discard && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(formTitle)),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TitleField(
+              controller: _titleController,
+              errorText: _titleError == null
                   ? null
-                  : l10n.choreFormIntervalTooSmallError,
-              unit: _unit,
-              onUnitChanged: _onUnitChanged,
-              anchor: _anchor,
-              onAnchorChanged: _onAnchorChanged,
-              weekdays: _weekdays,
-              onWeekdayToggle: _toggleWeekday,
-              monthlyMode: _monthlyMode,
-              onMonthlyModeChanged: (value) {
-                setState(() => _monthlyMode = value);
-              },
-              startDate: _startDate,
+                  : l10n.choreFormTitleRequiredError,
             ),
-          const SizedBox(height: 16),
-          StartDateField(
-            value: _startDate,
-            today: today,
-            onChanged: (value) => setState(() => _startDate = value),
+            const SizedBox(height: 16),
+            NotesField(controller: _notesController),
+            const SizedBox(height: 16),
+            semantic(
+              'chore_form.category',
+              child: CategoryPicker(
+                categories: categories,
+                selectedCategoryId: _categoryId,
+                onChanged: (value) => setState(() => _categoryId = value),
+                idPrefix: 'chore_form.category',
+                kind: CategoryKind.chore,
+              ),
+            ),
+            const SizedBox(height: 16),
+            RepeatToggle(
+              value: _repeatEnabled,
+              onChanged: (value) => setState(() => _repeatEnabled = value),
+            ),
+            if (_repeatEnabled)
+              RepeatControls(
+                intervalController: _intervalController,
+                intervalError: _intervalError == null
+                    ? null
+                    : l10n.choreFormIntervalTooSmallError,
+                unit: _unit,
+                onUnitChanged: _onUnitChanged,
+                anchor: _anchor,
+                onAnchorChanged: _onAnchorChanged,
+                weekdays: _weekdays,
+                onWeekdayToggle: _toggleWeekday,
+                monthlyMode: _monthlyMode,
+                onMonthlyModeChanged: (value) {
+                  setState(() => _monthlyMode = value);
+                },
+                startDate: _startDate,
+              ),
+            const SizedBox(height: 16),
+            StartDateField(
+              value: _startDate,
+              today: today,
+              onChanged: (value) => setState(() => _startDate = value),
+            ),
+            const SizedBox(height: 16),
+            AssignmentFields(
+              mode: _assignmentMode,
+              onModeChanged: _onAssignmentModeChanged,
+              members: members,
+              selectedMemberIds: _selectedMemberIds,
+              onMemberTap: _onMemberTap,
+              errorText: _assignmentErrorText(l10n, _assignmentError),
+            ),
+          ],
+        ),
+        // Pinned, not the last ListView row: the primary action must stay
+        // reachable no matter how long the form grows (design-language rule
+        // 1) — and on a real phone the bottom of this form is below the
+        // fold, which E2E caught as an unreachable save button.
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: semantic(
+            'chore_form.save',
+            child: FilledButton(
+              onPressed: _save,
+              child: Text(l10n.commonSave),
+            ),
           ),
-          const SizedBox(height: 16),
-          AssignmentFields(
-            mode: _assignmentMode,
-            onModeChanged: _onAssignmentModeChanged,
-            members: members,
-            selectedMemberIds: _selectedMemberIds,
-            onMemberTap: _onMemberTap,
-            errorText: _assignmentErrorText(l10n, _assignmentError),
-          ),
-        ],
-      ),
-      // Pinned, not the last ListView row: the primary action must stay
-      // reachable no matter how long the form grows (design-language rule
-      // 1) — and on a real phone the bottom of this form is below the
-      // fold, which E2E caught as an unreachable save button.
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: semantic(
-          'chore_form.save',
-          child: FilledButton(onPressed: _save, child: Text(l10n.commonSave)),
         ),
       ),
     );

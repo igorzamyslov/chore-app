@@ -596,6 +596,30 @@ abstract class AppLocalizations {
   /// **'Title is required'**
   String get choreFormTitleRequiredError;
 
+  /// Title of the confirmation dialog shown when backing out of a dirty chore form (C4, docs/feedback/2026-08-06-conventions-audit.md; design-language.md interaction rule 7, 'never lose user input').
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get choreFormDiscardDialogTitle;
+
+  /// Body of the discard-changes confirmation dialog shown when backing out of a dirty chore form.
+  ///
+  /// In en, this message translates to:
+  /// **'Your edits to this chore won\'t be saved.'**
+  String get choreFormDiscardDialogBody;
+
+  /// Discard-changes dialog's safe action: dismisses the dialog and stays on the chore form with every entered value intact.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get choreFormDiscardKeepEditing;
+
+  /// Discard-changes dialog's destructive action: confirms leaving the chore form, losing every unsaved change.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get choreFormDiscardConfirm;
+
   /// Label of the chore form's repeat on/off switch.
   ///
   /// In en, this message translates to:
@@ -1279,6 +1303,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Synced with {householdName}'**
   String settingsAccountLinkedSubtitle(String householdName);
+
+  /// Settings -> Account: relative last-sync line under the linked-household subtitle (spec docs/specs/sync-freshness.md §2.4), shown when the last successful pull was under a minute ago.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced just now'**
+  String get settingsAccountLastSyncedJustNow;
+
+  /// Settings -> Account: relative last-sync line shown when the last successful pull was under an hour ago. {count} is whole minutes elapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Last synced 1 minute ago} other{Last synced {count} minutes ago}}'**
+  String settingsAccountLastSyncedMinutes(int count);
+
+  /// Settings -> Account: relative last-sync line shown when the last successful pull was under 24 hours ago. {count} is whole hours elapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Last synced 1 hour ago} other{Last synced {count} hours ago}}'**
+  String settingsAccountLastSyncedHours(int count);
+
+  /// Settings -> Account: relative last-sync line shown when the last successful pull was 24+ hours ago. {date} is a locale-formatted weekday+month+day string (package:intl DateFormat.MMMEd), e.g. 'Fri, Jul 31'.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced {date}'**
+  String settingsAccountLastSyncedOn(String date);
 
   /// Title of the Account section's 'Invite a member' row (spec docs/feedback/2026-08-01-ux-audit.md B3), shown below the signed-in tile once linked -- runs the same create-invite flow as the Members screen's Invite row.
   ///

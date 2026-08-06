@@ -348,6 +348,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormTitleRequiredError => 'Titel ist erforderlich';
 
   @override
+  String get choreFormDiscardDialogTitle => 'Änderungen verwerfen?';
+
+  @override
+  String get choreFormDiscardDialogBody =>
+      'Deine Änderungen an dieser Aufgabe werden nicht gespeichert.';
+
+  @override
+  String get choreFormDiscardKeepEditing => 'Weiter bearbeiten';
+
+  @override
+  String get choreFormDiscardConfirm => 'Verwerfen';
+
+  @override
   String get choreFormRepeatToggleLabel => 'Wiederholen';
 
   @override
@@ -783,6 +796,37 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String settingsAccountLinkedSubtitle(String householdName) {
     return 'Synchronisiert mit $householdName';
+  }
+
+  @override
+  String get settingsAccountLastSyncedJustNow =>
+      'Zuletzt synchronisiert: gerade eben';
+
+  @override
+  String settingsAccountLastSyncedMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Zuletzt synchronisiert: vor $count Minuten',
+      one: 'Zuletzt synchronisiert: vor 1 Minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsAccountLastSyncedHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Zuletzt synchronisiert: vor $count Stunden',
+      one: 'Zuletzt synchronisiert: vor 1 Stunde',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String settingsAccountLastSyncedOn(String date) {
+    return 'Zuletzt synchronisiert: $date';
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
@@ -25,6 +26,7 @@ import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Lists the household's pending chore occurrences, grouped into
@@ -49,6 +51,13 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
+    // C1 (spec docs/specs/sync-freshness.md §2.3): the pull-to-refresh
+    // indicator is shown only when there's actually a remote to pull from --
+    // the same linked-AND-signed-in gate `syncEngineProvider` itself applies
+    // (see its doc comment, lib/app/providers.dart). A local-only household
+    // has no remote, so an indicator that provably does nothing would be
+    // exactly the dishonest affordance waves M and R removed.
+    final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
 
     // Day-progress card counts (spec docs/specs/theme-v2.md §4.1 item 1),
     // derived from data this screen already watches -- deliberately
@@ -98,20 +107,34 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
             ),
           Expanded(
             child: occurrencesAsync.when(
-              data: (occurrences) => _Body(
-                occurrences: occurrences,
-                closedToday: closedToday ?? const [],
-                paused: paused ?? const [],
-                hasActiveChores: hasActiveChores,
-                today: today,
-                memberFilter: _memberFilter,
-                categoryFilter: _categoryFilter,
-                onComplete: _complete,
-                onOpenMenu: _openMenu,
-                onReopen: _reopen,
-                onResume: _resume,
-                onClearFilters: _clearFilters,
-              ),
+              data: (occurrences) {
+                final body = _Body(
+                  occurrences: occurrences,
+                  closedToday: closedToday ?? const [],
+                  paused: paused ?? const [],
+                  hasActiveChores: hasActiveChores,
+                  today: today,
+                  memberFilter: _memberFilter,
+                  categoryFilter: _categoryFilter,
+                  onComplete: _complete,
+                  onOpenMenu: _openMenu,
+                  onReopen: _reopen,
+                  onResume: _resume,
+                  onClearFilters: _clearFilters,
+                );
+                if (!syncLinked) {
+                  return body;
+                }
+                // Success is silent (spec §2.3): the list simply updates,
+                // which is the platform convention -- no snackbar here.
+                return semantic(
+                  'chores.refresh',
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
+                    child: body,
+                  ),
+                );
+              },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stackTrace) => _ErrorState(
                 onRetry: () => ref.invalidate(pendingOccurrencesProvider),
@@ -159,6 +182,13 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     await ref
         .read(choreServiceProvider)
         .completeOccurrence(occurrence.occurrence.id, completedBy: completedBy);
+    // C3 (conventions audit, docs/feedback/2026-08-06-conventions-audit.md):
+    // haptic feedback, not animation -- doesn't touch the "no custom
+    // animation" rule (design-language.md's Motion bullet) or E2E
+    // determinism, so a future reader shouldn't "fix" this away. Fired here,
+    // once the write is confirmed, rather than in the tile's onTap, so it
+    // fires exactly once per real completion.
+    unawaited(HapticFeedback.mediumImpact());
     if (!mounted) {
       return;
     }
@@ -366,14 +396,16 @@ class _Body extends StatelessWidget {
       final filterActive = memberFilter != null || categoryFilter != null;
       final hasUnfilteredContent =
           occurrences.isNotEmpty || closedToday.isNotEmpty || paused.isNotEmpty;
-      if (filterActive && hasUnfilteredContent) {
-        return Center(
-          child: _ChoresEmptyFilteredState(onClear: onClearFilters),
-        );
-      }
-      return Center(
-        child: _ChoresEmptyState(fresh: !hasActiveChores),
-      );
+      final empty = filterActive && hasUnfilteredContent
+          ? _ChoresEmptyFilteredState(onClear: onClearFilters)
+          : _ChoresEmptyState(fresh: !hasActiveChores);
+      // Scrollable (not a bare Center): a RefreshIndicator higher up the
+      // tree (C1, spec docs/specs/sync-freshness.md §2.3) needs a
+      // Scrollable descendant to detect the pull gesture, and that must
+      // hold even when there's nothing to show -- an indicator that only
+      // "works" on a populated list would be exactly the kind of
+      // provably-does-nothing affordance waves M and R removed.
+      return _ScrollableEmptyState(child: empty);
     }
 
     final bySection = <ChoreSection, List<OccurrenceWithChore>>{};
@@ -389,6 +421,11 @@ class _Body extends StatelessWidget {
       // Clears the FAB: at large text sizes the FAB otherwise covers the
       // last section header (visual QA finding at AX2).
       padding: const EdgeInsets.only(bottom: 96),
+      // C8 (conventions audit): dismisses the keyboard on a scroll drag --
+      // this screen has no text field of its own today, but the filter
+      // sheets/menus it opens can leave one focused, and this is the
+      // convention every scrollable list in the app follows.
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         if (filtered.isEmpty)
           Padding(
@@ -420,6 +457,29 @@ class _Body extends StatelessWidget {
             ),
             onReopen: onReopen,
           ),
+      ],
+    );
+  }
+}
+
+/// Wraps an empty-state [child] in a scrollable that fills the available
+/// height (`SliverFillRemaining(hasScrollBody: false)`), so the
+/// [RefreshIndicator] wrapping this screen's list (C1, spec
+/// `docs/specs/sync-freshness.md` §2.3) still has a `Scrollable` descendant
+/// to detect a pull gesture even when there is nothing to show -- otherwise
+/// the indicator would silently do nothing on every empty/filtered-empty
+/// state, exactly the dishonest affordance waves M and R removed.
+class _ScrollableEmptyState extends StatelessWidget {
+  const _ScrollableEmptyState({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      slivers: [
+        SliverFillRemaining(hasScrollBody: false, child: Center(child: child)),
       ],
     );
   }
