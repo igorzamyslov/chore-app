@@ -44,7 +44,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Overdue'), findsOneWidget);
+      // Section headers render uppercase (theme-v2.md §2/§4.1 item 2).
+      expect(find.text('OVERDUE'), findsOneWidget);
       expect(find.text('Overdue chore'), findsOneWidget);
 
       // Completed via the service directly (not by tapping the tile's own
@@ -59,7 +60,7 @@ void main() {
       // Filters on closed_on == today, not due date: it appears in
       // Done-today immediately, despite being due days before today, and
       // the Overdue section (its only pending occurrence) is gone.
-      expect(find.text('Overdue'), findsNothing);
+      expect(find.text('OVERDUE'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
       expect(find.text('Done today (1)'), findsOneWidget);
       // Collapsed by default; no pending occurrences remain (one-off, no
@@ -88,7 +89,7 @@ void main() {
       // never at today's date.
       expect(find.bySemanticsIdentifier('chores.done.header'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsNothing);
-      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.text('OVERDUE'), findsOneWidget);
       expect(find.text('Overdue chore'), findsOneWidget);
 
       final restored = await repo.pendingOccurrenceOf(chore.id);
@@ -123,7 +124,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Tomorrow'), findsOneWidget);
+      expect(find.text('TOMORROW'), findsOneWidget);
       expect(find.text('Tomorrow chore'), findsOneWidget);
 
       // Completed via the service directly -- see the sibling test above
@@ -135,7 +136,7 @@ void main() {
 
       // Not due until tomorrow, yet it shows up today: closed_on == today
       // is what drives this section, not due date.
-      expect(find.text('Tomorrow'), findsNothing);
+      expect(find.text('TOMORROW'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
       expect(find.text('Done today (1)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
@@ -161,7 +162,7 @@ void main() {
       // never at today's date.
       expect(find.bySemanticsIdentifier('chores.done.header'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsNothing);
-      expect(find.text('Tomorrow'), findsOneWidget);
+      expect(find.text('TOMORROW'), findsOneWidget);
       expect(find.text('Tomorrow chore'), findsOneWidget);
 
       final restored = await repo.pendingOccurrenceOf(chore.id);
@@ -214,8 +215,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Overdue'), findsNothing);
-      expect(find.text('Tomorrow'), findsNothing);
+      expect(find.text('OVERDUE'), findsNothing);
+      expect(find.text('TOMORROW'), findsNothing);
       expect(find.text('Done today (2)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
 
@@ -236,7 +237,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('chores.empty'), findsNothing);
-      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.text('OVERDUE'), findsOneWidget);
       expect(find.text('Overdue chore'), findsOneWidget);
       expect(find.text('Done today (1)'), findsOneWidget);
 

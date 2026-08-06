@@ -218,17 +218,58 @@
   "@choresEmptyState": {
     "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done')."
   },
+  "choresEmptyDoneHeadline": "All done for today",
+  "@choresEmptyDoneHeadline": {
+    "description": "Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyState when the household has chores but none are currently pending."
+  },
   "choresEmptyFresh": "Add your first chore with +",
   "@choresEmptyFresh": {
     "description": "Chores list empty-state message shown instead of choresEmptyState on a fresh install (zero non-deleted chores in the household yet) — spec docs/specs/polish-round-1.md A1."
+  },
+  "choresEmptyFreshHeadline": "No chores yet",
+  "@choresEmptyFreshHeadline": {
+    "description": "Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyFresh on a fresh install."
   },
   "choresEmptyFiltered": "Nothing here for this filter.",
   "@choresEmptyFiltered": {
     "description": "Chores list empty-state message shown instead of choresEmptyState/choresEmptyFresh when a member/category filter hides every occurrence that would otherwise be visible (spec docs/feedback/2026-08-01-ux-audit.md B1)."
   },
+  "choresEmptyFilteredHeadline": "No matches",
+  "@choresEmptyFilteredHeadline": {
+    "description": "Chores list filtered-empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyFiltered."
+  },
   "choresErrorMessage": "Could not load your chores.",
   "@choresErrorMessage": {
     "description": "Chores list load-error message."
+  },
+
+  "choresProgressTitle": "{n} of {m} done today",
+  "@choresProgressTitle": {
+    "description": "Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences due today, overdue, or already completed today. The whole card is hidden when m is 0.",
+    "placeholders": {
+      "n": {
+        "type": "int",
+        "example": "2"
+      },
+      "m": {
+        "type": "int",
+        "example": "5"
+      }
+    }
+  },
+  "choresProgressRemainingToday": "{count, plural, one{1 still to go} other{{count} still to go}}",
+  "@choresProgressRemainingToday": {
+    "description": "Day-progress card's bodySmall sub-line shown when at least one of today's counted occurrences is still open: how many remain.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "choresProgressAllDoneToday": "That's everything — nice work",
+  "@choresProgressAllDoneToday": {
+    "description": "Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed."
   },
 
   "welcomeTagline": "Share chores and a shopping list with your household.",

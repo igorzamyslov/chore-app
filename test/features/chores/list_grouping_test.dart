@@ -48,19 +48,21 @@ void main() {
       // Tiles under Today/Tomorrow show NO due text (refined A1: the
       // header already says it), so each header string appears exactly
       // once. Other sections' tiles carry due text, but those strings
-      // ('in 3 days', 'Mon, Aug 3', …) aren't in this filter list.
+      // ('in 3 days', 'Mon, Aug 3', …) aren't in this filter list. Section
+      // headers render uppercase (theme-v2.md §2/§4.1 item 2), produced by
+      // the widget via .toUpperCase() -- chore titles are untouched.
       const expectedOrder = [
-        'Overdue',
+        'OVERDUE',
         'Overdue chore',
-        'Today',
+        'TODAY',
         'Today chore',
-        'Tomorrow',
+        'TOMORROW',
         'Tomorrow chore',
-        'This week',
+        'THIS WEEK',
         'This week chore',
-        'This month',
+        'THIS MONTH',
         'This month chore',
-        'Later',
+        'LATER',
         'Later chore',
       ];
 

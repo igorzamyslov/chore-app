@@ -52,9 +52,16 @@
   "actingManageMembers": "Mitglieder verwalten",
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
+  "choresEmptyDoneHeadline": "Für heute alles erledigt",
   "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
+  "choresEmptyFreshHeadline": "Noch keine Aufgaben",
   "choresEmptyFiltered": "Für diesen Filter gibt es nichts.",
+  "choresEmptyFilteredHeadline": "Keine Treffer",
   "choresErrorMessage": "Deine Aufgaben konnten nicht geladen werden.",
+
+  "choresProgressTitle": "{n} von {m} heute erledigt",
+  "choresProgressRemainingToday": "{count, plural, one{Noch 1 übrig} other{Noch {count} übrig}}",
+  "choresProgressAllDoneToday": "Alles erledigt — gut gemacht!",
 
   "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",
   "welcomeCreateTitle": "Neuen Haushalt einrichten",

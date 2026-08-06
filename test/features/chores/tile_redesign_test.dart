@@ -1,3 +1,4 @@
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -119,6 +120,106 @@ void main() {
       expect(
         dueText.style?.color,
         Theme.of(context).colorScheme.error,
+      );
+    },
+  );
+
+  testChoreApp(
+    'overdue tile treatment (design option C, spec docs/specs/theme-v2.md '
+    '§4.1 item 4): errorContainer ground, errorOutline border, a 3dp error '
+    'left edge, and the due chip in errorChip -- a same-day tile stays on '
+    'the default surface with no left edge',
+    today: today,
+    (tester, database) async {
+      final householdId = await currentHouseholdId(database);
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+
+      final overdueChore = await service.createChore(
+        householdId: householdId,
+        title: 'Overdue chore',
+        startDate: PlainDate(2026, 7, 19), // 3 days before `today`.
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final todayChore = await service.createChore(
+        householdId: householdId,
+        title: 'Today chore',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.text('Overdue chore'));
+      final colorScheme = Theme.of(context).colorScheme;
+      final famdo = famdoColors(context);
+      final overdueTileId = 'chores.occurrence.${overdueChore.id}';
+      final todayTileId = 'chores.occurrence.${todayChore.id}';
+
+      // The overdue tile's card: errorContainer ground, errorOutline border.
+      final overdueCard = tester.widget<Card>(
+        find.ancestor(
+          of: find.bySemanticsIdentifier(overdueTileId),
+          matching: find.byType(Card),
+        ),
+      );
+      expect(overdueCard.color, colorScheme.errorContainer);
+      final overdueShape = overdueCard.shape! as RoundedRectangleBorder;
+      expect(overdueShape.side.color, famdo.errorOutline);
+
+      // A 3dp error-colored left edge is present.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier(overdueTileId),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Container &&
+                widget.color == colorScheme.error &&
+                widget.constraints?.minWidth == 3 &&
+                widget.constraints?.maxWidth == 3,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // The due chip's ground is errorChip (its ink color is already
+      // covered by the sibling test above).
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier(overdueTileId),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Container &&
+                widget.decoration is BoxDecoration &&
+                (widget.decoration! as BoxDecoration).color == famdo.errorChip,
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // A same-day tile stays on the default surface: no error tint, no
+      // left edge.
+      final todayCard = tester.widget<Card>(
+        find.ancestor(
+          of: find.bySemanticsIdentifier(todayTileId),
+          matching: find.byType(Card),
+        ),
+      );
+      expect(todayCard.color, colorScheme.surfaceContainerLow);
+      final todayShape = todayCard.shape! as RoundedRectangleBorder;
+      expect(todayShape.side.color, colorScheme.outlineVariant);
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier(todayTileId),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Container && widget.color == colorScheme.error,
+          ),
+        ),
+        findsNothing,
       );
     },
   );

@@ -3,9 +3,11 @@ library;
 
 import 'dart:async';
 
+import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
@@ -16,6 +18,7 @@ import 'package:chore_app/features/chores/chore_done_section.dart';
 import 'package:chore_app/features/chores/chore_form_screen.dart';
 import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
 import 'package:chore_app/features/chores/chore_paused_section.dart';
+import 'package:chore_app/features/chores/chore_progress_card.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
@@ -47,6 +50,20 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
 
+    // Day-progress card counts (spec docs/specs/theme-v2.md §4.1 item 1),
+    // derived from data this screen already watches -- deliberately
+    // UNFILTERED (household-wide), like hasActiveChores above: the card is
+    // a summary of the day, not of whatever member/category filter happens
+    // to be active.
+    final completedToday = (closedToday ?? const [])
+        .where(
+          (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
+        )
+        .length;
+    final pendingDueOrOverdue = (occurrencesAsync.value ?? const [])
+        .where((occurrence) => !occurrence.occurrence.dueDate.isAfter(today))
+        .length;
+
     return Scaffold(
       appBar: AppBar(
         leading: const ActingMemberButton(),
@@ -70,6 +87,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         children: [
           const OnboardingNameBanner(),
           const DigestPrepromptBanner(),
+          // Only once occurrences have actually loaded -- avoids a
+          // zero-count flash while pendingOccurrencesProvider's stream is
+          // still resolving. ChoreProgressCard hides itself when M == 0.
+          if (occurrencesAsync.hasValue)
+            ChoreProgressCard(
+              completedToday: completedToday,
+              pendingDueOrOverdue: pendingDueOrOverdue,
+              today: today,
+            ),
           Expanded(
             child: occurrencesAsync.when(
               data: (occurrences) => _Body(
@@ -94,13 +120,26 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           ),
         ],
       ),
+      // The theme already sets the FAB's 20dp RoundedSuperellipseBorder
+      // shape and primary/onPrimary colors (lib/app/theme.dart); this
+      // Container just adds FamdoColors.fabShadow underneath so it reads as
+      // raised (spec docs/specs/theme-v2.md §4.1 item 6) -- the FAB itself
+      // stays elevation: 0 (spec §7.7).
       floatingActionButton: semantic(
         'chores.add',
-        child: FloatingActionButton(
-          onPressed: () => Navigator.of(context).push<void>(
-            MaterialPageRoute(builder: (_) => const ChoreFormScreen()),
+        child: Container(
+          decoration: ShapeDecoration(
+            shape: const RoundedSuperellipseBorder(
+              borderRadius: BorderRadius.all(Radius.circular(20)),
+            ),
+            shadows: famdoColors(context).fabShadow,
           ),
-          child: const Icon(Icons.add),
+          child: FloatingActionButton(
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const ChoreFormScreen()),
+            ),
+            child: const Icon(Icons.add),
+          ),
         ),
       ),
     );
@@ -359,13 +398,7 @@ class _Body extends StatelessWidget {
         else
           for (final section in ChoreSection.values)
             if (bySection[section] case final tiles? when tiles.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: Text(
-                  section.label(AppLocalizations.of(context)),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
+              _SectionHeader(section: section, count: tiles.length),
               for (final occurrence in tiles)
                 ChoreOccurrenceTile(
                   occurrence: occurrence,
@@ -392,6 +425,55 @@ class _Body extends StatelessWidget {
   }
 }
 
+/// A due-date section's header (spec `docs/specs/theme-v2.md` §4.1 item 2,
+/// amending `docs/specs/design-language.md`'s whitespace-only header):
+/// `labelSmall` uppercase in `onSurfaceVariant` (`error` for Overdue) --
+/// produced by the widget via `.toUpperCase()`, never by an already-
+/// uppercase ARB string, so German capitalization stays natural in the
+/// translator's source -- a 1px `outlineVariant` hairline rule filling the
+/// remaining width, then the section's item [count] in `labelMedium`.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.section, required this.count});
+
+  final ChoreSection section;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isOverdue = section == ChoreSection.overdue;
+    final labelColor = isOverdue
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        children: [
+          Text(
+            section.label(AppLocalizations.of(context)).toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(color: labelColor),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: theme.colorScheme.outlineVariant,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$count',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The chores list's empty state — two distinct copies/icons sharing one
 /// outer `chores.empty` container id (spec `docs/specs/polish-round-1.md`
 /// A1): [fresh] (zero non-deleted chores in the household) invites adding
@@ -408,25 +490,32 @@ class _ChoresEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
 
     return semantic(
       'chores.empty',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            fresh ? Icons.add_task_outlined : Icons.task_alt_outlined,
-            size: 48,
-            color: color,
+          _EmptyStateIcon(
+            icon: fresh ? Icons.add_task_outlined : Icons.task_alt_outlined,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          Text(
+            fresh
+                ? l10n.choresEmptyFreshHeadline
+                : l10n.choresEmptyDoneHeadline,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
           semantic(
             fresh ? 'chores.empty.fresh' : 'chores.empty.done',
             child: Text(
               fresh ? l10n.choresEmptyFresh : l10n.choresEmptyState,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -450,19 +539,26 @@ class _ChoresEmptyFilteredState extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
 
     return semantic(
       'chores.empty.filtered',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.filter_alt_off_outlined, size: 48, color: color),
-          const SizedBox(height: 8),
+          const _EmptyStateIcon(icon: Icons.filter_alt_off_outlined),
+          const SizedBox(height: 16),
+          Text(
+            l10n.choresEmptyFilteredHeadline,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
           Text(
             l10n.choresEmptyFiltered,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 8),
           semantic(
@@ -473,6 +569,35 @@ class _ChoresEmptyFilteredState extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The empty state's 76dp icon tile (spec `docs/specs/theme-v2.md` §4.1
+/// item 6): `primaryContainer` fill, a `FamdoColors.primaryOutline` border,
+/// and a centered glyph.
+class _EmptyStateIcon extends StatelessWidget {
+  const _EmptyStateIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 76,
+      height: 76,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: famdoColors(context).primaryOutline),
+      ),
+      child: Icon(
+        icon,
+        size: 36,
+        color: theme.colorScheme.onPrimaryContainer,
       ),
     );
   }

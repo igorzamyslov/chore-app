@@ -179,14 +179,42 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
 
   @override
+  String get choresEmptyDoneHeadline => 'Für heute alles erledigt';
+
+  @override
   String get choresEmptyFresh => 'Füge mit + deine erste Aufgabe hinzu';
+
+  @override
+  String get choresEmptyFreshHeadline => 'Noch keine Aufgaben';
 
   @override
   String get choresEmptyFiltered => 'Für diesen Filter gibt es nichts.';
 
   @override
+  String get choresEmptyFilteredHeadline => 'Keine Treffer';
+
+  @override
   String get choresErrorMessage =>
       'Deine Aufgaben konnten nicht geladen werden.';
+
+  @override
+  String choresProgressTitle(int n, int m) {
+    return '$n von $m heute erledigt';
+  }
+
+  @override
+  String choresProgressRemainingToday(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Noch $count übrig',
+      one: 'Noch 1 übrig',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get choresProgressAllDoneToday => 'Alles erledigt — gut gemacht!';
 
   @override
   String get welcomeTagline =>

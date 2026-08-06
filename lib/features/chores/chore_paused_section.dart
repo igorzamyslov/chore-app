@@ -31,17 +31,30 @@ class ChorePausedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     // Whole-section card (not per-row): matches ChoreDoneSection's choice —
-    // see that file's comment and the #6 plan report.
+    // see that file's comment and the #6 plan report. surfaceContainerHigh
+    // ground + a leading icon (spec docs/specs/theme-v2.md §4.1 item 5);
+    // the trailing chevron is ExpansionTile's own default.
     return DepthCard(
+      color: theme.colorScheme.surfaceContainerHigh,
       child: ExpansionTile(
+        leading: Icon(
+          Icons.pause_circle_outline,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
         title: semantic(
           'chores.paused.header',
           child: Text(l10n.choresPausedHeader(chores.length)),
         ),
         children: [
-          for (final details in chores)
-            _PausedRow(details: details, onResume: () => onResume(details)),
+          for (var i = 0; i < chores.length; i++) ...[
+            if (i > 0) const Divider(height: 1, thickness: 1),
+            _PausedRow(
+              details: chores[i],
+              onResume: () => onResume(chores[i]),
+            ),
+          ],
         ],
       ),
     );

@@ -120,7 +120,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Water plants'), findsNWidgets(2));
-      expect(find.text('Today'), findsOneWidget);
+      // Section headers render uppercase (theme-v2.md §2/§4.1 item 2).
+      expect(find.text('TODAY'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier(
           'chores.occurrence.${seed.choreBedroom.id}.complete',
