@@ -185,13 +185,28 @@ and must survive; ids marked *(new)* are to be added.
 1. **Day progress card** *(new)* — raised card at the top of the list:
    uppercase date (locale-formatted, `intl`), `titleLarge` "N of M done
    today", `bodySmall` sub-line ("K still to go" / "That's everything —
-   nice work"), and a 58dp progress ring on the right (`CustomPainter`,
-   `outlineVariant` track + `primary` arc + centered percentage).
+   nice work"), an optional `bodySmall` filter-active line, and a 58dp
+   progress ring on the right (`CustomPainter`, `outlineVariant` track +
+   `primary` arc + centered percentage).
    - **M** = still-pending occurrences due today or overdue **plus**
-     occurrences completed today. **N** = occurrences completed today.
+     occurrences completed today. **N** = occurrences completed today. Both
+     are computed from the SAME member/category-filtered collections the
+     sections below render, never the whole household when a filter is
+     active — so the card and the list beneath it can never disagree. When
+     a filter is active, the card also shows a short line saying so (e.g.
+     "Filtered — not the whole household"), so a narrowed "1 of 2" is never
+     mistaken for the household's whole day.
+     - **Changed 2026-08-07** (triage T1.1/D3): this was originally
+       computed household-wide/unfiltered by design, on the theory that
+       the card summarizes the day rather than whatever filter happens to
+       be active. That reasoning is reversed: filtering to one member
+       still showed the whole household's count here, e.g. "3 of 8 done
+       today" over a list of 2 — a card that visibly disagrees with the
+       list beneath it is worse than one that narrows with the filter.
    - No animation on the arc (see §7, motion rule holds).
    - Semantic id `chores.progress` *(new)*; the ring is decorative, the
-     card carries a screen-reader label of the same sentence.
+     card carries a screen-reader label of the same sentence (including
+     the filter-active line, when shown).
 2. **Section headers** — `labelSmall` uppercase in `onSurfaceVariant`
    (`error` for Overdue), a 1px `outlineVariant` rule filling the
    remaining width, then the item count. Replaces the current

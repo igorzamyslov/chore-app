@@ -59,17 +59,35 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // exactly the dishonest affordance waves M and R removed.
     final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
 
-    // Day-progress card counts (spec docs/specs/theme-v2.md §4.1 item 1),
-    // derived from data this screen already watches -- deliberately
-    // UNFILTERED (household-wide), like hasActiveChores above: the card is
-    // a summary of the day, not of whatever member/category filter happens
-    // to be active.
-    final completedToday = (closedToday ?? const [])
+    // Day-progress card counts (spec docs/specs/theme-v2.md §4.1 item 1).
+    // Changed 2026-08-07 (triage T1.1/D3): these used to be computed
+    // UNFILTERED (household-wide) on the theory that the card is a summary
+    // of the day, not of whatever member/category filter happens to be
+    // active. That's reversed now -- it let the card read "3 of 8 done
+    // today" while a member filter showed a list of 2 underneath, which is
+    // exactly the "a number disagrees with the list beneath it" failure
+    // mode this app exists to avoid. `_filterOccurrences`/
+    // `_filterClosedToday` below are the SAME functions `_Body` uses to
+    // build the sections themselves, so the card's numbers and the list can
+    // never disagree -- and when a filter is active, the card says so (see
+    // ChoreProgressCard.filterActive).
+    final filterActive = _memberFilter != null || _categoryFilter != null;
+    final filteredOccurrencesForCount = _filterOccurrences(
+      occurrencesAsync.value ?? const [],
+      memberFilter: _memberFilter,
+      categoryFilter: _categoryFilter,
+    );
+    final filteredClosedTodayForCount = _filterClosedToday(
+      closedToday ?? const [],
+      memberFilter: _memberFilter,
+      categoryFilter: _categoryFilter,
+    );
+    final completedToday = filteredClosedTodayForCount
         .where(
           (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
         )
         .length;
-    final pendingDueOrOverdue = (occurrencesAsync.value ?? const [])
+    final pendingDueOrOverdue = filteredOccurrencesForCount
         .where((occurrence) => !occurrence.occurrence.dueDate.isAfter(today))
         .length;
 
@@ -104,6 +122,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
               completedToday: completedToday,
               pendingDueOrOverdue: pendingDueOrOverdue,
               today: today,
+              filterActive: filterActive,
             ),
           Expanded(
             child: occurrencesAsync.when(
@@ -224,7 +243,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           ),
         );
       case ChoreMenuAction.pause:
-        await ref.read(choreServiceProvider).pauseChore(occurrence.chore.id);
+        await _pause(occurrence);
       case ChoreMenuAction.delete:
         final confirmed = await showChoreDeleteDialog(
           context,
@@ -237,6 +256,32 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
             .read(choreRepositoryProvider)
             .softDeleteChore(occurrence.chore.id);
     }
+  }
+
+  /// Pauses [occurrence]'s chore and confirms it with a snackbar whose
+  /// UNDO action resumes it (T1.5, triage.md): every other state-changing
+  /// action here (complete, skip, delete) already snackbars, but pause used
+  /// to change state silently, leaving a collapsed "Paused" section as its
+  /// only -- easy to miss -- recovery path. Built the same way as
+  /// [_showCloseSnackbar]: [showAppSnackbar] with an action, which is
+  /// `persist: false` internally so the bar still auto-dismisses.
+  Future<void> _pause(OccurrenceWithChore occurrence) async {
+    final choreId = occurrence.chore.id;
+    await ref.read(choreServiceProvider).pauseChore(choreId);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.choresSnackbarPaused,
+      action: SnackBarAction(
+        label: l10n.choresSnackbarUndo,
+        onPressed: () {
+          unawaited(ref.read(choreServiceProvider).unpauseChore(choreId));
+        },
+      ),
+    );
   }
 
   /// Shows the undo snackbar after [occurrence] was completed or skipped
@@ -330,6 +375,50 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) async {
   );
 }
 
+/// Filters [occurrences] to the active member/category filter (`null` for
+/// either means "no restriction") -- shared by the day-progress card's
+/// counts (`_ChoresListScreenState.build`) and the sections `_Body` renders
+/// (T1.1/D3, spec `docs/specs/theme-v2.md` §4.1 item 1), so both are
+/// computed from literally the same rule and can never disagree.
+List<OccurrenceWithChore> _filterOccurrences(
+  List<OccurrenceWithChore> occurrences, {
+  required String? memberFilter,
+  required String? categoryFilter,
+}) {
+  return occurrences.where((occurrence) {
+    if (memberFilter != null && occurrence.assignedMember?.id != memberFilter) {
+      return false;
+    }
+    if (categoryFilter != null && occurrence.category?.id != categoryFilter) {
+      return false;
+    }
+    return true;
+  }).toList();
+}
+
+/// Filters [closedToday] the same way (see [_filterOccurrences]), matching
+/// each row's DISPLAYED member -- the completer for a done row, the
+/// assignee for a skipped one (skipping doesn't record a dedicated closer).
+List<ClosedOccurrenceWithChore> _filterClosedToday(
+  List<ClosedOccurrenceWithChore> closedToday, {
+  required String? memberFilter,
+  required String? categoryFilter,
+}) {
+  return closedToday.where((row) {
+    if (categoryFilter != null && row.category?.id != categoryFilter) {
+      return false;
+    }
+    if (memberFilter != null) {
+      final displayedMemberId =
+          row.occurrence.completedBy ?? row.assignedMember?.id;
+      if (displayedMemberId != memberFilter) {
+        return false;
+      }
+    }
+    return true;
+  }).toList();
+}
+
 class _Body extends StatelessWidget {
   const _Body({
     required this.occurrences,
@@ -369,35 +458,25 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = occurrences.where((occurrence) {
-      if (memberFilter != null &&
-          occurrence.assignedMember?.id != memberFilter) {
-        return false;
-      }
-      if (categoryFilter != null && occurrence.category?.id != categoryFilter) {
-        return false;
-      }
-      return true;
-    }).toList();
+    // These call the SAME top-level functions the day-progress card's
+    // counts use (T1.1/D3, spec docs/specs/theme-v2.md §4.1 item 1), so the
+    // card and these sections are provably filtered by the same rule.
+    final filtered = _filterOccurrences(
+      occurrences,
+      memberFilter: memberFilter,
+      categoryFilter: categoryFilter,
+    );
 
     // Active filters apply to the auxiliary sections too (ux-round-2 C2):
     // a filtered view is a filtered view of EVERYTHING, or the sections
     // contradict each other. Member semantics per section: done rows match
     // the person they display (completer for done, assignee for skipped);
     // paused chores match "member is among the assignees".
-    final filteredClosedToday = closedToday.where((row) {
-      if (categoryFilter != null && row.category?.id != categoryFilter) {
-        return false;
-      }
-      if (memberFilter != null) {
-        final displayedMemberId =
-            row.occurrence.completedBy ?? row.assignedMember?.id;
-        if (displayedMemberId != memberFilter) {
-          return false;
-        }
-      }
-      return true;
-    }).toList();
+    final filteredClosedToday = _filterClosedToday(
+      closedToday,
+      memberFilter: memberFilter,
+      categoryFilter: categoryFilter,
+    );
     final filteredPaused = paused.where((details) {
       if (categoryFilter != null && details.category?.id != categoryFilter) {
         return false;

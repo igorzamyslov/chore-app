@@ -206,10 +206,10 @@ abstract class AppLocalizations {
   /// **'Delete chore?'**
   String get choresDeleteDialogTitle;
 
-  /// Body of the chore delete-confirmation dialog, explaining the consequence.
+  /// Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.
   ///
   /// In en, this message translates to:
-  /// **'This deletes \'{choreTitle}\'. Its history is kept, but its pending occurrence is removed.'**
+  /// **'This removes \'{choreTitle}\' from your list. You can\'t view it again yet.'**
   String choresDeleteDialogBody(String choreTitle);
 
   /// Tooltip for a chore occurrence tile's leading complete button.
@@ -392,6 +392,12 @@ abstract class AppLocalizations {
   /// **'That\'s everything — nice work'**
   String get choresProgressAllDoneToday;
 
+  /// Day-progress card's extra bodySmall line (spec docs/specs/theme-v2.md §4.1 item 1, changed 2026-08-07 per triage T1.1/D3), shown only while a member/category filter is active on the chores list: makes explicit that the card's N-of-M counts are the filtered subset, not the whole household's day, so a narrowed '1 of 2' is never mistaken for everyone's progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Filtered — not the whole household'**
+  String get choresProgressFilterActive;
+
   /// One-line purpose statement under the app name on the welcome screen (spec docs/specs/onboarding-v2.md §1), shown full-screen before any household exists locally.
   ///
   /// In en, this message translates to:
@@ -512,11 +518,17 @@ abstract class AppLocalizations {
   /// **'Skipped — next due {dueText}'**
   String choresSnackbarSkippedNextDue(String dueText);
 
-  /// Action label of the undo snackbar shown after completing or skipping an occurrence; reopens it via ChoreService.reopenOccurrence.
+  /// Action label of the undo snackbar shown after completing, skipping, or pausing an occurrence/chore; reopens/resumes it via ChoreService.reopenOccurrence/unpauseChore.
   ///
   /// In en, this message translates to:
   /// **'Undo'**
   String get choresSnackbarUndo;
+
+  /// Undo snackbar message shown after pausing a chore (T1.5, triage.md), mirroring choresSnackbarDone/choresSnackbarSkipped's one-word tone. The UNDO action (choresSnackbarUndo) resumes the chore via ChoreService.unpauseChore.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get choresSnackbarPaused;
 
   /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
   ///
