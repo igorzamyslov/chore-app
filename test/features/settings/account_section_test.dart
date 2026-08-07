@@ -300,9 +300,11 @@ void main() {
   );
 
   testChoreApp(
-    'signed-out+LINKED (spec docs/feedback/2026-08-01-ux-audit.md A5): '
-    'shows the one-line hint naming the linked household, under the '
-    'sign-in form',
+    'signed-out+LINKED (spec docs/feedback/2026-08-07-field-feedback.md '
+    'A1.1): shows the honest paused-notice state -- NOT the plain sign-in '
+    'form on its own -- naming the linked household, still offering the '
+    "reused sign-in form as 'sign in to resume', plus the old A5 hint "
+    '(kept, unmodified) and a reachable Disconnect action',
     today: today,
     overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
     (tester, database) async {
@@ -314,11 +316,30 @@ void main() {
 
       await openSettingsTab(tester);
 
-      // Still the signed-out form (not signed in), but now with the hint.
+      // The new, prominent paused notice -- this is what makes the state
+      // distinct from a device that was never linked at all.
+      expect(
+        find.bySemanticsIdentifier('settings.account.pausedNotice'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'This device is still connected to My household, but syncing is '
+          'paused. Changes you make now will be sent once you sign in '
+          'again.',
+        ),
+        findsOneWidget,
+      );
+
+      // The sign-in form itself is reused verbatim -- "sign in to resume"
+      // IS this same email field + send-link button, never forked.
       expect(
         find.bySemanticsIdentifier('settings.account.email'),
         findsOneWidget,
       );
+
+      // The pre-existing A5 hint still renders too (unmodified, un-removed
+      // semantic id) -- this section reuses `_SignedOutForm` as-is.
       expect(
         find.bySemanticsIdentifier('settings.account.signedOutLinked'),
         findsOneWidget,
@@ -329,6 +350,108 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      // And the new secondary Disconnect action is reachable from here.
+      expect(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'signed-out+LINKED: cancelling the disconnect confirm dialog is a '
+    'no-op -- stays linked, paused notice still shown',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.disconnect.confirm'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect.cancel'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.pausedNotice'),
+        findsOneWidget,
+      );
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, householdId);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'signed-out+LINKED: confirming Disconnect clears the local linked '
+    'state and flips the section back to the plain (never-linked-looking) '
+    'sign-in form -- local household/member rows are left untouched',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(database).setSyncLinked(
+        householdId: householdId,
+        linkedAt: DateTime.utc(2026),
+      );
+      await SettingsRepository(
+        database,
+      ).setSyncLastPulledAt(DateTime.utc(2026, 2));
+      final membersBefore = await database.select(database.members).get();
+
+      await openSettingsTab(tester);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      // No more paused notice, no more disconnect row -- indistinguishable
+      // from a device that was never linked, which is exactly the point.
+      expect(
+        find.bySemanticsIdentifier('settings.account.pausedNotice'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.email'),
+        findsOneWidget,
+      );
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, isNull);
+      expect(settings.syncLinkedAt, isNull);
+      expect(settings.syncLastPulledAt, isNull);
+
+      // Not a delete: the household and its members are exactly as before.
+      final households = await database.select(database.households).get();
+      expect(households.map((h) => h.id), [householdId]);
+      final membersAfter = await database.select(database.members).get();
+      expect(membersAfter, membersBefore);
 
       handle.dispose();
     },
@@ -788,6 +911,68 @@ void main() {
       expect(accountInviteGateway.createInviteCalls, [householdId]);
       expect(accountInviteGateway.revokeActiveInvitesCalls, [householdId]);
       expect(accountInviteGateway.inviteCallOrder, ['revoke', 'create']);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'signed-in+linked (spec docs/feedback/2026-08-07-field-feedback.md '
+    'A1.2): the Disconnect row is reachable below Invite; confirming it '
+    'clears the local linked state and flips the section back to the '
+    'signed-in+unlinked adopt/join rows, without signing the user out',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openSettingsTab(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.disconnect.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      // Still signed in -- only the LINKED state was cleared.
+      expect(
+        find.bySemanticsIdentifier('settings.account.signedIn'),
+        findsOneWidget,
+      );
+      expect(find.text('me@example.com'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.disconnect'),
+        findsNothing,
+      );
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, isNull);
 
       handle.dispose();
     },

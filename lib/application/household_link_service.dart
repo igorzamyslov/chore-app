@@ -1,6 +1,8 @@
 /// The P2b adopt flow ("Put my household online" -- spec
 /// `docs/specs/sync-backend.md` §7.3), run from the Settings Account
-/// section's adopt row (`lib/features/settings/account_section.dart`).
+/// section's adopt row (`lib/features/settings/account_section.dart`), and
+/// its inverse, the A1.2 disconnect action (spec
+/// `docs/feedback/2026-08-07-field-feedback.md`).
 library;
 
 import 'package:chore_app/application/household_gateway.dart';
@@ -107,5 +109,17 @@ class HouseholdLinkService {
       householdId: householdId,
       linkedAt: clock.now(),
     );
+  }
+
+  /// Disconnects this device from its currently linked household (spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` A1.2): the missing exit
+  /// from a stuck "signed out but still linked" state. Purely local and
+  /// synchronous with [SettingsRepository.clearSyncLink] -- there is no
+  /// server call, by design: the household stays exactly as it is on this
+  /// device, the other members keep their household on the server, and
+  /// this device's member row keeps its `user_id` there (so rejoining
+  /// later via the P2d reconnect path, spec §7.6, still works).
+  Future<void> disconnect() async {
+    await settings.clearSyncLink();
   }
 }

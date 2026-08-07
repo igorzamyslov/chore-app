@@ -780,9 +780,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppearanceDark => 'Dark';
 
   @override
-  String get settingsAccountSectionTitle => 'Account';
-
-  @override
   String get settingsAccountIntro =>
       'Sign in to sync your household across your devices.';
 
@@ -806,6 +803,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String settingsAccountPausedNotice(String householdName) {
+    return 'This device is still connected to $householdName, but syncing is paused. Changes you make now will be sent once you sign in again.';
+  }
+
+  @override
+  String get settingsAccountDisconnect =>
+      'Disconnect from the online household';
+
+  @override
+  String get settingsAccountDisconnectConfirmTitle =>
+      'Disconnect from the online household?';
+
+  @override
+  String get settingsAccountDisconnectConfirmBody =>
+      'The household stays on this device exactly as it is. Other members keep their household, and nothing is deleted anywhere.';
+
+  @override
+  String get settingsAccountDisconnectConfirmAction => 'Disconnect';
+
+  @override
   String get settingsAccountSendError =>
       'Couldn\'t send the sign-in link. Please try again.';
 
@@ -817,7 +834,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'You can sign in again anytime with your email.';
+      'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Sign out';

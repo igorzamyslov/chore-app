@@ -312,4 +312,55 @@ void main() {
 
     expect(emissions.last, 'household-1');
   });
+
+  test(
+    'clearSyncLink clears syncHouseholdId, syncLinkedAt, AND '
+    'syncLastPulledAt together, and bumps updated_at',
+    () async {
+      await repo.setSyncLinked(
+        householdId: 'household-1',
+        linkedAt: DateTime.utc(2026, 2),
+      );
+      await repo.setSyncLastPulledAt(DateTime.utc(2026, 3));
+      final linked =
+          await (db.select(
+                db.settings,
+              )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId)))
+              .getSingle();
+      expect(linked.syncHouseholdId, isNotNull);
+      expect(linked.syncLinkedAt, isNotNull);
+      expect(linked.syncLastPulledAt, isNotNull);
+      clock.advance(const Duration(minutes: 5));
+
+      await repo.clearSyncLink();
+
+      final cleared =
+          await (db.select(
+                db.settings,
+              )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId)))
+              .getSingle();
+      expect(cleared.syncHouseholdId, isNull);
+      expect(cleared.syncLinkedAt, isNull);
+      expect(cleared.syncLastPulledAt, isNull);
+      expect(cleared.updatedAt, isNot(linked.updatedAt));
+    },
+  );
+
+  test('clearSyncLink implicitly creates the row if missing', () async {
+    await repo.clearSyncLink();
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.syncHouseholdId, isNull);
+  });
+
+  test('clearSyncLink is a no-op on an already-unlinked row', () async {
+    final created = await repo.ensureSettings();
+    expect(created.syncHouseholdId, isNull);
+
+    await repo.clearSyncLink();
+
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.syncHouseholdId, isNull);
+  });
 }

@@ -227,6 +227,34 @@ class SettingsRepository {
     );
   }
 
+  /// Disconnects this device from its currently linked household (spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` A1.2 -- the exit this app
+  /// never had): clears `syncHouseholdId` and `syncLinkedAt` TOGETHER (spec
+  /// `docs/specs/sync-backend.md` §7.1's "always set/cleared together"
+  /// invariant, honored in both directions), plus the pull cursor
+  /// `syncLastPulledAt` (spec §8.1) so a future re-link starts pulling from
+  /// scratch rather than resuming a stale cursor.
+  ///
+  /// This is NOT a delete: every other local row (households, members,
+  /// categories, chores, shopping items, ...) is left exactly as it is, and
+  /// nothing on the server is touched -- this device's member row keeps its
+  /// `user_id` there, so reconnecting later (spec §7.6) still works. Called
+  /// by `HouseholdLinkService.disconnect`
+  /// (`lib/application/household_link_service.dart`).
+  Future<void> clearSyncLink() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        syncHouseholdId: const Value(null),
+        syncLinkedAt: const Value(null),
+        syncLastPulledAt: const Value(null),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   Future<DeviceSettings?> _find() {
     return (db.select(
       db.settings,

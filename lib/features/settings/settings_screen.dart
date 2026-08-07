@@ -19,15 +19,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// The Settings tab (spec `docs/specs/theme-v2.md` §4.2: labelled groups --
-/// Household, Preferences, Account, Data, About, in that order -- each a
-/// card of hairline-separated [SettingsRow]s with the current value visible
-/// on the right; spec `docs/specs/ux-round-2.md` B1: "Manage categories";
-/// spec `docs/specs/notifications.md`: the 'Daily summary' rows; spec
+/// Household, Preferences, Data, About, in that order -- each a card of
+/// hairline-separated [SettingsRow]s with the current value visible on the
+/// right; spec `docs/specs/ux-round-2.md` B1: "Manage categories"; spec
+/// `docs/specs/notifications.md`: the 'Daily summary' rows; spec
 /// `docs/next-session-plan.md` #5: the Language row and the About group;
-/// spec `docs/specs/sync-backend.md` §5: the Account group; spec
-/// `docs/feedback/2026-08-01-field-feedback.md` G2: the Appearance row,
+/// spec `docs/feedback/2026-08-01-field-feedback.md` G2: the Appearance row,
 /// directly below Language; B4/F7: the Data group -- the export row, then
 /// the destructive reset row).
+///
+/// The Household group (spec `docs/feedback/2026-08-07-field-feedback.md`
+/// B2) leads with whatever [AccountSectionBody] renders (spec
+/// `docs/specs/sync-backend.md` §5), then the Members row, then the
+/// Categories row -- merging what used to be a separate top-level Account
+/// group (between Data and About) into Household.
 class SettingsScreen extends ConsumerWidget {
   /// Creates the settings screen.
   const SettingsScreen({super.key});
@@ -51,6 +56,7 @@ class SettingsScreen extends ConsumerWidget {
           SettingsGroup(
             label: l10n.settingsHouseholdSectionTitle,
             children: [
+              const AccountSectionBody(),
               semantic(
                 'settings.members',
                 child: SettingsRow(
@@ -108,10 +114,6 @@ class SettingsScreen extends ConsumerWidget {
                 error: (error, stackTrace) => const [],
               ),
             ],
-          ),
-          SettingsGroup(
-            label: l10n.settingsAccountSectionTitle,
-            children: const [AccountSectionBody()],
           ),
           SettingsGroup(
             label: l10n.settingsDataSectionTitle,
