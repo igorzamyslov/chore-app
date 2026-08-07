@@ -60,6 +60,33 @@ Deltas vs local:
   SECURITY DEFINER — avoids the chicken-and-egg INSERT policy).
 - `members`: SELECT/UPDATE iff member of that household; INSERT only via
   RPCs (`create_household`, `redeem_invite`) — prevents self-inviting.
+- **D1 (2026-08-07): a household is flat by design, not admin/member.**
+  `members.role` is set once at creation (`create_household` makes the
+  caller `admin`; every join/claim path leaves the joiner `member`) but
+  gates nothing — no RLS policy above, no RPC, no client widget branches on
+  it (grepped: zero `MemberRole` checks in `manage_members_screen.dart`,
+  `account_section.dart`, `household_rename_sheet.dart`). The one place the
+  client reads it at all is `actingMemberProvider`'s default-member
+  tie-break (`lib/app/providers.dart`, spec
+  `docs/specs/members-management.md` §2: "first admin, else first member")
+  — a plausible-default guess for which member a fresh device is probably
+  acting as, not a capability check; it grants that member nothing the
+  others don't already have. Every member of a
+  household can equally rename it, invite, remove other members, and edit
+  anything — this is the actual, intentional model (a family is a circle of
+  equals), not an oversight to be closed later. `role` is **vestigial**:
+  keep writing it (removing the column is a migration, out of scope here),
+  but treat it as inert until a real spec change gives it meaning. Do NOT
+  add role-based enforcement on the strength of this decision. An earlier
+  draft of this finding also recommended revoking the `members` UPDATE
+  grant's `deleted_at` column (so one member couldn't soft-delete another)
+  — **that recommendation is withdrawn**: member removal (shipped
+  `docs/feedback/2026-08-01-ux-audit.md` A1) replicates to the server
+  through exactly that grant (`SupabaseSyncEngine._pushMembers`,
+  `lib/application/sync_engine.dart:464-490`, sends `deleted_at` as one of
+  the four granted columns on every member push), so revoking it would
+  silently stop member deletions from ever syncing. §7.2/§8.1's `members`
+  grants (name, color, role, deleted_at) stay exactly as they are.
 - RPCs (all SECURITY DEFINER, `set search_path = public`):
   - `create_household(p_name, p_member_name, p_color)` → creates
     household + creator's claimed member row; returns household id.

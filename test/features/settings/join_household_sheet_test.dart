@@ -14,6 +14,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../../test_utils/pump_app.dart';
 import 'fake_archive_file_writer.dart';
@@ -445,12 +446,24 @@ void main() {
     },
   );
 
+  // T1.6 (docs/research/triage.md, docs/research/persona-ben.md finding 9):
+  // the server's `_valid_invite` check (supabase/migrations/
+  // 20260731120000_initial_schema.sql) raises the SAME PostgrestException
+  // for a mistyped code, an expired code, and a revoked one -- those three
+  // are genuinely indistinguishable from the client, so a real RPC failure
+  // is simulated here (not a plain Exception) to exercise the actual
+  // distinction this wave adds: "the server rejected the code" vs.
+  // "something else went wrong before the server could even look".
   final invalidCodeGateway = FakeHouseholdGateway()
-    ..listClaimableMembersError = Exception('invalid or expired invite');
+    ..listClaimableMembersError = const PostgrestException(
+      message: 'invalid or expired invite',
+      code: 'P0001',
+    );
 
   testChoreApp(
-    'invalid code: listClaimableMembers throwing shows an inline error '
-    'and stays on the code step; nothing is deleted',
+    'invalid code (T1.6): a PostgrestException from listClaimableMembers '
+    'shows the "code doesn\'t work" inline error and stays on the code '
+    'step; nothing is deleted',
     today: today,
     overrides: [
       ...signedInAuth,
@@ -476,8 +489,8 @@ void main() {
 
       expect(
         find.text(
-          "That code isn't valid or has expired. Please check it and try "
-          'again.',
+          "That code doesn't work. Double-check it for typos, or ask them "
+          'to send you a new one.',
         ),
         findsOneWidget,
       );
@@ -488,6 +501,55 @@ void main() {
 
       final households = await database.select(database.households).get();
       expect(households.map((h) => h.id), [oldHouseholdId]);
+
+      handle.dispose();
+    },
+  );
+
+  final unreachableCodeGateway = FakeHouseholdGateway()
+    ..listClaimableMembersError = Exception('SocketException: no route');
+
+  testChoreApp(
+    'unreachable server (T1.6): a non-Postgrest exception from '
+    'listClaimableMembers shows a DIFFERENT inline error than an actually '
+    'invalid code -- the server never got to evaluate the code, so this '
+    'must not blame it',
+    today: today,
+    overrides: [
+      ...signedInAuth,
+      householdGatewayProvider.overrideWithValue(unreachableCodeGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.account.join'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        _fieldFor('settings.account.join.code'),
+        'ANYCODE1',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.join.continue'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          "Couldn't check that code. Check your connection and "
+          'try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          "That code doesn't work. Double-check it for typos, or ask them "
+          'to send you a new one.',
+        ),
+        findsNothing,
+      );
 
       handle.dispose();
     },

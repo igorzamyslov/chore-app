@@ -105,7 +105,20 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       FocusManager.instance.primaryFocus?.unfocus();
                       unawaited(showShoppingEditSheet(context, item: item));
                     },
-                    onClear: () => _clearChecked(ref),
+                    onClear: () => unawaited(
+                      _clearChecked(
+                        ref,
+                        // Captured NOW, before the write: T1.4's undo must
+                        // restore exactly the items this tap cleared, not
+                        // whatever happens to be checked when Undo is later
+                        // tapped (checking a new item in between must not
+                        // grow what Undo restores).
+                        [
+                          for (final item in items)
+                            if (item.item.checkedAt != null) item.item.id,
+                        ],
+                      ),
+                    ),
                     onUncheckAll: () => _uncheckAll(ref),
                   );
                   if (!syncLinked) {
@@ -152,9 +165,25 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     unawaited(HapticFeedback.selectionClick());
   }
 
-  Future<void> _clearChecked(WidgetRef ref) {
+  /// Clears every checked item, then shows an undo snackbar restoring
+  /// exactly [checkedIds] (spec T1.4) -- unlike every other delete-like
+  /// action in the app, this bulk one previously had no undo of its own.
+  Future<void> _clearChecked(WidgetRef ref, List<String> checkedIds) async {
     final householdId = ref.read(bootstrapProvider).requireValue;
-    return ref.read(shoppingRepositoryProvider).clearChecked(householdId);
+    final repository = ref.read(shoppingRepositoryProvider);
+    await repository.clearChecked(householdId);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.shoppingClearedSnackbar(checkedIds.length),
+      action: SnackBarAction(
+        label: l10n.shoppingClearedUndo,
+        onPressed: () => unawaited(repository.restoreItems(checkedIds)),
+      ),
+    );
   }
 
   Future<void> _uncheckAll(WidgetRef ref) {

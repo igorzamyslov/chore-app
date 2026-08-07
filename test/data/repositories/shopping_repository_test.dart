@@ -131,6 +131,38 @@ void main() {
     expect(active.map((i) => i.item.id), contains(uncheckedItem.id));
   });
 
+  test(
+    'restoreItems (T1.4 undo) restores exactly the given ids, not every '
+    'soft-deleted item',
+    () async {
+      final a = await repo.addItem(householdId, name: 'A');
+      final b = await repo.addItem(householdId, name: 'B');
+      final unrelated = await repo.addItem(householdId, name: 'C');
+      await repo.setChecked(a.id, checked: true);
+      await repo.setChecked(b.id, checked: true);
+      await repo.clearChecked(householdId);
+      // Deleted independently of the clear -- restoreItems must never
+      // touch this one even though it's also soft-deleted right now.
+      await repo.deleteItem(unrelated.id);
+
+      await repo.restoreItems([a.id, b.id]);
+
+      expect((await row(a.id)).deletedAt, isNull);
+      expect((await row(b.id)).deletedAt, isNull);
+      expect((await row(unrelated.id)).deletedAt, isNotNull);
+    },
+  );
+
+  test('restoreItems is a no-op for an empty id list', () async {
+    final item = await repo.addItem(householdId, name: 'A');
+    await repo.deleteItem(item.id);
+    final deletedAtBefore = (await row(item.id)).deletedAt;
+
+    await repo.restoreItems(const []);
+
+    expect((await row(item.id)).deletedAt, deletedAtBefore);
+  });
+
   test('updateItem supports the Value-wrapped nullable fields', () async {
     final item = await repo.addItem(
       householdId,

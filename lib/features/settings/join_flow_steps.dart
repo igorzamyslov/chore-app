@@ -17,6 +17,7 @@ import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 /// The first of [CategoryRepository.seedColors] not already used by a
 /// claimable member -- the "first free color" pattern
@@ -30,6 +31,26 @@ int autoJoinColor(List<ClaimableMember> claimableMembers) {
     (color) => !usedColors.contains(color),
     orElse: () => seedColors[claimableMembers.length % seedColors.length],
   );
+}
+
+/// Maps a `listClaimableMembers` failure to the right code-entry inline
+/// error (T1.6 -- `docs/research/persona-ben.md` finding 9,
+/// `docs/research/triage.md` T1.6).
+///
+/// Read from source (`supabase/migrations/20260731120000_initial_schema.sql`
+/// `_valid_invite`): a mistyped code, an expired code, and a revoked code
+/// all fail the SAME single query (`code = p_code and revoked_at is null
+/// and expires_at > now()`) and raise the SAME plain exception with no
+/// distinguishing detail -- so those three are genuinely NOT distinguishable
+/// from here, and this deliberately does not pretend otherwise. What IS
+/// real and worth separating: whether the server ever got to evaluate the
+/// code at all. A [PostgrestException] means it did (and rejected it) --
+/// every other exception (no connectivity, a timeout, ...) means it didn't,
+/// so blaming the code itself would be misleading.
+String joinCodeErrorMessage(AppLocalizations l10n, Object error) {
+  return error is PostgrestException
+      ? l10n.joinHouseholdCodeError
+      : l10n.joinHouseholdCodeUnknownError;
 }
 
 /// [MemberAvatar] takes a full [Member]; the chooser step only has a
