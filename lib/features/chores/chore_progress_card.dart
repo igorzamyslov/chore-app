@@ -13,32 +13,39 @@ import 'package:intl/intl.dart';
 
 /// A raised card summarizing today's chore-completion progress: an
 /// uppercase locale-formatted date, 'N of M done today', a sub-line ('K
-/// still to go', or a done-for-the-day line when K is 0), and a decorative
-/// 58dp progress ring.
+/// still to go', or a done-for-the-day line when K is 0), an optional
+/// filter-active line, and a decorative 58dp progress ring.
 ///
 /// **Counting rule (exact)**: [pendingDueOrOverdue] is the count of
 /// still-pending occurrences due today or overdue; [completedToday] is the
 /// count of occurrences with status `done` (never `skipped` -- a skip isn't
 /// "done") closed today. `M` = `pendingDueOrOverdue + completedToday`; `N` =
-/// `completedToday`. Both figures are computed by the caller from data the
-/// chores list screen already watches (`pendingOccurrencesProvider`,
-/// `closedTodayOccurrencesProvider`) -- no new provider needed.
+/// `completedToday`. **Changed 2026-08-07** (triage T1.1/D3): both figures
+/// are computed by the caller from the SAME member/category-filtered
+/// collections the chores list screen renders its sections from -- never
+/// the whole household when a filter is active -- so this card and the list
+/// beneath it can never disagree. [filterActive] tells the card whether
+/// that filtering is currently narrowing the count, so a filtered "1 of 2"
+/// is never mistaken for the household's whole day.
 ///
 /// The whole card renders as [SizedBox.shrink] when `M == 0` (nothing was
 /// ever on the plate today) -- an empty ring is noise, not signal.
 ///
 /// Semantic id `chores.progress`. The card carries a single [Semantics]
 /// label with the same sentence the visible text already shows (title +
-/// sub-line), and every descendant text node -- including the ring's
-/// decorative percentage -- is excluded from the accessibility tree, so a
-/// screen reader announces the sentence exactly once.
+/// sub-line + filter line, when shown), and every descendant text node --
+/// including the ring's decorative percentage -- is excluded from the
+/// accessibility tree, so a screen reader announces the sentence exactly
+/// once.
 class ChoreProgressCard extends StatelessWidget {
   /// Creates the progress card for [completedToday]/[pendingDueOrOverdue]
-  /// (see the counting rule above), on [today].
+  /// (see the counting rule above), on [today], noting via [filterActive]
+  /// whether a member/category filter is currently narrowing those counts.
   const ChoreProgressCard({
     required this.completedToday,
     required this.pendingDueOrOverdue,
     required this.today,
+    required this.filterActive,
     super.key,
   });
 
@@ -51,6 +58,11 @@ class ChoreProgressCard extends StatelessWidget {
 
   /// The current local calendar day, per the app's injected clock.
   final PlainDate today;
+
+  /// Whether a member/category filter is active on the chores list right
+  /// now -- when `true`, [completedToday]/[pendingDueOrOverdue] are the
+  /// FILTERED subset, not the whole household's day, and the card says so.
+  final bool filterActive;
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +87,12 @@ class ChoreProgressCard extends StatelessWidget {
     final subline = remaining == 0
         ? l10n.choresProgressAllDoneToday
         : l10n.choresProgressRemainingToday(remaining);
+    final filterNote = filterActive ? l10n.choresProgressFilterActive : null;
 
     return semantic(
       'chores.progress',
       child: Semantics(
-        label: '$dateNatural. $title. $subline',
+        label: [dateNatural, title, subline, ?filterNote].join('. '),
         child: DepthCard(
           shadow: true,
           child: Padding(
@@ -107,6 +120,15 @@ class ChoreProgressCard extends StatelessWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        if (filterNote != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            filterNote,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

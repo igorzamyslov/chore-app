@@ -4,6 +4,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
@@ -84,6 +85,59 @@ void main() {
 
       expect(find.text('One-off chore'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'pausing shows a "Paused" snackbar whose Undo action resumes the chore '
+    '(T1.5) -- every other state change here already snackbars; pause used '
+    'to be silent',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Pausable chore',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Paused'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
+
+      // showAppSnackbar's presentation (lib/app/snackbars.dart): 4s
+      // floating, persist: false so the action bar still auto-dismisses --
+      // mirrors the complete/skip undo snackbar exactly.
+      final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+      expect(snackBar.duration, const Duration(seconds: 4));
+      expect(snackBar.behavior, SnackBarBehavior.floating);
+      expect(snackBar.persist, isFalse);
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+
+      // Resumed: back in the main list, not the collapsed Paused section.
+      expect(find.bySemanticsIdentifier('chores.paused.header'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.complete'),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },

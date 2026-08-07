@@ -24,7 +24,7 @@
   "choresMenuPause": "Pausieren",
 
   "choresDeleteDialogTitle": "Aufgabe löschen?",
-  "choresDeleteDialogBody": "Damit löschst du '{choreTitle}'. Der Verlauf bleibt erhalten, aber die anstehende Erledigung wird entfernt.",
+  "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deiner Liste. Wieder ansehen kannst du es noch nicht.",
 
   "choresOccurrenceCompleteTooltip": "Erledigen",
   "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",
@@ -62,6 +62,7 @@
   "choresProgressTitle": "{n} von {m} heute erledigt",
   "choresProgressRemainingToday": "{count, plural, one{Noch 1 übrig} other{Noch {count} übrig}}",
   "choresProgressAllDoneToday": "Alles erledigt — gut gemacht!",
+  "choresProgressFilterActive": "Gefiltert – nicht der ganze Haushalt",
 
   "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",
   "welcomeCreateTitle": "Neuen Haushalt einrichten",
@@ -87,6 +88,7 @@
   "choresSnackbarSkipped": "Übersprungen",
   "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
   "choresSnackbarUndo": "Rückgängig",
+  "choresSnackbarPaused": "Pausiert",
 
   "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
   "choresDoneStatusDone": "Erledigt",

@@ -96,7 +96,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'This deletes \'$choreTitle\'. Its history is kept, but its pending occurrence is removed.';
+    return 'This removes \'$choreTitle\' from your list. You can\'t view it again yet.';
   }
 
   @override
@@ -216,6 +216,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresProgressAllDoneToday => 'That\'s everything — nice work';
 
   @override
+  String get choresProgressFilterActive => 'Filtered — not the whole household';
+
+  @override
   String get welcomeTagline =>
       'Share chores and a shopping list with your household.';
 
@@ -287,6 +290,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choresSnackbarUndo => 'Undo';
+
+  @override
+  String get choresSnackbarPaused => 'Paused';
 
   @override
   String choresDoneHeader(int count) {

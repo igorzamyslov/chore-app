@@ -96,7 +96,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'Damit löschst du \'$choreTitle\'. Der Verlauf bleibt erhalten, aber die anstehende Erledigung wird entfernt.';
+    return 'Damit entfernst du \'$choreTitle\' aus deiner Liste. Wieder ansehen kannst du es noch nicht.';
   }
 
   @override
@@ -217,6 +217,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresProgressAllDoneToday => 'Alles erledigt — gut gemacht!';
 
   @override
+  String get choresProgressFilterActive =>
+      'Gefiltert – nicht der ganze Haushalt';
+
+  @override
   String get welcomeTagline =>
       'Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.';
 
@@ -289,6 +293,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get choresSnackbarUndo => 'Rückgängig';
+
+  @override
+  String get choresSnackbarPaused => 'Pausiert';
 
   @override
   String choresDoneHeader(int count) {
