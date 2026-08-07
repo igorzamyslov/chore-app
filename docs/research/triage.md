@@ -57,25 +57,55 @@ Three honest options:
   that does not exist, so a future reader will assume protection that isn't
   there.
 
-**My recommendation: (a)**, plus one narrowing — revoke the `deleted_at`
-grant on `members` so one member cannot soft-delete another server-side.
-Flat trust is honest for a household; silently deletable people are not.
+**DECIDED (Igor, 2026-08-07): (a) flat by design.**
+
+I originally paired (a) with "revoke the `deleted_at` grant on `members` so
+one member cannot soft-delete another". **That recommendation was wrong and
+is withdrawn.** Member removal shipped in v0.3.0 and depends on exactly that
+grant: `deleteMember` soft-deletes locally and the engine replicates it via
+`updateMemberGrantedColumns(..., 'deleted_at': member.deletedAt)`
+(`sync_engine.dart:482-486`). Revoking it would make every member deletion
+stop replicating — the member disappears on one phone and stays on every
+other one, with no error.
+
+Flat by design therefore means the grants stay as they are: **removing a
+member is something any member can do**, which is what "flat" means. What
+changes is that the app stops implying otherwise:
+- `members.role` is documented as **vestigial** — written at creation,
+  read by nothing. Either keep it inert with a comment saying so, or drop
+  it in a later migration; do NOT add enforcement to it.
+- The specs say plainly that a household is a circle of equals: anyone can
+  rename it, invite, remove members, and edit anything.
+- The client-side guards that remain (can't remove a claimed member, can't
+  remove the last one) stay — they prevent *accidents*, not *permissions*,
+  and should be worded that way where the user meets them (T1.7).
 
 ### D2 — What does "history is kept" mean?
 
-T1.2 can be fixed two ways: **cheaply**, by changing the delete copy to
-stop promising something unobservable; or **properly**, by building the
-stats/history view (backlog F19) that makes the promise true. The cheap fix
-is a one-line ARB change and I'd do it now regardless; the question is
-whether F19 moves up.
+**DECIDED (Igor, 2026-08-07): the app keeps its promises — F19 gets built.**
+
+So the fix is *fulfil*, not *retract*. Two steps, in this order:
+1. **Now:** soften the delete copy so it stops promising something the app
+   cannot yet show. A promise with no mechanism is the bug; until the
+   mechanism exists, the honest copy is the narrower one.
+2. **Then:** build F19 (the history / "who actually does the chores" view),
+   promoted out of the open-ended backlog into committed work. When it
+   ships, the stronger copy comes back — and at that point it is true.
+
+This ordering matters: shipping the strong copy before the screen exists
+would mean deliberately keeping a promise we know is empty, which is the
+opposite of the decision.
 
 ### D3 — Should the progress card follow the filter?
 
-T1.1 has two fixes: make the card respect the active filter (so the numbers
-always match the list), or leave it household-wide and label it so. I
-recommend **the card follows the filter**, with its sub-line naming the
-filter when one is active — a summary that contradicts the list beneath it
-is worse than a summary that narrows.
+**DECIDED (Igor, 2026-08-07): the card follows the filter.**
+
+The card's counts are computed from the same filtered list the sections
+render, so the number and the list can never disagree. When a filter is
+active the card says so, so a narrowed "1 of 2" is never mistaken for the
+whole household's day. Note this also reverses the deliberate comment
+currently in `chores_list_screen.dart:62-66` ("deliberately UNFILTERED") —
+that comment must go, replaced by one explaining the new rule and why.
 
 ## Tier 4 — Accepted limitations (document, don't fix)
 
