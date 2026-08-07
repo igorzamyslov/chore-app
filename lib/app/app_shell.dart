@@ -152,8 +152,25 @@ class _BottomTabBar extends StatelessWidget {
                       child: Semantics(
                         button: true,
                         selected: tab == selected,
-                        child: InkWell(
+                        // Field feedback 2026-08-07 C2: a bare InkWell
+                        // rippled a grey RECTANGLE across the whole tab
+                        // column while the active state is a rounded pill --
+                        // the two shapes fought each other. InkResponse with
+                        // a bounded radius keeps the splash inside a pill
+                        // roughly the size of the active one, and tints it
+                        // with the accent instead of the default grey.
+                        child: InkResponse(
                           onTap: () => onSelected(tab),
+                          radius: 44,
+                          containedInkWell: true,
+                          highlightShape: BoxShape.rectangle,
+                          borderRadius: BorderRadius.circular(16),
+                          splashColor: colorScheme.primary.withValues(
+                            alpha: 0.12,
+                          ),
+                          highlightColor: colorScheme.primary.withValues(
+                            alpha: 0.06,
+                          ),
                           child: _TabContent(
                             tab: tab,
                             isSelected: tab == selected,

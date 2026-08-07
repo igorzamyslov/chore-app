@@ -130,6 +130,14 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                 return semantic(
                   'chores.refresh',
                   child: RefreshIndicator(
+                    // Field feedback 2026-08-07 C1: the spinner read as too
+                    // eager. Flutter draws it from the first pixel of
+                    // over-scroll and fires at a fixed 25% of viewport
+                    // extent -- the trigger distance is not a parameter --
+                    // so `displacement` (default 40) is the only lever: it
+                    // sets how far down the indicator settles, and a larger
+                    // value means more drag before it reads as present.
+                    displacement: 88,
                     onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
                     child: body,
                   ),

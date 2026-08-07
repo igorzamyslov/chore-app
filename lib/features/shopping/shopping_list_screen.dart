@@ -115,6 +115,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   return semantic(
                     'shopping.refresh',
                     child: RefreshIndicator(
+                      // Field feedback 2026-08-07 C1 -- see the matching
+                      // comment on the chores list for why `displacement`
+                      // is the only available lever here.
+                      displacement: 88,
                       onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
                       child: body,
                     ),

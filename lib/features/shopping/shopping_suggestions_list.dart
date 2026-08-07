@@ -42,6 +42,15 @@ class ShoppingSuggestionsList extends StatelessWidget {
         children: [
           for (var i = 0; i < suggestions.length; i++)
             _SuggestionChip(
+              // Keyed by NAME, not position (field feedback 2026-08-07 C3):
+              // tapping a chip adds that item, which re-ranks this list and
+              // shifts every later chip up one slot. Without a key Flutter
+              // matches chip elements positionally, so it reuses the tapped
+              // chip's element for the NEXT suggestion -- and the in-flight
+              // ink splash carries over, making the next proposal look like
+              // it tapped itself. A name key makes the tapped element leave
+              // with its own splash.
+              key: ValueKey(suggestions[i].name),
               index: i,
               suggestion: suggestions[i],
               onTap: () => onTap(suggestions[i]),
@@ -57,6 +66,7 @@ class _SuggestionChip extends StatelessWidget {
     required this.index,
     required this.suggestion,
     required this.onTap,
+    super.key,
   });
 
   final int index;
