@@ -25,11 +25,14 @@ import 'package:intl/intl.dart';
 
 /// The Account section's body: a static disabled row when
 /// [authGatewayProvider] resolves to [NoopAuthGateway] (Supabase not
-/// configured); the signed-out form or, when signed in, the signed-in tile
-/// -- joined by the P2d reconnect row (spec §7.6, only when
-/// `myMembershipProvider` finds a membership), the P2b adopt row (spec
+/// configured); otherwise branches on sign-in AND linked state --
+/// signed-out+unlinked shows the bare sign-in form, signed-out+LINKED shows
+/// the honest [_SignedOutLinkedSection] (spec
+/// `docs/feedback/2026-08-07-field-feedback.md` A1.1) instead, and signed-in
+/// shows the signed-in tile joined by the P2d reconnect row (spec §7.6, only
+/// when `myMembershipProvider` finds a membership), the P2b adopt row (spec
 /// §7.3), and the P2c join row while `settings.syncHouseholdId` is still
-/// `null`.
+/// `null` -- or, once linked, the Invite row and the A1.2 disconnect row.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -40,13 +43,19 @@ class AccountSectionBody extends ConsumerWidget {
       return const _ComingSoonTile();
     }
     final user = ref.watch(currentAuthUserProvider).valueOrNull;
-    if (user == null) {
-      return const _SignedOutForm();
-    }
     final householdId = ref
         .watch(settingsProvider)
         .valueOrNull
         ?.syncHouseholdId;
+    if (user == null) {
+      // A1.1: a signed-out device that's still linked gets its own honest
+      // state -- NOT the bare sign-in form, which used to be
+      // indistinguishable from a device that was never linked at all.
+      if (householdId != null) {
+        return const _SignedOutLinkedSection();
+      }
+      return const _SignedOutForm();
+    }
     if (householdId == null) {
       // Spec §7.6 (P2d reconnect): probe BEFORE showing adopt/join -- when
       // the signed-in account already has a membership elsewhere, the
@@ -68,6 +77,7 @@ class AccountSectionBody extends ConsumerWidget {
       children: [
         _SignedInTile(user: user, householdName: householdName),
         _InviteRow(householdId: householdId),
+        const _DisconnectRow(),
       ],
     );
   }
@@ -383,6 +393,119 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
       if (mounted) {
         setState(() => _sending = false);
       }
+    }
+  }
+}
+
+/// The Account section's honest signed-out-but-linked state (spec
+/// `docs/feedback/2026-08-07-field-feedback.md` A1.1): shown INSTEAD of the
+/// bare [_SignedOutForm] whenever there is no signed-in user but this device
+/// still carries a `syncHouseholdId`. The old behavior rendered the plain
+/// sign-in form with no indication anything was different -- indistinguishable
+/// from a device that was never linked at all, which read to a real user as
+/// "my household got converted to local".
+///
+/// Composition, top to bottom: a prominent notice naming the still-connected
+/// household and stating plainly that syncing is paused
+/// (`settings.account.pausedNotice`); the UNCHANGED [_SignedOutForm] itself
+/// (its "Send sign-in link" button IS the "sign in to resume" primary
+/// action -- reused verbatim, never forked, including its own pre-existing
+/// A5 hint at the bottom, which still applies); and, as a secondary,
+/// clearly non-primary action below it, [_DisconnectRow] (spec A1.2).
+class _SignedOutLinkedSection extends ConsumerWidget {
+  const _SignedOutLinkedSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    // Mirrors `_SignedOutForm`'s own linked-hint timing: `householdName`
+    // needs `currentHouseholdProvider`, which awaits `bootstrapProvider`
+    // first, so it's momentarily `null` for one frame -- the notice simply
+    // appears a frame later rather than blocking the rest of this section.
+    final householdName = ref.watch(currentHouseholdProvider).valueOrNull?.name;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (householdName != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: semantic(
+              'settings.account.pausedNotice',
+              child: Text(
+                l10n.settingsAccountPausedNotice(householdName),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ),
+        const _SignedOutForm(),
+        const _DisconnectRow(),
+      ],
+    );
+  }
+}
+
+/// The A1.2 disconnect action (spec
+/// `docs/feedback/2026-08-07-field-feedback.md`): the local exit the app
+/// never had for a linked household. Reachable from BOTH
+/// [_SignedOutLinkedSection] (A1.1) and the normal signed-in linked state
+/// (`AccountSectionBody`, below [_InviteRow]) -- shown as a plain, secondary
+/// [ListTile] (never a [FilledButton]) so it never competes with either
+/// state's primary action.
+///
+/// Guarded behind a confirm dialog stating exactly what this does (and does
+/// NOT do): the household stays on this device untouched, other members
+/// keep their household, nothing is deleted anywhere -- because this only
+/// ever clears this device's own local linked state (`HouseholdLinkService.
+/// disconnect`, `lib/application/household_link_service.dart`), never
+/// touching the server or any other local table.
+class _DisconnectRow extends ConsumerWidget {
+  const _DisconnectRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.disconnect',
+      child: ListTile(
+        leading: const Icon(Icons.link_off),
+        title: Text(l10n.settingsAccountDisconnect),
+        onTap: () => _confirmAndDisconnect(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndDisconnect(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: Text(l10n.settingsAccountDisconnectConfirmTitle),
+          content: Text(l10n.settingsAccountDisconnectConfirmBody),
+          actions: [
+            semantic(
+              'settings.account.disconnect.cancel',
+              child: TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(l10n.commonCancel),
+              ),
+            ),
+            semantic(
+              'settings.account.disconnect.confirm',
+              child: TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(l10n.settingsAccountDisconnectConfirmAction),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed ?? false) {
+      await ref.read(householdLinkServiceProvider).disconnect();
     }
   }
 }

@@ -1218,12 +1218,6 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsAppearanceDark;
 
-  /// Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section.
-  ///
-  /// In en, this message translates to:
-  /// **'Account'**
-  String get settingsAccountSectionTitle;
-
   /// Intro line shown above the email field in the Account section's signed-out state.
   ///
   /// In en, this message translates to:
@@ -1254,11 +1248,41 @@ abstract class AppLocalizations {
   /// **'Check your email at {email} for your sign-in link.'**
   String settingsAccountCheckEmail(String email);
 
-  /// One-line hint shown under the signed-out sign-in form when this device is linked but no user is currently signed in (spec docs/feedback/2026-08-01-ux-audit.md A5) -- explains why syncing has silently stopped.
+  /// One-line hint shown under the signed-out sign-in form when this device is linked but no user is currently signed in (spec docs/feedback/2026-08-01-ux-audit.md A5) -- explains why syncing has silently stopped. Still shown as-is (spec A1.1 adds settingsAccountPausedNotice ABOVE the form instead of replacing this).
   ///
   /// In en, this message translates to:
   /// **'This phone is linked to {householdName} — sign in to keep syncing.'**
   String settingsAccountSignedOutLinked(String householdName);
+
+  /// Notice shown ABOVE the reused sign-in form in the Account section's honest signed-out-but-linked state (spec docs/feedback/2026-08-07-field-feedback.md A1.1) -- names the still-connected household and states plainly that syncing is paused, replacing what used to render as a bare, indistinguishable-from-never-linked sign-in form.
+  ///
+  /// In en, this message translates to:
+  /// **'This device is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again.'**
+  String settingsAccountPausedNotice(String householdName);
+
+  /// Label of the Account section's A1.2 disconnect row -- a secondary, clearly non-primary action shown below the reused sign-in form in the signed-out-but-linked state, and below the Invite row in the normal signed-in linked state.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect from the online household'**
+  String get settingsAccountDisconnect;
+
+  /// Title of the A1.2 disconnect confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect from the online household?'**
+  String get settingsAccountDisconnectConfirmTitle;
+
+  /// Body of the A1.2 disconnect confirmation dialog -- states plainly that this is a local exit from sync, not a deletion: nothing local or remote is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'The household stays on this device exactly as it is. Other members keep their household, and nothing is deleted anywhere.'**
+  String get settingsAccountDisconnectConfirmBody;
+
+  /// Confirm button of the A1.2 disconnect confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get settingsAccountDisconnectConfirmAction;
 
   /// Snackbar shown when sending the magic-link email fails.
   ///
@@ -1278,10 +1302,10 @@ abstract class AppLocalizations {
   /// **'Sign out?'**
   String get settingsAccountSignOutConfirmTitle;
 
-  /// Body of the sign-out confirmation dialog.
+  /// Body of the sign-out confirmation dialog (spec docs/feedback/2026-08-07-field-feedback.md A1.3): states plainly what signing out actually does -- syncing pauses, the household stays on this device, and changes made while signed out are kept and sent on the next sign-in -- replacing the old, less complete 'sign in again anytime' copy.
   ///
   /// In en, this message translates to:
-  /// **'You can sign in again anytime with your email.'**
+  /// **'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.'**
   String get settingsAccountSignOutConfirmBody;
 
   /// Confirm button of the sign-out confirmation dialog.

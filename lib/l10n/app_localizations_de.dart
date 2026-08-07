@@ -785,9 +785,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAppearanceDark => 'Dunkel';
 
   @override
-  String get settingsAccountSectionTitle => 'Konto';
-
-  @override
   String get settingsAccountIntro =>
       'Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.';
 
@@ -811,6 +808,26 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String settingsAccountPausedNotice(String householdName) {
+    return 'Dieses Gerät ist weiterhin mit $householdName verbunden, aber die Synchronisierung ist pausiert. Änderungen, die du jetzt vornimmst, werden gesendet, sobald du dich wieder anmeldest.';
+  }
+
+  @override
+  String get settingsAccountDisconnect =>
+      'Verbindung zum Online-Haushalt trennen';
+
+  @override
+  String get settingsAccountDisconnectConfirmTitle =>
+      'Verbindung zum Online-Haushalt trennen?';
+
+  @override
+  String get settingsAccountDisconnectConfirmBody =>
+      'Der Haushalt bleibt genau so auf diesem Gerät erhalten. Andere Mitglieder behalten ihren Haushalt, und nirgendwo wird etwas gelöscht.';
+
+  @override
+  String get settingsAccountDisconnectConfirmAction => 'Trennen';
+
+  @override
   String get settingsAccountSendError =>
       'Der Anmeldelink konnte nicht gesendet werden. Versuch es noch mal.';
 
@@ -822,7 +839,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'Du kannst dich jederzeit wieder mit deiner E-Mail-Adresse anmelden.';
+      'Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Abmelden';

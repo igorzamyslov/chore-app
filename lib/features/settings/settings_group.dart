@@ -18,8 +18,9 @@ import 'package:flutter/material.dart';
 /// the translator must see (and translate) the natural-case source.
 class SettingsGroup extends StatelessWidget {
   /// Creates a labelled settings group. [children] are typically
-  /// [SettingsRow]s, but the Account group wraps its existing
-  /// (non-decomposed) section body as a single child instead.
+  /// [SettingsRow]s, but the Household group's first child wraps the
+  /// existing (non-decomposed) Account section body instead (spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` B2).
   const SettingsGroup({required this.label, required this.children, super.key});
 
   /// The group's natural-case header text, e.g. "Household".

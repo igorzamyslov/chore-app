@@ -1024,10 +1024,6 @@
     "description": "Appearance picker option (and settingsAppearanceEntry subtitle) for the dark theme -- a stored settings.themeMode of 'dark'."
   },
 
-  "settingsAccountSectionTitle": "Account",
-  "@settingsAccountSectionTitle": {
-    "description": "Settings screen section header above the Account rows (spec docs/specs/sync-backend.md §5), placed between the export row and the About section."
-  },
   "settingsAccountIntro": "Sign in to sync your household across your devices.",
   "@settingsAccountIntro": {
     "description": "Intro line shown above the email field in the Account section's signed-out state."
@@ -1056,13 +1052,39 @@
   },
   "settingsAccountSignedOutLinked": "This phone is linked to {householdName} — sign in to keep syncing.",
   "@settingsAccountSignedOutLinked": {
-    "description": "One-line hint shown under the signed-out sign-in form when this device is linked but no user is currently signed in (spec docs/feedback/2026-08-01-ux-audit.md A5) -- explains why syncing has silently stopped.",
+    "description": "One-line hint shown under the signed-out sign-in form when this device is linked but no user is currently signed in (spec docs/feedback/2026-08-01-ux-audit.md A5) -- explains why syncing has silently stopped. Still shown as-is (spec A1.1 adds settingsAccountPausedNotice ABOVE the form instead of replacing this).",
     "placeholders": {
       "householdName": {
         "type": "String",
         "example": "My household"
       }
     }
+  },
+  "settingsAccountPausedNotice": "This device is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again.",
+  "@settingsAccountPausedNotice": {
+    "description": "Notice shown ABOVE the reused sign-in form in the Account section's honest signed-out-but-linked state (spec docs/feedback/2026-08-07-field-feedback.md A1.1) -- names the still-connected household and states plainly that syncing is paused, replacing what used to render as a bare, indistinguishable-from-never-linked sign-in form.",
+    "placeholders": {
+      "householdName": {
+        "type": "String",
+        "example": "My household"
+      }
+    }
+  },
+  "settingsAccountDisconnect": "Disconnect from the online household",
+  "@settingsAccountDisconnect": {
+    "description": "Label of the Account section's A1.2 disconnect row -- a secondary, clearly non-primary action shown below the reused sign-in form in the signed-out-but-linked state, and below the Invite row in the normal signed-in linked state."
+  },
+  "settingsAccountDisconnectConfirmTitle": "Disconnect from the online household?",
+  "@settingsAccountDisconnectConfirmTitle": {
+    "description": "Title of the A1.2 disconnect confirmation dialog."
+  },
+  "settingsAccountDisconnectConfirmBody": "The household stays on this device exactly as it is. Other members keep their household, and nothing is deleted anywhere.",
+  "@settingsAccountDisconnectConfirmBody": {
+    "description": "Body of the A1.2 disconnect confirmation dialog -- states plainly that this is a local exit from sync, not a deletion: nothing local or remote is removed."
+  },
+  "settingsAccountDisconnectConfirmAction": "Disconnect",
+  "@settingsAccountDisconnectConfirmAction": {
+    "description": "Confirm button of the A1.2 disconnect confirmation dialog."
   },
   "settingsAccountSendError": "Couldn't send the sign-in link. Please try again.",
   "@settingsAccountSendError": {
@@ -1076,9 +1098,9 @@
   "@settingsAccountSignOutConfirmTitle": {
     "description": "Title of the sign-out confirmation dialog."
   },
-  "settingsAccountSignOutConfirmBody": "You can sign in again anytime with your email.",
+  "settingsAccountSignOutConfirmBody": "Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.",
   "@settingsAccountSignOutConfirmBody": {
-    "description": "Body of the sign-out confirmation dialog."
+    "description": "Body of the sign-out confirmation dialog (spec docs/feedback/2026-08-07-field-feedback.md A1.3): states plainly what signing out actually does -- syncing pauses, the household stays on this device, and changes made while signed out are kept and sent on the next sign-in -- replacing the old, less complete 'sign in again anytime' copy."
   },
   "settingsAccountSignOutConfirmAction": "Sign out",
   "@settingsAccountSignOutConfirmAction": {
