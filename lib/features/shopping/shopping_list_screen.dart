@@ -7,6 +7,7 @@ import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
@@ -119,7 +120,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       // comment on the chores list for why `displacement`
                       // is the only available lever here.
                       displacement: 88,
-                      onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
+                      onRefresh: () => _refresh(context, ref),
                       child: body,
                     ),
                   );
@@ -160,6 +161,25 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
   }
+}
+
+/// Runs a USER-INITIATED sync and reports failure (spec
+/// `docs/specs/sync-freshness.md` §2.3).
+///
+/// Uses `refreshNow()`, not `pushDirty()`: the latter swallows every error
+/// by contract (spec `sync-backend.md` §8.3), so the indicator used to spin
+/// and stop identically whether the sync worked or the phone was offline --
+/// found by the 2026-08-07 persona walkthrough. Success stays silent; the
+/// list simply updates, which is the platform convention.
+Future<void> _refresh(BuildContext context, WidgetRef ref) async {
+  final ok = await ref.read(syncEngineProvider).refreshNow();
+  if (ok || !context.mounted) {
+    return;
+  }
+  showAppSnackbar(
+    context,
+    message: AppLocalizations.of(context).syncRefreshError,
+  );
 }
 
 class _Body extends StatelessWidget {

@@ -1314,6 +1314,12 @@ abstract class AppLocalizations {
   /// **'Sign out'**
   String get settingsAccountSignOutConfirmAction;
 
+  /// Snackbar shown when a USER-INITIATED pull-to-refresh fails (spec docs/specs/sync-freshness.md 2.3). Reassures rather than alarms: a local-first app has not lost anything, it just could not reach the server. The background triggers stay silent by design; only this explicit user action reports failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the household. Your changes are saved here and will sync later.'**
+  String get syncRefreshError;
+
   /// Snackbar shown when signing out fails.
   ///
   /// In en, this message translates to:

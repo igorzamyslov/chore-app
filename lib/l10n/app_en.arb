@@ -1106,6 +1106,10 @@
   "@settingsAccountSignOutConfirmAction": {
     "description": "Confirm button of the sign-out confirmation dialog."
   },
+  "syncRefreshError": "Couldn't reach the household. Your changes are saved here and will sync later.",
+  "@syncRefreshError": {
+    "description": "Snackbar shown when a USER-INITIATED pull-to-refresh fails (spec docs/specs/sync-freshness.md 2.3). Reassures rather than alarms: a local-first app has not lost anything, it just could not reach the server. The background triggers stay silent by design; only this explicit user action reports failure."
+  },
   "settingsAccountSignOutError": "Couldn't sign out. Please try again.",
   "@settingsAccountSignOutError": {
     "description": "Snackbar shown when signing out fails."

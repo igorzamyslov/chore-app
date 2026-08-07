@@ -138,7 +138,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                     // sets how far down the indicator settles, and a larger
                     // value means more drag before it reads as present.
                     displacement: 88,
-                    onRefresh: () => ref.read(syncEngineProvider).pushDirty(),
+                    onRefresh: () => _refresh(context, ref),
                     child: body,
                   ),
                 );
@@ -309,6 +309,25 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       _categoryFilter = null;
     });
   }
+}
+
+/// Runs a USER-INITIATED sync and reports failure (spec
+/// `docs/specs/sync-freshness.md` §2.3).
+///
+/// Uses `refreshNow()`, not `pushDirty()`: the latter swallows every error
+/// by contract (spec `sync-backend.md` §8.3), so the indicator used to spin
+/// and stop identically whether the sync worked or the phone was offline --
+/// found by the 2026-08-07 persona walkthrough. Success stays silent; the
+/// list simply updates, which is the platform convention.
+Future<void> _refresh(BuildContext context, WidgetRef ref) async {
+  final ok = await ref.read(syncEngineProvider).refreshNow();
+  if (ok || !context.mounted) {
+    return;
+  }
+  showAppSnackbar(
+    context,
+    message: AppLocalizations.of(context).syncRefreshError,
+  );
 }
 
 class _Body extends StatelessWidget {

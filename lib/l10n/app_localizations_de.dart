@@ -845,6 +845,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountSignOutConfirmAction => 'Abmelden';
 
   @override
+  String get syncRefreshError =>
+      'Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Abmelden hat nicht geklappt. Versuch es noch mal.';
 

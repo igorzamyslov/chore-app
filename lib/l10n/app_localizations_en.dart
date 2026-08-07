@@ -840,6 +840,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountSignOutConfirmAction => 'Sign out';
 
   @override
+  String get syncRefreshError =>
+      'Couldn\'t reach the household. Your changes are saved here and will sync later.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Couldn\'t sign out. Please try again.';
 

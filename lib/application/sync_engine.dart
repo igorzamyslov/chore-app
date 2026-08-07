@@ -70,6 +70,20 @@ abstract class SyncEngine {
   /// Disarms everything [start] armed (timers, subscriptions). Idempotent.
   void stop();
 
+  /// A USER-INITIATED sync (pull-to-refresh, spec
+  /// `docs/specs/sync-freshness.md` §2.3): pushes then pulls, and reports
+  /// whether it actually worked -- `true` on success, `false` if either half
+  /// failed.
+  ///
+  /// Deliberately separate from [pushDirty]/[pullSince], whose contract is
+  /// to swallow every error into a silent retry-later (spec §8.3). That is
+  /// right for the background triggers, but it made the refresh indicator
+  /// incapable of ever reporting failure: it spun and stopped identically
+  /// whether the sync worked or the phone was in airplane mode. Found by the
+  /// 2026-08-07 persona walkthrough, against §2.3's own promise of a failure
+  /// snackbar.
+  Future<bool> refreshNow();
+
   /// Suspends the periodic safety-net poll while the app is backgrounded
   /// (spec `docs/specs/sync-freshness.md` §2.2) -- a backgrounded app must
   /// not hold a network wakeup every minute. Everything else [start] armed
@@ -102,6 +116,9 @@ class NoopSyncEngine implements SyncEngine {
 
   @override
   void stop() {}
+
+  @override
+  Future<bool> refreshNow() async => true;
 
   @override
   void pauseBackgroundWork() {}
@@ -305,17 +322,34 @@ class SupabaseSyncEngine implements SyncEngine {
     _pushTimer = Timer(pushDebounce, () => unawaited(pushDirty()));
   }
 
+  /// Every table's push, in FK order (spec §8.3) -- THROWS on failure.
+  /// [pushDirty] swallows that; [refreshNow] reports it.
+  Future<void> _pushAll() async {
+    await _pushHouseholds();
+    await _pushMembers();
+    await _pushCategories();
+    await _pushChores();
+    await _pushChoreAssignees();
+    await _pushChoreOccurrences();
+    await _pushShoppingItems();
+  }
+
+  @override
+  Future<bool> refreshNow() async {
+    try {
+      await _pushAll();
+      await _pullSinceInner();
+      return true;
+    } on Object catch (error, stackTrace) {
+      _logFailure('refreshNow', error, stackTrace);
+      return false;
+    }
+  }
+
   @override
   Future<void> pushDirty() async {
     try {
-      // FK order (spec §8.3).
-      await _pushHouseholds();
-      await _pushMembers();
-      await _pushCategories();
-      await _pushChores();
-      await _pushChoreAssignees();
-      await _pushChoreOccurrences();
-      await _pushShoppingItems();
+      await _pushAll();
     } on Object catch (error, stackTrace) {
       // Catches `Error` subclasses too, not just `Exception` -- spec
       // §8.3's "every engine error is swallowed" is read literally here:
@@ -332,84 +366,88 @@ class SupabaseSyncEngine implements SyncEngine {
   @override
   Future<void> pullSince() async {
     try {
-      final current = await settings.ensureSettings();
-      final since = current.syncLastPulledAt == null
-          ? null
-          : DateTime.parse(current.syncLastPulledAt!);
-      // Server now() FIRST (spec §8.3): a row touched between this call and
-      // the per-table reads below ends up with `updated_at` AFTER this
-      // value, so the NEXT pull (cursor == this value) finds it again --
-      // a possible harmless re-apply, never a missed row.
-      final serverNow = await transport.serverNow();
-
-      final householdRows = await transport.pullTable(
-        'households',
-        householdId: householdId,
-        since: since,
-      );
-      final memberRows = await transport.pullTable(
-        'members',
-        householdId: householdId,
-        since: since,
-      );
-      final categoryRows = await transport.pullTable(
-        'categories',
-        householdId: householdId,
-        since: since,
-      );
-      final choreRows = await transport.pullTable(
-        'chores',
-        householdId: householdId,
-        since: since,
-      );
-      final assigneeRows = await transport.pullTable(
-        'chore_assignees',
-        householdId: householdId,
-        since: since,
-      );
-      final occurrenceRows = await transport.pullTable(
-        'chore_occurrences',
-        householdId: householdId,
-        since: since,
-      );
-      final itemRows = await transport.pullTable(
-        'shopping_items',
-        householdId: householdId,
-        since: since,
-      );
-
-      // Apply in FK order, in ONE local transaction (spec §8.3).
-      await db.transaction(() async {
-        for (final row in householdRows) {
-          await _sync.applyPulledHousehold(householdFromRow(row));
-        }
-        for (final row in memberRows) {
-          await _sync.applyPulledMember(memberFromRow(row));
-        }
-        for (final row in categoryRows) {
-          await _sync.applyPulledCategory(categoryFromRow(row));
-        }
-        for (final row in choreRows) {
-          await _sync.applyPulledChore(choreFromRow(row));
-        }
-        for (final row in assigneeRows) {
-          await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
-        }
-        for (final row in occurrenceRows) {
-          await _sync.applyPulledChoreOccurrence(choreOccurrenceFromRow(row));
-        }
-        for (final row in itemRows) {
-          await _sync.applyPulledShoppingItem(shoppingItemFromRow(row));
-        }
-      });
-
-      // Cursor stored only after the transaction above commits (spec §8.3).
-      await settings.setSyncLastPulledAt(serverNow);
+      await _pullSinceInner();
     } on Object catch (error, stackTrace) {
-      // See pushDirty's matching catch for why this is `on Object`, not
-      // `on Exception`.
       _logFailure('pullSince', error, stackTrace);
     }
+  }
+
+  /// The pull itself -- THROWS on failure. [pullSince] swallows that;
+  /// [refreshNow] reports it.
+  Future<void> _pullSinceInner() async {
+    final current = await settings.ensureSettings();
+    final since = current.syncLastPulledAt == null
+        ? null
+        : DateTime.parse(current.syncLastPulledAt!);
+    // Server now() FIRST (spec §8.3): a row touched between this call and
+    // the per-table reads below ends up with `updated_at` AFTER this
+    // value, so the NEXT pull (cursor == this value) finds it again --
+    // a possible harmless re-apply, never a missed row.
+    final serverNow = await transport.serverNow();
+
+    final householdRows = await transport.pullTable(
+      'households',
+      householdId: householdId,
+      since: since,
+    );
+    final memberRows = await transport.pullTable(
+      'members',
+      householdId: householdId,
+      since: since,
+    );
+    final categoryRows = await transport.pullTable(
+      'categories',
+      householdId: householdId,
+      since: since,
+    );
+    final choreRows = await transport.pullTable(
+      'chores',
+      householdId: householdId,
+      since: since,
+    );
+    final assigneeRows = await transport.pullTable(
+      'chore_assignees',
+      householdId: householdId,
+      since: since,
+    );
+    final occurrenceRows = await transport.pullTable(
+      'chore_occurrences',
+      householdId: householdId,
+      since: since,
+    );
+    final itemRows = await transport.pullTable(
+      'shopping_items',
+      householdId: householdId,
+      since: since,
+    );
+
+    // Apply in FK order, in ONE local transaction (spec §8.3).
+    await db.transaction(() async {
+      for (final row in householdRows) {
+        await _sync.applyPulledHousehold(householdFromRow(row));
+      }
+      for (final row in memberRows) {
+        await _sync.applyPulledMember(memberFromRow(row));
+      }
+      for (final row in categoryRows) {
+        await _sync.applyPulledCategory(categoryFromRow(row));
+      }
+      for (final row in choreRows) {
+        await _sync.applyPulledChore(choreFromRow(row));
+      }
+      for (final row in assigneeRows) {
+        await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
+      }
+      for (final row in occurrenceRows) {
+        await _sync.applyPulledChoreOccurrence(choreOccurrenceFromRow(row));
+      }
+      for (final row in itemRows) {
+        await _sync.applyPulledShoppingItem(shoppingItemFromRow(row));
+      }
+    });
+
+    // Cursor stored only after the transaction above commits (spec §8.3).
+    await settings.setSyncLastPulledAt(serverNow);
   }
 
   /// Households-only push (spec §8.3's grants note applied to `households`
