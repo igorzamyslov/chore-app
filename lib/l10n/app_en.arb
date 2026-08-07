@@ -765,6 +765,21 @@
     "description": "Button that unchecks every checked item immediately (no confirmation), returning them all to the main list — shown in the checked-items section header next to Clear checked."
   },
 
+  "shoppingClearedSnackbar": "{count, plural, one{Cleared 1 item} other{Cleared {count} items}}",
+  "@shoppingClearedSnackbar": {
+    "description": "Undo snackbar message shown after tapping 'Clear checked' (T1.4): unlike every other delete-like action in the app, the bulk clear previously had no undo of its own.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "shoppingClearedUndo": "Undo",
+  "@shoppingClearedUndo": {
+    "description": "Action label of the 'Clear checked' undo snackbar; restores exactly the items that tap cleared, via ShoppingRepository.restoreItems."
+  },
+
   "shoppingAddHint": "Add item…",
   "@shoppingAddHint": {
     "description": "Placeholder hint text of the shopping list's quick-add text field."
@@ -881,6 +896,14 @@
   "memberEditColorLabel": "Color",
   "@memberEditColorLabel": {
     "description": "Section label above the member edit sheet's color swatch picker."
+  },
+  "memberEditDeleteBlockedClaimed": "This profile is linked to an account, so it can't be removed here.",
+  "@memberEditDeleteBlockedClaimed": {
+    "description": "T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed)."
+  },
+  "memberEditDeleteBlockedLastMember": "A household needs at least one member, so this one can't be removed.",
+  "@memberEditDeleteBlockedLastMember": {
+    "description": "T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member."
   },
   "memberDeleteDialogTitle": "Delete {memberName}?",
   "@memberDeleteDialogTitle": {
@@ -1226,9 +1249,13 @@
   "@joinHouseholdCodeLabel": {
     "description": "Label of the join sheet's code TextField (id settings.account.join.code)."
   },
-  "joinHouseholdCodeError": "That code isn't valid or has expired. Please check it and try again.",
+  "joinHouseholdCodeError": "That code doesn't work. Double-check it for typos, or ask them to send you a new one.",
   "@joinHouseholdCodeError": {
-    "description": "Inline error shown on the code-entry step when listClaimableMembers throws (invalid/expired code)."
+    "description": "Inline error shown on the code-entry step when the server rejects the code itself (a PostgrestException from listClaimableMembers). T1.6 finding: the server's _valid_invite check (supabase/migrations/20260731120000_initial_schema.sql) collapses 'no such code', 'expired', and 'revoked' into one identical query/exception with no distinguishing signal, so this message deliberately covers all three rather than guessing which one happened."
+  },
+  "joinHouseholdCodeUnknownError": "Couldn't check that code. Check your connection and try again.",
+  "@joinHouseholdCodeUnknownError": {
+    "description": "Inline error shown on the code-entry step when listClaimableMembers fails for a reason OTHER than the server rejecting the code (e.g. no network, a timeout) -- distinguished from joinHouseholdCodeError (T1.6) because the server never got to evaluate the code itself, so blaming the code would be misleading."
   },
   "joinHouseholdContinue": "Continue",
   "@joinHouseholdContinue": {

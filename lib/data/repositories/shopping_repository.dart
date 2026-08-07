@@ -448,6 +448,27 @@ class ShoppingRepository {
     );
   }
 
+  /// Restores exactly the items identified by [ids] (spec T1.4): the UNDO
+  /// action of the 'Clear checked' bulk action's snackbar, mirroring
+  /// [restoreItem]'s single-item semantics (a plain `deleted_at` clear) but
+  /// batched over ids the caller captured itself BEFORE calling
+  /// [clearChecked] -- this restores exactly that captured set, never
+  /// "every item ever cleared". A no-op for an empty [ids].
+  Future<void> restoreItems(List<String> ids) async {
+    if (ids.isEmpty) {
+      return;
+    }
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.isIn(ids))).write(
+      ShoppingItemsCompanion(
+        deletedAt: const Value(null),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
+    );
+  }
+
   /// Soft-deletes every active, checked item in [householdId].
   Future<void> clearChecked(String householdId) async {
     final now = _isoNow();

@@ -372,7 +372,8 @@ void main() {
 
   testChoreApp(
     'member delete action (spec A1) is hidden, not disabled, for the '
-    "household's last remaining member",
+    "household's last remaining member -- T1.7: a visible explanation "
+    'names the actual reason in its place',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -383,6 +384,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          "A household needs at least one member, so this one can't be "
+          'removed.',
+        ),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },
@@ -390,7 +402,8 @@ void main() {
 
   testChoreApp(
     'member delete action (spec A1) is hidden, not disabled, for a '
-    'claimed member',
+    'claimed member -- T1.7: a visible explanation names the actual '
+    'reason in its place',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -414,6 +427,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          "This profile is linked to an account, so it can't be removed "
+          'here.',
+        ),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'T1.7: the delete-blocked explanation is specific to the member being '
+    'edited -- an unclaimed, non-last member still shows the normal '
+    'Delete button with no explanation',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+      final householdId = await currentHouseholdId(database);
+      final anna = await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      // Claim 'Me' so a claimed member exists in the household, but edit
+      // ANNA (unclaimed, and not the last member since 'Me' also exists).
+      await (database.update(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(userId: Value('u1')),
+      );
+      await tester.pumpAndSettle();
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('members.edit.delete'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
+        findsNothing,
+      );
 
       handle.dispose();
     },

@@ -170,13 +170,16 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
         _step = _Step.chooser;
         _busy = false;
       });
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _busy = false;
-        _inlineError = AppLocalizations.of(context).joinHouseholdCodeError;
+        _inlineError = joinCodeErrorMessage(
+          AppLocalizations.of(context),
+          error,
+        );
       });
     }
   }

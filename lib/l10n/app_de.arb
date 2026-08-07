@@ -159,6 +159,9 @@
   "shoppingClearButton": "Erledigte leeren",
   "shoppingUncheckAll": "Alles zurücklegen",
 
+  "shoppingClearedSnackbar": "{count, plural, one{1 Artikel entfernt} other{{count} Artikel entfernt}}",
+  "shoppingClearedUndo": "Rückgängig",
+
   "shoppingAddHint": "Artikel hinzufügen…",
   "shoppingAddTooltip": "Artikel hinzufügen",
   "shoppingAddAlreadyOnList": "Schon auf der Liste",
@@ -191,6 +194,8 @@
   "memberEditEditTitle": "Mitglied bearbeiten",
   "memberEditNameLabel": "Name",
   "memberEditColorLabel": "Farbe",
+  "memberEditDeleteBlockedClaimed": "Dieses Profil ist mit einem Konto verknüpft und kann hier nicht entfernt werden.",
+  "memberEditDeleteBlockedLastMember": "Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.",
   "memberDeleteDialogTitle": "{memberName} löschen?",
   "memberDeleteDialogBody": "Damit entfernst du {memberName} aus dem Haushalt. Bei Aufgaben im Wechsel fällt {memberName} aus der Reihenfolge — wenn zu wenige Personen übrig bleiben, wird die Aufgabe auf eine feste Person oder \"jeden\" umgestellt. Aufgaben, die fest {memberName} zugewiesen sind, stehen danach allen offen, und alles, was {memberName} gerade zugewiesen ist, wird nicht mehr zugewiesen. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.",
   "householdRenameTitle": "Haushalt umbenennen",
@@ -264,7 +269,8 @@
   "joinHouseholdCodeTitle": "Gib deinen Einladungscode ein",
   "joinHouseholdCodeBody": "Frag ein Haushaltsmitglied nach dem Code aus seinem Mitglieder-Bildschirm.",
   "joinHouseholdCodeLabel": "Einladungscode",
-  "joinHouseholdCodeError": "Der Code ist ungültig oder abgelaufen. Bitte überprüfe ihn und versuch es noch mal.",
+  "joinHouseholdCodeError": "Der Code funktioniert nicht. Prüf ihn auf Tippfehler oder lass dir einen neuen schicken.",
+  "joinHouseholdCodeUnknownError": "Der Code konnte nicht geprüft werden. Prüf deine Verbindung und versuch es noch mal.",
   "joinHouseholdContinue": "Weiter",
   "joinHouseholdChooserTitle": "Welches Profil gehört dir?",
   "joinHouseholdChooserAreYou": "Bist du {name}?",

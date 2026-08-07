@@ -888,6 +888,18 @@ abstract class AppLocalizations {
   /// **'Put all back'**
   String get shoppingUncheckAll;
 
+  /// Undo snackbar message shown after tapping 'Clear checked' (T1.4): unlike every other delete-like action in the app, the bulk clear previously had no undo of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Cleared 1 item} other{Cleared {count} items}}'**
+  String shoppingClearedSnackbar(int count);
+
+  /// Action label of the 'Clear checked' undo snackbar; restores exactly the items that tap cleared, via ShoppingRepository.restoreItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get shoppingClearedUndo;
+
   /// Placeholder hint text of the shopping list's quick-add text field.
   ///
   /// In en, this message translates to:
@@ -1043,6 +1055,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Color'**
   String get memberEditColorLabel;
+
+  /// T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed).
+  ///
+  /// In en, this message translates to:
+  /// **'This profile is linked to an account, so it can\'t be removed here.'**
+  String get memberEditDeleteBlockedClaimed;
+
+  /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
+  ///
+  /// In en, this message translates to:
+  /// **'A household needs at least one member, so this one can\'t be removed.'**
+  String get memberEditDeleteBlockedLastMember;
 
   /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).
   ///
@@ -1440,11 +1464,17 @@ abstract class AppLocalizations {
   /// **'Invite code'**
   String get joinHouseholdCodeLabel;
 
-  /// Inline error shown on the code-entry step when listClaimableMembers throws (invalid/expired code).
+  /// Inline error shown on the code-entry step when the server rejects the code itself (a PostgrestException from listClaimableMembers). T1.6 finding: the server's _valid_invite check (supabase/migrations/20260731120000_initial_schema.sql) collapses 'no such code', 'expired', and 'revoked' into one identical query/exception with no distinguishing signal, so this message deliberately covers all three rather than guessing which one happened.
   ///
   /// In en, this message translates to:
-  /// **'That code isn\'t valid or has expired. Please check it and try again.'**
+  /// **'That code doesn\'t work. Double-check it for typos, or ask them to send you a new one.'**
   String get joinHouseholdCodeError;
+
+  /// Inline error shown on the code-entry step when listClaimableMembers fails for a reason OTHER than the server rejecting the code (e.g. no network, a timeout) -- distinguished from joinHouseholdCodeError (T1.6) because the server never got to evaluate the code itself, so blaming the code would be misleading.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check that code. Check your connection and try again.'**
+  String get joinHouseholdCodeUnknownError;
 
   /// Label of the join sheet's 'Continue' buttons (code entry and the new-member name step).
   ///

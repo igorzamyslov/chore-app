@@ -12,12 +12,24 @@ library;
 import 'package:chore_app/data/db/converters.dart';
 import 'package:drift/drift.dart';
 
-/// A member's permission level within a household.
+/// A member's role within a household.
+///
+/// D1 (2026-08-07, `docs/specs/sync-backend.md` §2): a household is flat by
+/// design -- any member can rename it, invite, remove members, and edit
+/// anything. This distinction is VESTIGIAL: no RLS policy, RPC, or widget
+/// gates anything on it. The one place it's read at all is
+/// `actingMemberProvider`'s default-member tie-break
+/// (`lib/app/providers.dart`, spec `docs/specs/members-management.md` §2:
+/// "first admin, else first member") -- a plausible-default guess, not a
+/// capability check; it grants nothing. Do not give this column
+/// enforcement meaning without a spec change.
 enum MemberRole {
-  /// Can manage household-wide settings (categories, other members).
+  /// Set for the member who created the household. Confers no actual
+  /// capability -- see the enum's own doc comment.
   admin,
 
-  /// A regular household member.
+  /// Set for every other member. Confers no actual capability -- see the
+  /// enum's own doc comment.
   member,
 }
 
@@ -119,7 +131,10 @@ class Members extends Table with SyncDirtyColumn {
   /// ARGB color used to represent this member in the UI.
   IntColumn get color => integer()();
 
-  /// This member's permission level.
+  /// This member's [MemberRole]. VESTIGIAL (D1, `docs/specs/sync-backend.md`
+  /// §2): written once at creation, and gates nothing -- no RLS policy, no
+  /// RPC, no widget. The household is flat by design; do not add
+  /// enforcement against this column without a spec change.
   TextColumn get role =>
       text().map(const EnumNameConverter(MemberRole.values))();
 

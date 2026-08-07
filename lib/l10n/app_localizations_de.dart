@@ -606,6 +606,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingUncheckAll => 'Alles zurücklegen';
 
   @override
+  String shoppingClearedSnackbar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Artikel entfernt',
+      one: '1 Artikel entfernt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shoppingClearedUndo => 'Rückgängig';
+
+  @override
   String get shoppingAddHint => 'Artikel hinzufügen…';
 
   @override
@@ -689,6 +703,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get memberEditColorLabel => 'Farbe';
+
+  @override
+  String get memberEditDeleteBlockedClaimed =>
+      'Dieses Profil ist mit einem Konto verknüpft und kann hier nicht entfernt werden.';
+
+  @override
+  String get memberEditDeleteBlockedLastMember =>
+      'Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.';
 
   @override
   String memberDeleteDialogTitle(String memberName) {
@@ -942,7 +964,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get joinHouseholdCodeError =>
-      'Der Code ist ungültig oder abgelaufen. Bitte überprüfe ihn und versuch es noch mal.';
+      'Der Code funktioniert nicht. Prüf ihn auf Tippfehler oder lass dir einen neuen schicken.';
+
+  @override
+  String get joinHouseholdCodeUnknownError =>
+      'Der Code konnte nicht geprüft werden. Prüf deine Verbindung und versuch es noch mal.';
 
   @override
   String get joinHouseholdContinue => 'Weiter';

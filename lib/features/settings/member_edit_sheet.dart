@@ -85,6 +85,32 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     return activeMembers.length > 1;
   }
 
+  /// The reason [canDelete] (the current build's [_canDelete] value, passed
+  /// in rather than re-read to avoid a second [membersProvider] watch) is
+  /// `false`, for the explanation that replaces the vanished Delete button
+  /// (T1.7 -- `docs/research/persona-anna.md` finding 6,
+  /// `docs/research/triage.md` T1.7): `null` while adding a new member (no
+  /// delete affordance applies at all, so there's nothing to explain) or
+  /// while genuinely deletable.
+  ///
+  /// Worded as an accident prevented, not a permission (spec D1,
+  /// `docs/specs/sync-backend.md` §2: the household is flat by design --
+  /// this is "removing this profile would break something", never "you
+  /// aren't allowed to").
+  String? _deleteBlockedReason(
+    AppLocalizations l10n, {
+    required bool canDelete,
+  }) {
+    final member = widget.member;
+    if (member == null || canDelete) {
+      return null;
+    }
+    if (member.userId != null) {
+      return l10n.memberEditDeleteBlockedClaimed;
+    }
+    return l10n.memberEditDeleteBlockedLastMember;
+  }
+
   int _firstFreeColor() {
     final usedColors = _currentMembers.map((m) => m.color).toSet();
     const seedColors = CategoryRepository.seedColors;
@@ -99,6 +125,11 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
+    final canDelete = _canDelete;
+    final deleteBlockedReason = _deleteBlockedReason(
+      l10n,
+      canDelete: canDelete,
+    );
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
@@ -128,9 +159,42 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
             semanticIdPrefix: 'members.edit.color',
           ),
           const SizedBox(height: 24),
+          // T1.7: a claimed or last-remaining member gets no Delete button
+          // (see _canDelete) -- previously nothing took its place, a quiet
+          // dead end where the (already-shipped) A1 audit item told the
+          // user deletion would now work. This explanation takes the
+          // button's place instead, on its own line (never squeezed into
+          // the Row below, which visual QA already flagged for overflow at
+          // large text scales -- see settings_group.dart's stacking fix).
+          if (deleteBlockedReason != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: semantic(
+                'members.edit.deleteBlockedReason',
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        deleteBlockedReason,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Row(
             children: [
-              if (_canDelete)
+              if (canDelete)
                 semantic(
                   'members.edit.delete',
                   child: TextButton(

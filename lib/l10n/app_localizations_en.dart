@@ -603,6 +603,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingUncheckAll => 'Put all back';
 
   @override
+  String shoppingClearedSnackbar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Cleared $count items',
+      one: 'Cleared 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shoppingClearedUndo => 'Undo';
+
+  @override
   String get shoppingAddHint => 'Add item…';
 
   @override
@@ -685,6 +699,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberEditColorLabel => 'Color';
+
+  @override
+  String get memberEditDeleteBlockedClaimed =>
+      'This profile is linked to an account, so it can\'t be removed here.';
+
+  @override
+  String get memberEditDeleteBlockedLastMember =>
+      'A household needs at least one member, so this one can\'t be removed.';
 
   @override
   String memberDeleteDialogTitle(String memberName) {
@@ -935,7 +957,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdCodeError =>
-      'That code isn\'t valid or has expired. Please check it and try again.';
+      'That code doesn\'t work. Double-check it for typos, or ask them to send you a new one.';
+
+  @override
+  String get joinHouseholdCodeUnknownError =>
+      'Couldn\'t check that code. Check your connection and try again.';
 
   @override
   String get joinHouseholdContinue => 'Continue';
