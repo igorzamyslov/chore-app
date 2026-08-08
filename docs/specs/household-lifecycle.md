@@ -40,30 +40,45 @@ healthy-looking household which silently stopped updating, permanently.
 That is the same class of trust defect as the signed-out state fixed in
 `docs/feedback/2026-08-07-field-feedback.md` A1.
 
-### 0.2 Live bug found while specifying this (fix is a prerequisite, §3.1)
+### 0.2 Two claim-state gaps found while specifying this (fixed in §3.1)
 
-The existing claimed-member protection is **inert**. Three layers guard on
-`member.userId != null`:
+*Correction, 2026-08-08: an earlier draft of this section claimed the
+claimed-member protection was entirely inert because local
+`members.userId` was never populated. That is WRONG and the claim came
+from an incomplete grep. `memberFromRow` maps `user_id`
+(`lib/data/sync/row_mappers.dart`), the join path inserts snapshot members
+verbatim (`lib/application/household_join_service.dart`), and
+`SyncRepository.applyPulledMember` full-row-replaces. Local `userId` IS
+populated on the join and pull paths, all three guards below work, and
+F10's premise ("today only unclaimed profiles can be deleted") holds.*
+
+The three layers that guard on `member.userId != null`:
 
 - `_canDelete` — `lib/features/settings/member_edit_sheet.dart`
 - the blocked-reason copy — same file, `_deleteBlockedReason`
 - `MemberService.deleteMember`'s guard — `lib/application/member_service.dart`
 
-No code path ever writes local `members.userId`:
-`HouseholdGateway.uploadHouseholdData` documents members as uploaded with
-`user_id` null, `downloadHousehold` does not map it back, and
-`SupabaseSyncEngine._pushMembers` sends only the four granted columns.
-Local `userId` is therefore always `null` and all three guards are
-unreachable.
+Two narrow gaps remain, both about local claim state going stale rather
+than never existing:
 
-So F10's premise ("today only unclaimed profiles can be deleted") is false.
-Today the app cannot tell which profiles are claimed, so it permits
-deleting **any** of them; on a linked device that soft-deletes locally and
-pushes `deleted_at` through the granted column — revoking a real person's
-access with no server-side unclaim, welding their `user_id` to a dead row
-(which breaks their §7.6 reconnect path), and telling them nothing.
+**G-A — unlink strands `userId`.** Precisely BECAUSE pull populates it,
+clearing the sync link leaves real `user_id` values on local rows in what
+is now a local-only household. Claim state is meaningless there, and the
+stale values permanently block deleting profiles that nobody can ever
+unclaim. Affects today's Disconnect
+(`lib/application/household_link_service.dart`) and, once it exists,
+§3.5's revocation path.
 
-This is a shipped bug, not a missing feature. §3.1 is its fix.
+**G-B — the adopting device has a window.** `HouseholdLinkService.adopt`
+step 3 sets the acting member's role locally but never their `userId`,
+and that write marks the row `syncDirty` — so `_applyPulled` SKIPS it
+(dirty local rows win, `sync-backend.md` §8.3) until a successful push
+clears the flag and a later pull replaces the row. Until then the
+adopter's own profile reads as unclaimed, so `_canDelete` would permit
+deleting themselves.
+
+Neither is a blocker for the exits, but both are cheap and both make the
+§3.2 routing trustworthy, so they lead the client work.
 
 ## 1. Decisions (taken 2026-08-08)
 
@@ -155,10 +170,16 @@ exits only. Revisit only with evidence of such failures.
 
 ### 2.5 Existing RPCs need a new guard
 
-`redeem_invite`, `list_claimable_members`, `claim_member`, and
-`join_as_new_member` must all reject a soft-deleted household. Without it
-a still-live invite code resurrects an abandoned household. This is a
-change to shipped server functions and needs its own pgTAP case.
+The invite-redemption family must reject a soft-deleted household —
+without it a still-live invite code resurrects an abandoned one.
+
+This is ONE change, not four: `list_claimable_members`, `claim_member`
+and `join_as_new_member` all obtain their invite through the shared
+`public._valid_invite(p_code)` helper
+(`20260731120000_initial_schema.sql`), which is the single choke point.
+Add the household-not-soft-deleted check there. (`sync-backend.md` §2
+names a `redeem_invite` RPC; no such function was ever implemented — the
+three above are the shipped redemption family.) Needs its own pgTAP case.
 
 ### 2.6 Rejected: client-side removal via the existing grant
 
@@ -170,8 +191,8 @@ It is not. `user_id` is NOT in the granted column list (`name, color,
 role, deleted_at` — `20260731120000_initial_schema.sql`), and the cascade
 must read every member's claim state atomically. The client-side shortcut
 yields a soft-delete that revokes access while leaving `user_id` welded to
-a dead row. Recorded here so it is not rediscovered as a shortcut later —
-it is also precisely the §0.2 bug.
+a dead row, which breaks that person's §7.6 reconnect path. Recorded here
+so it is not rediscovered as a shortcut later.
 
 ### 2.7 pgTAP
 
@@ -189,28 +210,31 @@ Extends `supabase/tests/001_rls_isolation_test.sql`:
 
 ## 3. Client
 
-### 3.1 Prerequisite — populate local `members.userId`
+### 3.1 Close the two §0.2 claim-state gaps
 
-Map `user_id` in `HouseholdGateway.downloadHousehold` and in the
-`SupabaseSyncEngine` pull path into the existing local column. No
-migration. This is what makes the §0.2 guards start working.
+No migration and no new mapping: `user_id` already flows server → local
+through `memberFromRow`. Both fixes are about keeping that value HONEST.
 
-Consequence: `_canDelete` becomes `false` for claimed members — so the
-Delete affordance for a claimed member must be RE-ROUTED (§3.2), not
-merely unblocked. Do not simply drop the guard.
+**G-A — unlinking must clear it.** Claim state is meaningless in a
+local-only household, and a stale `userId` keeps `_canDelete` false
+forever for profiles nobody can ever unclaim. So every path that clears
+the sync link — `SettingsRepository.clearSyncLink`'s callers: today's
+Disconnect (`lib/application/household_link_service.dart`) and §3.5's
+revocation — must also null every local `members.userId` in the same
+transaction. Disconnect stays behaviourally unchanged (it still deletes
+nothing and still permits reconnect, since `user_id` on the SERVER is
+untouched); it just stops leaving a dead flag behind.
 
-Push is unchanged: `_pushMembers` keeps sending only the four granted
-columns. `user_id` is server-owned and pull-only on the client.
+**G-B — adopt must set it.** `HouseholdLinkService.adopt` step 3 already
+mirrors the server's role rule locally; it must mirror the claim too,
+setting the acting member's `userId` to the current auth user id in the
+same write. Without it the row is dirty-and-unclaimed, and `_applyPulled`
+skips dirty rows, so the window stays open until a push/pull round trip
+closes it.
 
-**Unlinking must clear it.** Claim state is meaningless in a local-only
-household, and a stale `userId` would keep `_canDelete` false forever for
-profiles nobody can ever unclaim. So every path that clears the sync link
-— `SettingsRepository.clearSyncLink`'s callers: today's Disconnect
-(`lib/application/household_link_service.dart`) and §3.5's revocation —
-must also null every local `members.userId` in the same transaction.
-Disconnect keeps this behaviourally unchanged (it still deletes nothing
-and still permits reconnect, since `user_id` on the SERVER is untouched);
-it just stops leaving a dead flag behind.
+Push is unchanged: `user_id` is server-owned: `_pushMembers` sends only
+the four granted columns, and the local value exists to be READ by the
+§3.2 routing and the §3.4 count.
 
 ### 3.2 Member removal splits by claim state
 
@@ -288,9 +312,11 @@ under `settings.account.leave`, `settings.account.deleteAccount`,
   all three confirms, the §3.2 claimed/unclaimed split including the
   claimed path's failure surface, the §3.4 warning shown/not shown, and
   the §3.5 revocation notice.
-- **Unit** — pull populates `userId`; `_canDelete` flips accordingly.
-  This pair is what proves the §0.2 bug is dead; without it the fix is
-  unverified.
+- **Unit** — G-A: after `clearSyncLink`, every local `members.userId` is
+  null and a previously-claimed profile becomes deletable again. G-B:
+  after `adopt`, the acting member's local `userId` equals the auth user
+  id. A regression test that pull still populates `userId` pins the
+  behaviour §0.2's correction depends on.
 - **E2E** — stays offline per `sync-backend.md` §7.5, so none of this
   gets Maestro coverage. The real gate is the widget suite plus a manual
   live smoke against the local Docker stack following the §7.7 method.
@@ -305,8 +331,8 @@ the pump.
    migration and pgTAP. HARD GATE: if the delete is refused, fall back to
    the `sync-backend.md` §2 edge function and revisit the handoff story
    before any client code exists.
-2. **`userId` plumbing** (§3.1) + the shared confirm-with-checkbox widget
-   (§3.3) that slices 3–6 reuse.
+2. **Claim-state gaps** (§3.1 G-A and G-B) + the shared
+   confirm-with-checkbox widget (§3.3) that slices 3–6 reuse.
 3. **Revocation detection + notice** (§3.5).
 4. **Remove a claimed member** (§3.2).
 5. **Leave household** + last-member cascade warning (§3.4, D-L5).
@@ -314,7 +340,8 @@ the pump.
 
 Slice 3 precedes slice 4 deliberately: shipping claimed-member removal
 without the notice means knowingly shipping the §0.1 trap. Slices 1–3 are
-independently valuable — they fix a live bug and add no features.
+independently valuable and add no user-facing features — they close the
+§0.2 claim-state gaps and end the silent-stale state.
 
 **Main risk:** the `auth.users` delete (D-L4) is the only genuinely
 unknown thing here, which is why it is the first task rather than a late
@@ -324,8 +351,8 @@ discovery.
 
 - No role-based enforcement. D1 stands; `members.role` stays vestigial.
 - No pg_cron sweep (§2.4).
-- No change to Disconnect (§3.3) or to the P2d reconnect flow beyond what
-  §3.1 populates.
+- No change to Disconnect's user-facing behaviour or to the P2d reconnect
+  flow beyond §3.1's G-A cleanup.
 - No F12 restore-from-backup.
 - `chore_assignees` tombstones (`sync-backend.md` §8.5) remain out of
   scope; member removal's assignee cleanup is local and converges via the
