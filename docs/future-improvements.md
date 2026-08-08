@@ -24,6 +24,13 @@ its feedback doc until it has a decision. Updated 2026-08-07 (post-v0.4.0).*
 
 ## Household lifecycle (the P4 cluster)
 
+**F9, F10, F11 and F13 are now spec'd** in
+`docs/specs/household-lifecycle.md` (2026-08-08) — they are one operation
+(severing `user_id` from a `members` row) seen from four angles. That spec
+also records a live bug found while writing it: the claimed-member
+protection is inert because local `members.userId` is never populated.
+F12 was deliberately excluded and stays deferred here.
+
 | # | Item | Notes |
 | --- | --- | --- |
 | F9 | **Leave a household** (as distinct from Disconnect, which only unlinks this device) | server-side membership change |
