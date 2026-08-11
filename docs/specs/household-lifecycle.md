@@ -105,10 +105,14 @@ Neither is a blocker for the exits, but both are cheap and both make the
 
 ## 2. Server
 
-**No schema change on either side.** Server `households.deleted_at`
-already exists (`20260731120000_initial_schema.sql`); local `Households`
-has no such column and does not need one (§2.4). Local `Members.userId`
-already exists (`lib/data/db/tables.dart`) and only needs populating (§3.1).
+**No new tables or columns.** Server `households.deleted_at` already exists
+(`20260731120000_initial_schema.sql`); local `Households` has no such
+column and does not need one (§2.4). Local `Members.userId` already exists
+(`lib/data/db/tables.dart`).
+
+**But two foreign keys must be relaxed** — see §2.7. An earlier draft of
+this section claimed "no schema change on either side"; that was wrong,
+and the error was caught while implementing.
 
 ### 2.1 Shape
 
@@ -194,7 +198,37 @@ yields a soft-delete that revokes access while leaving `user_id` welded to
 a dead row, which breaks that person's §7.6 reconnect path. Recorded here
 so it is not rediscovered as a shortcut later.
 
-### 2.7 pgTAP
+### 2.7 The `auth.users` foreign keys (found during implementation)
+
+Three constraints reference `auth.users`, all `NO ACTION`:
+
+| Constraint | Column | Nullable |
+| --- | --- | --- |
+| `members_user_id_fkey` | `members.user_id` | yes |
+| `households_created_by_fkey` | `households.created_by` | **NOT NULL** |
+| `household_invites_created_by_fkey` | `household_invites.created_by` | **NOT NULL** |
+
+The unclaim (§2.2) handles the first. The other two block
+`delete from auth.users` for any account that ever created a household or
+an invite — i.e. every account F11 exists for. §2.4's cascade does not
+help: it stamps `households.deleted_at` and never touches `created_by`.
+
+Both columns are **write-only today** — inserted by `create_household` and
+`create_invite`, read by no RLS policy, no RPC and no client code (verified
+by grep; `chores.created_by` is an unrelated column referencing `members`).
+So the migration relaxes them:
+
+- `households.created_by` → drop `not null`, FK becomes `on delete set
+  null`. The household outlives its creator by design (§0: the household
+  owns its data), so a null creator is the honest representation.
+- `household_invites.created_by` → FK becomes `on delete cascade`. Invites
+  are ephemeral 7-day codes; they should die with their creator.
+
+Decision taken 2026-08-08 when the gate test surfaced the FK violation.
+Do NOT instead delete rows from inside `delete_account` — `created_by`
+being NOT NULL means that path still needs the same migration.
+
+### 2.8 pgTAP
 
 Extends `supabase/tests/001_rls_isolation_test.sql`:
 
@@ -305,7 +339,7 @@ under `settings.account.leave`, `settings.account.deleteAccount`,
 
 ## 4. Testing
 
-- **pgTAP** — §2.7, the server's only real test.
+- **pgTAP** — §2.8, the server's only real test.
 - **Widget** — extended `FakeHouseholdGateway` (three RPCs plus
   `findMyMembership` returning null on demand), per
   `sync-backend.md` §7.5's fake-gateway pattern: both checkbox states on

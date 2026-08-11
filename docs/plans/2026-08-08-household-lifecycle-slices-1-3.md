@@ -43,7 +43,7 @@ below (§2.2, §3.1 G-A, etc.) point into it.
 All three are refinements found while planning. They are called out here
 rather than silently applied:
 
-1. **§2.7 says "extends `supabase/tests/001_rls_isolation_test.sql`".** This
+1. **§2.8 says "extends `supabase/tests/001_rls_isolation_test.sql`".** This
    plan adds `supabase/tests/002_membership_exit_test.sql` instead. `001` opens
    with `select plan(32)` and is 259 lines; growing it means re-counting that
    plan on every task and re-running unrelated assertions. A second file is the
@@ -89,12 +89,23 @@ supabase start
 Expected: a table of local URLs (API on `http://127.0.0.1:54321`). If it is
 already running this is a no-op.
 
+**Applies to every task in slice 1:** `supabase test db` does NOT apply new
+or changed migrations — it runs the test files against the database as it
+currently stands. After editing anything under `supabase/migrations/`, run
+
+```bash
+supabase db reset
+```
+
+first, then `supabase test db`. Skipping the reset produces confusing
+"function does not exist" failures long after you wrote the function.
+
 - [ ] **Step 2: Write the failing test**
 
 Create `supabase/tests/002_membership_exit_test.sql`:
 
 ```sql
--- pgTAP: membership exit (spec docs/specs/household-lifecycle.md §2.7).
+-- pgTAP: membership exit (spec docs/specs/household-lifecycle.md §2.8).
 -- Run: `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -146,6 +157,29 @@ Create `supabase/migrations/20260808120000_membership_exit.sql`:
 -- remove-a-member, delete-account, and the orphan-household cascade.
 -- All three public RPCs are SECURITY DEFINER over internal helpers that
 -- are never granted to authenticated.
+
+-- The auth.users foreign keys (§2.7). Three constraints reference
+-- auth.users with NO ACTION. The unclaim handles members.user_id; these
+-- two are NOT NULL and would block `delete from auth.users` for every
+-- account that ever created a household or an invite -- which is every
+-- account delete_account exists for. Both columns are write-only (no RLS
+-- policy, RPC or client reads them), so relaxing them is safe:
+--   * a household outlives its creator by design (§0: the household owns
+--     its data), so a null creator is the honest representation;
+--   * invites are ephemeral 7-day codes and should die with their creator.
+alter table public.households
+  alter column created_by drop not null;
+alter table public.households
+  drop constraint households_created_by_fkey;
+alter table public.households
+  add constraint households_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete set null;
+
+alter table public.household_invites
+  drop constraint household_invites_created_by_fkey;
+alter table public.household_invites
+  add constraint household_invites_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete cascade;
 
 -- delete_account (§2.2, D-L4): unclaims every membership, cascades any
 -- household left with no claimed members, then deletes the auth user.
