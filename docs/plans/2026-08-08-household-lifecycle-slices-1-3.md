@@ -677,7 +677,7 @@ select throws_ok(
 
 select throws_ok(
   $$select join_as_new_member('DEADCODE',
-      '20000000-0000-0000-0000-0000000000z1'::uuid, 'Zoe', 4278190080)$$,
+      '20000000-0000-0000-0000-0000000000ce'::uuid, 'Zoe', 4278190080)$$,
   'invalid or expired invite',
   'joining a cascaded household is rejected');
 ```
@@ -771,12 +771,12 @@ reset role;
 -- Household J: Jo alone (claimed) plus an unclaimed profile. Deleting Jo's
 -- account must unclaim her, cascade J, and remove the auth user.
 insert into auth.users (id, email)
-values ('00000000-0000-0000-0000-0000000000j1', 'jo@test.local');
+values ('00000000-0000-0000-0000-0000000000da', 'jo@test.local');
 
-select test_login('00000000-0000-0000-0000-0000000000j1');
+select test_login('00000000-0000-0000-0000-0000000000da');
 select create_household(
-  '10000000-0000-0000-0000-0000000000j1'::uuid, 'Haus J',
-  '20000000-0000-0000-0000-0000000000j1'::uuid, 'Jo', 4278190080);
+  '10000000-0000-0000-0000-0000000000da'::uuid, 'Haus J',
+  '20000000-0000-0000-0000-0000000000da'::uuid, 'Jo', 4278190080);
 
 select lives_ok(
   $$select delete_account()$$,
@@ -785,19 +785,19 @@ select lives_ok(
 reset role;
 select is(
   (select user_id from members
-   where id = '20000000-0000-0000-0000-0000000000j1'),
+   where id = '20000000-0000-0000-0000-0000000000da'),
   null,
   'delete_account unclaims every membership');
 
 select isnt(
   (select deleted_at from households
-   where id = '10000000-0000-0000-0000-0000000000j1'),
+   where id = '10000000-0000-0000-0000-0000000000da'),
   null,
   'delete_account cascades a household left with no claimed members');
 
 select is(
   (select count(*)::int from auth.users
-   where id = '00000000-0000-0000-0000-0000000000j1'),
+   where id = '00000000-0000-0000-0000-0000000000da'),
   0,
   'delete_account removes the auth user (D-L4)');
 ```
