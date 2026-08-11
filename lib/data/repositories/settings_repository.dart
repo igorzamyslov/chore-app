@@ -56,6 +56,7 @@ class SettingsRepository {
         id: deviceId,
         digestEnabled: true,
         digestMinutes: 480,
+        membershipRevoked: false,
         createdAt: now,
         updatedAt: now,
       );
@@ -262,10 +263,43 @@ class SettingsRepository {
           updatedAt: Value(_isoNow()),
         ),
       );
+      // No WHERE clause: safe only because this app has exactly one
+      // household per device, so every local member row belongs to the
+      // household being unlinked. Add a household/household-membership
+      // filter here before this app ever supports more than one household
+      // per device.
       await db
           .update(db.members)
           .write(const MembersCompanion(userId: Value(null)));
     });
+  }
+
+  /// Records that this device's household membership was revoked
+  /// server-side, so the UI can explain it once (spec
+  /// `docs/specs/household-lifecycle.md` §3.5).
+  Future<void> setMembershipRevoked() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        membershipRevoked: const Value(true),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Clears the revocation flag once the user has acknowledged the notice.
+  Future<void> clearMembershipRevoked() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        membershipRevoked: const Value(false),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
   }
 
   Future<DeviceSettings?> _find() {

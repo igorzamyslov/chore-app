@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,6 +110,18 @@ class AppDatabase extends _$AppDatabase {
           // nullable `settings.syncLastPulledAt` pull-cursor column,
           // defaulting to `NULL` (no pull yet) -- no data rewrite.
           await migrator.addColumn(settings, settings.syncLastPulledAt);
+        }
+        if (from < 10) {
+          // v9 -> v10 (spec `docs/specs/household-lifecycle.md` §3.5): the
+          // `settings.membershipRevoked` flag, defaulting to `false` (not
+          // revoked) -- no data rewrite. Lives here, inside the `else`
+          // branch, rather than as an unconditional backfill below: unlike
+          // `households`/`members`/etc (which existed since schemaVersion
+          // 1), `settings` itself didn't exist before v2, so a v1 -> v10
+          // jump already gets this column for free via [createTable]
+          // above, and adding it again here would throw a
+          // duplicate-column error.
+          await migrator.addColumn(settings, settings.membershipRevoked);
         }
       }
       if (from < 8) {

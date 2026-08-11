@@ -43,6 +43,13 @@ class FakeSyncTransport implements SyncTransport {
   /// `docs/specs/sync-freshness.md` §2.2's foreground poll).
   int serverNowCalls = 0;
 
+  /// What [hasMembership] returns. `false` models a revoked membership --
+  /// the server-side removal this device has not noticed yet.
+  bool membershipPresent = true;
+
+  @override
+  Future<bool> hasMembership(String householdId) async => membershipPresent;
+
   @override
   Future<DateTime> serverNow() async {
     serverNowCalls++;

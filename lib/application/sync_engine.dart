@@ -190,6 +190,15 @@ abstract class SyncTransport {
   /// change to a row scoped to [householdId], across every synced table.
   /// The stream closes (no more events) once nothing is listening.
   Stream<void> householdChanges(String householdId);
+
+  /// Whether the signed-in account still has a live claimed membership in
+  /// [householdId] (spec `docs/specs/household-lifecycle.md` §3.5).
+  ///
+  /// This is the revocation signal: RLS answers a revoked device with
+  /// EMPTY RESULT SETS rather than errors, so an ordinary pull is
+  /// indistinguishable from "nothing changed" and the device would look
+  /// healthy forever.
+  Future<bool> hasMembership(String householdId);
 }
 
 /// The production [SyncEngine]: LWW push/pull over a [SyncTransport], with
@@ -375,6 +384,22 @@ class SupabaseSyncEngine implements SyncEngine {
   /// The pull itself -- THROWS on failure. [pullSince] swallows that;
   /// [refreshNow] reports it.
   Future<void> _pullSinceInner() async {
+    // Revocation probe (spec docs/specs/household-lifecycle.md §3.5).
+    // While linked, a missing membership IS the signal that this device
+    // was removed from its household -- RLS stops returning rows rather
+    // than erroring, so a pull would otherwise look like "no changes"
+    // forever.
+    //
+    // This deliberately overrides sync-backend.md §8.3's swallow-all-
+    // errors posture. §8.3 rests on the local DB always being consistent
+    // with the household; that argument stops holding the moment this
+    // device is cut off from it. Do not "fix" this back into silence.
+    if (!await transport.hasMembership(householdId)) {
+      await settings.setMembershipRevoked();
+      await settings.clearSyncLink();
+      return;
+    }
+
     final current = await settings.ensureSettings();
     final since = current.syncLastPulledAt == null
         ? null
@@ -667,6 +692,16 @@ class SupabaseSyncTransport implements SyncTransport {
   @override
   Future<void> updateHousehold(String id, Map<String, Object?> columns) async {
     await _client.from('households').update(columns).eq('id', id);
+  }
+
+  @override
+  Future<bool> hasMembership(String householdId) async {
+    final rows = await _client
+        .from('members')
+        .select('id')
+        .eq('household_id', householdId)
+        .limit(1);
+    return rows.isNotEmpty;
   }
 
   @override

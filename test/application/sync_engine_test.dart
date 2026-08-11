@@ -60,6 +60,7 @@ void main() {
     late CategoryRepository categories;
     late Household household;
     late FakeSyncTransport transport;
+    late SettingsRepository settings;
     late SupabaseSyncEngine engine;
 
     setUp(() async {
@@ -68,10 +69,11 @@ void main() {
       categories = CategoryRepository(db);
       household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
+      settings = SettingsRepository(db);
       engine = SupabaseSyncEngine(
         db: db,
         transport: transport,
-        settings: SettingsRepository(db),
+        settings: settings,
         householdId: household.id,
       );
     });
@@ -276,6 +278,42 @@ void main() {
 
         final settingsRow = await SettingsRepository(db).ensureSettings();
         expect(settingsRow.syncLastPulledAt, isNull);
+      },
+    );
+
+    test(
+      'a pull whose membership probe comes back false clears the sync link '
+      'and records the revocation for the notice (spec '
+      'docs/specs/household-lifecycle.md §3.5)',
+      () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        transport.membershipPresent = false;
+
+        await engine.pullSince();
+
+        final row = await settings.ensureSettings();
+        expect(row.syncHouseholdId, isNull);
+        expect(row.membershipRevoked, isTrue);
+      },
+    );
+
+    test(
+      'a pull whose membership probe succeeds leaves the link alone',
+      () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        transport.membershipPresent = true;
+
+        await engine.pullSince();
+
+        final row = await settings.ensureSettings();
+        expect(row.syncHouseholdId, household.id);
+        expect(row.membershipRevoked, isFalse);
       },
     );
   });

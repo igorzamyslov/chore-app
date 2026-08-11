@@ -40,6 +40,19 @@ Future<void> _dropMemberDeletedAtColumn(AppDatabase seed) async {
   await seed.customStatement('ALTER TABLE members DROP COLUMN deleted_at');
 }
 
+/// Drops `membership_revoked` (schema v10, spec
+/// `docs/specs/household-lifecycle.md` §3.5) from `settings` on [seed] --
+/// mirrors `_dropMemberDeletedAtColumn`'s reasoning for the same
+/// collateral-drop pattern: [seed] always opens at the *current* (now v10)
+/// schema first, so every test below that simulates a pre-v10 install
+/// needs this, or the later `onUpgrade` would try to `ADD COLUMN
+/// membership_revoked` on a column that's already there.
+Future<void> _dropMembershipRevokedColumn(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE settings DROP COLUMN membership_revoked',
+  );
+}
+
 void main() {
   test(
     'schemaVersion 1 -> 2 upgrade creates the settings table with defaults',
@@ -56,14 +69,17 @@ void main() {
 
       // Simulate a pre-existing v1 install without hand-copying v1's
       // CREATE TABLE SQL (which would drift out of sync with tables.dart
-      // over time): open the *current* (v9) schema once against a real
+      // over time): open the *current* (v10) schema once against a real
       // file so `onCreate` materializes every table, including the v2-only
       // `settings` table, then drop that table (plus `syncDirty` from
       // every OTHER table -- see `_dropSyncDirtyColumns`, added at v8 --
       // and `members.deletedAt`, added at v9 -- see
       // `_dropMemberDeletedAtColumn`) and roll `user_version` back to 1 —
       // reproducing exactly what a real v1 database on a user's device
-      // looks like.
+      // looks like. Dropping the whole `settings` table also covers
+      // `membership_revoked` (added at v10) -- there's no separate
+      // collateral drop needed for it here, unlike the versioned-upgrade
+      // tests below.
       final seed = AppDatabase(NativeDatabase(file));
       await seed.customStatement('DROP TABLE settings');
       await _dropSyncDirtyColumns(seed);
@@ -71,9 +87,9 @@ void main() {
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 1` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 1, 9)` —
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 1, 10)` —
       // exactly the real upgrade path a v1 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -94,6 +110,7 @@ void main() {
       expect(row.digestEnabled, isTrue);
       expect(row.digestMinutes, 480);
       expect(row.syncLastPulledAt, isNull);
+      expect(row.membershipRevoked, isFalse);
 
       // Pre-existing v1 data survived the upgrade untouched.
       final households = await upgraded.select(upgraded.households).get();
@@ -115,9 +132,10 @@ void main() {
   });
 
   test(
-    'schemaVersion 3 -> 9 upgrade adds locale, both shown-once flags, the '
-    'sync-linked columns, themeMode, and syncLastPulledAt (NULL by '
-    'default), keeping the existing settings row',
+    'schemaVersion 3 -> 10 upgrade adds locale, both shown-once flags, the '
+    'sync-linked columns, themeMode, syncLastPulledAt, and '
+    'membershipRevoked (NULL/false by default), keeping the existing '
+    'settings row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v4_test',
@@ -171,12 +189,13 @@ void main() {
       );
       await _dropSyncDirtyColumns(seed);
       await _dropMemberDeletedAtColumn(seed);
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 3` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 3, 9)` —
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 3, 10)` —
       // exactly the real upgrade path a v3 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -190,6 +209,7 @@ void main() {
       expect(row.syncLinkedAt, isNull);
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
+      expect(row.membershipRevoked, isFalse);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -199,9 +219,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 2 -> 9 upgrade adds every later settings column, '
+    'schemaVersion 2 -> 10 upgrade adds every later settings column, '
     'keeping the existing settings row -- this app never actually stops '
-    'at an intermediate version once schemaVersion is 9, so this '
+    'at an intermediate version once schemaVersion is 10, so this '
     'supersedes earlier per-step tests',
     () async {
       final dir = await Directory.systemTemp.createTemp(
@@ -214,16 +234,18 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v2 install: open the *current* (v9) schema
-      // once so `onCreate` materializes every table with its full v9
+      // Simulate a pre-existing v2 install: open the *current* (v10) schema
+      // once so `onCreate` materializes every table with its full v10
       // column set, insert a settings row, then drop every column newer
       // than v2 (plus `syncDirty` from every other table -- see
-      // `_dropSyncDirtyColumns`, added at v8 -- and `members.deletedAt`,
-      // added at v9 -- see `_dropMemberDeletedAtColumn`) and roll
-      // `user_version` back to 2 — reproducing exactly what a real v2
-      // database on a user's device looks like, so the `from < 2` branch is
-      // never hit and every `if (from < N)` backfill inside the `else`
-      // branch runs in the same upgrade.
+      // `_dropSyncDirtyColumns`, added at v8 -- `members.deletedAt`, added
+      // at v9 -- see `_dropMemberDeletedAtColumn` -- and
+      // `membershipRevoked`, added at v10 -- see
+      // `_dropMembershipRevokedColumn`) and roll `user_version` back to 2 —
+      // reproducing exactly what a real v2 database on a user's device
+      // looks like, so the `from < 2` branch is never hit and every `if
+      // (from < N)` backfill inside the `else` branch runs in the same
+      // upgrade.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -258,12 +280,13 @@ void main() {
       );
       await _dropSyncDirtyColumns(seed);
       await _dropMemberDeletedAtColumn(seed);
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 2, 9)`.
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 2, 10)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -277,6 +300,7 @@ void main() {
       expect(row.syncLinkedAt, isNull);
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
+      expect(row.membershipRevoked, isFalse);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.digestEnabled, isTrue);
@@ -285,9 +309,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 5 -> 9 upgrade adds syncHouseholdId, syncLinkedAt, '
-    'themeMode, and syncLastPulledAt (NULL by default, no data rewrite), '
-    'keeping the existing settings row',
+    'schemaVersion 5 -> 10 upgrade adds syncHouseholdId, syncLinkedAt, '
+    'themeMode, syncLastPulledAt, and membershipRevoked (NULL/false by '
+    'default, no data rewrite), keeping the existing settings row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v6_test',
@@ -299,16 +323,17 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v5 install: open the *current* (v9) schema
-      // once so `onCreate` materializes every table with its full v9 column
-      // set, insert a settings row with a non-NULL actingMemberId (so the
-      // upgrade's "existing row survives" guarantee is actually exercised),
-      // then drop every column newer than v5 (plus `syncDirty` from every
-      // other table -- see `_dropSyncDirtyColumns`, added at v8 -- and
-      // `members.deletedAt`, added at v9 -- see
-      // `_dropMemberDeletedAtColumn`) and roll `user_version` back to 5 --
-      // reproducing exactly what a real v5 database on a user's device
-      // looks like.
+      // Simulate a pre-existing v5 install: open the *current* (v10) schema
+      // once so `onCreate` materializes every table with its full v10
+      // column set, insert a settings row with a non-NULL actingMemberId
+      // (so the upgrade's "existing row survives" guarantee is actually
+      // exercised), then drop every column newer than v5 (plus `syncDirty`
+      // from every other table -- see `_dropSyncDirtyColumns`, added at
+      // v8 -- `members.deletedAt`, added at v9 -- see
+      // `_dropMemberDeletedAtColumn` -- and `membershipRevoked`, added at
+      // v10 -- see `_dropMembershipRevokedColumn`) and roll `user_version`
+      // back to 5 -- reproducing exactly what a real v5 database on a
+      // user's device looks like.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -334,13 +359,15 @@ void main() {
       );
       await _dropSyncDirtyColumns(seed);
       await _dropMemberDeletedAtColumn(seed);
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 5` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 5, 9)` --
-      // exactly the real upgrade path a v5 user's device would go through.
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 5, 10)`
+      // -- exactly the real upgrade path a v5 user's device would go
+      // through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -350,6 +377,7 @@ void main() {
       expect(row.syncLinkedAt, isNull);
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
+      expect(row.membershipRevoked, isFalse);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -359,8 +387,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 6 -> 9 upgrade adds themeMode and syncLastPulledAt '
-    '(NULL by default, no data rewrite), keeping the existing settings row',
+    'schemaVersion 6 -> 10 upgrade adds themeMode, syncLastPulledAt, and '
+    'membershipRevoked (NULL/false by default, no data rewrite), keeping '
+    'the existing settings row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v7_test',
@@ -372,17 +401,18 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v6 install: open the *current* (v9) schema
-      // once so `onCreate` materializes every table with its full v9 column
-      // set, insert a settings row with a non-NULL actingMemberId and a
-      // non-NULL syncHouseholdId (so the upgrade's "existing row survives"
-      // guarantee is actually exercised for both pre-existing columns),
-      // then drop the v7/v8-only columns (plus `syncDirty` from every other
-      // table -- see `_dropSyncDirtyColumns`, added at v8 -- and
+      // Simulate a pre-existing v6 install: open the *current* (v10) schema
+      // once so `onCreate` materializes every table with its full v10
+      // column set, insert a settings row with a non-NULL actingMemberId
+      // and a non-NULL syncHouseholdId (so the upgrade's "existing row
+      // survives" guarantee is actually exercised for both pre-existing
+      // columns), then drop the v7/v8-only columns (plus `syncDirty` from
+      // every other table -- see `_dropSyncDirtyColumns`, added at v8 --
       // `members.deletedAt`, added at v9 -- see
-      // `_dropMemberDeletedAtColumn`) and roll `user_version` back to 6 --
-      // reproducing exactly what a real v6 database on a user's device
-      // looks like.
+      // `_dropMemberDeletedAtColumn` -- and `membershipRevoked`, added at
+      // v10 -- see `_dropMembershipRevokedColumn`) and roll `user_version`
+      // back to 6 -- reproducing exactly what a real v6 database on a
+      // user's device looks like.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.settings)
@@ -403,13 +433,15 @@ void main() {
       );
       await _dropSyncDirtyColumns(seed);
       await _dropMemberDeletedAtColumn(seed);
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 6` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 6, 9)` --
-      // exactly the real upgrade path a v6 user's device would go through.
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 6, 10)`
+      // -- exactly the real upgrade path a v6 user's device would go
+      // through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -417,6 +449,7 @@ void main() {
       expect(row.id, 'device');
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
+      expect(row.membershipRevoked, isFalse);
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -427,9 +460,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 7 -> 9 upgrade adds syncDirty (default false) to every '
-    'synced table and syncLastPulledAt (NULL) to settings, keeping '
-    'existing rows',
+    'schemaVersion 7 -> 10 upgrade adds syncDirty (default false) to every '
+    'synced table and syncLastPulledAt/membershipRevoked (NULL/false) to '
+    'settings, keeping existing rows',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v8_test',
@@ -441,16 +474,18 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v7 install: open the *current* (v9) schema
-      // once so `onCreate` materializes every table with its full v9
+      // Simulate a pre-existing v7 install: open the *current* (v10) schema
+      // once so `onCreate` materializes every table with its full v10
       // column set, insert one row into every synced table (so the
       // upgrade's "existing rows survive, syncDirty defaults to false"
       // guarantee is actually exercised everywhere, not just on
       // `settings`), then drop `syncDirty` from all 7 of those tables,
       // `members.deletedAt` (added at v9 -- see
-      // `_dropMemberDeletedAtColumn`), and `syncLastPulledAt` from
-      // `settings`, and roll `user_version` back to 7 -- reproducing
-      // exactly what a real v7 database on a user's device looks like.
+      // `_dropMemberDeletedAtColumn`), and `syncLastPulledAt` and
+      // `membershipRevoked` (added at v10 -- see
+      // `_dropMembershipRevokedColumn`) from `settings`, and roll
+      // `user_version` back to 7 -- reproducing exactly what a real v7
+      // database on a user's device looks like.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.households)
@@ -547,13 +582,15 @@ void main() {
       await seed.customStatement(
         'ALTER TABLE settings DROP COLUMN sync_last_pulled_at',
       );
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 7` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 7, 9)` --
-      // exactly the real upgrade path a v7 user's device would go through.
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 7, 10)`
+      // -- exactly the real upgrade path a v7 user's device would go
+      // through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -598,6 +635,7 @@ void main() {
 
       final settingsRow = await upgraded.select(upgraded.settings).getSingle();
       expect(settingsRow.syncLastPulledAt, isNull);
+      expect(settingsRow.membershipRevoked, isFalse);
       // Pre-existing settings data survived the upgrade untouched.
       expect(settingsRow.createdAt, 't0');
       expect(settingsRow.digestEnabled, isTrue);
@@ -605,8 +643,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 8 -> 9 upgrade adds members.deletedAt (NULL by default, '
-    'no data rewrite), keeping the existing member row',
+    'schemaVersion 8 -> 10 upgrade adds members.deletedAt and '
+    'settings.membershipRevoked (NULL/false by default, no data rewrite), '
+    'keeping the existing member row',
     () async {
       final dir = await Directory.systemTemp.createTemp(
         'chore_app_migration_v9_test',
@@ -618,15 +657,19 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v8 install: open the *current* (v9) schema
-      // once so `onCreate` materializes every table with its full v9
-      // column set, insert a household + member row (so the upgrade's
-      // "existing row survives, deletedAt defaults to NULL" guarantee is
-      // actually exercised), then drop only `members.deletedAt` (every
-      // other v9-affected column already exists at v8 -- see
-      // `_dropMemberDeletedAtColumn`) and roll `user_version` back to 8 --
-      // reproducing exactly what a real v8 database on a user's device
-      // looks like.
+      // Simulate a pre-existing v8 install: open the *current* (v10) schema
+      // once so `onCreate` materializes every table with its full v10
+      // column set -- `settings` included, even though this test never
+      // inserts a row into it, so its `membership_revoked` column (added
+      // at v10) must be dropped too, or the upgrade below throws a
+      // duplicate-column error -- insert a household + member row (so the
+      // upgrade's "existing row survives, deletedAt defaults to NULL"
+      // guarantee is actually exercised), then drop `members.deletedAt`
+      // (every other v9-affected column already exists at v8 -- see
+      // `_dropMemberDeletedAtColumn`) and `settings.membership_revoked`
+      // (see `_dropMembershipRevokedColumn`), and roll `user_version` back
+      // to 8 -- reproducing exactly what a real v8 database on a user's
+      // device looks like.
       final seed = AppDatabase(NativeDatabase(file));
       await seed
           .into(seed.households)
@@ -652,13 +695,15 @@ void main() {
             ),
           );
       await _dropMemberDeletedAtColumn(seed);
+      await _dropMembershipRevokedColumn(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 9)
+      // Re-opening the same file with the real (schemaVersion: 10)
       // `AppDatabase` now sees `user_version == 8` on disk vs. a declared
-      // `schemaVersion` of 9, so drift runs `onUpgrade(migrator, 8, 9)` --
-      // exactly the real upgrade path a v8 user's device would go through.
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 8, 10)`
+      // -- exactly the real upgrade path a v8 user's device would go
+      // through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -671,6 +716,9 @@ void main() {
       expect(member.createdAt, 't0');
       // The new column defaults to NULL (active) -- no data rewrite.
       expect(member.deletedAt, isNull);
+
+      final settingsRow = await upgraded.select(upgraded.settings).get();
+      expect(settingsRow, isEmpty);
     },
   );
 }

@@ -661,7 +661,10 @@ class Member extends DataClass implements Insertable<Member> {
   /// ARGB color used to represent this member in the UI.
   final int color;
 
-  /// This member's permission level.
+  /// This member's [MemberRole]. VESTIGIAL (D1, `docs/specs/sync-backend.md`
+  /// §2): written once at creation, and gates nothing -- no RLS policy, no
+  /// RPC, no widget. The household is flat by design; do not add
+  /// enforcement against this column without a spec change.
   final MemberRole role;
 
   /// Future auth-provider user id mapping; unused in v1.
@@ -4400,6 +4403,21 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _membershipRevokedMeta = const VerificationMeta(
+    'membershipRevoked',
+  );
+  @override
+  late final GeneratedColumn<bool> membershipRevoked = GeneratedColumn<bool>(
+    'membership_revoked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("membership_revoked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4435,6 +4453,7 @@ class $SettingsTable extends Settings
     syncLinkedAt,
     themeMode,
     syncLastPulledAt,
+    membershipRevoked,
     createdAt,
     updatedAt,
   ];
@@ -4539,6 +4558,15 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('membership_revoked')) {
+      context.handle(
+        _membershipRevokedMeta,
+        membershipRevoked.isAcceptableOrUnknown(
+          data['membership_revoked']!,
+          _membershipRevokedMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4608,6 +4636,10 @@ class $SettingsTable extends Settings
         DriftSqlType.string,
         data['${effectivePrefix}sync_last_pulled_at'],
       ),
+      membershipRevoked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}membership_revoked'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -4699,6 +4731,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// `AppDatabase.migration`.
   final String? syncLastPulledAt;
 
+  /// Set when a pull discovered this device's membership was revoked
+  /// server-side (spec `docs/specs/household-lifecycle.md` §3.5). Cleared
+  /// when the user acknowledges the notice. Added in schemaVersion 10; see
+  /// `AppDatabase.migration`.
+  final bool membershipRevoked;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4716,6 +4754,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.syncLinkedAt,
     this.themeMode,
     this.syncLastPulledAt,
+    required this.membershipRevoked,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4753,6 +4792,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     if (!nullToAbsent || syncLastPulledAt != null) {
       map['sync_last_pulled_at'] = Variable<String>(syncLastPulledAt);
     }
+    map['membership_revoked'] = Variable<bool>(membershipRevoked);
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4788,6 +4828,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLastPulledAt: syncLastPulledAt == null && nullToAbsent
           ? const Value.absent()
           : Value(syncLastPulledAt),
+      membershipRevoked: Value(membershipRevoked),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4814,6 +4855,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLinkedAt: serializer.fromJson<String?>(json['syncLinkedAt']),
       themeMode: serializer.fromJson<String?>(json['themeMode']),
       syncLastPulledAt: serializer.fromJson<String?>(json['syncLastPulledAt']),
+      membershipRevoked: serializer.fromJson<bool>(json['membershipRevoked']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4837,6 +4879,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'syncLinkedAt': serializer.toJson<String?>(syncLinkedAt),
       'themeMode': serializer.toJson<String?>(themeMode),
       'syncLastPulledAt': serializer.toJson<String?>(syncLastPulledAt),
+      'membershipRevoked': serializer.toJson<bool>(membershipRevoked),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4854,6 +4897,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> syncLinkedAt = const Value.absent(),
     Value<String?> themeMode = const Value.absent(),
     Value<String?> syncLastPulledAt = const Value.absent(),
+    bool? membershipRevoked,
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4878,6 +4922,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     syncLastPulledAt: syncLastPulledAt.present
         ? syncLastPulledAt.value
         : this.syncLastPulledAt,
+    membershipRevoked: membershipRevoked ?? this.membershipRevoked,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4910,6 +4955,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLastPulledAt: data.syncLastPulledAt.present
           ? data.syncLastPulledAt.value
           : this.syncLastPulledAt,
+      membershipRevoked: data.membershipRevoked.present
+          ? data.membershipRevoked.value
+          : this.membershipRevoked,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4929,6 +4977,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('themeMode: $themeMode, ')
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
+          ..write('membershipRevoked: $membershipRevoked, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4948,6 +4997,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     syncLinkedAt,
     themeMode,
     syncLastPulledAt,
+    membershipRevoked,
     createdAt,
     updatedAt,
   );
@@ -4967,6 +5017,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.syncLinkedAt == this.syncLinkedAt &&
           other.themeMode == this.themeMode &&
           other.syncLastPulledAt == this.syncLastPulledAt &&
+          other.membershipRevoked == this.membershipRevoked &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4983,6 +5034,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> syncLinkedAt;
   final Value<String?> themeMode;
   final Value<String?> syncLastPulledAt;
+  final Value<bool> membershipRevoked;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -4998,6 +5050,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncLinkedAt = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.syncLastPulledAt = const Value.absent(),
+    this.membershipRevoked = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5014,6 +5067,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncLinkedAt = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.syncLastPulledAt = const Value.absent(),
+    this.membershipRevoked = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -5032,6 +5086,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? syncLinkedAt,
     Expression<String>? themeMode,
     Expression<String>? syncLastPulledAt,
+    Expression<bool>? membershipRevoked,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -5050,6 +5105,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (syncLinkedAt != null) 'sync_linked_at': syncLinkedAt,
       if (themeMode != null) 'theme_mode': themeMode,
       if (syncLastPulledAt != null) 'sync_last_pulled_at': syncLastPulledAt,
+      if (membershipRevoked != null) 'membership_revoked': membershipRevoked,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5068,6 +5124,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? syncLinkedAt,
     Value<String?>? themeMode,
     Value<String?>? syncLastPulledAt,
+    Value<bool>? membershipRevoked,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -5086,6 +5143,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       syncLinkedAt: syncLinkedAt ?? this.syncLinkedAt,
       themeMode: themeMode ?? this.themeMode,
       syncLastPulledAt: syncLastPulledAt ?? this.syncLastPulledAt,
+      membershipRevoked: membershipRevoked ?? this.membershipRevoked,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5132,6 +5190,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (syncLastPulledAt.present) {
       map['sync_last_pulled_at'] = Variable<String>(syncLastPulledAt.value);
     }
+    if (membershipRevoked.present) {
+      map['membership_revoked'] = Variable<bool>(membershipRevoked.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -5158,6 +5219,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('syncLinkedAt: $syncLinkedAt, ')
           ..write('themeMode: $themeMode, ')
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
+          ..write('membershipRevoked: $membershipRevoked, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -9633,6 +9695,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> syncLinkedAt,
       Value<String?> themeMode,
       Value<String?> syncLastPulledAt,
+      Value<bool> membershipRevoked,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -9650,6 +9713,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> syncLinkedAt,
       Value<String?> themeMode,
       Value<String?> syncLastPulledAt,
+      Value<bool> membershipRevoked,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -9716,6 +9780,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get syncLastPulledAt => $composableBuilder(
     column: $table.syncLastPulledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get membershipRevoked => $composableBuilder(
+    column: $table.membershipRevoked,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9794,6 +9863,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get membershipRevoked => $composableBuilder(
+    column: $table.membershipRevoked,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9863,6 +9937,11 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get membershipRevoked => $composableBuilder(
+    column: $table.membershipRevoked,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9913,6 +9992,7 @@ class $$SettingsTableTableManager
                 Value<String?> syncLinkedAt = const Value.absent(),
                 Value<String?> themeMode = const Value.absent(),
                 Value<String?> syncLastPulledAt = const Value.absent(),
+                Value<bool> membershipRevoked = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9928,6 +10008,7 @@ class $$SettingsTableTableManager
                 syncLinkedAt: syncLinkedAt,
                 themeMode: themeMode,
                 syncLastPulledAt: syncLastPulledAt,
+                membershipRevoked: membershipRevoked,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9946,6 +10027,7 @@ class $$SettingsTableTableManager
                 Value<String?> syncLinkedAt = const Value.absent(),
                 Value<String?> themeMode = const Value.absent(),
                 Value<String?> syncLastPulledAt = const Value.absent(),
+                Value<bool> membershipRevoked = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -9961,6 +10043,7 @@ class $$SettingsTableTableManager
                 syncLinkedAt: syncLinkedAt,
                 themeMode: themeMode,
                 syncLastPulledAt: syncLastPulledAt,
+                membershipRevoked: membershipRevoked,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
