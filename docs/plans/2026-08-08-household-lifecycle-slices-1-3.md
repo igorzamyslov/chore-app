@@ -568,7 +568,13 @@ select is(
   (select deleted_at from households
    where id = '10000000-0000-0000-0000-0000000000g1'),
   null,
-  'remove_member never cascades -- the caller stays claimed (§2.3)');
+  'removing a member never soft-deletes the household');
+-- NOTE on what this does and does not prove: it cannot distinguish
+-- "_cascade_if_orphaned was never called" from "it was called and
+-- correctly no-opped", because Gil is still claimed either way. It is a
+-- real invariant (a removal must never take the household with it), just
+-- not a proof of §2.3's mechanism. §2.3 holds structurally: self-removal
+-- is rejected, so the caller is always a surviving claimed member.
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -602,10 +608,13 @@ declare
 begin
   select household_id into v_household_id from members
     where id = p_member_id;
-  if v_household_id is null then
-    raise exception 'no such member';
-  end if;
-  if not is_household_member(v_household_id) then
+  -- ONE message for "no such member" and "not your household" alike.
+  -- This function is SECURITY DEFINER, so the lookup above bypasses RLS:
+  -- two distinct messages would tell a non-member whether an arbitrary
+  -- member UUID exists anywhere in the system -- an existence oracle
+  -- across household boundaries, and a hole in the is_household_member
+  -- perimeter this project treats as its security boundary. Say nothing.
+  if v_household_id is null or not is_household_member(v_household_id) then
     raise exception 'not a member of this household';
   end if;
   select id into v_caller_member_id from members
