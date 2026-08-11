@@ -1239,8 +1239,8 @@ In `lib/l10n/app_en.arb`:
 In `lib/l10n/app_de.arb` (du-form):
 
 ```json
-  "exitConfirmDeleteLocalLabel": "Kopie auf diesem Handy auch löschen",
-  "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Handy. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Handy werden gelöscht und die App startet neu.",
+  "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
+  "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",
   "exitConfirmCancel": "Abbrechen",
 ```
 
