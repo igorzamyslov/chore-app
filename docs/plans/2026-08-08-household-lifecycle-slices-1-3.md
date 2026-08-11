@@ -181,11 +181,21 @@ alter table public.household_invites
   add constraint household_invites_created_by_fkey
   foreign key (created_by) references auth.users (id) on delete cascade;
 
--- delete_account (§2.2, D-L4): unclaims every membership, cascades any
--- household left with no claimed members, then deletes the auth user.
--- The auth.users delete works because this function is owned by
--- `postgres`, which has rights on the auth schema -- no edge function and
--- no service-role key. Task 1's pgTAP case is what proves that.
+-- delete_account (§2.2, D-L4), first form: unclaim every membership, then
+-- delete the auth user. The auth.users delete works because this function
+-- is owned by `postgres`, which has rights on the auth schema -- no edge
+-- function and no service-role key. Task 1's pgTAP case proves that.
+--
+-- The unclaim is NOT optional padding: members.user_id is the third
+-- NO ACTION foreign key to auth.users, and unlike the two created_by
+-- columns it must NOT be relaxed -- is_household_member() reads it, so it
+-- is load-bearing for every RLS policy. Nulling it here is what the
+-- finished form does anyway (§2.2 loops over memberships), so this stub is
+-- a true subset of the final behaviour rather than a throwaway.
+--
+-- Still deliberately INCOMPLETE: no orphan cascade, and no reuse of the
+-- _exit_membership / _cascade_if_orphaned helpers, which do not exist yet.
+-- Task 6 replaces this body entirely. Do not add the cascade here.
 create or replace function public.delete_account()
 returns void
 language plpgsql
@@ -196,6 +206,7 @@ begin
   if auth.uid() is null then
     raise exception 'not authenticated';
   end if;
+  update members set user_id = null where user_id = auth.uid();
   delete from auth.users where id = auth.uid();
 end;
 $$;
