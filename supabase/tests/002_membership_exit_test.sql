@@ -159,7 +159,14 @@ select is(
   (select deleted_at from households
    where id = '10000000-0000-0000-0000-0000000000a2'),
   null,
-  'remove_member never cascades -- the caller stays claimed (§2.3)');
+  'removing a member never soft-deletes the household');
+
+-- NOTE on what this does and does not prove: it cannot distinguish
+-- "_cascade_if_orphaned was never called" from "it was called and
+-- correctly no-opped", because Gil is still claimed either way. It is a
+-- real invariant (a removal must never take the household with it), just
+-- not a proof of §2.3's mechanism. §2.3 holds structurally: self-removal
+-- is rejected, so the caller is always a surviving claimed member.
 
 select * from finish();
 rollback;

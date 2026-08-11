@@ -158,10 +158,13 @@ declare
 begin
   select household_id into v_household_id from members
     where id = p_member_id;
-  if v_household_id is null then
-    raise exception 'no such member';
-  end if;
-  if not is_household_member(v_household_id) then
+  -- ONE message for "no such member" and "not your household" alike.
+  -- This function is SECURITY DEFINER, so the lookup above bypasses RLS:
+  -- two distinct messages would tell a non-member whether an arbitrary
+  -- member UUID exists anywhere in the system -- an existence oracle
+  -- across household boundaries, and a hole in the is_household_member
+  -- perimeter this project treats as its security boundary. Say nothing.
+  if v_household_id is null or not is_household_member(v_household_id) then
     raise exception 'not a member of this household';
   end if;
   select id into v_caller_member_id from members
