@@ -139,3 +139,44 @@ $$;
 
 revoke execute on function public._cascade_if_orphaned(uuid)
   from public, anon, authenticated;
+
+-- remove_member (§2.2): unclaims AND soft-deletes another member's
+-- profile. Any member may remove any other (D-L2 -- the household is flat
+-- by D1; role is not consulted). Self-removal is rejected: that is
+-- leave_household, which keeps the profile claimable. Idempotent on an
+-- already-removed row and tolerant of an unclaimed target, so a retry
+-- after a partial failure is safe.
+create or replace function public.remove_member(p_member_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_household_id uuid;
+  v_caller_member_id uuid;
+begin
+  select household_id into v_household_id from members
+    where id = p_member_id;
+  if v_household_id is null then
+    raise exception 'no such member';
+  end if;
+  if not is_household_member(v_household_id) then
+    raise exception 'not a member of this household';
+  end if;
+  select id into v_caller_member_id from members
+    where household_id = v_household_id
+      and user_id = auth.uid()
+      and deleted_at is null;
+  if v_caller_member_id = p_member_id then
+    raise exception 'use leave_household to remove yourself';
+  end if;
+  update members
+    set user_id = null,
+        deleted_at = coalesce(deleted_at, now())
+    where id = p_member_id;
+end;
+$$;
+
+revoke execute on function public.remove_member(uuid) from public, anon;
+grant execute on function public.remove_member(uuid) to authenticated;

@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(9);
+select plan(15);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -103,6 +103,63 @@ select isnt(
    where id = '10000000-0000-0000-0000-0000000000e1'),
   null,
   'the household cascades when its last claimed member leaves');
+
+-- Household G: Gil and Hana both claimed, plus an unclaimed profile.
+insert into auth.users (id, email)
+values ('00000000-0000-0000-0000-0000000000a2', 'gil@test.local'),
+       ('00000000-0000-0000-0000-0000000000b2', 'hana@test.local');
+
+select test_login('00000000-0000-0000-0000-0000000000a2');
+select create_household(
+  '10000000-0000-0000-0000-0000000000a2'::uuid, 'Haus G',
+  '20000000-0000-0000-0000-0000000000a2'::uuid, 'Gil', 4278190080);
+
+reset role;
+insert into members (id, household_id, name, color, role, user_id)
+values ('20000000-0000-0000-0000-0000000000b2',
+        '10000000-0000-0000-0000-0000000000a2', 'Hana', 4278190081,
+        'member', '00000000-0000-0000-0000-0000000000b2'),
+       ('20000000-0000-0000-0000-0000000000b3',
+        '10000000-0000-0000-0000-0000000000a2', 'Kid', 4278190082,
+        'member', null);
+
+-- A non-member cannot remove anyone in G.
+select test_login('00000000-0000-0000-0000-00000000000c');
+select throws_ok(
+  $$select remove_member('20000000-0000-0000-0000-0000000000b2'::uuid)$$,
+  'not a member of this household',
+  'a non-member cannot remove a member of another household');
+
+-- Gil cannot remove himself.
+select test_login('00000000-0000-0000-0000-0000000000a2');
+select throws_ok(
+  $$select remove_member('20000000-0000-0000-0000-0000000000a2'::uuid)$$,
+  'use leave_household to remove yourself',
+  'remove_member rejects self-removal (§2.2)');
+
+-- Gil removes Hana, a claimed member, with no role privilege (D-L2/D1).
+select lives_ok(
+  $$select remove_member('20000000-0000-0000-0000-0000000000b2'::uuid)$$,
+  'any member can remove any other member');
+
+reset role;
+select is(
+  (select user_id from members
+   where id = '20000000-0000-0000-0000-0000000000b2'),
+  null,
+  'removal unclaims the profile');
+
+select isnt(
+  (select deleted_at from members
+   where id = '20000000-0000-0000-0000-0000000000b2'),
+  null,
+  'removal soft-deletes the profile (unlike leaving)');
+
+select is(
+  (select deleted_at from households
+   where id = '10000000-0000-0000-0000-0000000000a2'),
+  null,
+  'remove_member never cascades -- the caller stays claimed (§2.3)');
 
 select * from finish();
 rollback;
