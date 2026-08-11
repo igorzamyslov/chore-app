@@ -1795,108 +1795,47 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 
 - [ ] **Step 2: Write the failing test**
 
-Create `test/features/settings/membership_revoked_notice_test.dart`:
+Create `test/features/settings/membership_revoked_notice_test.dart`.
 
-```dart
-import 'package:chore_app/app/providers.dart';
-import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/repositories/household_repository.dart';
-import 'package:chore_app/data/repositories/settings_repository.dart';
-import 'package:chore_app/features/settings/membership_revoked_notice.dart';
-import 'package:chore_app/l10n/app_localizations.dart';
-import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test/flutter_test.dart';
+**Do NOT hand-roll a `ProviderScope` pump with `tearDown(() => db.close())`.**
+Two earlier drafts of this task did exactly that and both HUNG rather than
+failed. The reason is documented in `test/test_utils/pump_app.dart`'s own
+header: flutter_test's "a Timer is still pending" leak check runs BEFORE
+registered tear-downs, so a database closed in `tearDown` never drains
+drift's stream-cleanup timer, and the run deadlocks. That in turn hangs the
+whole suite and therefore the pre-commit hook.
 
-/// Widget tests for the membership-revoked notice (spec
-/// `docs/specs/household-lifecycle.md` §3.5): the honest replacement for a
-/// device that silently stopped syncing.
-void main() {
-  late AppDatabase db;
+Use the project's established harness instead. Read
+`test/features/settings/account_section_test.dart` first and follow its
+shape exactly — it is the closest existing test to this one:
 
-  setUp(() => db = AppDatabase(NativeDatabase.memory()));
-  tearDown(() async => db.close());
+- `testChoreApp(description, (tester, database) async { ... }, today: ...)`
+  from `test/test_utils/pump_app.dart`, which owns the database lifecycle.
+- `await openSettingsTab(tester);` to reach the Account section.
+- `find.bySemanticsIdentifier('...')` for every element — this project
+  selects by semantic id, not by visible text. Text finders are also what
+  made the earlier draft ambiguous once the sheet was open.
 
-  Future<void> pumpNotice(WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: MembershipRevokedNotice()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-  }
+Cover four cases:
 
-  testWidgets('renders nothing when the flag is not set', (tester) async {
-    await HouseholdRepository(db).createLocalHousehold('Me');
-    await pumpNotice(tester);
-    expect(find.textContaining('no longer part'), findsNothing);
-  });
+1. **Flag unset** — `membership.revoked.banner` finds nothing.
+2. **Flag set** (`SettingsRepository(database).setMembershipRevoked()`
+   before opening Settings) — the banner is present.
+3. **Acknowledge, keep by default (D-L3)** — tap
+   `membership.revoked.acknowledge`, then the sheet's
+   `membership.revoked.confirm`, WITHOUT touching the checkbox. Assert the
+   households table is still non-empty and `membershipRevoked` is now
+   false.
+4. **Acknowledge, opt in to the wipe** — same, but tap
+   `membership.revoked.deleteLocal` before confirming. Assert the
+   households table is empty. This is the destructive path; it had no
+   coverage in earlier drafts of this plan.
 
-  testWidgets('explains the revocation when the flag is set', (tester) async {
-    await HouseholdRepository(db).createLocalHousehold('Me');
-    await SettingsRepository(db).setMembershipRevoked();
-    await pumpNotice(tester);
-    expect(find.textContaining('no longer part'), findsOneWidget);
-  });
-
-  // Acknowledging is TWO taps, not one: the banner's button only opens the
-  // shared exit-confirmation sheet, and the keep-or-wipe choice is made
-  // there. A test that taps only the banner asserts state that cannot have
-  // happened yet, and pumpAndSettle never settles with the sheet left open.
-  Future<void> acknowledge(WidgetTester tester, {required bool alsoDelete}) async {
-    await tester.tap(find.text('Got it'));
-    await tester.pumpAndSettle();
-    if (alsoDelete) {
-      await tester.tap(find.byType(CheckboxListTile));
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets('acknowledging keeps local data by default', (tester) async {
-    final household = await HouseholdRepository(db).createLocalHousehold('Me');
-    await SettingsRepository(db).setMembershipRevoked();
-    await pumpNotice(tester);
-
-    await acknowledge(tester, alsoDelete: false);
-
-    final households = await db.select(db.households).get();
-    expect(
-      households.map((h) => h.id),
-      contains(household.id),
-      reason: 'D-L3: the default is to keep this phone\'s copy',
-    );
-    final settings = await SettingsRepository(db).ensureSettings();
-    expect(settings.membershipRevoked, isFalse);
-  });
-
-  testWidgets('opting in wipes this device', (tester) async {
-    await HouseholdRepository(db).createLocalHousehold('Me');
-    await SettingsRepository(db).setMembershipRevoked();
-    await pumpNotice(tester);
-
-    await acknowledge(tester, alsoDelete: true);
-
-    // resetAppData clears every table, which is what returns the app to
-    // the welcome screen. This is the destructive path; without a test it
-    // is the one nobody finds out is broken until a user runs it.
-    final households = await db.select(db.households).get();
-    expect(households, isEmpty);
-  });
-}
-```
+The sheet's ids come from Task 9's `semanticPrefix` — with prefix
+`membership.revoked` they are `membership.revoked.deleteLocal`,
+`.cancel` and `.confirm`. Verify them against
+`lib/features/settings/exit_confirm_sheet.dart` rather than trusting this
+list.
 
 - [ ] **Step 3: Run to verify it fails**
 
