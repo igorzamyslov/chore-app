@@ -114,4 +114,52 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'cancelling the sheet leaves the notice in place and deletes nothing',
+    today: today,
+    (tester, database) async {
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(database).setMembershipRevoked();
+
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      await tester.tap(
+        find.bySemanticsIdentifier('membership.revoked.acknowledge'),
+      );
+      await tester.pumpAndSettle();
+      // Even with the wipe box ticked, Cancel must still delete nothing --
+      // this pins that the checkbox state never leaks out on a decline.
+      await tester.tap(
+        find.bySemanticsIdentifier('membership.revoked.deleteLocal'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('membership.revoked.cancel'));
+      await tester.pumpAndSettle();
+
+      final households = await database.select(database.households).get();
+      expect(
+        households.map((h) => h.id),
+        contains(householdId),
+        reason: 'cancelling must not delete local data',
+      );
+      final settings = await SettingsRepository(database).ensureSettings();
+      expect(
+        settings.membershipRevoked,
+        isTrue,
+        reason:
+            'the user has not yet made a choice -- clearing the flag here '
+            'would silence the notice forever while the device stays '
+            'unsynced',
+      );
+      expect(
+        find.bySemanticsIdentifier('membership.revoked.banner'),
+        findsOneWidget,
+        reason: 'the notice must still be showing after a decline',
+      );
+
+      handle.dispose();
+    },
+  );
 }
