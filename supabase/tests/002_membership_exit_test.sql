@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(7);
+select plan(9);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -89,6 +89,20 @@ select is(
    where id = '10000000-0000-0000-0000-0000000000e1'),
   null,
   'no cascade while Fran is still claimed');
+
+-- Fran now leaves too -- she is the last claimed member, so the household
+-- cascades (§2.4, D-L5).
+select test_login('00000000-0000-0000-0000-0000000000f1');
+select lives_ok(
+  $$select leave_household('10000000-0000-0000-0000-0000000000e1'::uuid)$$,
+  'fran, the last claimed member, can leave');
+
+reset role;
+select isnt(
+  (select deleted_at from households
+   where id = '10000000-0000-0000-0000-0000000000e1'),
+  null,
+  'the household cascades when its last claimed member leaves');
 
 select * from finish();
 rollback;

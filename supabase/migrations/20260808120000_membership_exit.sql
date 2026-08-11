@@ -104,9 +104,38 @@ begin
     where household_id = p_household_id
       and user_id = auth.uid()
       and deleted_at is null;
-  perform _exit_membership(v_member_id);
+  perform _cascade_if_orphaned(_exit_membership(v_member_id));
 end;
 $$;
 
 revoke execute on function public.leave_household(uuid) from public, anon;
 grant execute on function public.leave_household(uuid) to authenticated;
+
+-- Internal: soft-delete a household that has no claimed members left
+-- (§2.4). Child rows are deliberately left alone -- RLS already hides
+-- every row once nobody is a member, so cascading them buys nothing and
+-- costs a large write. `updated_at` is trigger-maintained; do not set it.
+create or replace function public._cascade_if_orphaned(p_household_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_claimed int;
+begin
+  select count(*) into v_claimed from members
+    where household_id = p_household_id
+      and user_id is not null
+      and deleted_at is null;
+  if v_claimed > 0 then
+    return false;
+  end if;
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  return true;
+end;
+$$;
+
+revoke execute on function public._cascade_if_orphaned(uuid)
+  from public, anon, authenticated;
