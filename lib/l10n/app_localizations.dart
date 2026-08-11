@@ -1655,6 +1655,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete everything'**
   String get settingsResetConfirm2Action;
+
+  /// Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit.
+  ///
+  /// In en, this message translates to:
+  /// **'Also delete this phone\'s copy'**
+  String get exitConfirmDeleteLocalLabel;
+
+  /// One-line explanation under the exit-confirmation checkbox, stating what each state means.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: the household stays on this phone as your own local copy. On: this phone\'s members, chores and shopping list are deleted and the app starts fresh.'**
+  String get exitConfirmDeleteLocalExplanation;
+
+  /// Cancel button of the shared exit-confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get exitConfirmCancel;
 }
 
 class _AppLocalizationsDelegate

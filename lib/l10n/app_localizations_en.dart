@@ -1061,4 +1061,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Delete everything';
+
+  @override
+  String get exitConfirmDeleteLocalLabel => 'Also delete this phone\'s copy';
+
+  @override
+  String get exitConfirmDeleteLocalExplanation =>
+      'Off: the household stays on this phone as your own local copy. On: this phone\'s members, chores and shopping list are deleted and the app starts fresh.';
+
+  @override
+  String get exitConfirmCancel => 'Cancel';
 }

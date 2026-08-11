@@ -1394,5 +1394,18 @@
   "settingsResetConfirm2Action": "Delete everything",
   "@settingsResetConfirm2Action": {
     "description": "The final destructive confirm button; tapping it wipes every table and re-bootstraps the app to the fresh-install state."
+  },
+
+  "exitConfirmDeleteLocalLabel": "Also delete this phone's copy",
+  "@exitConfirmDeleteLocalLabel": {
+    "description": "Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit."
+  },
+  "exitConfirmDeleteLocalExplanation": "Off: the household stays on this phone as your own local copy. On: this phone's members, chores and shopping list are deleted and the app starts fresh.",
+  "@exitConfirmDeleteLocalExplanation": {
+    "description": "One-line explanation under the exit-confirmation checkbox, stating what each state means."
+  },
+  "exitConfirmCancel": "Cancel",
+  "@exitConfirmCancel": {
+    "description": "Cancel button of the shared exit-confirmation sheet."
   }
 }

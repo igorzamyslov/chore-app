@@ -302,5 +302,9 @@
   "settingsResetConfirm1Action": "Weiter",
   "settingsResetConfirm2Title": "Wirklich alles löschen?",
   "settingsResetConfirm2Body": "Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.",
-  "settingsResetConfirm2Action": "Alles löschen"
+  "settingsResetConfirm2Action": "Alles löschen",
+
+  "exitConfirmDeleteLocalLabel": "Kopie auf diesem Handy auch löschen",
+  "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Handy. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Handy werden gelöscht und die App startet neu.",
+  "exitConfirmCancel": "Abbrechen"
 }
