@@ -21,9 +21,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_sync_transport.dart';
 
-/// A transport whose `serverNow` always throws — i.e. the pull half fails,
-/// as it would with no connectivity.
+/// A transport that always throws — i.e. the pull half fails, as it would
+/// with no connectivity. Overrides BOTH `hasMembership` (the revocation
+/// probe, called first by `_pullSinceInner`) and `serverNow`: a real
+/// no-connectivity device fails every network call, not just the one this
+/// fake used to override — leaving `hasMembership` inherited (defaulting to
+/// success) would have modeled a device that can reach the revocation
+/// probe but nothing else, which is a different (and much stranger)
+/// failure than "no connectivity".
 class _OfflineTransport extends FakeSyncTransport {
+  @override
+  Future<bool> hasMembership(String householdId) async =>
+      throw Exception('no connectivity');
+
   @override
   Future<DateTime> serverNow() async => throw Exception('no connectivity');
 }

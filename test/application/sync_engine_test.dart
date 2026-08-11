@@ -42,6 +42,24 @@ class _ThrowingPullTransport extends FakeSyncTransport {
   }
 }
 
+/// A [FakeSyncTransport] whose [hasMembership] THROWS -- simulates a
+/// transient network failure IN the revocation probe itself (a dropped
+/// connection, a timeout), as opposed to [FakeSyncTransport.membershipPresent]
+/// `= false`, which models the probe SUCCEEDING with an empty result (the
+/// actual revocation signal). These must be handled differently: a throw
+/// here propagates past both of `_pullSinceInner`'s membership-revoked
+/// writes into `pullSince`'s outer `on Object catch` and is swallowed as an
+/// ordinary retry-later, leaving the device linked and unflagged. Pins that
+/// distinction against a future refactor that wraps the probe in its own
+/// try/catch and folds "probe threw" into "probe returned false" -- which
+/// would silently convert every network blip into a permanent unlink.
+class _RevocationProbeFailsTransport extends FakeSyncTransport {
+  @override
+  Future<bool> hasMembership(String householdId) async {
+    throw Exception('simulated network failure in the revocation probe');
+  }
+}
+
 void main() {
   group('NoopSyncEngine', () {
     test('every method is a true no-op and never throws', () async {
@@ -297,6 +315,36 @@ void main() {
         final row = await settings.ensureSettings();
         expect(row.syncHouseholdId, isNull);
         expect(row.membershipRevoked, isTrue);
+        // The probe short-circuits BEFORE any table fetch or cursor
+        // advance -- not merely "ends up in the right state" via some
+        // later step undoing a fetch that already happened.
+        expect(transport.serverNowCalls, 0);
+      },
+    );
+
+    test(
+      'a pull whose membership probe THROWS (transient network failure) '
+      'leaves the device linked and unflagged -- retryable, not silently '
+      'unlinked (spec docs/specs/household-lifecycle.md §3.5: only an '
+      'empty result is a revocation signal, an error is not)',
+      () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        final throwingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _RevocationProbeFailsTransport(),
+          settings: settings,
+          householdId: household.id,
+        );
+        addTearDown(throwingEngine.stop);
+
+        await throwingEngine.pullSince();
+
+        final row = await settings.ensureSettings();
+        expect(row.syncHouseholdId, household.id);
+        expect(row.membershipRevoked, isFalse);
       },
     );
 

@@ -60,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v8) column set, so a fresh v1 -> v8 jump already
+      // *current* (here, v10) column set, so a fresh v1 -> v10 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then

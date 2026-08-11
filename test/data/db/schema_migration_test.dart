@@ -118,18 +118,35 @@ void main() {
     },
   );
 
-  test('a fresh (never-opened) database is created at schemaVersion 2 '
-      'directly, settings table included', () async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
+  test(
+    'a fresh (never-opened) database is created at the current '
+    'schemaVersion (10) directly, settings table included with every '
+    'column -- membershipRevoked among them',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
 
-    // No upgrade path is exercised here (`onCreate`'s default
-    // `Migrator.createAll()` already creates every v2 table, `settings`
-    // included) — this just guards against a regression where a fresh
-    // install would need `onUpgrade` to get the settings table.
-    final rows = await db.select(db.settings).get();
-    expect(rows, isEmpty);
-  });
+      // No upgrade path is exercised here (`onCreate`'s default
+      // `Migrator.createAll()` already creates every table at the full
+      // CURRENT column set, `settings` included) — this just guards
+      // against a regression where a fresh install would need `onUpgrade`
+      // to get a column, `membershipRevoked` (added at v10) included.
+      final rows = await db.select(db.settings).get();
+      expect(rows, isEmpty);
+
+      await db
+          .into(db.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      final row = await db.select(db.settings).getSingle();
+      expect(row.membershipRevoked, isFalse);
+    },
+  );
 
   test(
     'schemaVersion 3 -> 10 upgrade adds locale, both shown-once flags, the '
@@ -719,6 +736,83 @@ void main() {
 
       final settingsRow = await upgraded.select(upgraded.settings).get();
       expect(settingsRow, isEmpty);
+    },
+  );
+
+  test(
+    'schemaVersion 9 -> 10 upgrade adds settings.membershipRevoked '
+    '(false by default, no data rewrite), keeping the existing settings '
+    'row -- this is the ONLY upgrade path any real (shipped, v9) install '
+    'will actually execute',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v10_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v9 install -- the schema every shipped
+      // build (0.4.1+7) is actually running: open the *current* (v10)
+      // schema once so `onCreate` materializes every table with its full
+      // v10 column set, insert a settings row with non-NULL
+      // actingMemberId/syncHouseholdId (so the upgrade's "existing row
+      // survives" guarantee is actually exercised), then drop only
+      // `settings.membership_revoked` (every OTHER column already exists
+      // at v9 -- see `_dropMembershipRevokedColumn`) and roll
+      // `user_version` back to 9 -- reproducing exactly what a real v9
+      // database on a user's device looks like.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+              syncHouseholdId: const Value('household-1'),
+            ),
+          );
+      await _dropMembershipRevokedColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 9');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 10)
+      // `AppDatabase` now sees `user_version == 9` on disk vs. a declared
+      // `schemaVersion` of 10, so drift runs `onUpgrade(migrator, 9, 10)`
+      // -- exactly the real upgrade path every shipped user's device will
+      // go through.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final row = await upgraded.select(upgraded.settings).getSingle();
+      expect(row.membershipRevoked, isFalse);
+      // The pre-existing row's own data survived the upgrade untouched.
+      expect(row.createdAt, 't0');
+      expect(row.actingMemberId, 'member-1');
+      expect(row.syncHouseholdId, 'household-1');
+      expect(row.digestEnabled, isTrue);
+      expect(row.digestMinutes, 480);
+
+      // Exactly one `membership_revoked` column on `settings` -- guards
+      // against the flat/unconditional `addColumn` placement this upgrade
+      // must NOT use (see `AppDatabase.migration`'s doc comment on why it
+      // lives inside the `else` branch): that placement would have this
+      // test pass anyway (the column still ends up added once on a 9 -> 10
+      // upgrade) while silently duplicate-adding it on a 1 -> 10 jump, so
+      // this assertion alone would not catch that regression -- it exists
+      // to pin the shape of THIS upgrade path specifically.
+      final columns = await upgraded
+          .customSelect("PRAGMA table_info('settings')")
+          .get();
+      final membershipRevokedColumns = columns.where(
+        (row) => row.read<String>('name') == 'membership_revoked',
+      );
+      expect(membershipRevokedColumns, hasLength(1));
     },
   );
 }
