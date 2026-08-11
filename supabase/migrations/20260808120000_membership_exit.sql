@@ -26,32 +26,38 @@ alter table public.household_invites
   add constraint household_invites_created_by_fkey
   foreign key (created_by) references auth.users (id) on delete cascade;
 
--- delete_account (§2.2, D-L4), first form: unclaim every membership, then
--- delete the auth user. The auth.users delete works because this function
--- is owned by `postgres`, which has rights on the auth schema -- no edge
--- function and no service-role key. Task 1's pgTAP case proves that.
+-- delete_account (§2.2, D-L4), final form: leave EVERY household where
+-- the caller is claimed (user_id is UNIQUE per household, so there may be
+-- several), cascade each one that is left with no claimed members, then
+-- delete the auth user. Local data on the caller's own device is NOT
+-- touched -- that is the client's opt-in checkbox (D-L3).
 --
--- The unclaim is NOT optional padding: members.user_id is the third
--- NO ACTION foreign key to auth.users, and unlike the two created_by
--- columns it must NOT be relaxed -- is_household_member() reads it, so it
--- is load-bearing for every RLS policy. Nulling it here is what the
--- finished form does anyway (§2.2 loops over memberships), so this stub is
--- a true subset of the final behaviour rather than a throwaway.
+-- The auth.users delete works because this function is owned by
+-- `postgres`, which has rights on the auth schema -- no edge function and
+-- no service-role key needed.
 --
--- Still deliberately INCOMPLETE: no orphan cascade, and no reuse of the
--- _exit_membership / _cascade_if_orphaned helpers, which do not exist yet.
--- Task 6 replaces this body entirely. Do not add the cascade here.
+-- The loop's unclaim (via _exit_membership) is NOT optional padding:
+-- members.user_id is a NO ACTION foreign key to auth.users, and unlike the
+-- two created_by columns above it must NOT be relaxed -- is_household_member()
+-- reads it, so it is load-bearing for every RLS policy. Nulling every claim
+-- here is what makes the auth.users delete below legal.
 create or replace function public.delete_account()
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_member_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'not authenticated';
   end if;
-  update members set user_id = null where user_id = auth.uid();
+  for v_member_id in
+    select id from members where user_id = auth.uid() and deleted_at is null
+  loop
+    perform _cascade_if_orphaned(_exit_membership(v_member_id));
+  end loop;
   delete from auth.users where id = auth.uid();
 end;
 $$;
@@ -123,6 +129,7 @@ set search_path = public
 as $$
 declare
   v_claimed int;
+  v_stamped int;
 begin
   select count(*) into v_claimed from members
     where household_id = p_household_id
@@ -133,7 +140,11 @@ begin
   end if;
   update households set deleted_at = now()
     where id = p_household_id and deleted_at is null;
-  return true;
+  -- Report what actually happened, not what was merely eligible: an
+  -- already-cascaded household is eligible but stamps nothing. The doc
+  -- comment above promises "stamped", so return that.
+  get diagnostics v_stamped = row_count;
+  return v_stamped > 0;
 end;
 $$;
 

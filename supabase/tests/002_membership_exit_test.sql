@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(22);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -186,6 +186,51 @@ select throws_ok(
       '20000000-0000-0000-0000-0000000000ce'::uuid, 'Zoe', 4278190080)$$,
   'invalid or expired invite',
   'joining a cascaded household is rejected');
+
+select throws_ok(
+  $$select claim_member('DEADCODE',
+      '20000000-0000-0000-0000-0000000000f1'::uuid)$$,
+  'invalid or expired invite',
+  'claiming a profile in a cascaded household is rejected');
+
+-- Task 5's block ends with role=authenticated still set (its last
+-- statements are throws_ok calls after a test_login), so this superuser
+-- insert needs the reset first -- see Task 2's note on test_login's
+-- transaction-scoped set_config.
+reset role;
+
+-- Household J: Jo alone (claimed) plus an unclaimed profile. Deleting Jo's
+-- account must unclaim her, cascade J, and remove the auth user.
+insert into auth.users (id, email)
+values ('00000000-0000-0000-0000-0000000000da', 'jo@test.local');
+
+select test_login('00000000-0000-0000-0000-0000000000da');
+select create_household(
+  '10000000-0000-0000-0000-0000000000da'::uuid, 'Haus J',
+  '20000000-0000-0000-0000-0000000000da'::uuid, 'Jo', 4278190080);
+
+select lives_ok(
+  $$select delete_account()$$,
+  'jo can delete her account');
+
+reset role;
+select is(
+  (select user_id from members
+   where id = '20000000-0000-0000-0000-0000000000da'),
+  null,
+  'delete_account unclaims every membership');
+
+select isnt(
+  (select deleted_at from households
+   where id = '10000000-0000-0000-0000-0000000000da'),
+  null,
+  'delete_account cascades a household left with no claimed members');
+
+select is(
+  (select count(*)::int from auth.users
+   where id = '00000000-0000-0000-0000-0000000000da'),
+  0,
+  'delete_account removes the auth user (D-L4)');
 
 select * from finish();
 rollback;
