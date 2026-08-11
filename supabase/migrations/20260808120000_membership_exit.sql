@@ -58,3 +58,55 @@ $$;
 
 revoke execute on function public.delete_account() from public, anon;
 grant execute on function public.delete_account() to authenticated;
+
+-- Internal: sever one member row's claim. Returns the household id so
+-- callers can run the cascade check. NEVER granted to authenticated --
+-- unclaiming must go through the three authorized RPCs.
+create or replace function public._exit_membership(p_member_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_household_id uuid;
+begin
+  update members set user_id = null
+    where id = p_member_id
+    returning household_id into v_household_id;
+  if v_household_id is null then
+    raise exception 'no such member';
+  end if;
+  return v_household_id;
+end;
+$$;
+
+revoke execute on function public._exit_membership(uuid)
+  from public, anon, authenticated;
+
+-- leave_household (§2.2): unclaims ONLY. The profile stays active so the
+-- family keeps seeing the person and their history, and they can reclaim
+-- it later through the invite path. Takes the household id explicitly --
+-- user_id is UNIQUE per household, so an account may belong to several.
+create or replace function public.leave_household(p_household_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_member_id uuid;
+begin
+  if not is_household_member(p_household_id) then
+    raise exception 'not a member of this household';
+  end if;
+  select id into v_member_id from members
+    where household_id = p_household_id
+      and user_id = auth.uid()
+      and deleted_at is null;
+  perform _exit_membership(v_member_id);
+end;
+$$;
+
+revoke execute on function public.leave_household(uuid) from public, anon;
+grant execute on function public.leave_household(uuid) to authenticated;
