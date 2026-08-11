@@ -42,10 +42,12 @@ class HouseholdLinkService {
 
   /// Runs the adopt flow for [householdId] (the local household -- its id
   /// is preserved verbatim on the server) and [actingMemberId] (the
-  /// caller's own member profile within it).
+  /// caller's own member profile within it), claimed locally by
+  /// [authUserId] (the signed-in auth user driving the flow).
   Future<void> adopt({
     required String householdId,
     required String actingMemberId,
+    required String authUserId,
   }) async {
     final snapshot = await households.loadSnapshot(householdId);
     final household = snapshot.household;
@@ -100,9 +102,12 @@ class HouseholdLinkService {
       ),
     );
 
-    // Step 3: acting member becomes admin locally, mirroring the server
-    // rule `create_household` just applied.
+    // Step 3: mirror the server's role AND claim rules locally. Without
+    // the claim, the row is dirty-and-unclaimed and `_applyPulled` skips
+    // it, so this device would read its own profile as unclaimed until a
+    // full push/pull round trip (spec §3.1 G-B).
     await households.setMemberRole(actingMemberId, MemberRole.admin);
+    await households.setMemberUserId(actingMemberId, authUserId);
 
     // Step 4: mark this device linked -- only now that 1-2 have succeeded.
     await settings.setSyncLinked(

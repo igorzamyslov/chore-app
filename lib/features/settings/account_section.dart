@@ -630,6 +630,16 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
     if (actingMemberId == null) {
       throw StateError('No acting member to adopt with.');
     }
+    // Also unreachable in practice: this row only renders once
+    // `AccountSectionBody` has already resolved a non-null
+    // `currentAuthUserProvider` user (see its build method above) -- but
+    // `adopt`'s `authUserId` is non-nullable, so this is read again here
+    // rather than threaded down as a widget field, and bails out (rather
+    // than crashing) to keep the method total.
+    final authUserId = ref.read(currentAuthUserProvider).valueOrNull?.id;
+    if (authUserId == null) {
+      return;
+    }
     setState(() {
       _running = true;
       _failed = false;
@@ -638,7 +648,11 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
       final householdId = await ref.read(bootstrapProvider.future);
       await ref
           .read(householdLinkServiceProvider)
-          .adopt(householdId: householdId, actingMemberId: actingMemberId);
+          .adopt(
+            householdId: householdId,
+            actingMemberId: actingMemberId,
+            authUserId: authUserId,
+          );
     } on Exception catch (_) {
       if (mounted) {
         setState(() => _failed = true);
