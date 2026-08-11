@@ -1770,7 +1770,11 @@ In `lib/l10n/app_en.arb`:
   },
   "membershipRevokedAction": "Got it",
   "@membershipRevokedAction": {
-    "description": "Confirm button of the membership-revoked notice."
+    "description": "Button on the membership-revoked BANNER. Opens the shared exit-confirmation sheet, where the keep-or-wipe choice is made."
+  },
+  "membershipRevokedConfirm": "Done",
+  "@membershipRevokedConfirm": {
+    "description": "Confirm button INSIDE the shared exit-confirmation sheet when opened from the membership-revoked notice. Must differ from membershipRevokedAction: both are on screen once the sheet is open, and an identical label makes the banner button and the sheet button indistinguishable to a widget test and to a screen reader."
   },
 ```
 
@@ -1780,6 +1784,7 @@ In `lib/l10n/app_de.arb` (du-form):
   "membershipRevokedTitle": "Du gehörst nicht mehr zu diesem Haushalt",
   "membershipRevokedBody": "Dieses Gerät synchronisiert nicht mehr: Entweder wurde das Profil aus dem Online-Haushalt entfernt, oder den Haushalt gibt es nicht mehr. Nichts ist verloren — alles, was du hier siehst, ist weiterhin auf diesem Gerät.",
   "membershipRevokedAction": "Verstanden",
+  "membershipRevokedConfirm": "Fertig",
 ```
 
 Regenerate:
@@ -1845,13 +1850,27 @@ void main() {
     expect(find.textContaining('no longer part'), findsOneWidget);
   });
 
+  // Acknowledging is TWO taps, not one: the banner's button only opens the
+  // shared exit-confirmation sheet, and the keep-or-wipe choice is made
+  // there. A test that taps only the banner asserts state that cannot have
+  // happened yet, and pumpAndSettle never settles with the sheet left open.
+  Future<void> acknowledge(WidgetTester tester, {required bool alsoDelete}) async {
+    await tester.tap(find.text('Got it'));
+    await tester.pumpAndSettle();
+    if (alsoDelete) {
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('acknowledging keeps local data by default', (tester) async {
     final household = await HouseholdRepository(db).createLocalHousehold('Me');
     await SettingsRepository(db).setMembershipRevoked();
     await pumpNotice(tester);
 
-    await tester.tap(find.text('Got it'));
-    await tester.pumpAndSettle();
+    await acknowledge(tester, alsoDelete: false);
 
     final households = await db.select(db.households).get();
     expect(
@@ -1861,6 +1880,20 @@ void main() {
     );
     final settings = await SettingsRepository(db).ensureSettings();
     expect(settings.membershipRevoked, isFalse);
+  });
+
+  testWidgets('opting in wipes this device', (tester) async {
+    await HouseholdRepository(db).createLocalHousehold('Me');
+    await SettingsRepository(db).setMembershipRevoked();
+    await pumpNotice(tester);
+
+    await acknowledge(tester, alsoDelete: true);
+
+    // resetAppData clears every table, which is what returns the app to
+    // the welcome screen. This is the destructive path; without a test it
+    // is the one nobody finds out is broken until a user runs it.
+    final households = await db.select(db.households).get();
+    expect(households, isEmpty);
   });
 }
 ```
@@ -1956,7 +1989,10 @@ class MembershipRevokedNotice extends ConsumerWidget {
       context,
       title: l10n.membershipRevokedTitle,
       body: l10n.membershipRevokedBody,
-      actionLabel: l10n.membershipRevokedAction,
+      // Distinct from the banner's own button label: once the sheet is
+      // open both are mounted, so sharing a label makes them ambiguous to
+      // a widget test and to a screen reader.
+      actionLabel: l10n.membershipRevokedConfirm,
       semanticPrefix: 'membership.revoked',
     );
     if (!result.confirmed) {
