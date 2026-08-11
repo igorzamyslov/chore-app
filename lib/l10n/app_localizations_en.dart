@@ -1071,4 +1071,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitConfirmCancel => 'Cancel';
+
+  @override
+  String get membershipRevokedTitle =>
+      'You\'re no longer part of this household';
+
+  @override
+  String get membershipRevokedBody =>
+      'This phone has stopped syncing: either the profile was removed from the online household, or the household itself is gone. Nothing is lost — everything you see here is still on this phone.';
+
+  @override
+  String get membershipRevokedAction => 'Got it';
+
+  @override
+  String get membershipRevokedConfirm => 'Done';
 }

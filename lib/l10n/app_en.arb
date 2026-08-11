@@ -1407,5 +1407,22 @@
   "exitConfirmCancel": "Cancel",
   "@exitConfirmCancel": {
     "description": "Cancel button of the shared exit-confirmation sheet."
+  },
+
+  "membershipRevokedTitle": "You're no longer part of this household",
+  "@membershipRevokedTitle": {
+    "description": "Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5)."
+  },
+  "membershipRevokedBody": "This phone has stopped syncing: either the profile was removed from the online household, or the household itself is gone. Nothing is lost — everything you see here is still on this phone.",
+  "@membershipRevokedBody": {
+    "description": "Body of the membership-revoked notice. Deliberately names BOTH causes: the probe (hasMembership) cannot distinguish 'someone removed you' from 'the household was cascade-deleted when its last claimed member left, or when you deleted your account from another device'. Claiming someone removed them would be wrong in those cases. Also states plainly that local data is intact."
+  },
+  "membershipRevokedAction": "Got it",
+  "@membershipRevokedAction": {
+    "description": "Button on the membership-revoked BANNER. Opens the shared exit-confirmation sheet, where the keep-or-wipe choice is made."
+  },
+  "membershipRevokedConfirm": "Done",
+  "@membershipRevokedConfirm": {
+    "description": "Confirm button INSIDE the shared exit-confirmation sheet when opened from the membership-revoked notice. Must differ from membershipRevokedAction: both are on screen once the sheet is open, and an identical label makes the banner button and the sheet button indistinguishable to a widget test and to a screen reader."
   }
 }

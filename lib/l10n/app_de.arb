@@ -306,5 +306,10 @@
 
   "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
   "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",
-  "exitConfirmCancel": "Abbrechen"
+  "exitConfirmCancel": "Abbrechen",
+
+  "membershipRevokedTitle": "Du gehörst nicht mehr zu diesem Haushalt",
+  "membershipRevokedBody": "Dieses Gerät synchronisiert nicht mehr: Entweder wurde das Profil aus dem Online-Haushalt entfernt, oder den Haushalt gibt es nicht mehr. Nichts ist verloren — alles, was du hier siehst, ist weiterhin auf diesem Gerät.",
+  "membershipRevokedAction": "Verstanden",
+  "membershipRevokedConfirm": "Fertig"
 }
