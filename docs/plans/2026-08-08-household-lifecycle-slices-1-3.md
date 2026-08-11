@@ -766,9 +766,12 @@ behaviour §2.2 requires.
 - Consumes: `_exit_membership` (Task 2), `_cascade_if_orphaned` (Task 3).
 - Produces: `public.delete_account() returns void`, final form.
 
+This task also carries two Minor findings from earlier reviews, both in
+files it already edits. They are Steps 6 and 7.
+
 - [ ] **Step 1: Write the failing tests**
 
-Bump `select plan(17);` to `select plan(21);` and append before `finish()`:
+Bump `select plan(17);` to `select plan(22);` and append before `finish()`:
 
 ```sql
 -- Task 5's block ends with role=authenticated still set (its last
@@ -858,7 +861,57 @@ $$;
 supabase test db
 ```
 
-Expected: PASS, 21/21.
+Expected: PASS, 22/22.
+
+- [ ] **Step 6: Make `_cascade_if_orphaned`'s return value honest**
+
+Task 3's review finding. The function's doc comment promises "true when it
+stamped `households.deleted_at`", but it returns true whenever zero claimed
+members remain — including when the household was already soft-deleted and
+the UPDATE touched no rows. Harmless today (every caller uses `perform`),
+a trap the moment anything branches on it.
+
+In `supabase/migrations/20260808120000_membership_exit.sql`, add
+`v_stamped int;` to `_cascade_if_orphaned`'s `declare` block and replace:
+
+```sql
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  return true;
+```
+
+with:
+
+```sql
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  -- Report what actually happened, not what was merely eligible: an
+  -- already-cascaded household is eligible but stamps nothing. The doc
+  -- comment above promises "stamped", so return that.
+  get diagnostics v_stamped = row_count;
+  return v_stamped > 0;
+```
+
+No test count change — no current caller reads the return value.
+
+- [ ] **Step 7: Assert the invite guard covers `claim_member` too**
+
+Task 5's review finding: `_valid_invite`'s household-liveness guard was
+asserted through `list_claimable_members` and `join_as_new_member`, but not
+through `claim_member`, the third caller sharing that choke point. The
+guard does cover it (verified live during review); the suite just didn't
+say so. Append to `supabase/tests/002_membership_exit_test.sql`, beside the
+other two `DEADCODE` assertions:
+
+```sql
+select throws_ok(
+  $$select claim_member('DEADCODE',
+      '20000000-0000-0000-0000-0000000000f1'::uuid)$$,
+  'invalid or expired invite',
+  'claiming a profile in a cascaded household is rejected');
+```
+
+This is the 22nd assertion counted in Step 1's `plan(22)`.
 
 - [ ] **Step 5: Commit**
 
