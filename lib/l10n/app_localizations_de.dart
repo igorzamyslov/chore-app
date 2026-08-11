@@ -1072,11 +1072,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exitConfirmDeleteLocalLabel =>
-      'Kopie auf diesem Handy auch löschen';
+      'Kopie auf diesem Gerät auch löschen';
 
   @override
   String get exitConfirmDeleteLocalExplanation =>
-      'Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Handy. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Handy werden gelöscht und die App startet neu.';
+      'Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.';
 
   @override
   String get exitConfirmCancel => 'Abbrechen';
