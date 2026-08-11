@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(15);
+select plan(17);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -167,6 +167,25 @@ select is(
 -- real invariant (a removal must never take the household with it), just
 -- not a proof of §2.3's mechanism. §2.3 holds structurally: self-removal
 -- is rejected, so the caller is always a surviving claimed member.
+
+-- An invite created while Haus E was alive must not work after it
+-- cascaded (§2.5) -- otherwise a live code resurrects a dead household.
+reset role;
+insert into household_invites (household_id, code, created_by)
+values ('10000000-0000-0000-0000-0000000000e1', 'DEADCODE',
+        '00000000-0000-0000-0000-0000000000e1');
+
+select test_login('00000000-0000-0000-0000-00000000000c');
+select throws_ok(
+  $$select list_claimable_members('DEADCODE')$$,
+  'invalid or expired invite',
+  'a code for a cascaded household is rejected');
+
+select throws_ok(
+  $$select join_as_new_member('DEADCODE',
+      '20000000-0000-0000-0000-0000000000ce'::uuid, 'Zoe', 4278190080)$$,
+  'invalid or expired invite',
+  'joining a cascaded household is rejected');
 
 select * from finish();
 rollback;

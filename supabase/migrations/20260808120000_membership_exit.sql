@@ -183,3 +183,34 @@ $$;
 
 revoke execute on function public.remove_member(uuid) from public, anon;
 grant execute on function public.remove_member(uuid) to authenticated;
+
+-- _valid_invite gains a household-liveness check (§2.5). This one helper
+-- backs list_claimable_members, claim_member and join_as_new_member, so
+-- guarding it here covers the whole redemption family. Same error message
+-- as the other rejections: an outsider learns nothing about why.
+create or replace function public._valid_invite(p_code text)
+returns public.household_invites
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_invite household_invites;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  select * into v_invite from household_invites
+    where code = p_code and revoked_at is null and expires_at > now();
+  if v_invite.id is null then
+    raise exception 'invalid or expired invite';
+  end if;
+  if exists (
+    select 1 from households h
+    where h.id = v_invite.household_id and h.deleted_at is not null
+  ) then
+    raise exception 'invalid or expired invite';
+  end if;
+  return v_invite;
+end;
+$$;
