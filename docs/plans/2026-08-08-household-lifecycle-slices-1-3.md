@@ -253,6 +253,15 @@ In `supabase/tests/002_membership_exit_test.sql`, change `select plan(2);` to
 `select plan(7);` and insert before `select * from finish();`:
 
 ```sql
+-- test_login() sets role=authenticated through set_config(..., true),
+-- which persists for the REST OF THIS TRANSACTION -- it never reverts on
+-- its own. Any statement needing superuser must `reset role;` first:
+-- writing auth.users, or inserting a CLAIMED members row (members_insert
+-- deliberately forbids those from the client). This recurs all through
+-- the file; when a fixture fails with "permission denied for table
+-- users", a missing reset role is why.
+reset role;
+
 -- Erik and Fran share household E. `outsider` belongs to no household and
 -- is the non-member probe for every authorization case below -- Dana is
 -- NOT reusable for that: Task 1 deleted her auth row.
@@ -753,6 +762,12 @@ behaviour §2.2 requires.
 Bump `select plan(17);` to `select plan(21);` and append before `finish()`:
 
 ```sql
+-- Task 5's block ends with role=authenticated still set (its last
+-- statements are throws_ok calls after a test_login), so this superuser
+-- insert needs the reset first -- see Task 2's note on test_login's
+-- transaction-scoped set_config.
+reset role;
+
 -- Household J: Jo alone (claimed) plus an unclaimed profile. Deleting Jo's
 -- account must unclaim her, cascade J, and remove the auth user.
 insert into auth.users (id, email)
