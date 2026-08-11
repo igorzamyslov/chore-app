@@ -1764,9 +1764,9 @@ In `lib/l10n/app_en.arb`:
   "@membershipRevokedTitle": {
     "description": "Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5)."
   },
-  "membershipRevokedBody": "Someone removed this profile from the online household, so this phone has stopped syncing. Everything you see here is still on this phone.",
+  "membershipRevokedBody": "This phone has stopped syncing: either the profile was removed from the online household, or the household itself is gone. Nothing is lost — everything you see here is still on this phone.",
   "@membershipRevokedBody": {
-    "description": "Body of the membership-revoked notice. States plainly that syncing stopped and that local data is intact."
+    "description": "Body of the membership-revoked notice. Deliberately names BOTH causes: the probe (hasMembership) cannot distinguish 'someone removed you' from 'the household was cascade-deleted when its last claimed member left, or when you deleted your account from another device'. Claiming someone removed them would be wrong in those cases. Also states plainly that local data is intact."
   },
   "membershipRevokedAction": "Got it",
   "@membershipRevokedAction": {
@@ -1778,7 +1778,7 @@ In `lib/l10n/app_de.arb` (du-form):
 
 ```json
   "membershipRevokedTitle": "Du gehörst nicht mehr zu diesem Haushalt",
-  "membershipRevokedBody": "Jemand hat dieses Profil aus dem Online-Haushalt entfernt, deshalb synchronisiert dieses Handy nicht mehr. Alles, was du hier siehst, ist weiterhin auf diesem Handy.",
+  "membershipRevokedBody": "Dieses Gerät synchronisiert nicht mehr: Entweder wurde das Profil aus dem Online-Haushalt entfernt, oder den Haushalt gibt es nicht mehr. Nichts ist verloren — alles, was du hier siehst, ist weiterhin auf diesem Gerät.",
   "membershipRevokedAction": "Verstanden",
 ```
 
