@@ -235,24 +235,37 @@ class SettingsRepository {
   /// `syncLastPulledAt` (spec §8.1) so a future re-link starts pulling from
   /// scratch rather than resuming a stale cursor.
   ///
+  /// Also nulls every local `members.userId` (spec
+  /// `docs/specs/household-lifecycle.md` §3.1 G-A): claim state is
+  /// meaningless in a local-only household, and a stale value left behind
+  /// by an earlier pull would keep those profiles undeletable forever.
+  /// Deliberately does NOT mark the members rows `syncDirty` -- `user_id`
+  /// is server-owned and is not in the client's UPDATE grant.
+  ///
   /// This is NOT a delete: every other local row (households, members,
   /// categories, chores, shopping items, ...) is left exactly as it is, and
-  /// nothing on the server is touched -- this device's member row keeps its
-  /// `user_id` there, so reconnecting later (spec §7.6) still works. Called
-  /// by `HouseholdLinkService.disconnect`
+  /// nothing on the server is touched -- the server's copy of `user_id`
+  /// (only this device's local copy is cleared here) is untouched, so
+  /// reconnecting later (spec §7.6) still works. Called by
+  /// `HouseholdLinkService.disconnect`
   /// (`lib/application/household_link_service.dart`).
   Future<void> clearSyncLink() async {
     await ensureSettings();
-    await (db.update(
-      db.settings,
-    )..where((tbl) => tbl.id.equals(deviceId))).write(
-      SettingsCompanion(
-        syncHouseholdId: const Value(null),
-        syncLinkedAt: const Value(null),
-        syncLastPulledAt: const Value(null),
-        updatedAt: Value(_isoNow()),
-      ),
-    );
+    await db.transaction(() async {
+      await (db.update(
+        db.settings,
+      )..where((tbl) => tbl.id.equals(deviceId))).write(
+        SettingsCompanion(
+          syncHouseholdId: const Value(null),
+          syncLinkedAt: const Value(null),
+          syncLastPulledAt: const Value(null),
+          updatedAt: Value(_isoNow()),
+        ),
+      );
+      await db
+          .update(db.members)
+          .write(const MembersCompanion(userId: Value(null)));
+    });
   }
 
   Future<DeviceSettings?> _find() {

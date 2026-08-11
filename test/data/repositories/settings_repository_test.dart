@@ -1,5 +1,7 @@
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -363,4 +365,48 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.syncHouseholdId, isNull);
   });
+
+  test(
+    'clearSyncLink also nulls every local members.userId, so claim state '
+    'from a previous link cannot block deletion in a local-only household '
+    '(spec docs/specs/household-lifecycle.md §3.1 G-A)',
+    () async {
+      final households = HouseholdRepository(db);
+      final settings = SettingsRepository(db);
+      final household = await households.createLocalHousehold('Me');
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+
+      // Simulate a pulled, claimed row: a real pull full-row-replaces with
+      // syncDirty: false (see lib/data/sync/row_mappers.dart), which a bare
+      // local write (as createLocalHousehold performs) does not.
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(
+          userId: Value('auth-user-1'),
+          syncDirty: Value(false),
+        ),
+      );
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026),
+      );
+
+      await settings.clearSyncLink();
+
+      final after = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(after.userId, isNull);
+      expect(
+        after.syncDirty,
+        isFalse,
+        reason:
+            'user_id is server-owned and not UPDATE-granted; marking the '
+            'row dirty would push a column the client may not write',
+      );
+    },
+  );
 }
