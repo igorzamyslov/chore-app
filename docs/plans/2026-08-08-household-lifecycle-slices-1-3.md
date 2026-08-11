@@ -31,6 +31,10 @@ below (§2.2, §3.1 G-A, etc.) point into it.
 - Never `await` a drift stream outside a widget pump — it deadlocks.
 - Run Flutter/Dart commands as `env -u GIT_DIR -u GIT_INDEX_FILE flutter ...`
   when anywhere near git hooks or worktrees.
+- **Running tests requires the Supabase dart-defines**, exactly as
+  `lefthook.yml` does — they keep `syncEngineProvider` offline, and six
+  tests fail without them:
+  `env -u GIT_DIR -u GIT_INDEX_FILE flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= <path>`
 - Do NOT run more than 2 concurrent `flutter test`/`build` processes.
 - Never add `Co-Authored-By` trailers to commits.
 - `members.role` is vestigial (D1). Do not add role-based enforcement.
