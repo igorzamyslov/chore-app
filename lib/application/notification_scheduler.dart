@@ -10,10 +10,19 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-/// The fixed notification id used for the single daily digest notification;
-/// every reschedule cancels and re-schedules this same id (spec
+/// The lowest notification id the daily digest owns; horizon slot `k`
+/// (0 = the next slot) uses `digestNotificationIdBase + k` (spec
 /// `docs/specs/notifications.md` architecture #2).
-const int digestNotificationId = 1001;
+const int digestNotificationIdBase = 1001;
+
+/// Every notification id the digest horizon owns, in slot order.
+///
+/// Fixed and exhaustive on purpose: every reschedule rewrites ALL of these
+/// (scheduling some, cancelling the rest), so a day that stops having
+/// anything to say can never keep a stale notification armed.
+final List<int> digestNotificationIds = List<int>.unmodifiable([
+  for (var k = 0; k < digestHorizonDays; k++) digestNotificationIdBase + k,
+]);
 
 /// The Android notification channel the digest notification is posted on.
 const String digestChannelId = 'digest';
@@ -44,6 +53,13 @@ abstract class DigestNotificationPlugin {
   /// Schedules a one-shot notification titled [title] with body [body], to
   /// fire at [fireAt] (device-local wall-clock time), replacing any
   /// previously-scheduled notification with the same [id].
+  ///
+  /// Still deliberately one-shot per id: the daily repeat comes from
+  /// [NotificationScheduler] arming a whole horizon of distinct ids at
+  /// once, NOT from a repeating OS alarm — a repeating alarm could not
+  /// honour the spec's "no notification when nothing is due" rule, and
+  /// would freeze its body text at whatever the counts were when it was
+  /// armed.
   Future<void> zonedSchedule({
     required int id,
     required String title,
@@ -206,8 +222,8 @@ class NotificationScheduler {
   }
 
   /// (Re)schedules the digest notification per [plan]: fixed id
-  /// [digestNotificationId], localized title (the app name) and body (the
-  /// due/overdue counts).
+  /// [digestNotificationIdBase], localized title (the app name) and body
+  /// (the due/overdue counts).
   ///
   /// Deliberately never requests the OS notification permission itself
   /// (spec `docs/specs/polish-round-1.md` A3): that dialog is intrusive
@@ -223,17 +239,60 @@ class NotificationScheduler {
     await ensureInitialized();
     final l10n = lookupAppLocalizations(localeResolver());
     await plugin.zonedSchedule(
-      id: digestNotificationId,
+      id: digestNotificationIdBase,
       title: l10n.appTitle,
       body: _digestBody(l10n, plan),
       fireAt: plan.fireAt,
     );
   }
 
-  /// Cancels the digest notification, if scheduled.
+  /// Rewrites the digest's ENTIRE scheduling horizon in one go: [plans] is
+  /// indexed by slot (0 = the next slot), a non-null entry is scheduled on
+  /// id `digestNotificationIdBase + index`, and a `null` entry cancels that
+  /// id.
+  ///
+  /// Rewriting every id on every call — rather than only touching the days
+  /// that changed — is what makes the horizon self-correcting: a completed
+  /// chore silences its day, and a day whose counts changed gets the fresh
+  /// number, with no bookkeeping about what was armed before.
+  ///
+  /// Deliberately never requests the OS notification permission itself; see
+  /// the class doc and spec `docs/specs/polish-round-1.md` A3.
+  ///
+  /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonDays]
+  /// long.
+  Future<void> applyDigestPlans(List<DigestPlan?> plans) async {
+    if (plans.length != digestHorizonDays) {
+      throw ArgumentError.value(
+        plans.length,
+        'plans.length',
+        'Must be exactly digestHorizonDays ($digestHorizonDays)',
+      );
+    }
+    await ensureInitialized();
+    final l10n = lookupAppLocalizations(localeResolver());
+    for (var k = 0; k < plans.length; k++) {
+      final plan = plans[k];
+      final id = digestNotificationIdBase + k;
+      if (plan == null) {
+        await plugin.cancel(id);
+      } else {
+        await plugin.zonedSchedule(
+          id: id,
+          title: l10n.appTitle,
+          body: _digestBody(l10n, plan),
+          fireAt: plan.fireAt,
+        );
+      }
+    }
+  }
+
+  /// Cancels every day of the digest horizon.
   Future<void> cancelDigest() async {
     await ensureInitialized();
-    await plugin.cancel(digestNotificationId);
+    for (final id in digestNotificationIds) {
+      await plugin.cancel(id);
+    }
   }
 
   String _digestBody(AppLocalizations l10n, DigestPlan plan) {
