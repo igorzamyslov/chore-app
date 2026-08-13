@@ -4,7 +4,9 @@
 /// *widget* test or E2E run ever needs to override; every screen-facing
 /// provider is built on top of them, so overriding just those two is enough
 /// to make the whole app deterministic and hermetic (in-memory database,
-/// fixed clock). [digestNotificationPluginProvider] is a third override
+/// fixed clock). [todayProvider] in particular is DERIVED from
+/// `clockProvider` and must never be overridden directly — see its own doc
+/// comment. [digestNotificationPluginProvider] is a third override
 /// point used only by scheduler/reschedule tests (spec
 /// `docs/specs/notifications.md`), swapping the real OS-level plugin for a
 /// fake; see that provider's doc comment. [authGatewayProvider] is a
@@ -87,6 +89,59 @@ Clock resolveClock(String e2eToday) {
   }
   final date = PlainDate.parse(e2eToday);
   return Clock.fixed(DateTime(date.year, date.month, date.day, 9));
+}
+
+/// Today's local calendar date — the single source of truth for every
+/// date-bucketed piece of UI: the chores list's Overdue / Today / Tomorrow /
+/// This week / This month / Later boundaries, the collapsed 'Done today'
+/// section, the day-progress card, and the chore form's start-date picker
+/// range.
+///
+/// Seeded from [clockProvider], so a fixed widget-test clock and the
+/// `--dart-define=E2E_TODAY` hook still decide what "today" means, and
+/// republished by [TodayNotifier.refresh] — which [CatchUpController] calls
+/// UNCONDITIONALLY on both of its day-boundary triggers (the
+/// [nextLocalMidnight] timer firing, and the app resuming). Without this,
+/// nothing in the widget tree ever re-reads the date: [clockProvider] is a
+/// plain [Provider] that never re-emits, so an app left open overnight kept
+/// showing yesterday's completions under 'Done today' indefinitely
+/// (backlog A-2 / audit P1).
+///
+/// Deliberately holds NO timer of its own. The widget tree watches this
+/// provider directly, and `flutter_test`'s "a Timer is still pending" leak
+/// check runs before the pumped tree is torn down — a provider-armed timer
+/// would therefore fail every widget test that renders the chores list.
+/// That is the same hazard [CatchUpController] and
+/// [DigestRescheduleController] document as the reason they are only ever
+/// activated from `main.dart`; the day-change timer stays there, where that
+/// discipline already holds.
+///
+/// NEVER override this in a test. It derives from [clockProvider] by
+/// construction — overriding it directly would let a test's UI disagree
+/// with the same test's domain layer.
+final todayProvider = NotifierProvider<TodayNotifier, PlainDate>(
+  TodayNotifier.new,
+);
+
+/// The notifier behind [todayProvider].
+class TodayNotifier extends Notifier<PlainDate> {
+  /// Reads the current local calendar date from [clockProvider].
+  @override
+  PlainDate build() => PlainDate.fromDateTime(ref.watch(clockProvider).now());
+
+  /// Re-reads [clockProvider] and republishes the current local date.
+  ///
+  /// A no-op when the calendar day hasn't actually changed: this is called
+  /// on every app resume, and an unguarded write would re-subscribe every
+  /// drift stream watching [todayProvider] (notably
+  /// [closedTodayOccurrencesProvider]) each time the user so much as
+  /// glances at another app.
+  void refresh() {
+    final today = PlainDate.fromDateTime(ref.read(clockProvider).now());
+    if (today != state) {
+      state = today;
+    }
+  }
 }
 
 /// The chore repository, built on [appDatabaseProvider].
