@@ -857,11 +857,10 @@ DateTime nextLocalMidnight(DateTime now) {
 /// current time, since a backgrounded app's timers don't reliably fire on
 /// schedule and could otherwise go stale.
 ///
-/// Catch-up only triggers a digest recompute
-/// ([DigestRescheduleController.triggerRecompute]) when
-/// [ChoreService.catchUpOverdue] reports it actually changed something —
-/// the common case (nothing overdue) has nothing new for the digest to
-/// reflect.
+/// Every day-change (and every resume) triggers a digest recompute
+/// unconditionally — see [_runCatchUp]. This is what re-arms the digest's
+/// rolling horizon for an app that simply stays open, which no other
+/// trigger covers.
 class CatchUpController {
   /// Starts listening immediately; arms the first day-change timer once
   /// [bootstrapProvider] resolves. The `ref` is retained for the lifetime
@@ -911,12 +910,13 @@ class CatchUpController {
     if (householdId == null) {
       return;
     }
-    final changed = await _ref
-        .read(choreServiceProvider)
-        .catchUpOverdue(householdId);
-    if (changed) {
-      _ref.read(digestRescheduleControllerProvider).triggerRecompute();
-    }
+    await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
+    // Deliberately unconditional, and NOT gated on catch-up having changed
+    // something: the digest is armed only `digestHorizonDays` days ahead,
+    // so an app left open longer than that with no mutations would run off
+    // the end of its own horizon and go silent. A day passing is itself a
+    // reason to re-arm.
+    _ref.read(digestRescheduleControllerProvider).triggerRecompute();
   }
 }
 

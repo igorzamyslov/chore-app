@@ -19,6 +19,7 @@ library;
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
@@ -212,8 +213,8 @@ void main() {
     );
 
     testWidgets(
-      'is a no-op (and triggers no digest recompute) when nothing is '
-      'overdue',
+      'leaves occurrences alone when nothing is overdue, but still rolls '
+      'the digest horizon forward',
       (tester) async {
         final currentTime = DateTime(2026, 1, 5, 9);
         final database = AppDatabase(NativeDatabase.memory());
@@ -244,6 +245,13 @@ void main() {
             );
         await tester.pump(digestRescheduleDebounce);
         plugin.scheduledCalls.clear();
+        // Captured right before triggerOnResume: bootstrap's own recompute
+        // and the chore creation above already pushed cancelCallCount past
+        // digestHorizonDays, so asserting an absolute floor would pass
+        // trivially regardless of whether triggerOnResume's catch-up path
+        // recomputes anything at all. The delta from here is what actually
+        // proves it.
+        final cancelCountBefore = plugin.cancelCallCount;
 
         catchUpController.triggerOnResume();
         // Nothing overdue: give the (no-op) transaction a moment to run,
@@ -254,7 +262,16 @@ void main() {
         final repo = container.read(choreRepositoryProvider);
         final pending = await repo.pendingOccurrenceOf(chore.id);
         expect(pending!.dueDate, PlainDate(2026, 1, 20));
+        // Nothing is due inside the horizon (the chore is 15 days out), so
+        // the recompute correctly arms nothing...
         expect(plugin.scheduledCalls, isEmpty);
+        // ...but it MUST have run: without an unconditional recompute, an
+        // app left open longer than digestHorizonDays runs off the end of
+        // its own horizon and goes silent.
+        expect(
+          plugin.cancelCallCount,
+          greaterThanOrEqualTo(cancelCountBefore + digestHorizonDays),
+        );
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.
