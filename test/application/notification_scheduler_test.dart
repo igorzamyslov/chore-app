@@ -218,6 +218,30 @@ void main() {
       ]);
       expect(plugin.pending[1001]!.body, '2 Aufgaben heute · 1 überfällig');
     });
+
+    test(
+      'day 1 firing leaves days 2-7 armed, with nothing to re-arm them — '
+      'this is the whole point of the horizon (audit P0)',
+      () async {
+        await scheduler.applyDigestPlans([
+          for (var k = 0; k < digestHorizonDays; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: 1,
+              overdueCount: 0,
+            ),
+        ]);
+
+        // The OS delivers day 1's notification a minute after it fires.
+        // Nothing re-arms it, but days 2-7 must remain untouched.
+        plugin.deliverDue(DateTime(2026, 7, 24, 8, 1));
+
+        expect(
+          plugin.pending.keys,
+          unorderedEquals([1002, 1003, 1004, 1005, 1006, 1007]),
+        );
+      },
+    );
   });
 
   group('cancelDigest', () {

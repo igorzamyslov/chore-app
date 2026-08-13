@@ -98,6 +98,39 @@ void main() {
     }
   });
 
+  test(
+    'pausing a chore silences its slots across the whole horizon '
+    '(regression: the exclusion otherwise lives entirely in '
+    "watchPendingOccurrences's WHERE clause, two layers away)",
+    () async {
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Water the plants',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(1),
+      );
+
+      final filled = buildDigestPlans(
+        now: DateTime(2026, 1, 5, 7),
+        settings: settings,
+        pending: await pending(),
+        recipientMemberId: null,
+      );
+      expect(filled.every((plan) => plan != null), isTrue);
+
+      await service.pauseChore(chore.id);
+
+      final paused = buildDigestPlans(
+        now: DateTime(2026, 1, 5, 7),
+        settings: settings,
+        pending: await pending(),
+        recipientMemberId: null,
+      );
+      expect(paused, everyElement(isNull));
+    },
+  );
+
   test('a one-off is due on its day and overdue on every day after', () async {
     await service.createChore(
       householdId: householdId,
