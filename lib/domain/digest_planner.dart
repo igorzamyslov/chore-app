@@ -18,7 +18,7 @@ library;
 /// A resolved decision to fire the digest notification at [fireAt] with the
 /// given content counts.
 ///
-/// `null` (returned by [planDigest] instead of an instance) means "don't
+/// `null` (returned by [planDigestSlot] instead of an instance) means "don't
 /// schedule anything": the digest is disabled, or there is nothing to say.
 class DigestPlan {
   /// Creates a plan.
@@ -74,10 +74,10 @@ class DigestPlan {
 /// `DateTime` constructor already normalizes an out-of-range day into the
 /// correct following month/year.
 ///
-/// Exposed separately from [planDigest] so callers can determine which
-/// calendar date's occurrence counts to fetch *before* calling [planDigest]
-/// (see that function's doc comment) — both use this exact same rule, so
-/// there's no duplicated "which slot" logic to keep in sync.
+/// Exposed separately from [planDigestSlot] so callers can determine which
+/// calendar date's occurrence counts to fetch *before* calling
+/// [planDigestSlot] — both use this exact same rule, so there's no
+/// duplicated "which slot" logic to keep in sync.
 ///
 /// [digestMinutes] must be in `0..1439` (minutes since local midnight);
 /// throws [ArgumentError] otherwise.
@@ -90,46 +90,6 @@ DateTime nextDigestSlot({required DateTime now, required int digestMinutes}) {
     return todayCandidate;
   }
   return DateTime(now.year, now.month, now.day + 1, hour, minute);
-}
-
-/// Decides whether/when to (re)schedule the daily digest notification.
-///
-/// Returns `null` (don't schedule) when [enabled] is `false`, or when both
-/// [dueTodayCount] and [overdueCount] are zero — silence is a feature: a
-/// notification with nothing to say would make the signal meaningless, and
-/// this holds even when overdue-only (an overdue-only day still notifies,
-/// via a non-zero [overdueCount] with [dueTodayCount] at zero).
-///
-/// Otherwise returns a [DigestPlan] firing at [nextDigestSlot].
-///
-/// [dueTodayCount] and [overdueCount] must already be computed by the
-/// caller for the correct date: whichever calendar date [nextDigestSlot]
-/// resolves to (today or tomorrow), not necessarily *now*'s calendar date.
-/// This function is pure and can't fetch that data itself — call
-/// [nextDigestSlot] first (with the same [now]/[digestMinutes]) to know
-/// which date to count occurrences for.
-///
-/// [digestMinutes] must be in `0..1439` (minutes since local midnight);
-/// throws [ArgumentError] otherwise.
-DigestPlan? planDigest({
-  required DateTime now,
-  required int digestMinutes,
-  required bool enabled,
-  required int dueTodayCount,
-  required int overdueCount,
-}) {
-  _validateDigestMinutes(digestMinutes);
-  if (!enabled) {
-    return null;
-  }
-  if (dueTodayCount == 0 && overdueCount == 0) {
-    return null;
-  }
-  return DigestPlan(
-    fireAt: nextDigestSlot(now: now, digestMinutes: digestMinutes),
-    dueTodayCount: dueTodayCount,
-    overdueCount: overdueCount,
-  );
 }
 
 /// How many consecutive daily digest slots are armed with the OS at once

@@ -221,31 +221,6 @@ class NotificationScheduler {
     _initialized = true;
   }
 
-  /// (Re)schedules the digest notification per [plan]: fixed id
-  /// [digestNotificationIdBase], localized title (the app name) and body
-  /// (the due/overdue counts).
-  ///
-  /// Deliberately never requests the OS notification permission itself
-  /// (spec `docs/specs/polish-round-1.md` A3): that dialog is intrusive
-  /// enough that it must only ever fire from an explicit user tap (the
-  /// digest pre-prompt banner's 'Turn on', or the Settings digest
-  /// permission hint's recovery path) — never as a side effect of a
-  /// schedule attempt that could be triggered automatically (e.g. at
-  /// bootstrap, with the digest enabled by default). Callers that DO want
-  /// the permission requested call [DigestNotificationPlugin.
-  /// requestPermission] directly, before or after this method, as
-  /// appropriate.
-  Future<void> scheduleDigest(DigestPlan plan) async {
-    await ensureInitialized();
-    final l10n = lookupAppLocalizations(localeResolver());
-    await plugin.zonedSchedule(
-      id: digestNotificationIdBase,
-      title: l10n.appTitle,
-      body: _digestBody(l10n, plan),
-      fireAt: plan.fireAt,
-    );
-  }
-
   /// Rewrites the digest's ENTIRE scheduling horizon in one go: [plans] is
   /// indexed by slot (0 = the next slot), a non-null entry is scheduled on
   /// id `digestNotificationIdBase + index`, and a `null` entry cancels that
