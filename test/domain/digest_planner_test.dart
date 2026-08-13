@@ -219,4 +219,117 @@ void main() {
       );
     });
   });
+
+  group('digestSlots', () {
+    test('returns digestHorizonDays consecutive slots by default', () {
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 24, 7),
+        digestMinutes: 480,
+      );
+      expect(slots, hasLength(digestHorizonDays));
+      expect(slots.first, DateTime(2026, 7, 24, 8));
+      expect(slots.last, DateTime(2026, 7, 30, 8));
+    });
+
+    test('the first slot is exactly nextDigestSlot', () {
+      final now = DateTime(2026, 7, 24, 9); // past 08:00
+      final slots = digestSlots(now: now, digestMinutes: 480);
+      expect(slots.first, nextDigestSlot(now: now, digestMinutes: 480));
+      expect(slots.first, DateTime(2026, 7, 25, 8));
+      expect(slots.last, DateTime(2026, 7, 31, 8));
+    });
+
+    test('every slot keeps the same local wall-clock time across a DST '
+        'transition', () {
+      // 2026-03-29 is the European spring-forward day. Built from calendar
+      // components, so 08:00 stays 08:00 rather than drifting to 09:00.
+      final slots = digestSlots(
+        now: DateTime(2026, 3, 27, 7),
+        digestMinutes: 480,
+      );
+      for (final slot in slots) {
+        expect(slot.hour, 8);
+        expect(slot.minute, 0);
+      }
+    });
+
+    test('rolls over the month boundary', () {
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 30, 7),
+        digestMinutes: 480,
+      );
+      expect(slots.last, DateTime(2026, 8, 5, 8));
+    });
+
+    test('rejects an out-of-range digestMinutes', () {
+      expect(
+        () => digestSlots(now: DateTime(2026), digestMinutes: 1440),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a horizon below one day', () {
+      expect(
+        () => digestSlots(
+          now: DateTime(2026),
+          digestMinutes: 480,
+          horizonDays: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('planDigestSlot', () {
+    final fireAt = DateTime(2026, 7, 25, 8);
+
+    test('disabled returns null even with nonzero counts', () {
+      expect(
+        planDigestSlot(
+          fireAt: fireAt,
+          enabled: false,
+          dueTodayCount: 3,
+          overdueCount: 2,
+        ),
+        isNull,
+      );
+    });
+
+    test('zero counts returns null (silence is a feature, per day)', () {
+      expect(
+        planDigestSlot(
+          fireAt: fireAt,
+          enabled: true,
+          dueTodayCount: 0,
+          overdueCount: 0,
+        ),
+        isNull,
+      );
+    });
+
+    test('overdue-only still schedules (must not silently rot)', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 0,
+        overdueCount: 1,
+      );
+      expect(
+        plan,
+        DigestPlan(fireAt: fireAt, dueTodayCount: 0, overdueCount: 1),
+      );
+    });
+
+    test('carries both counts and the exact fireAt through', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 2,
+        overdueCount: 1,
+      );
+      expect(plan!.fireAt, fireAt);
+      expect(plan.dueTodayCount, 2);
+      expect(plan.overdueCount, 1);
+    });
+  });
 }
