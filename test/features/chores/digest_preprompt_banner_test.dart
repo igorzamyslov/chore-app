@@ -1,5 +1,6 @@
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
@@ -176,6 +177,11 @@ void main() {
       expect(enablePlugin.requestPermissionCallCount, 1);
       // One chore due today: the recompute must have scheduled a digest.
       expect(enablePlugin.scheduledCalls, isNotEmpty);
+      expect(
+        enablePlugin.pending.keys,
+        everyElement(isIn(digestNotificationIds)),
+        reason: 'the banner must arm the same horizon the controller does',
+      );
       final settings = await database.select(database.settings).getSingle();
       expect(settings.digestPrepromptShownAt, isNotNull);
       expect(find.bySemanticsIdentifier('digest.preprompt'), findsNothing);
