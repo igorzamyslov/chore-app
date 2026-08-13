@@ -172,10 +172,20 @@ class SettingsRepository {
 
   /// Links this device to [householdId] as of [linkedAt] (spec
   /// `docs/specs/sync-backend.md` §7.1): sets `syncHouseholdId` and
-  /// `syncLinkedAt` together -- "linked" ⇔ `syncHouseholdId != null`.
-  /// Called once, as the last step of the adopt flow
-  /// (`HouseholdLinkService.adopt`, `lib/application/household_link_service.dart`),
-  /// only after every earlier step has already succeeded.
+  /// `syncLinkedAt` together -- "linked" ⇔ `syncHouseholdId != null`. This
+  /// is the single funnel every re-link path goes through --
+  /// `HouseholdLinkService.adopt` and both `HouseholdJoinService` entry
+  /// points -- so it is also where `membershipRevoked` (spec §3.5) must be
+  /// cleared: that flag is otherwise sticky (only the user tapping through
+  /// the notice clears it), and a device that was removed, unlinked, and
+  /// then joins a DIFFERENT household by invite code would keep showing
+  /// the stale "you're no longer part of this household" banner while
+  /// syncing correctly against the new one -- and a wipe-checked tap on
+  /// that stale banner would reset local data against the household just
+  /// joined. `clearSyncLink` deliberately does NOT clear this flag itself
+  /// (a manual disconnect is not an acknowledgement of the notice); this
+  /// write is what makes the flag symmetric overall -- set once by
+  /// revocation, cleared once linking (re)succeeds.
   Future<void> setSyncLinked({
     required String householdId,
     required DateTime linkedAt,
@@ -187,6 +197,7 @@ class SettingsRepository {
       SettingsCompanion(
         syncHouseholdId: Value(householdId),
         syncLinkedAt: Value(linkedAt.toUtc().toIso8601String()),
+        membershipRevoked: const Value(false),
         updatedAt: Value(_isoNow()),
       ),
     );

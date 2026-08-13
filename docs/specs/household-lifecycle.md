@@ -262,7 +262,7 @@ untouched); it just stops leaving a dead flag behind.
 **G-B — adopt must set it.** `HouseholdLinkService.adopt` step 3 already
 mirrors the server's role rule locally; it must mirror the claim too,
 setting the acting member's `userId` to the current auth user id in the
-same write. Without it the row is dirty-and-unclaimed, and `_applyPulled`
+same step. Without it the row is dirty-and-unclaimed, and `_applyPulled`
 skips dirty rows, so the window stays open until a push/pull round trip
 closes it.
 
@@ -325,9 +325,22 @@ recorded here so it is not "fixed" back into silence later: §8.3 exists
 because the local DB is always self-consistent, which stops being a
 sufficient argument once the device has been cut off from its household.
 
-After delete-account the session itself is invalid, so probes fail as
-unauthenticated rather than as revoked — a different signal, handled by
-the existing auth path, not here.
+After delete-account, the session is NOT invalid: GoTrue JWTs are
+stateless, and while deleting the `auth.users` row cascades refresh
+tokens and server-side sessions, an already-issued access token stays
+valid until its `exp` (default 1h) — PostgREST only checks the token's
+signature and expiry, never a server-side revocation list. For the rest
+of that window, `auth.uid()` still resolves on the deleting device, and
+`delete_account` has already nulled every one of its claims before that
+token expires. So the probe does not fail as unauthenticated here: it
+succeeds and returns FALSE, exactly like an ordinary revocation. Left
+alone, the deleting device would read its own deletion as having been
+kicked out by someone else and run the revoke-and-notify path instead of
+simply finishing its own exit. Slice 6 (delete account) must handle this
+explicitly — e.g. by tearing down the sync engine / clearing the local
+session as part of the delete-account flow itself, before any pull can
+observe it — rather than relying on this section's revocation path to
+produce the right outcome by accident.
 
 ### 3.6 l10n
 

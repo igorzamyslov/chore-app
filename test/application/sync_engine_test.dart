@@ -364,6 +364,44 @@ void main() {
         expect(row.membershipRevoked, isFalse);
       },
     );
+
+    test(
+      'refreshNow reports false when its own pull discovers revocation '
+      '(smaller fix 4): a deliberate pull-to-refresh must not answer '
+      '"yes, working" at the exact moment the device is cut off, right '
+      'before the refresh affordance disappears because it is gated on '
+      'linked state',
+      () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        transport.membershipPresent = false;
+
+        final result = await engine.refreshNow();
+
+        expect(result, isFalse);
+        final row = await settings.ensureSettings();
+        expect(row.syncHouseholdId, isNull);
+        expect(row.membershipRevoked, isTrue);
+      },
+    );
+
+    test(
+      'refreshNow still reports true for an ordinary successful refresh '
+      '(membership present)',
+      () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        transport.membershipPresent = true;
+
+        final result = await engine.refreshNow();
+
+        expect(result, isTrue);
+      },
+    );
   });
 
   group('SupabaseSyncEngine push mechanics', () {

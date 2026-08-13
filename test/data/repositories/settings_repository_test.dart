@@ -298,6 +298,32 @@ void main() {
     expect(rows.single.syncHouseholdId, 'household-1');
   });
 
+  test(
+    'setSyncLinked clears a sticky membershipRevoked flag (blocking fix 2, '
+    'spec docs/specs/household-lifecycle.md §3.5): otherwise a device that '
+    'was removed, unlinked, and then joins a DIFFERENT household by invite '
+    'code would sync correctly while still showing the stale revocation '
+    'banner, whose wipe-checked acknowledgement would reset local data '
+    'against the household it just joined',
+    () async {
+      await repo.setMembershipRevoked();
+      final revoked = await repo.ensureSettings();
+      expect(revoked.membershipRevoked, isTrue);
+
+      await repo.setSyncLinked(
+        householdId: 'household-1',
+        linkedAt: DateTime.utc(2026),
+      );
+
+      final relinked =
+          await (db.select(
+                db.settings,
+              )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId)))
+              .getSingle();
+      expect(relinked.membershipRevoked, isFalse);
+    },
+  );
+
   test('watchSettings emits an updated value after setSyncLinked', () async {
     final emissions = <String?>[];
     final sub = repo.watchSettings().listen(

@@ -41,6 +41,24 @@ alter table public.household_invites
 -- two created_by columns above it must NOT be relaxed -- is_household_member()
 -- reads it, so it is load-bearing for every RLS policy. Nulling every claim
 -- here is what makes the auth.users delete below legal.
+--
+-- DELIBERATELY no `and deleted_at is null` on the select below, even
+-- though every other unclaim lookup in this file (leave_household,
+-- remove_member) filters on it. remove_member soft-deletes ANOTHER
+-- member's row without touching user_id, and the members UPDATE grant
+-- (`name, color, role, deleted_at` -- 20260731120000_initial_schema.sql)
+-- lets any member set deleted_at on any other member's row directly
+-- through PostgREST, with no RPC involved. That leaves a row that is
+-- soft-deleted but STILL CLAIMED. If this loop only picked up live rows,
+-- such a row would be skipped, the DELETE below would then hit
+-- members_user_id_fkey (NO ACTION) and roll back the whole function --
+-- so any other member could permanently break your GDPR account
+-- deletion. Every row still holding this user's claim must be unclaimed
+-- regardless of deleted_at: _exit_membership on an already-soft-deleted
+-- row just nulls user_id and leaves deleted_at as it was, and
+-- _cascade_if_orphaned only ever counts `deleted_at is null` rows, so
+-- cascade behaviour for still-live households is unaffected. Do not
+-- re-add this filter "for symmetry" with the other two lookups.
 create or replace function public.delete_account()
 returns void
 language plpgsql
@@ -54,7 +72,7 @@ begin
     raise exception 'not authenticated';
   end if;
   for v_member_id in
-    select id from members where user_id = auth.uid() and deleted_at is null
+    select id from members where user_id = auth.uid()
   loop
     perform _cascade_if_orphaned(_exit_membership(v_member_id));
   end loop;

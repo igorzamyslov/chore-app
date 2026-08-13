@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(22);
+select plan(32);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -231,6 +231,126 @@ select is(
    where id = '00000000-0000-0000-0000-0000000000da'),
   0,
   'delete_account removes the auth user (D-L4)');
+
+-- BLOCKING FIX 1: Household L. Lena is claimed, then another member
+-- soft-deletes her profile directly (the members UPDATE grant covers
+-- `deleted_at`, and does not require `user_id` to change) -- exactly the
+-- state a "remove another member" abuse of that grant produces. Before
+-- the fix, delete_account()'s unclaim loop filtered on
+-- `deleted_at is null` and skipped this row, so the DELETE FROM
+-- auth.users below hit members_user_id_fkey and the whole function
+-- raised -- permanently blocking Lena's GDPR account deletion.
+insert into auth.users (id, email)
+values ('00000000-0000-0000-0000-0000000000d4', 'lena@test.local');
+
+select test_login('00000000-0000-0000-0000-0000000000d4');
+select create_household(
+  '10000000-0000-0000-0000-0000000000d4'::uuid, 'Haus L',
+  '20000000-0000-0000-0000-0000000000d4'::uuid, 'Lena', 4278190080);
+
+-- Simulate another member soft-deleting Lena's own profile via the
+-- members UPDATE grant, leaving her claim (user_id) untouched.
+reset role;
+update members set deleted_at = now()
+  where id = '20000000-0000-0000-0000-0000000000d4';
+
+select test_login('00000000-0000-0000-0000-0000000000d4');
+select lives_ok(
+  $$select delete_account()$$,
+  'a member whose profile was soft-deleted while still claimed can still '
+  'delete her account (blocking fix 1)');
+
+reset role;
+select is(
+  (select user_id from members
+   where id = '20000000-0000-0000-0000-0000000000d4'),
+  null,
+  'delete_account unclaims a soft-deleted-but-claimed row too');
+
+select is(
+  (select count(*)::int from auth.users
+   where id = '00000000-0000-0000-0000-0000000000d4'),
+  0,
+  'delete_account removes the auth user even though her own profile was '
+  'already soft-deleted');
+
+-- BLOCKING FIX 3(b): Household K. Kai creates it (so households.created_by
+-- = Kai) and Uli is a second claimed member. Kai deletes her account: she
+-- is unclaimed but the household must survive (Uli is still claimed), and
+-- households_created_by_fkey's `on delete set null` must fire rather than
+-- leaving a dangling reference -- pinning that this is SET NULL, not
+-- CASCADE. The suite's only other delete_account cases (Task 1, Jo) both
+-- cascade their household, so neither ever exercises this branch: a
+-- migration that flipped the FK to `on delete cascade` -- hard-deleting a
+-- household Uli still lives in, in violation of this project's
+-- soft-deletes-only invariant -- would pass 54/54 without this case.
+insert into auth.users (id, email)
+values ('00000000-0000-0000-0000-0000000000d5', 'kai@test.local'),
+       ('00000000-0000-0000-0000-0000000000d6', 'uli@test.local');
+
+select test_login('00000000-0000-0000-0000-0000000000d5');
+select create_household(
+  '10000000-0000-0000-0000-0000000000d5'::uuid, 'Haus K',
+  '20000000-0000-0000-0000-0000000000d5'::uuid, 'Kai', 4278190080);
+
+reset role;
+insert into members (id, household_id, name, color, role, user_id)
+values ('20000000-0000-0000-0000-0000000000d6',
+        '10000000-0000-0000-0000-0000000000d5', 'Uli', 4278190081,
+        'member', '00000000-0000-0000-0000-0000000000d6');
+
+select test_login('00000000-0000-0000-0000-0000000000d5');
+select lives_ok(
+  $$select delete_account()$$,
+  'kai, the household creator, can delete her account while Uli is still '
+  'claimed (blocking fix 3b)');
+
+reset role;
+select is(
+  (select deleted_at from households
+   where id = '10000000-0000-0000-0000-0000000000d5'),
+  null,
+  'the household survives delete_account when a second claimed member '
+  'remains -- pins ON DELETE SET NULL, not CASCADE');
+
+select is(
+  (select created_by from households
+   where id = '10000000-0000-0000-0000-0000000000d5'),
+  null,
+  'households_created_by_fkey nulls created_by once the creator''s auth '
+  'row is gone, rather than leaving it dangling');
+
+select is(
+  (select user_id from members
+   where id = '20000000-0000-0000-0000-0000000000d5'),
+  null,
+  'delete_account still unclaims the deleting member even though the '
+  'household survives');
+
+-- BLOCKING FIX 3(a): pin the grant matrix itself, not merely behaviour
+-- reachable through it. Nothing else in this suite (or 001) asserts a
+-- has_function_privilege/has_table_privilege fact, so a future migration
+-- containing `grant execute on all functions in schema public to
+-- authenticated` would pass 54/54 unnoticed. These three internal
+-- helpers are SECURITY DEFINER and must only ever be reachable through
+-- the public RPCs that wrap them.
+select is(
+  has_function_privilege(
+    'authenticated', 'public._exit_membership(uuid)', 'EXECUTE'),
+  false,
+  '_exit_membership is never granted to authenticated');
+
+select is(
+  has_function_privilege(
+    'authenticated', 'public._cascade_if_orphaned(uuid)', 'EXECUTE'),
+  false,
+  '_cascade_if_orphaned is never granted to authenticated');
+
+select is(
+  has_function_privilege(
+    'authenticated', 'public._valid_invite(text)', 'EXECUTE'),
+  false,
+  '_valid_invite is never granted to authenticated');
 
 select * from finish();
 rollback;

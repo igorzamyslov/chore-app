@@ -198,6 +198,12 @@ abstract class SyncTransport {
   /// EMPTY RESULT SETS rather than errors, so an ordinary pull is
   /// indistinguishable from "nothing changed" and the device would look
   /// healthy forever.
+  ///
+  /// Called on EVERY pull -- the 60s foreground poll, every realtime
+  /// event, and after every successful push (spec §8.3c) -- so this is
+  /// one extra round trip per pull, not a one-off check. Whoever next
+  /// sizes the sync budget (poll interval, realtime fan-out) should not
+  /// have to discover that by reading every `_pullSinceInner` call site.
   Future<bool> hasMembership(String householdId);
 }
 
@@ -347,8 +353,14 @@ class SupabaseSyncEngine implements SyncEngine {
   Future<bool> refreshNow() async {
     try {
       await _pushAll();
-      await _pullSinceInner();
-      return true;
+      final revoked = await _pullSinceInner();
+      // A pull that discovers revocation is not a success from the
+      // caller's point of view: this is a deliberate pull-to-refresh, and
+      // "true" here would tell the user "yes, working" at the exact
+      // moment their device is being cut off from the household -- right
+      // before the refresh affordance itself disappears because it is
+      // gated on linked state.
+      return !revoked;
     } on Object catch (error, stackTrace) {
       _logFailure('refreshNow', error, stackTrace);
       return false;
@@ -382,8 +394,12 @@ class SupabaseSyncEngine implements SyncEngine {
   }
 
   /// The pull itself -- THROWS on failure. [pullSince] swallows that;
-  /// [refreshNow] reports it.
-  Future<void> _pullSinceInner() async {
+  /// [refreshNow] reports it. Returns whether this pull discovered
+  /// revocation (and therefore short-circuited before fetching any table)
+  /// -- [pullSince] ignores it, [refreshNow] folds it into its own return
+  /// value so a pull-to-refresh that finds the device cut off does not
+  /// report success.
+  Future<bool> _pullSinceInner() async {
     // Revocation probe (spec docs/specs/household-lifecycle.md §3.5).
     // While linked, a missing membership IS the signal that this device
     // was removed from its household -- RLS stops returning rows rather
@@ -397,7 +413,7 @@ class SupabaseSyncEngine implements SyncEngine {
     if (!await transport.hasMembership(householdId)) {
       await settings.setMembershipRevoked();
       await settings.clearSyncLink();
-      return;
+      return true;
     }
 
     final current = await settings.ensureSettings();
@@ -473,6 +489,7 @@ class SupabaseSyncEngine implements SyncEngine {
 
     // Cursor stored only after the transaction above commits (spec §8.3).
     await settings.setSyncLastPulledAt(serverNow);
+    return false;
   }
 
   /// Households-only push (spec §8.3's grants note applied to `households`
