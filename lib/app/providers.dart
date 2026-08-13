@@ -598,10 +598,18 @@ final pendingOccurrencesProvider = StreamProvider<List<OccurrenceWithChore>>((
 ///
 /// Backs the chores list's collapsed 'Done today' section (spec
 /// `docs/specs/ux-round-2.md` A3).
+///
+/// Rebuilds at local midnight: the date comes from [todayProvider], not
+/// from a one-shot [clockProvider] read (backlog A-2 / audit P1).
 final closedTodayOccurrencesProvider =
     StreamProvider<List<ClosedOccurrenceWithChore>>((ref) async* {
+      // Watched BEFORE the await, deliberately: a `ref.watch` placed after
+      // an await registers its dependency late, and on the welcome gate
+      // `bootstrapProvider` parks on a future that never completes (see its
+      // doc comment) — the line after the await would then never run and
+      // this provider would never learn about a day change at all.
+      final today = ref.watch(todayProvider);
       final householdId = await ref.watch(bootstrapProvider.future);
-      final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
       yield* ref
           .watch(choreRepositoryProvider)
           .watchClosedOnDate(householdId, today);

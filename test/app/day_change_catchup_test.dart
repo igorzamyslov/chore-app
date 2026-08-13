@@ -3,6 +3,10 @@
 /// day-change, followed by a digest recompute when catch-up actually
 /// changed something.
 ///
+/// Also covers what the same two triggers do for the UI's notion of the
+/// date — [todayProvider] and the [closedTodayOccurrencesProvider] rebuild
+/// that hangs off it (backlog A-2 / audit P1).
+///
 /// Same approach as `test/app/digest_reschedule_test.dart`: the real
 /// controller + real repositories/service against an in-memory database,
 /// with only the bottom-most OS-facing notification plugin faked. These
@@ -361,6 +365,65 @@ void main() {
 
         await tester.pump(digestRescheduleDebounce);
         expect(plugin.scheduledCalls, isNotEmpty);
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
+  });
+
+  group('closedTodayOccurrencesProvider', () {
+    testWidgets(
+      'empties when the calendar day rolls over: a completion made '
+      'yesterday is no longer "closed today"',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 9);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+          ],
+        );
+        final householdId = await _awaitBootstrap(tester, container);
+        final me = await database.select(database.members).getSingle();
+
+        final service = container.read(choreServiceProvider);
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 5),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final repo = container.read(choreRepositoryProvider);
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        await service.completeOccurrence(pending!.id, completedBy: me.id);
+
+        // A StreamProvider only runs while something listens to it.
+        container.listen(closedTodayOccurrencesProvider, (_, _) {});
+        await _pumpUntil(
+          tester,
+          () async =>
+              container.read(closedTodayOccurrencesProvider).value?.length == 1,
+        );
+
+        // Midnight passes. Nothing else changes in the database at all.
+        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+        container.read(todayProvider.notifier).refresh();
+
+        // The provider re-subscribes against the new date; until its new
+        // stream emits, Riverpod keeps serving the previous value, which is
+        // exactly what _pumpUntil is for.
+        await _pumpUntil(
+          tester,
+          () async =>
+              container.read(closedTodayOccurrencesProvider).value?.isEmpty ??
+              false,
+        );
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.
