@@ -282,6 +282,7 @@ distribution question below.
 | **G-6** | Finer-grained notifications — N2: per-chore reminders, evening re-reminder (F16) | Own spec; depends on A-1 landing first | L |
 | **G-7** | Search in long lists (F18) | Low value at family scale | M |
 | **G-8** | Multiple shopping lists (F20) | Schema is single-list today | XL |
+| **G-9** | Digest scope toggle — "include unassigned chores" | The opt-in that `DESIGN.md` §3 originally promised, retired as a *default* by OPD-1 (`docs/plans/2026-08-08-daily-digest-scheduling.md`) rather than as a *capability*. Would be a `settings` boolean feeding `projectDigestCounts`'s recipient predicate — genuinely small, but it is a new settings row, new l10n and new widget tests, and nobody has asked for it. Build it if a real household reports the over-inclusion as noise, not before | S |
 
 ---
 
