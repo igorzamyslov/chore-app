@@ -118,7 +118,6 @@ the local recommendation contradicted something else in the app.*
 | --- | --- | --- | --- |
 | **A-2b** | Settings "Last synced" text goes stale while open | Needs a periodic ticker; deliberately excluded from A-2 because a provider-armed timer trips `flutter_test`'s pending-timer check | S |
 | **A-3b** | iOS: the database is in `Documents/`, which iCloud backs up by default | The iOS counterpart to A-3's `allowBackup="false"`. Needs per-file `NSURLIsExcludedFromBackupKey` at runtime, not a manifest flag — deliberately out of A-3's scope | S |
-| **G-9** | A per-device "include unassigned chores in my digest" toggle | The genuine opt-in that `DESIGN.md` §3 originally implied, retired by the A-1 decision. Build only if someone actually complains about "anyone" chores in their digest | S |
 
 ## Suggested execution order
 
@@ -191,7 +190,7 @@ would catch by eye.*
 
 | ID | Title | What's wrong | Files | Effort |
 | --- | --- | --- | --- | --- |
-| **A-1** | **The daily digest is not daily** | **DONE 2026-08-08** (`docs/plans/2026-08-08-daily-digest-scheduling.md`): the digest is now armed as a rolling 7-day horizon of distinct ids, rewritten on every trigger, with counts projected per date and scoped to the acting member. **T2.3 closed with it** | `lib/domain/digest_planner.dart`, `lib/application/notification_scheduler.dart`, `lib/app/providers.dart:672-760`, `docs/specs/notifications.md` | M |
+| **A-1** | **The daily digest is not daily** | **DONE 2026-08-08** (`docs/plans/2026-08-08-daily-digest-scheduling.md`): the digest is now armed as a rolling 7-day horizon of distinct ids, rewritten on every trigger, with counts projected per date and scoped to the acting member. **T2.3 closed with it** | `lib/domain/digest_planner.dart`, `lib/application/notification_scheduler.dart`, `lib/app/providers.dart:650-856`, `docs/specs/notifications.md` | M |
 | **A-2** | **Date-derived UI never rolls over at midnight** | `clockProvider` never re-emits. `closedTodayOccurrencesProvider` captures `today` at build time and watches nothing that changes at midnight — an app left open overnight shows yesterday's completions under "Done today" forever, and the progress ring with it. Section buckets only refresh if catch-up happens to change something. `CatchUpController` already owns a DST-safe midnight timer; its only consumer is catch-up | `lib/app/providers.dart:545-552,820-884`, `lib/features/chores/chores_list_screen.dart:53` | S |
 | **A-3** | **Android auto-backup unconfigured** | No `allowBackup`, no `dataExtractionRules`, no `fullBackupContent` anywhere under `android/`, so backup defaults on with no rules: a live SQLite file plus WAL sidecars copied uncoordinated, and the Supabase refresh token + pull cursor restored onto a second device. Under last-push-wins that is a data-clobbering configuration. Invisible in every emulator and E2E run — same blind-spot class as the v0.2.0 `INTERNET` miss. **Decided (D-B1): `allowBackup="false"`. Planned in `docs/plans/2026-08-08-android-backup.md`, ready to execute** | `android/app/src/main/AndroidManifest.xml`, `docs/app-lifecycle.md` G8 | XS–S |
 | **A-3b** | **iOS: no backup exclusion on the local DB** | `chore_app.sqlite` (+ `-wal`/`-shm`) lives under `getApplicationDocumentsDirectory()` (`drift_flutter`'s native default, no iOS/Android branch), which iCloud/iTunes backs up by default — same torn-restore and cross-device session-clobber shape as A-3, but the fix is per-file (`NSURLIsExcludedFromBackupKey` at runtime), not a manifest flag, so it needs its own scoping pass. Deliberately excluded from A-3/D-B1, which is Android-only | `ios/Runner/Info.plist`, wherever the DB file is opened (`lib/data/db/app_database.dart`) | S |
@@ -282,7 +281,7 @@ distribution question below.
 | **G-6** | Finer-grained notifications — N2: per-chore reminders, evening re-reminder (F16) | Own spec; depends on A-1 landing first | L |
 | **G-7** | Search in long lists (F18) | Low value at family scale | M |
 | **G-8** | Multiple shopping lists (F20) | Schema is single-list today | XL |
-| **G-9** | Digest scope toggle — "include unassigned chores" | The opt-in that `DESIGN.md` §3 originally promised, retired as a *default* by OPD-1 (`docs/plans/2026-08-08-daily-digest-scheduling.md`) rather than as a *capability*. Would be a `settings` boolean feeding `projectDigestCounts`'s recipient predicate — genuinely small, but it is a new settings row, new l10n and new widget tests, and nobody has asked for it. Build it if a real household reports the over-inclusion as noise, not before | S |
+| **G-9** | Digest scope toggle — a per-device "include unassigned chores in my digest" opt-in | The opt-in that `DESIGN.md` §3 originally promised, retired as a *default* by OPD-1 (`docs/plans/2026-08-08-daily-digest-scheduling.md`) rather than as a *capability*. Would be a per-device `settings` boolean feeding `projectDigestCounts`'s recipient predicate — genuinely small, but it is a new settings row, new l10n and new widget tests, and nobody has asked for it. Build it if a real household reports the over-inclusion as noise, not before | S |
 
 ---
 
