@@ -287,6 +287,13 @@ class Settings extends Table {
   /// `AppDatabase.migration`.
   TextColumn get syncLastPulledAt => text().nullable()();
 
+  /// Set when a pull discovered this device's membership was revoked
+  /// server-side (spec `docs/specs/household-lifecycle.md` §3.5). Cleared
+  /// when the user acknowledges the notice. Added in schemaVersion 10; see
+  /// `AppDatabase.migration`.
+  BoolColumn get membershipRevoked =>
+      boolean().withDefault(const Constant(false))();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

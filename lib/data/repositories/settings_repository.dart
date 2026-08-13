@@ -56,6 +56,7 @@ class SettingsRepository {
         id: deviceId,
         digestEnabled: true,
         digestMinutes: 480,
+        membershipRevoked: false,
         createdAt: now,
         updatedAt: now,
       );
@@ -171,10 +172,20 @@ class SettingsRepository {
 
   /// Links this device to [householdId] as of [linkedAt] (spec
   /// `docs/specs/sync-backend.md` §7.1): sets `syncHouseholdId` and
-  /// `syncLinkedAt` together -- "linked" ⇔ `syncHouseholdId != null`.
-  /// Called once, as the last step of the adopt flow
-  /// (`HouseholdLinkService.adopt`, `lib/application/household_link_service.dart`),
-  /// only after every earlier step has already succeeded.
+  /// `syncLinkedAt` together -- "linked" ⇔ `syncHouseholdId != null`. This
+  /// is the single funnel every re-link path goes through --
+  /// `HouseholdLinkService.adopt` and both `HouseholdJoinService` entry
+  /// points -- so it is also where `membershipRevoked` (spec §3.5) must be
+  /// cleared: that flag is otherwise sticky (only the user tapping through
+  /// the notice clears it), and a device that was removed, unlinked, and
+  /// then joins a DIFFERENT household by invite code would keep showing
+  /// the stale "you're no longer part of this household" banner while
+  /// syncing correctly against the new one -- and a wipe-checked tap on
+  /// that stale banner would reset local data against the household just
+  /// joined. `clearSyncLink` deliberately does NOT clear this flag itself
+  /// (a manual disconnect is not an acknowledgement of the notice); this
+  /// write is what makes the flag symmetric overall -- set once by
+  /// revocation, cleared once linking (re)succeeds.
   Future<void> setSyncLinked({
     required String householdId,
     required DateTime linkedAt,
@@ -186,6 +197,7 @@ class SettingsRepository {
       SettingsCompanion(
         syncHouseholdId: Value(householdId),
         syncLinkedAt: Value(linkedAt.toUtc().toIso8601String()),
+        membershipRevoked: const Value(false),
         updatedAt: Value(_isoNow()),
       ),
     );
@@ -235,21 +247,67 @@ class SettingsRepository {
   /// `syncLastPulledAt` (spec §8.1) so a future re-link starts pulling from
   /// scratch rather than resuming a stale cursor.
   ///
+  /// Also nulls every local `members.userId` (spec
+  /// `docs/specs/household-lifecycle.md` §3.1 G-A): claim state is
+  /// meaningless in a local-only household, and a stale value left behind
+  /// by an earlier pull would keep those profiles undeletable forever.
+  /// Deliberately does NOT mark the members rows `syncDirty` -- `user_id`
+  /// is server-owned and is not in the client's UPDATE grant.
+  ///
   /// This is NOT a delete: every other local row (households, members,
   /// categories, chores, shopping items, ...) is left exactly as it is, and
-  /// nothing on the server is touched -- this device's member row keeps its
-  /// `user_id` there, so reconnecting later (spec §7.6) still works. Called
-  /// by `HouseholdLinkService.disconnect`
+  /// nothing on the server is touched -- the server's copy of `user_id`
+  /// (only this device's local copy is cleared here) is untouched, so
+  /// reconnecting later (spec §7.6) still works. Called by
+  /// `HouseholdLinkService.disconnect`
   /// (`lib/application/household_link_service.dart`).
   Future<void> clearSyncLink() async {
+    await ensureSettings();
+    await db.transaction(() async {
+      await (db.update(
+        db.settings,
+      )..where((tbl) => tbl.id.equals(deviceId))).write(
+        SettingsCompanion(
+          syncHouseholdId: const Value(null),
+          syncLinkedAt: const Value(null),
+          syncLastPulledAt: const Value(null),
+          updatedAt: Value(_isoNow()),
+        ),
+      );
+      // No WHERE clause: safe only because this app has exactly one
+      // household per device, so every local member row belongs to the
+      // household being unlinked. Add a household/household-membership
+      // filter here before this app ever supports more than one household
+      // per device.
+      await db
+          .update(db.members)
+          .write(const MembersCompanion(userId: Value(null)));
+    });
+  }
+
+  /// Records that this device's household membership was revoked
+  /// server-side, so the UI can explain it once (spec
+  /// `docs/specs/household-lifecycle.md` §3.5).
+  Future<void> setMembershipRevoked() async {
     await ensureSettings();
     await (db.update(
       db.settings,
     )..where((tbl) => tbl.id.equals(deviceId))).write(
       SettingsCompanion(
-        syncHouseholdId: const Value(null),
-        syncLinkedAt: const Value(null),
-        syncLastPulledAt: const Value(null),
+        membershipRevoked: const Value(true),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Clears the revocation flag once the user has acknowledged the notice.
+  Future<void> clearMembershipRevoked() async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        membershipRevoked: const Value(false),
         updatedAt: Value(_isoNow()),
       ),
     );

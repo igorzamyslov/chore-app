@@ -101,4 +101,27 @@ void main() {
       expect(settings.syncHouseholdId, isNull);
     },
   );
+
+  test(
+    'adopt sets the acting member userId locally, mirroring the claim the '
+    'server just made (spec docs/specs/household-lifecycle.md §3.1 G-B)',
+    () async {
+      final households = HouseholdRepository(db);
+      final household = await households.createLocalHousehold('Me');
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+
+      await service.adopt(
+        householdId: household.id,
+        actingMemberId: me.id,
+        authUserId: 'auth-user-1',
+      );
+
+      final after = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(after.userId, 'auth-user-1');
+    },
+  );
 }

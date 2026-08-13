@@ -1069,4 +1069,29 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Alles löschen';
+
+  @override
+  String get exitConfirmDeleteLocalLabel =>
+      'Kopie auf diesem Gerät auch löschen';
+
+  @override
+  String get exitConfirmDeleteLocalExplanation =>
+      'Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.';
+
+  @override
+  String get exitConfirmCancel => 'Abbrechen';
+
+  @override
+  String get membershipRevokedTitle =>
+      'Du gehörst nicht mehr zu diesem Haushalt';
+
+  @override
+  String get membershipRevokedBody =>
+      'Dieses Gerät synchronisiert nicht mehr: Entweder wurde das Profil aus dem Online-Haushalt entfernt, oder den Haushalt gibt es nicht mehr. Nichts ist verloren — alles, was du hier siehst, ist weiterhin auf diesem Gerät.';
+
+  @override
+  String get membershipRevokedAction => 'Verstanden';
+
+  @override
+  String get membershipRevokedConfirm => 'Fertig';
 }

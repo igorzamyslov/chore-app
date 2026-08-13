@@ -31,6 +31,10 @@ below (§2.2, §3.1 G-A, etc.) point into it.
 - Never `await` a drift stream outside a widget pump — it deadlocks.
 - Run Flutter/Dart commands as `env -u GIT_DIR -u GIT_INDEX_FILE flutter ...`
   when anywhere near git hooks or worktrees.
+- **Running tests requires the Supabase dart-defines**, exactly as
+  `lefthook.yml` does — they keep `syncEngineProvider` offline, and six
+  tests fail without them:
+  `env -u GIT_DIR -u GIT_INDEX_FILE flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= <path>`
 - Do NOT run more than 2 concurrent `flutter test`/`build` processes.
 - Never add `Co-Authored-By` trailers to commits.
 - `members.role` is vestigial (D1). Do not add role-based enforcement.
@@ -43,7 +47,7 @@ below (§2.2, §3.1 G-A, etc.) point into it.
 All three are refinements found while planning. They are called out here
 rather than silently applied:
 
-1. **§2.7 says "extends `supabase/tests/001_rls_isolation_test.sql`".** This
+1. **§2.8 says "extends `supabase/tests/001_rls_isolation_test.sql`".** This
    plan adds `supabase/tests/002_membership_exit_test.sql` instead. `001` opens
    with `select plan(32)` and is 259 lines; growing it means re-counting that
    plan on every task and re-running unrelated assertions. A second file is the
@@ -89,12 +93,23 @@ supabase start
 Expected: a table of local URLs (API on `http://127.0.0.1:54321`). If it is
 already running this is a no-op.
 
+**Applies to every task in slice 1:** `supabase test db` does NOT apply new
+or changed migrations — it runs the test files against the database as it
+currently stands. After editing anything under `supabase/migrations/`, run
+
+```bash
+supabase db reset
+```
+
+first, then `supabase test db`. Skipping the reset produces confusing
+"function does not exist" failures long after you wrote the function.
+
 - [ ] **Step 2: Write the failing test**
 
 Create `supabase/tests/002_membership_exit_test.sql`:
 
 ```sql
--- pgTAP: membership exit (spec docs/specs/household-lifecycle.md §2.7).
+-- pgTAP: membership exit (spec docs/specs/household-lifecycle.md §2.8).
 -- Run: `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -147,11 +162,44 @@ Create `supabase/migrations/20260808120000_membership_exit.sql`:
 -- All three public RPCs are SECURITY DEFINER over internal helpers that
 -- are never granted to authenticated.
 
--- delete_account (§2.2, D-L4): unclaims every membership, cascades any
--- household left with no claimed members, then deletes the auth user.
--- The auth.users delete works because this function is owned by
--- `postgres`, which has rights on the auth schema -- no edge function and
--- no service-role key. Task 1's pgTAP case is what proves that.
+-- The auth.users foreign keys (§2.7). Three constraints reference
+-- auth.users with NO ACTION. The unclaim handles members.user_id; these
+-- two are NOT NULL and would block `delete from auth.users` for every
+-- account that ever created a household or an invite -- which is every
+-- account delete_account exists for. Both columns are write-only (no RLS
+-- policy, RPC or client reads them), so relaxing them is safe:
+--   * a household outlives its creator by design (§0: the household owns
+--     its data), so a null creator is the honest representation;
+--   * invites are ephemeral 7-day codes and should die with their creator.
+alter table public.households
+  alter column created_by drop not null;
+alter table public.households
+  drop constraint households_created_by_fkey;
+alter table public.households
+  add constraint households_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete set null;
+
+alter table public.household_invites
+  drop constraint household_invites_created_by_fkey;
+alter table public.household_invites
+  add constraint household_invites_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete cascade;
+
+-- delete_account (§2.2, D-L4), first form: unclaim every membership, then
+-- delete the auth user. The auth.users delete works because this function
+-- is owned by `postgres`, which has rights on the auth schema -- no edge
+-- function and no service-role key. Task 1's pgTAP case proves that.
+--
+-- The unclaim is NOT optional padding: members.user_id is the third
+-- NO ACTION foreign key to auth.users, and unlike the two created_by
+-- columns it must NOT be relaxed -- is_household_member() reads it, so it
+-- is load-bearing for every RLS policy. Nulling it here is what the
+-- finished form does anyway (§2.2 loops over memberships), so this stub is
+-- a true subset of the final behaviour rather than a throwaway.
+--
+-- Still deliberately INCOMPLETE: no orphan cascade, and no reuse of the
+-- _exit_membership / _cascade_if_orphaned helpers, which do not exist yet.
+-- Task 6 replaces this body entirely. Do not add the cascade here.
 create or replace function public.delete_account()
 returns void
 language plpgsql
@@ -162,6 +210,7 @@ begin
   if auth.uid() is null then
     raise exception 'not authenticated';
   end if;
+  update members set user_id = null where user_id = auth.uid();
   delete from auth.users where id = auth.uid();
 end;
 $$;
@@ -208,6 +257,15 @@ In `supabase/tests/002_membership_exit_test.sql`, change `select plan(2);` to
 `select plan(7);` and insert before `select * from finish();`:
 
 ```sql
+-- test_login() sets role=authenticated through set_config(..., true),
+-- which persists for the REST OF THIS TRANSACTION -- it never reverts on
+-- its own. Any statement needing superuser must `reset role;` first:
+-- writing auth.users, or inserting a CLAIMED members row (members_insert
+-- deliberately forbids those from the client). This recurs all through
+-- the file; when a fixture fails with "permission denied for table
+-- users", a missing reset role is why.
+reset role;
+
 -- Erik and Fran share household E. `outsider` belongs to no household and
 -- is the non-member probe for every authorization case below -- Dana is
 -- NOT reusable for that: Task 1 deleted her auth row.
@@ -514,7 +572,13 @@ select is(
   (select deleted_at from households
    where id = '10000000-0000-0000-0000-0000000000g1'),
   null,
-  'remove_member never cascades -- the caller stays claimed (§2.3)');
+  'removing a member never soft-deletes the household');
+-- NOTE on what this does and does not prove: it cannot distinguish
+-- "_cascade_if_orphaned was never called" from "it was called and
+-- correctly no-opped", because Gil is still claimed either way. It is a
+-- real invariant (a removal must never take the household with it), just
+-- not a proof of §2.3's mechanism. §2.3 holds structurally: self-removal
+-- is rejected, so the caller is always a surviving claimed member.
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -548,10 +612,13 @@ declare
 begin
   select household_id into v_household_id from members
     where id = p_member_id;
-  if v_household_id is null then
-    raise exception 'no such member';
-  end if;
-  if not is_household_member(v_household_id) then
+  -- ONE message for "no such member" and "not your household" alike.
+  -- This function is SECURITY DEFINER, so the lookup above bypasses RLS:
+  -- two distinct messages would tell a non-member whether an arbitrary
+  -- member UUID exists anywhere in the system -- an existence oracle
+  -- across household boundaries, and a hole in the is_household_member
+  -- perimeter this project treats as its security boundary. Say nothing.
+  if v_household_id is null or not is_household_member(v_household_id) then
     raise exception 'not a member of this household';
   end if;
   select id into v_caller_member_id from members
@@ -623,7 +690,7 @@ select throws_ok(
 
 select throws_ok(
   $$select join_as_new_member('DEADCODE',
-      '20000000-0000-0000-0000-0000000000z1'::uuid, 'Zoe', 4278190080)$$,
+      '20000000-0000-0000-0000-0000000000ce'::uuid, 'Zoe', 4278190080)$$,
   'invalid or expired invite',
   'joining a cascaded household is rejected');
 ```
@@ -703,20 +770,29 @@ behaviour §2.2 requires.
 - Consumes: `_exit_membership` (Task 2), `_cascade_if_orphaned` (Task 3).
 - Produces: `public.delete_account() returns void`, final form.
 
+This task also carries two Minor findings from earlier reviews, both in
+files it already edits. They are Steps 6 and 7.
+
 - [ ] **Step 1: Write the failing tests**
 
-Bump `select plan(17);` to `select plan(21);` and append before `finish()`:
+Bump `select plan(17);` to `select plan(22);` and append before `finish()`:
 
 ```sql
+-- Task 5's block ends with role=authenticated still set (its last
+-- statements are throws_ok calls after a test_login), so this superuser
+-- insert needs the reset first -- see Task 2's note on test_login's
+-- transaction-scoped set_config.
+reset role;
+
 -- Household J: Jo alone (claimed) plus an unclaimed profile. Deleting Jo's
 -- account must unclaim her, cascade J, and remove the auth user.
 insert into auth.users (id, email)
-values ('00000000-0000-0000-0000-0000000000j1', 'jo@test.local');
+values ('00000000-0000-0000-0000-0000000000da', 'jo@test.local');
 
-select test_login('00000000-0000-0000-0000-0000000000j1');
+select test_login('00000000-0000-0000-0000-0000000000da');
 select create_household(
-  '10000000-0000-0000-0000-0000000000j1'::uuid, 'Haus J',
-  '20000000-0000-0000-0000-0000000000j1'::uuid, 'Jo', 4278190080);
+  '10000000-0000-0000-0000-0000000000da'::uuid, 'Haus J',
+  '20000000-0000-0000-0000-0000000000da'::uuid, 'Jo', 4278190080);
 
 select lives_ok(
   $$select delete_account()$$,
@@ -725,19 +801,19 @@ select lives_ok(
 reset role;
 select is(
   (select user_id from members
-   where id = '20000000-0000-0000-0000-0000000000j1'),
+   where id = '20000000-0000-0000-0000-0000000000da'),
   null,
   'delete_account unclaims every membership');
 
 select isnt(
   (select deleted_at from households
-   where id = '10000000-0000-0000-0000-0000000000j1'),
+   where id = '10000000-0000-0000-0000-0000000000da'),
   null,
   'delete_account cascades a household left with no claimed members');
 
 select is(
   (select count(*)::int from auth.users
-   where id = '00000000-0000-0000-0000-0000000000j1'),
+   where id = '00000000-0000-0000-0000-0000000000da'),
   0,
   'delete_account removes the auth user (D-L4)');
 ```
@@ -789,7 +865,57 @@ $$;
 supabase test db
 ```
 
-Expected: PASS, 21/21.
+Expected: PASS, 22/22.
+
+- [ ] **Step 6: Make `_cascade_if_orphaned`'s return value honest**
+
+Task 3's review finding. The function's doc comment promises "true when it
+stamped `households.deleted_at`", but it returns true whenever zero claimed
+members remain — including when the household was already soft-deleted and
+the UPDATE touched no rows. Harmless today (every caller uses `perform`),
+a trap the moment anything branches on it.
+
+In `supabase/migrations/20260808120000_membership_exit.sql`, add
+`v_stamped int;` to `_cascade_if_orphaned`'s `declare` block and replace:
+
+```sql
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  return true;
+```
+
+with:
+
+```sql
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  -- Report what actually happened, not what was merely eligible: an
+  -- already-cascaded household is eligible but stamps nothing. The doc
+  -- comment above promises "stamped", so return that.
+  get diagnostics v_stamped = row_count;
+  return v_stamped > 0;
+```
+
+No test count change — no current caller reads the return value.
+
+- [ ] **Step 7: Assert the invite guard covers `claim_member` too**
+
+Task 5's review finding: `_valid_invite`'s household-liveness guard was
+asserted through `list_claimable_members` and `join_as_new_member`, but not
+through `claim_member`, the third caller sharing that choke point. The
+guard does cover it (verified live during review); the suite just didn't
+say so. Append to `supabase/tests/002_membership_exit_test.sql`, beside the
+other two `DEADCODE` assertions:
+
+```sql
+select throws_ok(
+  $$select claim_member('DEADCODE',
+      '20000000-0000-0000-0000-0000000000f1'::uuid)$$,
+  'invalid or expired invite',
+  'claiming a profile in a cascaded household is rejected');
+```
+
+This is the 22nd assertion counted in Step 1's `plan(22)`.
 
 - [ ] **Step 5: Commit**
 
@@ -1113,8 +1239,8 @@ In `lib/l10n/app_en.arb`:
 In `lib/l10n/app_de.arb` (du-form):
 
 ```json
-  "exitConfirmDeleteLocalLabel": "Kopie auf diesem Handy auch löschen",
-  "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Handy. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Handy werden gelöscht und die App startet neu.",
+  "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
+  "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",
   "exitConfirmCancel": "Abbrechen",
 ```
 
@@ -1638,13 +1764,17 @@ In `lib/l10n/app_en.arb`:
   "@membershipRevokedTitle": {
     "description": "Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5)."
   },
-  "membershipRevokedBody": "Someone removed this profile from the online household, so this phone has stopped syncing. Everything you see here is still on this phone.",
+  "membershipRevokedBody": "This phone has stopped syncing: either the profile was removed from the online household, or the household itself is gone. Nothing is lost — everything you see here is still on this phone.",
   "@membershipRevokedBody": {
-    "description": "Body of the membership-revoked notice. States plainly that syncing stopped and that local data is intact."
+    "description": "Body of the membership-revoked notice. Deliberately names BOTH causes: the probe (hasMembership) cannot distinguish 'someone removed you' from 'the household was cascade-deleted when its last claimed member left, or when you deleted your account from another device'. Claiming someone removed them would be wrong in those cases. Also states plainly that local data is intact."
   },
   "membershipRevokedAction": "Got it",
   "@membershipRevokedAction": {
-    "description": "Confirm button of the membership-revoked notice."
+    "description": "Button on the membership-revoked BANNER. Opens the shared exit-confirmation sheet, where the keep-or-wipe choice is made."
+  },
+  "membershipRevokedConfirm": "Done",
+  "@membershipRevokedConfirm": {
+    "description": "Confirm button INSIDE the shared exit-confirmation sheet when opened from the membership-revoked notice. Must differ from membershipRevokedAction: both are on screen once the sheet is open, and an identical label makes the banner button and the sheet button indistinguishable to a widget test and to a screen reader."
   },
 ```
 
@@ -1652,8 +1782,9 @@ In `lib/l10n/app_de.arb` (du-form):
 
 ```json
   "membershipRevokedTitle": "Du gehörst nicht mehr zu diesem Haushalt",
-  "membershipRevokedBody": "Jemand hat dieses Profil aus dem Online-Haushalt entfernt, deshalb synchronisiert dieses Handy nicht mehr. Alles, was du hier siehst, ist weiterhin auf diesem Handy.",
+  "membershipRevokedBody": "Dieses Gerät synchronisiert nicht mehr: Entweder wurde das Profil aus dem Online-Haushalt entfernt, oder den Haushalt gibt es nicht mehr. Nichts ist verloren — alles, was du hier siehst, ist weiterhin auf diesem Gerät.",
   "membershipRevokedAction": "Verstanden",
+  "membershipRevokedConfirm": "Fertig",
 ```
 
 Regenerate:
@@ -1664,80 +1795,47 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 
 - [ ] **Step 2: Write the failing test**
 
-Create `test/features/settings/membership_revoked_notice_test.dart`:
+Create `test/features/settings/membership_revoked_notice_test.dart`.
 
-```dart
-import 'package:chore_app/app/providers.dart';
-import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/repositories/household_repository.dart';
-import 'package:chore_app/data/repositories/settings_repository.dart';
-import 'package:chore_app/features/settings/membership_revoked_notice.dart';
-import 'package:chore_app/l10n/app_localizations.dart';
-import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test/flutter_test.dart';
+**Do NOT hand-roll a `ProviderScope` pump with `tearDown(() => db.close())`.**
+Two earlier drafts of this task did exactly that and both HUNG rather than
+failed. The reason is documented in `test/test_utils/pump_app.dart`'s own
+header: flutter_test's "a Timer is still pending" leak check runs BEFORE
+registered tear-downs, so a database closed in `tearDown` never drains
+drift's stream-cleanup timer, and the run deadlocks. That in turn hangs the
+whole suite and therefore the pre-commit hook.
 
-/// Widget tests for the membership-revoked notice (spec
-/// `docs/specs/household-lifecycle.md` §3.5): the honest replacement for a
-/// device that silently stopped syncing.
-void main() {
-  late AppDatabase db;
+Use the project's established harness instead. Read
+`test/features/settings/account_section_test.dart` first and follow its
+shape exactly — it is the closest existing test to this one:
 
-  setUp(() => db = AppDatabase(NativeDatabase.memory()));
-  tearDown(() async => db.close());
+- `testChoreApp(description, (tester, database) async { ... }, today: ...)`
+  from `test/test_utils/pump_app.dart`, which owns the database lifecycle.
+- `await openSettingsTab(tester);` to reach the Account section.
+- `find.bySemanticsIdentifier('...')` for every element — this project
+  selects by semantic id, not by visible text. Text finders are also what
+  made the earlier draft ambiguous once the sheet was open.
 
-  Future<void> pumpNotice(WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: MembershipRevokedNotice()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-  }
+Cover four cases:
 
-  testWidgets('renders nothing when the flag is not set', (tester) async {
-    await HouseholdRepository(db).createLocalHousehold('Me');
-    await pumpNotice(tester);
-    expect(find.textContaining('no longer part'), findsNothing);
-  });
+1. **Flag unset** — `membership.revoked.banner` finds nothing.
+2. **Flag set** (`SettingsRepository(database).setMembershipRevoked()`
+   before opening Settings) — the banner is present.
+3. **Acknowledge, keep by default (D-L3)** — tap
+   `membership.revoked.acknowledge`, then the sheet's
+   `membership.revoked.confirm`, WITHOUT touching the checkbox. Assert the
+   households table is still non-empty and `membershipRevoked` is now
+   false.
+4. **Acknowledge, opt in to the wipe** — same, but tap
+   `membership.revoked.deleteLocal` before confirming. Assert the
+   households table is empty. This is the destructive path; it had no
+   coverage in earlier drafts of this plan.
 
-  testWidgets('explains the revocation when the flag is set', (tester) async {
-    await HouseholdRepository(db).createLocalHousehold('Me');
-    await SettingsRepository(db).setMembershipRevoked();
-    await pumpNotice(tester);
-    expect(find.textContaining('no longer part'), findsOneWidget);
-  });
-
-  testWidgets('acknowledging keeps local data by default', (tester) async {
-    final household = await HouseholdRepository(db).createLocalHousehold('Me');
-    await SettingsRepository(db).setMembershipRevoked();
-    await pumpNotice(tester);
-
-    await tester.tap(find.text('Got it'));
-    await tester.pumpAndSettle();
-
-    final households = await db.select(db.households).get();
-    expect(
-      households.map((h) => h.id),
-      contains(household.id),
-      reason: 'D-L3: the default is to keep this phone\'s copy',
-    );
-    final settings = await SettingsRepository(db).ensureSettings();
-    expect(settings.membershipRevoked, isFalse);
-  });
-}
-```
+The sheet's ids come from Task 9's `semanticPrefix` — with prefix
+`membership.revoked` they are `membership.revoked.deleteLocal`,
+`.cancel` and `.confirm`. Verify them against
+`lib/features/settings/exit_confirm_sheet.dart` rather than trusting this
+list.
 
 - [ ] **Step 3: Run to verify it fails**
 
@@ -1830,7 +1928,10 @@ class MembershipRevokedNotice extends ConsumerWidget {
       context,
       title: l10n.membershipRevokedTitle,
       body: l10n.membershipRevokedBody,
-      actionLabel: l10n.membershipRevokedAction,
+      // Distinct from the banner's own button label: once the sheet is
+      // open both are mounted, so sharing a label makes them ambiguous to
+      // a widget test and to a screen reader.
+      actionLabel: l10n.membershipRevokedConfirm,
       semanticPrefix: 'membership.revoked',
     );
     if (!result.confirmed) {

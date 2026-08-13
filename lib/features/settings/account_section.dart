@@ -18,6 +18,7 @@ import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
+import 'package:chore_app/features/settings/membership_revoked_notice.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,22 @@ class AccountSectionBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The §3.5 revocation notice leads every state of this section --
+    // including the disabled Supabase-not-configured tile -- since it
+    // renders nothing unless `settings.membershipRevoked` is set. Mounting
+    // it unconditionally here means the branches below never need to know
+    // about it.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const MembershipRevokedNotice(),
+        _body(context, ref),
+      ],
+    );
+  }
+
+  Widget _body(BuildContext context, WidgetRef ref) {
     if (ref.watch(authGatewayProvider) is NoopAuthGateway) {
       return const _ComingSoonTile();
     }
@@ -630,6 +647,16 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
     if (actingMemberId == null) {
       throw StateError('No acting member to adopt with.');
     }
+    // Also unreachable in practice: this row only renders once
+    // `AccountSectionBody` has already resolved a non-null
+    // `currentAuthUserProvider` user (see its build method above) -- but
+    // `adopt`'s `authUserId` is non-nullable, so this is read again here
+    // rather than threaded down as a widget field, and bails out (rather
+    // than crashing) to keep the method total.
+    final authUserId = ref.read(currentAuthUserProvider).valueOrNull?.id;
+    if (authUserId == null) {
+      return;
+    }
     setState(() {
       _running = true;
       _failed = false;
@@ -638,7 +665,11 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
       final householdId = await ref.read(bootstrapProvider.future);
       await ref
           .read(householdLinkServiceProvider)
-          .adopt(householdId: householdId, actingMemberId: actingMemberId);
+          .adopt(
+            householdId: householdId,
+            actingMemberId: actingMemberId,
+            authUserId: authUserId,
+          );
     } on Exception catch (_) {
       if (mounted) {
         setState(() => _failed = true);

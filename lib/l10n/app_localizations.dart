@@ -1655,6 +1655,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete everything'**
   String get settingsResetConfirm2Action;
+
+  /// Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit.
+  ///
+  /// In en, this message translates to:
+  /// **'Also delete this phone\'s copy'**
+  String get exitConfirmDeleteLocalLabel;
+
+  /// One-line explanation under the exit-confirmation checkbox, stating what each state means.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: the household stays on this phone as your own local copy. On: this phone\'s members, chores and shopping list are deleted and the app starts fresh.'**
+  String get exitConfirmDeleteLocalExplanation;
+
+  /// Cancel button of the shared exit-confirmation sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get exitConfirmCancel;
+
+  /// Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5).
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re no longer part of this household'**
+  String get membershipRevokedTitle;
+
+  /// Body of the membership-revoked notice. Deliberately names BOTH causes: the probe (hasMembership) cannot distinguish 'someone removed you' from 'the household was cascade-deleted when its last claimed member left, or when you deleted your account from another device'. Claiming someone removed them would be wrong in those cases. Also states plainly that local data is intact.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone has stopped syncing: either the profile was removed from the online household, or the household itself is gone. Nothing is lost — everything you see here is still on this phone.'**
+  String get membershipRevokedBody;
+
+  /// Button on the membership-revoked BANNER. Opens the shared exit-confirmation sheet, where the keep-or-wipe choice is made.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get membershipRevokedAction;
+
+  /// Confirm button INSIDE the shared exit-confirmation sheet when opened from the membership-revoked notice. Must differ from membershipRevokedAction: both are on screen once the sheet is open, and an identical label makes the banner button and the sheet button indistinguishable to a widget test and to a screen reader.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get membershipRevokedConfirm;
 }
 
 class _AppLocalizationsDelegate

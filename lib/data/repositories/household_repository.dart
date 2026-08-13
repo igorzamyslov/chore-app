@@ -280,6 +280,21 @@ class HouseholdRepository {
     );
   }
 
+  /// Records locally that [memberId] is claimed by auth user [userId].
+  ///
+  /// Mirrors the claim the server made in `create_household` /
+  /// `claim_member` (spec `docs/specs/household-lifecycle.md` §3.1 G-B).
+  /// Deliberately does NOT mark the row `syncDirty`: `user_id` is
+  /// server-owned and is not in the client's column-scoped UPDATE grant,
+  /// so pushing it would be rejected.
+  Future<void> setMemberUserId(String memberId, String userId) async {
+    await (db.update(
+      db.members,
+    )..where((tbl) => tbl.id.equals(memberId))).write(
+      MembersCompanion(userId: Value(userId)),
+    );
+  }
+
   /// Adds a new member to [householdId].
   Future<Member> addMember(
     String householdId, {

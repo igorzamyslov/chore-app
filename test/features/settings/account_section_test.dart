@@ -669,6 +669,7 @@ void main() {
         database.members,
       )..where((tbl) => tbl.id.equals(me.id))).getSingle();
       expect(updatedMe.role, MemberRole.admin);
+      expect(updatedMe.userId, 'u1');
 
       handle.dispose();
     },

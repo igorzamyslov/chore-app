@@ -1,0 +1,245 @@
+-- Membership exit (spec docs/specs/household-lifecycle.md §2): leave,
+-- remove-a-member, delete-account, and the orphan-household cascade.
+-- All three public RPCs are SECURITY DEFINER over internal helpers that
+-- are never granted to authenticated.
+
+-- The auth.users foreign keys (§2.7). Three constraints reference
+-- auth.users with NO ACTION. The unclaim handles members.user_id; these
+-- two are NOT NULL and would block `delete from auth.users` for every
+-- account that ever created a household or an invite -- which is every
+-- account delete_account exists for. Both columns are write-only (no RLS
+-- policy, RPC or client reads them), so relaxing them is safe:
+--   * a household outlives its creator by design (§0: the household owns
+--     its data), so a null creator is the honest representation;
+--   * invites are ephemeral 7-day codes and should die with their creator.
+alter table public.households
+  alter column created_by drop not null;
+alter table public.households
+  drop constraint households_created_by_fkey;
+alter table public.households
+  add constraint households_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete set null;
+
+alter table public.household_invites
+  drop constraint household_invites_created_by_fkey;
+alter table public.household_invites
+  add constraint household_invites_created_by_fkey
+  foreign key (created_by) references auth.users (id) on delete cascade;
+
+-- delete_account (§2.2, D-L4), final form: leave EVERY household where
+-- the caller is claimed (user_id is UNIQUE per household, so there may be
+-- several), cascade each one that is left with no claimed members, then
+-- delete the auth user. Local data on the caller's own device is NOT
+-- touched -- that is the client's opt-in checkbox (D-L3).
+--
+-- The auth.users delete works because this function is owned by
+-- `postgres`, which has rights on the auth schema -- no edge function and
+-- no service-role key needed.
+--
+-- The loop's unclaim (via _exit_membership) is NOT optional padding:
+-- members.user_id is a NO ACTION foreign key to auth.users, and unlike the
+-- two created_by columns above it must NOT be relaxed -- is_household_member()
+-- reads it, so it is load-bearing for every RLS policy. Nulling every claim
+-- here is what makes the auth.users delete below legal.
+--
+-- DELIBERATELY no `and deleted_at is null` on the select below, even
+-- though every other unclaim lookup in this file (leave_household,
+-- remove_member) filters on it. remove_member soft-deletes ANOTHER
+-- member's row without touching user_id, and the members UPDATE grant
+-- (`name, color, role, deleted_at` -- 20260731120000_initial_schema.sql)
+-- lets any member set deleted_at on any other member's row directly
+-- through PostgREST, with no RPC involved. That leaves a row that is
+-- soft-deleted but STILL CLAIMED. If this loop only picked up live rows,
+-- such a row would be skipped, the DELETE below would then hit
+-- members_user_id_fkey (NO ACTION) and roll back the whole function --
+-- so any other member could permanently break your GDPR account
+-- deletion. Every row still holding this user's claim must be unclaimed
+-- regardless of deleted_at: _exit_membership on an already-soft-deleted
+-- row just nulls user_id and leaves deleted_at as it was, and
+-- _cascade_if_orphaned only ever counts `deleted_at is null` rows, so
+-- cascade behaviour for still-live households is unaffected. Do not
+-- re-add this filter "for symmetry" with the other two lookups.
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_member_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  for v_member_id in
+    select id from members where user_id = auth.uid()
+  loop
+    perform _cascade_if_orphaned(_exit_membership(v_member_id));
+  end loop;
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+revoke execute on function public.delete_account() from public, anon;
+grant execute on function public.delete_account() to authenticated;
+
+-- Internal: sever one member row's claim. Returns the household id so
+-- callers can run the cascade check. NEVER granted to authenticated --
+-- unclaiming must go through the three authorized RPCs.
+create or replace function public._exit_membership(p_member_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_household_id uuid;
+begin
+  update members set user_id = null
+    where id = p_member_id
+    returning household_id into v_household_id;
+  if v_household_id is null then
+    raise exception 'no such member';
+  end if;
+  return v_household_id;
+end;
+$$;
+
+revoke execute on function public._exit_membership(uuid)
+  from public, anon, authenticated;
+
+-- leave_household (§2.2): unclaims ONLY. The profile stays active so the
+-- family keeps seeing the person and their history, and they can reclaim
+-- it later through the invite path. Takes the household id explicitly --
+-- user_id is UNIQUE per household, so an account may belong to several.
+create or replace function public.leave_household(p_household_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_member_id uuid;
+begin
+  if not is_household_member(p_household_id) then
+    raise exception 'not a member of this household';
+  end if;
+  select id into v_member_id from members
+    where household_id = p_household_id
+      and user_id = auth.uid()
+      and deleted_at is null;
+  perform _cascade_if_orphaned(_exit_membership(v_member_id));
+end;
+$$;
+
+revoke execute on function public.leave_household(uuid) from public, anon;
+grant execute on function public.leave_household(uuid) to authenticated;
+
+-- Internal: soft-delete a household that has no claimed members left
+-- (§2.4). Child rows are deliberately left alone -- RLS already hides
+-- every row once nobody is a member, so cascading them buys nothing and
+-- costs a large write. `updated_at` is trigger-maintained; do not set it.
+create or replace function public._cascade_if_orphaned(p_household_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_claimed int;
+  v_stamped int;
+begin
+  select count(*) into v_claimed from members
+    where household_id = p_household_id
+      and user_id is not null
+      and deleted_at is null;
+  if v_claimed > 0 then
+    return false;
+  end if;
+  update households set deleted_at = now()
+    where id = p_household_id and deleted_at is null;
+  -- Report what actually happened, not what was merely eligible: an
+  -- already-cascaded household is eligible but stamps nothing. The doc
+  -- comment above promises "stamped", so return that.
+  get diagnostics v_stamped = row_count;
+  return v_stamped > 0;
+end;
+$$;
+
+revoke execute on function public._cascade_if_orphaned(uuid)
+  from public, anon, authenticated;
+
+-- remove_member (§2.2): unclaims AND soft-deletes another member's
+-- profile. Any member may remove any other (D-L2 -- the household is flat
+-- by D1; role is not consulted). Self-removal is rejected: that is
+-- leave_household, which keeps the profile claimable. Idempotent on an
+-- already-removed row and tolerant of an unclaimed target, so a retry
+-- after a partial failure is safe.
+create or replace function public.remove_member(p_member_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_household_id uuid;
+  v_caller_member_id uuid;
+begin
+  select household_id into v_household_id from members
+    where id = p_member_id;
+  -- ONE message for "no such member" and "not your household" alike.
+  -- This function is SECURITY DEFINER, so the lookup above bypasses RLS:
+  -- two distinct messages would tell a non-member whether an arbitrary
+  -- member UUID exists anywhere in the system -- an existence oracle
+  -- across household boundaries, and a hole in the is_household_member
+  -- perimeter this project treats as its security boundary. Say nothing.
+  if v_household_id is null or not is_household_member(v_household_id) then
+    raise exception 'not a member of this household';
+  end if;
+  select id into v_caller_member_id from members
+    where household_id = v_household_id
+      and user_id = auth.uid()
+      and deleted_at is null;
+  if v_caller_member_id = p_member_id then
+    raise exception 'use leave_household to remove yourself';
+  end if;
+  update members
+    set user_id = null,
+        deleted_at = coalesce(deleted_at, now())
+    where id = p_member_id;
+end;
+$$;
+
+revoke execute on function public.remove_member(uuid) from public, anon;
+grant execute on function public.remove_member(uuid) to authenticated;
+
+-- _valid_invite gains a household-liveness check (§2.5). This one helper
+-- backs list_claimable_members, claim_member and join_as_new_member, so
+-- guarding it here covers the whole redemption family. Same error message
+-- as the other rejections: an outsider learns nothing about why.
+create or replace function public._valid_invite(p_code text)
+returns public.household_invites
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_invite household_invites;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  select * into v_invite from household_invites
+    where code = p_code and revoked_at is null and expires_at > now();
+  if v_invite.id is null then
+    raise exception 'invalid or expired invite';
+  end if;
+  if exists (
+    select 1 from households h
+    where h.id = v_invite.household_id and h.deleted_at is not null
+  ) then
+    raise exception 'invalid or expired invite';
+  end if;
+  return v_invite;
+end;
+$$;
