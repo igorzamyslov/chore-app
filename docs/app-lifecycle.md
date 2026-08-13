@@ -72,6 +72,17 @@ Covered by the existing specs/tests; lifecycle-relevant leftovers:
   off — check the manifest/flags. (b) Consider a manual JSON
   export/share as cheap insurance until sync lands (small task,
   debatable value — decide next session).
+  **Resolved 2026-08-08 (decision D-B1, `docs/backlog.md`):** (a) is
+  answered — the manifest had no `allowBackup`/`dataExtractionRules`/
+  `fullBackupContent` at all, so Android defaulted to auto-backup ON
+  with no rules. The app now ships `android:allowBackup="false"`
+  (`docs/plans/2026-08-08-android-backup.md`), asserted on the built
+  release APK in `.github/workflows/release.yml` so it can't silently
+  regress. iOS still backs up `Documents/` (where the database also
+  lives) to iCloud by default; excluding it is tracked separately as
+  `docs/backlog.md` A-3b, deliberately out of scope for this fix. (b)
+  shipped as the "Export data" settings row and is tracked further as
+  `docs/backlog.md` G-3 (restore from a backup file).
 - Occurrence history grows unbounded — a non-issue at family scale for
   years; revisit with sync (server storage + sync payload size).
 - Midnight rollover while app open: already in the backlog (catch-up on
