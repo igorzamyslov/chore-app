@@ -541,6 +541,87 @@ void main() {
   );
 
   testWidgets(
+    'FIX 1 (regression): dispose() during a queued trailing recompute must '
+    'not let that recompute start afterward -- before the fix it reads '
+    'from the disposed container and throws',
+    (tester) async {
+      final currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final plugin = _PausingPlugin(pauseOnId: digestNotificationIdBase + 3);
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      // Baseline recompute (no chores yet): every slot is null, so this
+      // only ever calls `cancel`, never `zonedSchedule` -- the pause guard
+      // below stays armed for recompute A.
+      await tester.pump(digestRescheduleDebounce);
+
+      // Recompute A pauses mid-horizon, same shape as the FIX A test above.
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Chore X',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+      expect(
+        plugin.pending.containsKey(digestNotificationIdBase + 3),
+        isFalse,
+        reason: 'recompute A is paused before writing this slot',
+      );
+
+      // A second mutation lands while A is still paused mid-loop: this
+      // triggers a second recompute request, which finds A in flight and
+      // is recorded as a queued trailing re-run (`_recomputeQueued`).
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Chore Y',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      // Dispose the container -- via `ref.onDispose`, this calls the
+      // controller's own `dispose()` -- while A is still paused mid-flight
+      // AND a trailing recompute is queued behind it. This is the exact
+      // shape of the regression: before the fix, `dispose()` only
+      // cancelled `_debounceTimer`, which is not the path the queued
+      // re-run takes.
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 5));
+
+      // Let A's paused call proceed. Before the fix, A's `whenComplete`
+      // callback then sees the still-set `_recomputeQueued` flag and calls
+      // `_startRecompute()` again, which reads from `_ref` -- a container
+      // that is now disposed -- and throws "Bad state: Tried to read a
+      // provider from a ProviderContainer that was already disposed".
+      // That throw happens inside an unawaited Future chain, so it
+      // surfaces as an uncaught async error and fails this test. After the
+      // fix, `dispose()` clears the queued flag and the re-run path
+      // early-returns, so nothing of the sort happens.
+      plugin.release();
+      await tester.pump(const Duration(milliseconds: 5));
+      await tester.pump(digestRescheduleDebounce);
+
+      // The container is already disposed above (that's the whole point
+      // of this test) -- only the database still needs closing.
+      await database.close();
+    },
+  );
+
+  testWidgets(
     "a partner's fixed chore does not appear in this device's digest (T2.3)",
     (tester) async {
       final currentTime = DateTime(2026, 1, 5, 7);

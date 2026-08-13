@@ -737,9 +737,29 @@ class DigestRescheduleController {
   /// finishes -- see that field's doc comment.
   bool _recomputeQueued = false;
 
-  /// Cancels any pending debounce timer. Called via `ref.onDispose` when
-  /// the owning [ProviderContainer] is torn down.
-  void dispose() => _debounceTimer?.cancel();
+  /// Set by [dispose]. Guards [_startRecompute] against starting a new
+  /// recompute once the owning [ProviderContainer] is gone.
+  ///
+  /// FIX 1 (review of the FIX A serialization work): before serialization,
+  /// [_debounceTimer] was the ONLY path into [_recompute], so cancelling it
+  /// in [dispose] was sufficient. Now a trailing recompute can also be
+  /// launched from [_startRecompute]'s own `whenComplete` callback, once
+  /// [_inFlightRecompute] finishes -- a path [dispose] does not touch by
+  /// cancelling the timer. Without this flag, disposing the container
+  /// while one recompute is in flight AND a trailing one is queued lets
+  /// that trailing recompute start after disposal, reading from `_ref`
+  /// (via [_recompute]) and throwing "Bad state: Tried to read a provider
+  /// from a ProviderContainer that was already disposed".
+  bool _disposed = false;
+
+  /// Cancels any pending debounce timer and prevents any further recompute
+  /// -- including a trailing one already queued -- from starting. Called
+  /// via `ref.onDispose` when the owning [ProviderContainer] is torn down.
+  void dispose() {
+    _disposed = true;
+    _debounceTimer?.cancel();
+    _recomputeQueued = false;
+  }
 
   /// (Re)starts the [digestRescheduleDebounce] timer; when it fires,
   /// starts (or queues, per [_startRecompute]) a recompute of the digest
@@ -754,7 +774,15 @@ class DigestRescheduleController {
   /// that one more run is owed once the in-flight one finishes (see
   /// [_inFlightRecompute]'s doc comment for why this can't just run
   /// concurrently or be dropped).
+  ///
+  /// Early-returns once [_disposed] -- see that field's doc comment. This
+  /// covers both the trailing re-run launched from the `whenComplete`
+  /// callback below and any call reachable while a recompute already
+  /// in-flight at dispose time is still winding down.
   void _startRecompute() {
+    if (_disposed) {
+      return;
+    }
     if (_inFlightRecompute != null) {
       _recomputeQueued = true;
       return;
