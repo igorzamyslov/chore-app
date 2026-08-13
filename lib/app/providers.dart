@@ -706,16 +706,66 @@ class DigestRescheduleController {
   final Ref _ref;
   Timer? _debounceTimer;
 
+  /// The currently-running [_recompute] call, or `null` when idle.
+  ///
+  /// FIX A (review of the P0 digest-fix plan): `applyDigestPlans` awaits
+  /// SEVEN sequential platform-channel calls, one per horizon day, and
+  /// every `await` yields the isolate. `triggerRecompute` only ever
+  /// cancelled the *pending Timer* -- it had no idea whether a previous
+  /// `_recompute` was still mid-flight -- so two debounce firings could run
+  /// `_recompute` concurrently and interleave their writes: recompute A
+  /// writes ids 1001-1003 from stale counts, yields; recompute B (newer
+  /// counts) runs to completion, writing all seven; A resumes and
+  /// overwrites 1004-1007 with its now-stale plans. The result is a
+  /// horizon that's silently part-fresh, part-stale, with no bookkeeping
+  /// that would ever notice.
+  ///
+  /// Fixed by turning [_recompute] into a strict one-at-a-time queue of
+  /// depth 1, using this field plus [_recomputeQueued] -- chosen over
+  /// chaining every request onto a stored `Future` because a trailing
+  /// request must be *coalesced*, not queued arbitrarily deep: while one
+  /// recompute is in flight, any number of further triggers should collapse
+  /// into a single re-run afterward (dropping the request entirely would
+  /// lose the newer counts; a `Future`-chain would instead run once per
+  /// trigger, each redundant one re-reading identical state). A re-run
+  /// always re-reads `_ref.read(...)` from scratch when it actually
+  /// executes, so it reflects whatever is current at that moment -- not
+  /// whatever was current when it was requested.
+  Future<void>? _inFlightRecompute;
+
+  /// Whether a trailing recompute is owed once [_inFlightRecompute]
+  /// finishes -- see that field's doc comment.
+  bool _recomputeQueued = false;
+
   /// Cancels any pending debounce timer. Called via `ref.onDispose` when
   /// the owning [ProviderContainer] is torn down.
   void dispose() => _debounceTimer?.cancel();
 
   /// (Re)starts the [digestRescheduleDebounce] timer; when it fires,
-  /// recomputes the digest plan and (re)schedules or cancels it. Called by
-  /// this controller's own listeners above, and externally on app resume.
+  /// starts (or queues, per [_startRecompute]) a recompute of the digest
+  /// plan. Called by this controller's own listeners above, and externally
+  /// on app resume.
   void triggerRecompute() {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(digestRescheduleDebounce, _recompute);
+    _debounceTimer = Timer(digestRescheduleDebounce, _startRecompute);
+  }
+
+  /// Runs [_recompute] if none is currently in flight; otherwise records
+  /// that one more run is owed once the in-flight one finishes (see
+  /// [_inFlightRecompute]'s doc comment for why this can't just run
+  /// concurrently or be dropped).
+  void _startRecompute() {
+    if (_inFlightRecompute != null) {
+      _recomputeQueued = true;
+      return;
+    }
+    _inFlightRecompute = _recompute().whenComplete(() {
+      _inFlightRecompute = null;
+      if (_recomputeQueued) {
+        _recomputeQueued = false;
+        _startRecompute();
+      }
+    });
   }
 
   /// Re-checks the OS notification permission immediately (no debounce:

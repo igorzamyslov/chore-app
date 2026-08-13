@@ -99,9 +99,11 @@ void main() {
   });
 
   test(
-    'pausing a chore silences its slots across the whole horizon '
-    '(regression: the exclusion otherwise lives entirely in '
-    "watchPendingOccurrences's WHERE clause, two layers away)",
+    'pausing a chore silences the digest across the whole horizon '
+    '(end-to-end behaviour lock: pausing both filters the chore out of '
+    "watchPendingOccurrences's WHERE clause AND hard-deletes its pending "
+    'occurrence via ChoreService.pauseChore, either of which alone would '
+    'already make this pass)',
     () async {
       final chore = await service.createChore(
         householdId: householdId,

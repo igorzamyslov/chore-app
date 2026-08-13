@@ -99,6 +99,19 @@ void main() {
       expect(plugin.requestPermissionCallCount, 0);
     });
 
+    test('due-only body uses the ICU singular form for a count of 1', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 1,
+            overdueCount: 0,
+          ),
+        }),
+      );
+      expect(plugin.pending[1001]!.body, '1 chore today');
+    });
+
     test('overdue-only and combined bodies survive the move', () async {
       await scheduler.applyDigestPlans(
         plansOf({

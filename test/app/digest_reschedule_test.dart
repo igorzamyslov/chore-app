@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -12,6 +14,48 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../application/fake_digest_notification_plugin.dart';
+
+/// A [FakeDigestNotificationPlugin] that pauses the FIRST [zonedSchedule]
+/// call for [pauseOnId] until [release] is called, then behaves normally
+/// forever after (the guard is one-shot, keyed off having paused once, not
+/// off the id, so a *later* recompute's call for the same id never pauses
+/// again).
+///
+/// Used only by the FIX A serialization test below, to hold one recompute
+/// mid-loop (after it has already written some slots but before it writes
+/// the rest) while a second recompute is triggered — the same shape as the
+/// bug it regression-tests: `applyDigestPlans` awaits seven sequential
+/// platform-channel calls, and every `await` yields the isolate.
+class _PausingPlugin extends FakeDigestNotificationPlugin {
+  _PausingPlugin({required this.pauseOnId});
+
+  /// The notification id whose first [zonedSchedule] call blocks.
+  final int pauseOnId;
+
+  final Completer<void> _gate = Completer<void>();
+  bool _hasPaused = false;
+
+  /// Lets the paused call (if any) proceed.
+  void release() {
+    if (!_gate.isCompleted) {
+      _gate.complete();
+    }
+  }
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime fireAt,
+  }) async {
+    if (id == pauseOnId && !_hasPaused) {
+      _hasPaused = true;
+      await _gate.future;
+    }
+    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+  }
+}
 
 /// [DigestRescheduleController] tests (spec `docs/specs/notifications.md`
 /// testing section): reschedule-on-mutation, debounce, cancel-on-disable —
@@ -285,6 +329,9 @@ void main() {
     expect(plugin.cancelCallCount, greaterThan(cancelCountBefore));
     // No further schedule call after disabling.
     expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
+    // The direct proof that disabling silences all digestHorizonDays days,
+    // not just that some cancels happened somewhere.
+    expect(plugin.pending, isEmpty);
 
     await _disposeAndClose(tester, container, database);
   });
@@ -335,8 +382,20 @@ void main() {
       // no resume, no launch — the app is never opened again.
       plugin.deliverDue(DateTime(2026, 1, 5, 8));
       currentTime = DateTime(2026, 1, 6, 7);
+      // Captured before the 23h pump, so the assertion below can prove the
+      // test's own premise ("no app interaction of any kind") rather than
+      // merely being satisfied by some OTHER recompute firing during the
+      // pump and coincidentally re-arming the same slot.
+      final scheduledCallsBefore = plugin.scheduledCalls.length;
       await tester.pump(const Duration(hours: 23));
 
+      expect(
+        plugin.scheduledCalls.length,
+        scheduledCallsBefore,
+        reason:
+            'no app interaction occurred, so no recompute should have run '
+            'at all during this pump',
+      );
       // Tomorrow's digest is still armed. With a single one-shot id this
       // assertion fails: `pending` is empty here.
       expect(
@@ -397,6 +456,84 @@ void main() {
         plugin.pending,
         isEmpty,
         reason: 'a one-off has no successor, so every day is now silent',
+      );
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'FIX A: a recompute paused mid-horizon does not interleave with a '
+    'second one triggered while it waits -- the final horizon is entirely '
+    'from the LATER counts, with nothing left over from the earlier ones',
+    (tester) async {
+      final currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final plugin = _PausingPlugin(pauseOnId: digestNotificationIdBase + 3);
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      // Baseline recompute (no chores yet): every slot is null, so this
+      // only ever calls `cancel`, never `zonedSchedule` -- the pause guard
+      // below stays armed for recompute A.
+      await tester.pump(digestRescheduleDebounce);
+
+      // Recompute A: one daily chore means every horizon slot's count is 1
+      // ("counts X"). Its `applyDigestPlans` call pauses after writing ids
+      // 1001-1003, blocked on id 1004.
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Chore X',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      expect(plugin.pending[digestNotificationIdBase]!.body, '1 chore today');
+      expect(
+        plugin.pending.containsKey(digestNotificationIdBase + 3),
+        isFalse,
+        reason: 'recompute A is paused before writing this slot',
+      );
+
+      // A second mutation lands while A is still paused mid-loop: two
+      // daily chores are now due every day ("counts Y"). This triggers a
+      // second recompute request.
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Chore Y',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      // Let A's paused call proceed, then give both A's remainder and the
+      // queued trailing recompute room to run to completion.
+      plugin.release();
+      await tester.pump(const Duration(milliseconds: 5));
+      await tester.pump(digestRescheduleDebounce);
+
+      // Every one of the digestHorizonDays ids must show Y's count. If the
+      // two recomputes had interleaved (the bug), ids 1004-1007 would
+      // still show A's stale '1 chore today' -- A resuming after B would
+      // overwrite them with counts that were already out of date.
+      expect(plugin.pending, hasLength(digestHorizonDays));
+      expect(
+        plugin.pending.values.every((call) => call.body == '2 chores today'),
+        isTrue,
+        reason: 'no slot may be left over from the earlier, stale recompute',
       );
 
       await _disposeAndClose(tester, container, database);

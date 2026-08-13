@@ -230,6 +230,19 @@ void main() {
       );
     });
 
+    test('due-only, zero overdue, still schedules', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 1,
+        overdueCount: 0,
+      );
+      expect(
+        plan,
+        DigestPlan(fireAt: fireAt, dueTodayCount: 1, overdueCount: 0),
+      );
+    });
+
     test('carries both counts and the exact fireAt through', () {
       final plan = planDigestSlot(
         fireAt: fireAt,
