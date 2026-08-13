@@ -30,6 +30,7 @@ import 'dart:async';
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/application/household_create_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
@@ -652,10 +653,15 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// Listens to [pendingOccurrencesProvider] and [settingsProvider] (any
 /// occurrence/chore/settings mutation shows up through one of those two),
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
-/// after the last relevant change, recomputes the [DigestPlan] for the
-/// current [clockProvider] time and pushes it to
-/// [notificationSchedulerProvider] — scheduling or cancelling the digest
-/// notification as appropriate.
+/// after the last relevant change, rebuilds the digest's whole scheduling
+/// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
+/// current [clockProvider] time and pushes all [digestHorizonDays] days of
+/// it to [notificationSchedulerProvider] at once — scheduling the days that
+/// have something to say and cancelling the days that don't. The horizon is
+/// what makes the digest survive the app simply not being opened (spec
+/// `docs/specs/notifications.md` architecture #2): every trigger this class
+/// listens to requires a running app, so a single-slot schedule went
+/// silent the morning after it fired.
 ///
 /// [triggerRecompute] is also called directly by `main.dart`'s app-resume
 /// observer: an OS lifecycle transition isn't itself a Riverpod-watchable
@@ -685,6 +691,14 @@ class DigestRescheduleController {
         triggerRecompute();
       })
       ..listen(settingsProvider, (previous, next) {
+        triggerRecompute();
+      })
+      // The digest is scoped to the acting member (triage T2.3), so a
+      // change of who that is must re-count. Most such changes arrive via
+      // `settingsProvider` (the stored id) — but a member being added,
+      // renamed or removed can change `actingMemberProvider`'s fallback
+      // resolution with no settings write at all.
+      ..listen(actingMemberProvider, (previous, next) {
         triggerRecompute();
       });
   }
@@ -729,33 +743,14 @@ class DigestRescheduleController {
       return;
     }
 
-    final now = _ref.read(clockProvider).now();
-    final slotDate = PlainDate.fromDateTime(
-      nextDigestSlot(now: now, digestMinutes: settings.digestMinutes),
+    await scheduler.applyDigestPlans(
+      buildDigestPlans(
+        now: _ref.read(clockProvider).now(),
+        settings: settings,
+        pending: pending,
+        recipientMemberId: _ref.read(actingMemberProvider)?.id,
+      ),
     );
-    var dueTodayCount = 0;
-    var overdueCount = 0;
-    for (final occurrence in pending) {
-      final dueDate = occurrence.occurrence.dueDate;
-      if (dueDate == slotDate) {
-        dueTodayCount++;
-      } else if (dueDate.isBefore(slotDate)) {
-        overdueCount++;
-      }
-    }
-
-    final plan = planDigest(
-      now: now,
-      digestMinutes: settings.digestMinutes,
-      enabled: settings.digestEnabled,
-      dueTodayCount: dueTodayCount,
-      overdueCount: overdueCount,
-    );
-    if (plan == null) {
-      await scheduler.cancelDigest();
-    } else {
-      await scheduler.scheduleDigest(plan);
-    }
   }
 }
 
