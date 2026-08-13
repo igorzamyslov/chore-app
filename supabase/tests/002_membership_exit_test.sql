@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(32);
+select plan(33);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -306,6 +306,21 @@ select lives_ok(
   'claimed (blocking fix 3b)');
 
 reset role;
+-- This existence check comes FIRST and is not redundant with the two
+-- assertions below it. A scalar subquery over a missing row yields NULL,
+-- and pgTAP's is() treats NULL as equal to NULL -- so if the household
+-- were ever HARD-deleted, both `is(..., null)` assertions below would
+-- pass VACUOUSLY and this block would stay green while the project's
+-- soft-deletes-only invariant was being violated. The realistic route to
+-- that is someone adding `on delete cascade` to the child FKs to make
+-- household deletion "actually work". Assert the row is still there.
+select is(
+  (select count(*)::int from households
+   where id = '10000000-0000-0000-0000-0000000000d5'),
+  1,
+  'the household row still EXISTS -- a hard delete would make both NULL '
+  'assertions below pass vacuously');
+
 select is(
   (select deleted_at from households
    where id = '10000000-0000-0000-0000-0000000000d5'),
