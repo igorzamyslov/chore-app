@@ -629,4 +629,47 @@ void main() {
       }
     });
   });
+
+  group('latestScheduledOnOrBefore', () {
+    test('daily rule returns the newest slot at or before notAfter', () {
+      final slot = latestScheduledOnOrBefore(
+        rule: Recurrence.everyNDays(1),
+        startDate: PlainDate(2026, 1, 5),
+        afterDueDate: PlainDate(2026, 1, 5),
+        notAfter: PlainDate(2026, 1, 8),
+      );
+      expect(slot, PlainDate(2026, 1, 8));
+    });
+
+    test('weekly rule skips the days between two slots', () {
+      // 2026-01-05 is a Monday; 2026-01-15 is a Thursday.
+      final slot = latestScheduledOnOrBefore(
+        rule: Recurrence.weekly(weekdays: const {DateTime.monday}),
+        startDate: PlainDate(2026, 1, 5),
+        afterDueDate: PlainDate(2026, 1, 5),
+        notAfter: PlainDate(2026, 1, 15),
+      );
+      expect(slot, PlainDate(2026, 1, 12));
+    });
+
+    test('returns null when the next slot is still ahead of notAfter', () {
+      final slot = latestScheduledOnOrBefore(
+        rule: Recurrence.everyNDays(3),
+        startDate: PlainDate(2026, 1, 5),
+        afterDueDate: PlainDate(2026, 1, 5),
+        notAfter: PlainDate(2026, 1, 7),
+      );
+      expect(slot, isNull);
+    });
+
+    test('never returns a slot at or before afterDueDate', () {
+      final slot = latestScheduledOnOrBefore(
+        rule: Recurrence.everyNDays(1),
+        startDate: PlainDate(2026, 1, 1),
+        afterDueDate: PlainDate(2026, 1, 10),
+        notAfter: PlainDate(2026, 1, 10),
+      );
+      expect(slot, isNull);
+    });
+  });
 }

@@ -152,11 +152,11 @@ class ChoreService {
         if (pending == null) {
           continue;
         }
-        final latestSlot = _latestOverdueSlot(
+        final latestSlot = latestScheduledOnOrBefore(
           rule: recurrence,
           startDate: chore.startDate,
           afterDueDate: pending.dueDate,
-          today: today,
+          notAfter: today,
         );
         if (latestSlot == null) {
           continue;
@@ -629,32 +629,5 @@ class ChoreService {
             ),
           ]))
         .get();
-  }
-}
-
-/// The latest schedule slot for [rule]/[startDate] that is `<= today` and
-/// strictly after [afterDueDate], or `null` if there is none (i.e. the chore
-/// isn't overdue past [afterDueDate]).
-///
-/// Walks forward one slot at a time from [afterDueDate] via
-/// [nextScheduledOnOrAfter], which is efficient per that function's
-/// performance contract; the number of steps is bounded by how many slots
-/// have been missed, not by the distance from the chore's start date.
-PlainDate? _latestOverdueSlot({
-  required Recurrence rule,
-  required PlainDate startDate,
-  required PlainDate afterDueDate,
-  required PlainDate today,
-}) {
-  var latest = nextScheduledOnOrAfter(rule, startDate, afterDueDate.addDays(1));
-  if (latest.isAfter(today)) {
-    return null;
-  }
-  while (true) {
-    final next = nextScheduledOnOrAfter(rule, startDate, latest.addDays(1));
-    if (next.isAfter(today)) {
-      return latest;
-    }
-    latest = next;
   }
 }
