@@ -731,6 +731,16 @@ class DigestRescheduleController {
   /// always re-reads `_ref.read(...)` from scratch when it actually
   /// executes, so it reflects whatever is current at that moment -- not
   /// whatever was current when it was requested.
+  ///
+  /// This queue is a one-at-a-time guarantee for triggers that reach
+  /// [_recompute] THROUGH THIS CONTROLLER -- it says nothing about a
+  /// second, independent caller of `NotificationScheduler.applyDigestPlans`
+  /// (e.g. `DigestPrepromptBanner._enable`), which does not go through
+  /// [_recompute] at all. FIX 2 (same review) closes that gap at its
+  /// actual source: `NotificationScheduler.applyDigestPlans` itself now
+  /// serializes every call it receives, from any caller, so the ids this
+  /// queue protects and the ids that method writes can never interleave
+  /// either way.
   Future<void>? _inFlightRecompute;
 
   /// Whether a trailing recompute is owed once [_inFlightRecompute]

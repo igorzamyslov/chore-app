@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:chore_app/application/notification_scheduler.dart';
@@ -5,6 +6,43 @@ import 'package:chore_app/domain/digest_planner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_digest_notification_plugin.dart';
+
+/// A [FakeDigestNotificationPlugin] that pauses the very FIRST
+/// [zonedSchedule] call it ever receives -- across ANY caller -- until
+/// [release] is called, then behaves normally forever after.
+///
+/// Used only by the FIX 2 serialization test below, to force two
+/// concurrent [NotificationScheduler.applyDigestPlans] calls to actually
+/// overlap in time, deterministically: a fake with uniform latency would
+/// make both calls proceed in lockstep and prove nothing about ordering.
+/// Mirrors `_PausingPlugin` in `test/app/digest_reschedule_test.dart`,
+/// gated on call order rather than notification id since both callers'
+/// plans use the same ids.
+class _GatedPlugin extends FakeDigestNotificationPlugin {
+  final Completer<void> _gate = Completer<void>();
+  bool _hasPaused = false;
+
+  /// Lets the paused call (if any) proceed.
+  void release() {
+    if (!_gate.isCompleted) {
+      _gate.complete();
+    }
+  }
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime fireAt,
+  }) async {
+    if (!_hasPaused) {
+      _hasPaused = true;
+      await _gate.future;
+    }
+    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+  }
+}
 
 void main() {
   late FakeDigestNotificationPlugin plugin;
@@ -147,6 +185,66 @@ void main() {
       ]);
       expect(plugin.pending[1001]!.body, '2 Aufgaben heute · 1 überfällig');
     });
+
+    test(
+      'FIX 2: two concurrent calls from different callers cannot '
+      'interleave their seven-slot writes -- the later caller is not left '
+      'with slots clobbered by an earlier one resuming after it',
+      () async {
+        final gatedPlugin = _GatedPlugin();
+        final gatedScheduler = NotificationScheduler(
+          plugin: gatedPlugin,
+          localeResolver: () => const Locale('en'),
+        );
+
+        List<DigestPlan?> plansWithCount(int count) => [
+          for (var k = 0; k < digestHorizonDays; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: count,
+              overdueCount: 0,
+            ),
+        ];
+
+        // Caller A (e.g. the controller's recompute) starts first; its
+        // very first `zonedSchedule` call blocks on the gate.
+        final callA = gatedScheduler.applyDigestPlans(plansWithCount(1));
+        // Give A's Future chain a turn to actually run up to the gate.
+        await Future<void>.delayed(Duration.zero);
+
+        // Caller B (e.g. the pre-prompt banner's own apply) starts while A
+        // is still paused mid-loop.
+        final callB = gatedScheduler.applyDigestPlans(plansWithCount(2));
+        await Future<void>.delayed(Duration.zero);
+
+        // The gate only pauses the very first `zonedSchedule` call ever
+        // (A's). If B's loop could run concurrently with A's, B -- being
+        // unblocked -- would already have written its whole horizon by
+        // now. Serialized correctly, B is still queued behind A and has
+        // written nothing yet.
+        expect(
+          gatedPlugin.pending,
+          isEmpty,
+          reason: 'caller B must wait behind caller A, not run concurrently',
+        );
+
+        gatedPlugin.release();
+        await callA;
+        await callB;
+
+        // The final horizon is entirely B's. If the two loops had
+        // interleaved (the bug this guards against), A resuming after B
+        // had already written would overwrite some slots with A's stale
+        // count.
+        expect(
+          gatedPlugin.pending.values.every(
+            (call) => call.body == '2 chores today',
+          ),
+          isTrue,
+          reason: 'no slot may be left over from the earlier, stale call',
+        );
+      },
+    );
 
     test(
       'day 1 firing leaves days 2-7 armed, with nothing to re-arm them — '

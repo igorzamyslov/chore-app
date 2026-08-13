@@ -3,6 +3,7 @@
 /// architecture #2/#3).
 library;
 
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:chore_app/domain/digest_planner.dart';
@@ -211,6 +212,17 @@ class NotificationScheduler {
 
   bool _initialized = false;
 
+  /// The tail of the serialized-apply chain: resolves once whichever
+  /// [applyDigestPlans] call is currently running -- from ANY caller --
+  /// has finished writing its own seven slots. A new call waits on this
+  /// before starting its own loop; see [applyDigestPlans]'s doc comment.
+  ///
+  /// Deliberately never allowed to complete with an error: a failed apply
+  /// must not permanently jam the queue for every apply that comes after
+  /// it. The error itself still reaches the caller that made THAT call,
+  /// via the future [applyDigestPlans] returns to them.
+  Future<void> _applyTail = Future<void>.value();
+
   /// Initializes the underlying plugin. Idempotent: only the first call
   /// does anything. Safe to call on every bootstrap/resume.
   Future<void> ensureInitialized() async {
@@ -231,12 +243,27 @@ class NotificationScheduler {
   /// chore silences its day, and a day whose counts changed gets the fresh
   /// number, with no bookkeeping about what was armed before.
   ///
+  /// This call is one of SEVEN sequential platform-channel calls (one per
+  /// horizon day), and every `await` yields the isolate — so two calls
+  /// in flight at once, from any two callers, could otherwise interleave
+  /// their writes to the very same seven ids (`DigestRescheduleController`
+  /// and `DigestPrepromptBanner._enable` both call this independently).
+  /// This method therefore chains every call onto [_applyTail], so a call
+  /// that arrives while another is still mid-loop waits for it to finish
+  /// completely before writing a single slot of its own, no matter which
+  /// caller either one is. `DigestRescheduleController`'s own in-flight/
+  /// queued bookkeeping (`_inFlightRecompute`/`_recomputeQueued`) is a
+  /// separate, narrower guarantee on top of this one: it *coalesces*
+  /// redundant triggers from that one call site into a single re-run, it
+  /// does not by itself protect the horizon from a second, independent
+  /// caller such as the banner.
+  ///
   /// Deliberately never requests the OS notification permission itself; see
   /// the class doc and spec `docs/specs/polish-round-1.md` A3.
   ///
   /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonDays]
   /// long.
-  Future<void> applyDigestPlans(List<DigestPlan?> plans) async {
+  Future<void> applyDigestPlans(List<DigestPlan?> plans) {
     if (plans.length != digestHorizonDays) {
       throw ArgumentError.value(
         plans.length,
@@ -244,6 +271,13 @@ class NotificationScheduler {
         'Must be exactly digestHorizonDays ($digestHorizonDays)',
       );
     }
+    final waitForPrevious = _applyTail.catchError((_) {});
+    final thisApply = waitForPrevious.then((_) => _applyDigestPlansNow(plans));
+    _applyTail = thisApply.catchError((_) {});
+    return thisApply;
+  }
+
+  Future<void> _applyDigestPlansNow(List<DigestPlan?> plans) async {
     await ensureInitialized();
     final l10n = lookupAppLocalizations(localeResolver());
     for (var k = 0; k < plans.length; k++) {
