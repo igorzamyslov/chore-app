@@ -1027,6 +1027,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong while joining the household. Please try again.';
 
   @override
+  String get joinHouseholdNoLongerMemberError =>
+      'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.';
+
+  @override
   String get settingsAboutSectionTitle => 'About';
 
   @override

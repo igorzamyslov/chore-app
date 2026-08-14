@@ -289,6 +289,7 @@
   "joinHouseholdImportAccept": "Mitnehmen",
   "joinHouseholdImportDecline": "Neu anfangen",
   "joinHouseholdWorkingError": "Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.",
+  "joinHouseholdNoLongerMemberError": "Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.",
 
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",

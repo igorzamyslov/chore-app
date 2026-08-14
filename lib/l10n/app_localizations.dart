@@ -1584,6 +1584,12 @@ abstract class AppLocalizations {
   /// **'Something went wrong while joining the household. Please try again.'**
   String get joinHouseholdWorkingError;
 
+  /// Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.'**
+  String get joinHouseholdNoLongerMemberError;
+
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///
   /// In en, this message translates to:

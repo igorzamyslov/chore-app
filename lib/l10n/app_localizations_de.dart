@@ -1035,6 +1035,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.';
 
   @override
+  String get joinHouseholdNoLongerMemberError =>
+      'Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.';
+
+  @override
   String get settingsAboutSectionTitle => 'Über die App';
 
   @override
