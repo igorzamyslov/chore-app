@@ -1035,6 +1035,83 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.';
 
   @override
+  String get statsSettingsEntry => 'Aufgaben-Verlauf';
+
+  @override
+  String get statsTitle => 'Aufgaben-Verlauf';
+
+  @override
+  String get statsWindowLast30Days => 'In den letzten 30 Tagen';
+
+  @override
+  String statsWindowSinceStart(String date) {
+    return 'Seit deinem Start am $date';
+  }
+
+  @override
+  String statsTotalDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Aufgaben erledigt',
+      one: '1 Aufgabe erledigt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsShareUnknownMember => 'Jemand anderes';
+
+  @override
+  String get statsChoresSectionTitle => 'Aufgaben';
+
+  @override
+  String statsChoreTimesDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count-mal erledigt',
+      one: 'Einmal erledigt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsChoreLastDone(String date) {
+    return 'zuletzt $date';
+  }
+
+  @override
+  String statsDeletedSectionHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Gelöschte Aufgaben ($count)',
+      one: 'Gelöschte Aufgaben (1)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsDeletedNotice =>
+      'Diese Aufgabe wurde gelöscht. Ihr Verlauf bleibt hier erhalten.';
+
+  @override
+  String statsHistoryTruncated(int shown, int total) {
+    return 'Zeigt die $shown neuesten von $total';
+  }
+
+  @override
+  String get statsEmptyTitle => 'Noch nichts erledigt';
+
+  @override
+  String get statsEmptyBody =>
+      'Sobald ihr Aufgaben abhakt, siehst du hier, wer was gemacht hat.';
+
+  @override
+  String get statsErrorMessage => 'Der Verlauf konnte nicht geladen werden.';
+
+  @override
   String get settingsAboutSectionTitle => 'Über die App';
 
   @override
