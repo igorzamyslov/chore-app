@@ -160,7 +160,7 @@ Streams → `AsyncValue` with loading (skeleton-free plain
 ## Widget test matrix (minimum)
 
 1. Shell: three tabs render; switching tabs swaps content and preserves
-   state per tab (IndexedStack).
+   state per tab (keep-alive `PageView` — see "App shell navigation" below).
 2. Bootstrap: loading → list; bootstrap error → error state.
 3. List grouping: fabricated occurrences land in the right sections
    (overdue/today/tomorrow/this-week/later boundaries — use a fixed
@@ -179,6 +179,39 @@ Streams → `AsyncValue` with loading (skeleton-free plain
 10. Both themes render the list screen without exceptions (smoke,
     `ThemeMode.dark`).
 11. Text scale 2.0 renders the list + form without overflow exceptions.
+
+## App shell navigation (added 2026-08-08 — backlog D-1 / D-4 / D-6)
+
+Binding for `lib/app/app_shell.dart`.
+
+1. **Content is a `PageView`**, one page per tab in `_AppTab.values` order,
+   each page kept alive (`AutomaticKeepAliveClientMixin`) so leaving a tab
+   preserves its scroll position and in-flight state. Horizontal swipe moves
+   one tab at a time; there is no wrap-around.
+2. **`allowImplicitScrolling` must stay `false`.** Setting it true lays the
+   neighbouring page out inside the viewport's semantics clip, leaking that
+   tab's `Semantics(identifier: ...)` nodes into `find.bySemanticsIdentifier`
+   and Maestro's `assertVisible` while another tab is on screen. Regression
+   test: `test/app/shell_navigation_test.dart`.
+3. **A tab TAP switches instantly (`jumpToPage`); only a user's drag
+   animates.** Material 3 does not slide between bottom-navigation
+   destinations, and an instant tap keeps every E2E flow deterministic
+   (`docs/specs/testing-strategy.md` §2.4). Never change this to
+   `animateToPage` without re-timing the suite.
+4. **Re-tapping the active tab scrolls that tab's list to the top**
+   (conventions audit C6). The shell owns one `ScrollController` per tab and
+   publishes it through `PrimaryScrollController`; the tab screens' scroll
+   views stay uncontrolled and inherit it. A screen that ever needs its own
+   `controller:` must instead accept one, or D-4 silently stops working for
+   that tab.
+5. **Re-tapping the active tab does NOT clear its snackbar.** Clearing is
+   tied to *leaving* a tab (field feedback B1) and lives in `onPageChanged`,
+   which a re-tap never reaches.
+6. **System back on a non-first tab returns to the Chores tab**; on the
+   Chores tab it is not intercepted and the app exits (Material's
+   start-destination rule). No "press back again" confirmation.
+7. **The hand-rolled `_BottomTabBar` and every `shell.tab.*` id are
+   unchanged** by all of the above (`docs/specs/theme-v2.md` §4.5).
 
 All tests use in-memory AppDatabase + fixed clock via provider overrides —
 no mocks of repositories/services (integration-style, same as data layer).
