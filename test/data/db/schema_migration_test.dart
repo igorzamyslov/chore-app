@@ -53,6 +53,27 @@ Future<void> _dropMembershipRevokedColumn(AppDatabase seed) async {
   );
 }
 
+/// Drops the `(status, closed_on)` index (schema v11, spec
+/// `docs/specs/stats.md` §2.3) from `chore_occurrences` on [seed] -- the
+/// same collateral-drop pattern as the column helpers above, one rung down
+/// the schema-object hierarchy, and needed by *every* test below rather
+/// than only the pre-v11 ones.
+///
+/// The reason it is needed everywhere: `onUpgrade`'s `from < 11` branch
+/// issues a plain `CREATE INDEX` (drift's [Migrator.createIndex] has no
+/// `IF NOT EXISTS` form), which is exactly right in production -- no
+/// install at any shipped version 1..10 can have this index, so a
+/// collision would be a genuine bug worth throwing on. But [seed] always
+/// opens at the *current* (v11) schema first, so `onCreate` has already
+/// created the index, and rewinding `user_version` alone does not remove
+/// it. Without this drop, every rewound test would hit "index ... already
+/// exists" -- an artifact of the harness, not of the migration.
+Future<void> _dropStatusClosedOnIndex(AppDatabase seed) async {
+  await seed.customStatement(
+    'DROP INDEX IF EXISTS chore_occurrences_status_closed_on_idx',
+  );
+}
+
 void main() {
   test(
     'schemaVersion 1 -> 2 upgrade creates the settings table with defaults',
@@ -813,6 +834,47 @@ void main() {
         (row) => row.read<String>('name') == 'membership_revoked',
       );
       expect(membershipRevokedColumns, hasLength(1));
+    },
+  );
+
+  test(
+    'schemaVersion 10 -> 11 upgrade creates the (status, closed_on) index on '
+    'chore_occurrences',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v11_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v10 install: open the *current* (v11)
+      // schema once so `onCreate` materializes every table, then drop only
+      // the index this migration adds (see
+      // `_dropStatusClosedOnIndex` -- the same collateral-drop reasoning
+      // the column helpers above use, one rung down the schema-object
+      // hierarchy) and roll `user_version` back to 10.
+      final seed = AppDatabase(NativeDatabase(file));
+      await _dropStatusClosedOnIndex(seed);
+      await seed.customStatement('PRAGMA user_version = 10');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 11)
+      // `AppDatabase` sees `user_version == 10` vs. a declared 11, so
+      // drift runs `onUpgrade(migrator, 10, 11)`.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final rows = await upgraded
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND name = 'chore_occurrences_status_closed_on_idx'",
+          )
+          .get();
+      expect(rows, hasLength(1));
     },
   );
 }
