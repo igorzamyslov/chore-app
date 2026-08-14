@@ -2,6 +2,7 @@ import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/features/settings/settings_screen.dart';
 import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
@@ -154,6 +155,93 @@ void main() {
       // (test/app/snackbar_tab_switch_test.dart covers the tap path).
       await dragPage(tester, -500);
       expect(find.byType(SnackBar), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    're-tapping the tab you are already on scrolls its list back to the top '
+    '(conventions audit C6 / backlog D-4)',
+    today: today,
+    (tester, database) async {
+      // The shared surface is 2400 px tall so forms lay out without
+      // scrolling; shrink it here so the Settings list actually overflows
+      // and has somewhere to scroll to. `pump_app.dart` already registered
+      // the tear-down that restores it.
+      tester.view.physicalSize = const Size(400, 700);
+      await tester.pumpAndSettle();
+
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+
+      // `.first` guards against a future nested scrollable inside the
+      // Settings subtree turning this into an ambiguous finder.
+      final position = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(SettingsScreen),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      expect(position.maxScrollExtent, greaterThan(0));
+
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(0));
+
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, 0);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'each tab gets its own scroll controller: scrolling one tab and '
+    "re-tapping another leaves the first tab's position alone",
+    today: today,
+    (tester, database) async {
+      tester.view.physicalSize = const Size(400, 700);
+      await tester.pumpAndSettle();
+
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+
+      final position = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(SettingsScreen),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final scrolled = position.pixels;
+      expect(scrolled, greaterThan(0));
+
+      // Leave, re-tap the OTHER tab twice (a switch, then a scroll-to-top
+      // on that tab), then come back.
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, scrolled);
 
       handle.dispose();
     },
