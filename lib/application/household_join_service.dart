@@ -255,7 +255,8 @@ class HouseholdJoinService {
     // archive from step 1 has already been written by now and stays on disk;
     // that is the intended trade: a spare archive file is harmless, a
     // deleted household is not.
-    // TEMPORARY INVERSION -- guard deliberately moved below the transaction.
+    _requireUsableSnapshot(downloaded, joinedHouseholdId, choice);
+
     // Step 4: one local transaction.
     var importedChores = const <Chore>[];
     var importedOccurrences = const <ChoreOccurrence>[];
@@ -289,8 +290,6 @@ class HouseholdJoinService {
         linkedAt: clock.now(),
       );
     });
-
-    _requireUsableSnapshot(downloaded, joinedHouseholdId, choice);
 
     // Step 5: best-effort push of just the import copies. Tolerated on
     // failure -- unlike every other step here, this one deliberately does
