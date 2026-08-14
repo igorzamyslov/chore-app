@@ -47,6 +47,15 @@ tags:
 - assertVisible: "(?s).*Done once.*"
 
 # Delete the chore, then prove its history survived and is findable.
+#
+# Back out of the pushed Chore history screen first: like the members
+# screen, it covers the bottom tab bar, so `shell.tab.chores` is genuinely
+# not on screen until this route pops. Tap the app bar's BackButton
+# (semantics label 'Back' on both platforms) rather than Maestro's own
+# `back` command, which is a left-edge swipe on iOS and does not pop the
+# route there (README convention 7, and the same note in
+# members_and_acting.yaml).
+- tapOn: "Back"
 - tapOn:
     id: "shell.tab.chores"
 - tapOn:
