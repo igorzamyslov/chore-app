@@ -1071,7 +1071,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.';
+      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>

@@ -1397,9 +1397,9 @@
   "@settingsResetConfirm1Title": {
     "description": "Title of the first reset confirmation dialog (spec docs/specs/polish-round-1.md B2)."
   },
-  "settingsResetConfirm1Body": "This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can't be undone.",
+  "settingsResetConfirm1Body": "This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can't be undone. If you're signed in, this also signs you out of this phone.",
   "@settingsResetConfirm1Body": {
-    "description": "Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2)."
+    "description": "Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2)."
   },
   "settingsResetConfirm1BodyLinked": "Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone's local members, chores, and shopping list.",
   "@settingsResetConfirm1BodyLinked": {
