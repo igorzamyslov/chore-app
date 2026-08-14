@@ -1068,7 +1068,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.';
+      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>

@@ -1,3 +1,5 @@
+import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -8,7 +10,9 @@ import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../application/fake_digest_notification_plugin.dart';
 import '../../test_utils/pump_app.dart';
+import 'fake_auth_gateway.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the Settings tab's destructive 'Reset app data'
@@ -188,6 +192,80 @@ void main() {
       expect(
         find.textContaining('There is no cloud backup'),
         findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  final fakeAuth = FakeAuthGateway(
+    currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+  );
+  testChoreApp(
+    'confirming both dialogs signs out the current user (spec '
+    'docs/feedback/2026-08-08-prerelease-audit.md P3): Reset is the '
+    'opposite of Disconnect, which deliberately keeps the session',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(fakeAuth)],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.reset'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('settings.reset.confirm1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('settings.reset.confirm2'));
+      await tester.pumpAndSettle();
+
+      expect(fakeAuth.currentUser, isNull);
+
+      handle.dispose();
+    },
+  );
+
+  final fakePlugin = FakeDigestNotificationPlugin();
+  testChoreApp(
+    'confirming both dialogs cancels the scheduled digest notification '
+    '(spec docs/feedback/2026-08-08-prerelease-audit.md P3)',
+    today: today,
+    overrides: [
+      digestNotificationPluginProvider.overrideWithValue(fakePlugin),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.reset'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('settings.reset.confirm1'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('settings.reset.confirm2'));
+      await tester.pumpAndSettle();
+
+      expect(fakePlugin.cancelCallCount, greaterThanOrEqualTo(1));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'unlinked device: the first dialog also states that an active '
+    'session ends too (spec docs/feedback/2026-08-08-prerelease-audit.md '
+    'P3 -- the copy used to never mention an account at all, even though '
+    'Reset is reachable while signed in but not yet linked, e.g. mid the '
+    'P2b/P2c adopt-or-join choice)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.reset'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("If you're signed in, this also signs you out"),
+        findsOneWidget,
       );
 
       handle.dispose();

@@ -303,7 +303,7 @@
   "settingsDataSectionTitle": "Daten",
   "settingsResetEntry": "App-Daten zurücksetzen",
   "settingsResetConfirm1Title": "App-Daten zurücksetzen?",
-  "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.",
+  "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.",
   "settingsResetConfirm1BodyLinked": "Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät.",
   "settingsResetConfirm1Action": "Weiter",
   "settingsResetConfirm2Title": "Wirklich alles löschen?",

@@ -1656,10 +1656,10 @@ abstract class AppLocalizations {
   /// **'Reset app data?'**
   String get settingsResetConfirm1Title;
 
-  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
+  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.'**
+  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
   String get settingsResetConfirm1Body;
 
   /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.

@@ -90,6 +90,14 @@ of the chores list, and flows keep passing untouched.
   (invalidate `bootstrapProvider`) so the app lands in the fresh-install
   state (including the A2 banner — the flags live in the deleted
   settings row, which is exactly right).
+- Confirmed also cancels the scheduled digest notification and signs out
+  of the current Supabase session, if any (spec
+  `docs/feedback/2026-08-08-prerelease-audit.md` P3) — both best-effort,
+  run before the wipe, and never blocking it. This is the deliberate
+  opposite of the A1.2 Disconnect action (spec
+  `docs/feedback/2026-08-07-field-feedback.md` A1), which keeps the
+  session and only unlinks the device: Reset is the clean-slate operation,
+  Disconnect is the "keep working, just not with this household" one.
 
 ## C. Lifecycle robustness
 
