@@ -189,10 +189,7 @@ class _RotationAssigneeControls extends StatelessWidget {
     // full edit converges it. Throwing there would take the whole form
     // down; dropping the unresolvable row degrades the same way the old
     // chip row did (it simply rendered nothing for such an id).
-    final selected = [
-      for (final id in selectedMemberIds)
-        if (byId[id] case final member?) member,
-    ];
+    final selected = [for (final id in selectedMemberIds) ?byId[id]];
     final unselected = [
       for (final member in members)
         if (!selectedMemberIds.contains(member.id)) member,
@@ -235,7 +232,6 @@ class _RotationAssigneeControls extends StatelessWidget {
                 child: FilterChip(
                   avatar: MemberAvatar(member: member, radius: 12),
                   label: Text(member.name),
-                  selected: false,
                   onSelected: (_) => onMemberTap(member.id),
                 ),
               ),

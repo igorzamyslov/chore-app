@@ -45,7 +45,7 @@ void main() {
             members: [anna, ben, mia],
             selectedMemberIds: selectedMemberIds,
             onMemberTap: onMemberTap ?? (_) {},
-            onReorder: onReorder ?? (_, __) {},
+            onReorder: onReorder ?? (_, _) {},
           ),
         ),
       ),
