@@ -248,4 +248,27 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'unlinked device: the first dialog also states that an active '
+    'session ends too (spec docs/feedback/2026-08-08-prerelease-audit.md '
+    'P3 -- the copy used to never mention an account at all, even though '
+    'Reset is reachable while signed in but not yet linked, e.g. mid the '
+    'P2b/P2c adopt-or-join choice)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.reset'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("If you're signed in, this also signs you out"),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
 }
