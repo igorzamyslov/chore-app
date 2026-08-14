@@ -352,9 +352,10 @@ void main() {
 
       expect(
         plugin.scheduledCalls,
-        // DELIBERATELY WRONG (temporary): pinned at two applies so the
-        // failure names the real count and proves this assertion is live.
-        hasLength(2 * digestHorizonSlots),
+        // Observed empirically: pinning this at 2 * digestHorizonSlots
+        // failed with a real count of exactly digestHorizonSlots (24), so
+        // this bound is live, not vacuous.
+        hasLength(digestHorizonSlots),
         reason:
             'five mutations must cost ONE apply of the whole horizon; five '
             'applies would be 5 * digestHorizonSlots calls',
@@ -417,9 +418,11 @@ void main() {
 
       expect(
         plugin.scheduledCalls.length,
-        // DELIBERATELY WRONG (temporary): pinned at one apply so the
-        // failure names the real count and proves this assertion is live.
-        lessThanOrEqualTo(digestHorizonSlots),
+        // Observed empirically: pinning this at digestHorizonSlots failed
+        // with a real count of exactly 48 = 2 * digestHorizonSlots, so the
+        // bound is tight — the in-flight apply plus ONE trailing re-run,
+        // with the three triggers genuinely coalesced.
+        lessThanOrEqualTo(2 * digestHorizonSlots),
         reason:
             'the in-flight apply plus exactly one coalesced trailing '
             're-run; one apply per trigger would be 4 * digestHorizonSlots',

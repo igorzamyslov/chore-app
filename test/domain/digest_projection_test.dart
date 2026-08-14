@@ -185,10 +185,7 @@ void main() {
         if (sawNonSilent) {
           expect(
             counts.isSilent,
-            // DELIBERATELY INVERTED (temporary): proves this assertion is
-            // reached and really compares, since a characterization test
-            // has no natural RED. Reverted in the next commit.
-            isTrue,
+            isFalse,
             reason:
                 'a date that was non-silent earlier must never become '
                 'silent again — at $date (offset $offset)',
