@@ -63,7 +63,9 @@ EVERY interactive widget gets one. IDs used in this spec are normative:
   `chore_form.repeat.weekday.<1..7>`,
   `chore_form.repeat.monthly_mode.<day_of_month|nth_weekday>`,
   `chore_form.start_date`, `chore_form.assignment.<fixed|rotation|anyone>`,
-  `chore_form.assignee.<memberId>`, `chore_form.save`
+  `chore_form.assignee.<memberId>`, `chore_form.assignee.<memberId>.drag`
+  (rotation reorder drag handle), `chore_form.assignee.<memberId>.remove`
+  (rotation reorder remove button), `chore_form.save`
 
 ### Theme (`lib/app/theme.dart`)
 Material 3, `ColorScheme.fromSeed(seedColor: Color(0xFF26A69A))`, light +
@@ -140,9 +142,17 @@ error text `semantic('app.bootstrap_error')`.
     chips.
 - Start date: date picker, defaults to today, min today - 1 year.
 - Assignment: segmented fixed/rotation/anyone; fixed → single-select member
-  chips; rotation → multi-select member chips in tap order with visible
-  order badges (1, 2, …), each chip showing the member's `MemberAvatar`
-  before their name (field feedback F3). Validation errors inline: fixed
+  chips, each showing the member's `MemberAvatar` before their name (field
+  feedback F3). rotation (backlog B-4 / triage T2.5,
+  `docs/plans/2026-08-08-rotation-reorder.md`) → already-selected members
+  render as a compact reorderable list (drag handle, avatar, visible order
+  label "1. Anna" etc., remove button), directly editable by dragging a
+  row or tapping its remove button — not only rebuildable by deselecting
+  and reselecting; not-yet-selected members stay a tap-to-add chip row
+  below, appending to the end of the order, same as fixed mode's picker.
+  Reordering is a widget-tested interaction only (not E2E: Maestro can't
+  drive `ReorderableListView` reliably, same limitation already accepted
+  for `manage_categories_screen.dart`). Validation errors inline: fixed
   needs exactly one ('Pick one member'), rotation at least two ('Pick at
   least two').
 - Save: create via `ChoreService.createChore` (or update via

@@ -274,7 +274,10 @@ requires).
 - Weekdays become a row of circular toggles (selected = `primary` fill).
 - The anchor choice becomes **two explanatory radio cards** naming the
   actual interval (selected = `primaryContainer` + `primaryOutline`).
-- Rotation chips show turn order on the chip ("1. Anna", "2. Ben").
+- Rotation mode shows selected members as a reorderable list with an
+  order label per row ("1. Anna", "2. Ben") instead of chips, and
+  not-yet-selected members as a chip row below it (spec
+  `ui-foundation-chores.md`, `docs/plans/2026-08-08-rotation-reorder.md`).
 - Category chips carry the category dot in `categoryTone`.
 
 ### 4.5 Welcome + overlays (wave T5)
