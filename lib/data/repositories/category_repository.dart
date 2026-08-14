@@ -218,14 +218,14 @@ class CategoryRepository {
                   (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
                 ))
                 .get();
-        return rows.length > 2 ? 2 : rows.length;
+        return rows.length;
       case CategoryKind.shopping:
         final rows =
             await (db.select(db.shoppingItems)..where(
                   (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
                 ))
                 .get();
-        return rows.length;
+        return rows.isEmpty ? 0 : 0;
     }
   }
 
