@@ -62,7 +62,18 @@ Supabase client reconnects on its own, and the reconnect produces the
 
 ### 2.2 Foreground safety-net poll
 
-A `Timer.periodic` on the engine, **60 seconds**, calling `pullSince()`.
+A `Timer.periodic` on the engine, **60 seconds**. Amended by B-6
+(`docs/backlog.md`): each tick now pushes every dirty row (swallowing
+failure per §8.3's posture) AND THEN ALWAYS pulls, regardless of whether
+the push succeeded -- retrying anything a debounced push failed to send
+(e.g. connectivity dropping mid-write) without ever making the pull
+conditional on that retry's outcome. A tick is not simply
+`pushDirty()` followed by `pullSince()`: `pushDirty()` already pulls
+internally on a successful push, which would double-pull, and `pushDirty()`
+returns early WITHOUT pulling on a failed push, which would turn one
+persistently-rejected row into a total pull blackout -- exactly what this
+section exists to prevent. The engine implements this as its own
+`_pollTick()` method with an independent try/catch around the push half.
 
 - 60s, not tighter: realtime is the fast path (sub-second when healthy);
   this only bounds worst-case staleness when realtime is degraded in a way
