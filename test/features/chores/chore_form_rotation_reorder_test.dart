@@ -82,6 +82,20 @@ void main() {
       );
       expect(find.textContaining('. Anna'), findsNothing);
 
+      // Reorder once more, AFTER the removal. This is what makes the
+      // persistence assertion below order-discriminating: the first
+      // reorder moved Anna, who was then removed, so [Ben, Me] would be
+      // the saved order with or without it. Swapping the two survivors
+      // makes the saved order differ from the tap order (Anna, Ben, Me
+      // minus Anna = Ben, Me) on the member sequence itself.
+      final afterRemoval = tester.widget<ReorderableListView>(
+        find.byType(ReorderableListView),
+      );
+      afterRemoval.onReorderItem!(0, 1);
+      await tester.pumpAndSettle();
+      expect(find.text('1. Me'), findsOneWidget);
+      expect(find.text('2. Ben'), findsOneWidget);
+
       await tester.tap(find.bySemanticsIdentifier('chore_form.save'));
       await tester.pumpAndSettle();
 
@@ -89,7 +103,10 @@ void main() {
         (c) => c.title == 'Dishes',
       );
       final details = await ChoreRepository(database).getChore(chore.id);
-      expect(details!.assigneeMemberIds, [ben.id, me.id]);
+      // Tap order was Anna, Ben, Me; dropping Anna would leave [Ben, Me].
+      // Seeing [Me, Ben] proves chore_assignees.position followed the
+      // reordered list, not the order the members were tapped in.
+      expect(details!.assigneeMemberIds, [me.id, ben.id]);
 
       handle.dispose();
     },
