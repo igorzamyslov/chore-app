@@ -123,7 +123,7 @@ class _AppShellState extends State<AppShell> {
     // `canPop: false` Android's predictive-back preview is suppressed on the
     // other two tabs, which is the documented cost of intercepting a pop.)
     return PopScope(
-      canPop: _selected == _AppTab.chores,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           return;
@@ -261,7 +261,7 @@ class _KeepAlivePage extends StatefulWidget {
 class _KeepAlivePageState extends State<_KeepAlivePage>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => false;
 
   @override
   Widget build(BuildContext context) {
