@@ -314,3 +314,5 @@ distribution question below.
   as a deletion — and rotation drifts on the other device as a result.
 - Delete-vs-check resurrection; cross-device duplicate names; the 60-second
   pull bound with realtime degraded.
+
+<!-- scope-check probe: touches no supabase path -->
