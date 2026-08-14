@@ -41,9 +41,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   /// `ListView` below, which can reset a bare `ExpansionTile`'s expansion.
   /// This screen stays mounted for the tab's entire lifetime once first
   /// visited (each page of the `PageView` in `lib/app/app_shell.dart` is
-  /// kept alive), so this field survives every such rebuild. Reset to `false` in [build] whenever the section
-  /// itself unmounts (no checked items left) — its next appearance always
-  /// starts collapsed, by design.
+  /// kept alive), so this field survives every such rebuild. Reset to
+  /// `false` in [build] whenever the section itself unmounts (no checked
+  /// items left) — its next appearance always starts collapsed, by design.
   bool _cartExpanded = false;
 
   @override
