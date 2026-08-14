@@ -248,6 +248,15 @@ class HouseholdJoinService {
     // Step 3.
     final downloaded = await gateway.downloadHousehold(joinedHouseholdId);
 
+    // Step 3b: refuse to trade live local data for a snapshot that does not
+    // confirm access. Deliberately BEFORE `database.transaction(...)` opens,
+    // so nothing has been deleted and no rollback is relied upon -- the
+    // failure is provably non-destructive rather than merely reverted. The
+    // archive from step 1 has already been written by now and stays on disk;
+    // that is the intended trade: a spare archive file is harmless, a
+    // deleted household is not.
+    _requireUsableSnapshot(downloaded, joinedHouseholdId, choice);
+
     // Step 4: one local transaction.
     var importedChores = const <Chore>[];
     var importedOccurrences = const <ChoreOccurrence>[];
@@ -329,6 +338,11 @@ class HouseholdJoinService {
 
     final downloaded = await gateway.downloadHousehold(joinedHouseholdId);
 
+    // Same guard as [join]'s step 3b -- see its call site. There is no local
+    // household to lose on this path, but a device must still never record
+    // itself as linked to a household it could not actually read.
+    _requireUsableSnapshot(downloaded, joinedHouseholdId, choice);
+
     await database.transaction(() async {
       await _insertSnapshot(downloaded);
       await settings.setActingMember(actingMemberId);
@@ -363,6 +377,48 @@ class HouseholdJoinService {
       case ReconnectChoice(:final householdId, :final memberId):
         // Spec §7.6: already claimed server-side -- no RPC call at all.
         return (householdId: householdId, memberId: memberId);
+    }
+  }
+
+  /// Throws [HouseholdSnapshotUnavailable] unless [downloaded] positively
+  /// confirms that this account may join [joinedHouseholdId]. Shared by
+  /// [join] and [joinFresh] so the two paths cannot drift apart -- the whole
+  /// point of the guard is that it holds on EVERY route into
+  /// [_insertSnapshot].
+  ///
+  /// Two rules, deliberately asymmetric:
+  ///
+  /// 1. **Every** [JoinChoice]: the snapshot must carry a household row. An
+  ///    absent one means the select returned nothing, which under RLS is
+  ///    indistinguishable from "you are not allowed to see this household"
+  ///    (see [HouseholdSnapshotUnavailable]'s doc comment) -- and replacing a
+  ///    live local household with an empty snapshot is never a sane outcome
+  ///    regardless of how the caller got here.
+  /// 2. **[ReconnectChoice] only**: the snapshot must also contain the
+  ///    reconnecting member's own row, active (`deletedAt == null`).
+  ///    [ClaimMemberChoice] and [NewMemberChoice] already passed through
+  ///    `claim_member` / `join_as_new_member`, which authorize server-side
+  ///    against a live invite and raise on refusal. [ReconnectChoice] makes
+  ///    no RPC at all by design (spec §7.6), so this membership check is the
+  ///    only authorization the flow performs -- and a removed member is
+  ///    exactly the caller who still holds a stale, still-tappable offer
+  ///    (`myMembershipProvider` is non-`autoDispose` and does not re-probe
+  ///    between the probe and the tap).
+  void _requireUsableSnapshot(
+    HouseholdSnapshot downloaded,
+    String joinedHouseholdId,
+    JoinChoice choice,
+  ) {
+    if (downloaded.household == null) {
+      throw HouseholdSnapshotUnavailable(joinedHouseholdId);
+    }
+    if (choice is ReconnectChoice) {
+      final stillAMember = downloaded.members.any(
+        (member) => member.id == choice.memberId && member.deletedAt == null,
+      );
+      if (!stillAMember) {
+        throw HouseholdSnapshotUnavailable(joinedHouseholdId);
+      }
     }
   }
 
