@@ -282,6 +282,53 @@ void main() {
         await _disposeAndClose(tester, container, database);
       },
     );
+
+    testWidgets(
+      'moves todayProvider even when catch-up changes nothing — the common '
+      'night, where no chore fell overdue',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 9);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        // Faked, like every other test in this file that lets catch-up run
+        // to completion: without it, the digest recompute `triggerOnResume`
+        // also kicks off would reach the real (unfaked) OS notification
+        // plugin, which throws in a `flutter_test` environment.
+        final plugin = FakeDigestNotificationPlugin();
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+            digestNotificationPluginProvider.overrideWithValue(plugin),
+          ],
+        );
+        final catchUpController = container.read(catchUpControllerProvider);
+        await _awaitBootstrap(tester, container);
+        expect(container.read(todayProvider), PlainDate(2026, 1, 5));
+
+        // Backgrounded overnight; no chores exist at all, so catch-up has
+        // nothing to change and reports `changed == false`.
+        currentTime = DateTime(2026, 1, 6, 9);
+        catchUpController.triggerOnResume();
+
+        // The refresh itself is synchronous, so this holds even before the
+        // unawaited catch-up below has had a chance to run.
+        expect(container.read(todayProvider), PlainDate(2026, 1, 6));
+
+        // Let the catch-up (and the digest recompute it unconditionally
+        // triggers) settle before disposing: otherwise that still-pending
+        // work resumes after `container.dispose()` below and tries to read
+        // from an already-disposed container.
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pump(digestRescheduleDebounce);
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
   });
 
   group('CatchUpController day-change timer', () {
@@ -365,6 +412,53 @@ void main() {
 
         await tester.pump(digestRescheduleDebounce);
         expect(plugin.scheduledCalls, isNotEmpty);
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
+
+    testWidgets(
+      'moves todayProvider when it fires, with nothing overdue and no other '
+      'trigger — the regression backlog A-2 describes',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 23, 59, 50);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        // Faked, like every other test in this file that lets catch-up run
+        // to completion: without it, the digest recompute the day-change
+        // timer also kicks off would reach the real (unfaked) OS
+        // notification plugin, which throws in a `flutter_test`
+        // environment.
+        final plugin = FakeDigestNotificationPlugin();
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+            digestNotificationPluginProvider.overrideWithValue(plugin),
+          ],
+        )..read(catchUpControllerProvider);
+        await _awaitBootstrap(tester, container);
+        expect(container.read(todayProvider), PlainDate(2026, 1, 5));
+
+        // The fake Timer's countdown is governed purely by *pumped*
+        // duration, independent of what [currentTime] reads — so a short
+        // first pump (well under the ~11s countdown armed at bootstrap)
+        // lets us move the clock without racing it, and the second pump
+        // reaches the boundary. Same technique as the test above.
+        await tester.pump(const Duration(milliseconds: 500));
+        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+        await tester.pump(const Duration(seconds: 12));
+
+        expect(container.read(todayProvider), PlainDate(2026, 1, 6));
+
+        // Let the digest recompute the timer unconditionally triggers
+        // settle before disposing — see the identical comment in the test
+        // above.
+        await tester.pump(digestRescheduleDebounce);
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.

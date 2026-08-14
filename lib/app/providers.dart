@@ -962,6 +962,15 @@ DateTime nextLocalMidnight(DateTime now) {
 /// unconditionally — see [_runCatchUp]. This is what re-arms the digest's
 /// rolling horizon for an app that simply stays open, which no other
 /// trigger covers.
+///
+/// On the same two triggers this controller ALSO refreshes [todayProvider]
+/// — unconditionally, whether or not catch-up changed anything — which is
+/// what makes every date-bucketed screen roll over at local midnight
+/// (backlog A-2 / audit P1). The timer lives here rather than in
+/// [todayProvider] itself because this class is activated only from
+/// `main.dart`, never from the widget tree: see [todayProvider]'s doc
+/// comment for why a provider-armed timer would break every chores widget
+/// test.
 class CatchUpController {
   /// Starts listening immediately; arms the first day-change timer once
   /// [bootstrapProvider] resolves. The `ref` is retained for the lifetime
@@ -990,6 +999,7 @@ class CatchUpController {
   /// Re-runs catch-up and re-arms the day-change timer from the current
   /// time. Called externally on app resume.
   void triggerOnResume() {
+    _refreshToday();
     unawaited(_runCatchUp());
     _armDayChangeTimer();
   }
@@ -1001,10 +1011,22 @@ class CatchUpController {
     _dayChangeTimer?.cancel();
     final now = _ref.read(clockProvider).now();
     _dayChangeTimer = Timer(nextLocalMidnight(now).difference(now), () {
+      _refreshToday();
       unawaited(_runCatchUp());
       _armDayChangeTimer();
     });
   }
+
+  /// Republishes [todayProvider] from the clock.
+  ///
+  /// UNCONDITIONAL on both day-boundary triggers, unlike the digest
+  /// recompute below: the digest only has news when catch-up actually
+  /// changed rows, but the DATE changes every single night whether or not
+  /// anything fell overdue — and the common night is precisely the one
+  /// where nothing does (backlog A-2 / audit P1). [TodayNotifier.refresh]
+  /// is itself a no-op when the calendar day hasn't moved, so calling it on
+  /// every resume is free.
+  void _refreshToday() => _ref.read(todayProvider.notifier).refresh();
 
   Future<void> _runCatchUp() async {
     final householdId = _householdId;
