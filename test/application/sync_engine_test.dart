@@ -775,23 +775,35 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 5));
         await ShoppingRepository(db).addItem(household.id, name: 'Milk');
 
-        // Let the 20ms debounced push fire and fail against the simulated
-        // drop -- the row must still be dirty afterward, and nothing must
-        // have reached the fake server.
-        await Future<void>.delayed(const Duration(milliseconds: 40));
+        // The 20ms debounced push fires first and is made to fail, leaving
+        // the row dirty. Nothing else pushes from here -- no further local
+        // write, no app resume -- so only the 30ms foreground poll can
+        // move it.
+        //
+        // Deliberately NO intermediate "nothing has reached the server
+        // yet" assertion: the first poll tick lands at 30ms, before any
+        // such check could run, so asserting it would be asserting the
+        // absence of the very retry this test exists to prove.
+        await Future<void>.delayed(const Duration(milliseconds: 140));
+
         expect(
-          transport.serverRows['shopping_items'],
-          isEmpty,
-          reason: 'the first push attempt was made to fail on purpose',
+          upsertAttempts,
+          greaterThanOrEqualTo(2),
+          reason:
+              'the first attempt was failed on purpose, so a second one can '
+              'only have come from the poll. It also proves the row was '
+              'still dirty when that tick ran: FakeSyncTransport.upsertRows '
+              'returns before calling beforeUpsert when there is nothing '
+              'to push, so the hook is unreachable with a clean table',
         );
-        final stillDirty = await (db.select(
+        final retried = await (db.select(
           db.shoppingItems,
         )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
-        expect(stillDirty.syncDirty, isTrue);
-
-        // The 30ms foreground poll must retry it on its own -- no further
-        // local write, no resume.
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          retried.syncDirty,
+          isFalse,
+          reason: 'a successful retry must clear the dirty flag',
+        );
         expect(
           transport.serverRows['shopping_items']!.any(
             (row) => row['name'] == 'Milk',
