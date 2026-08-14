@@ -96,4 +96,45 @@ void main() {
       expect(renderedTexts, expectedOrder);
     },
   );
+
+  // A second mutable clock, independent of the one above: each testChoreApp
+  // body runs once, but these variables live at file scope, so the two
+  // tests must not share one.
+  var formTime = DateTime(2026, 1, 5, 9);
+
+  testChoreApp(
+    'a start date the user already picked never moves under them when the '
+    'day rolls over with the chore form open',
+    today: DateTime(2026, 1, 5, 9),
+    clock: Clock(() => formTime),
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await tester.tap(find.bySemanticsIdentifier('chores.add'));
+      await tester.pumpAndSettle();
+
+      // The new-chore form defaults its start date to today, rendered by
+      // StartDateField as DateFormat.yMMMd('en').
+      expect(find.text('Jan 5, 2026'), findsOneWidget);
+
+      // Midnight passes with the form still open.
+      formTime = DateTime(2026, 1, 6, 0, 0, 1);
+      ProviderScope.containerOf(
+        tester.element(find.byType(ChoreApp)),
+        listen: false,
+      ).read(todayProvider.notifier).refresh();
+      await tester.pumpAndSettle();
+
+      // The picker's RANGE reference moved (today - 1 year is now
+      // 2025-01-06); the user's chosen VALUE did not. `_startDate` is read
+      // once in initState precisely so this stays true.
+      expect(find.text('Jan 5, 2026'), findsOneWidget);
+      expect(find.text('Jan 6, 2026'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('chore_form.start_date'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
 }
