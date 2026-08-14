@@ -16,10 +16,17 @@ import 'package:timezone/timezone.dart' as tz;
 /// `docs/specs/notifications.md` architecture #2).
 const int digestNotificationIdBase = 1001;
 
-/// Every notification id the digest horizon owns, in slot order.
+/// Every notification id the digest horizon owns, in slot order: one id
+/// per horizon SLOT, not per calendar day.
+///
+/// Those were the same thing while the horizon was a flat run of
+/// consecutive days. They no longer are: the horizon's trailing segment
+/// samples one day in every `digestHorizonTailStepDays` (spec
+/// `docs/specs/notifications.md` N1), so slot `k`'s calendar date is not
+/// `k` days out once `k` passes the daily segment.
 ///
 /// Fixed and exhaustive on purpose: every reschedule rewrites ALL of these
-/// (scheduling some, cancelling the rest), so a day that stops having
+/// (scheduling some, cancelling the rest), so a slot that stops having
 /// anything to say can never keep a stale notification armed.
 final List<int> digestNotificationIds = List<int>.unmodifiable([
   for (var k = 0; k < digestHorizonSlots; k++) digestNotificationIdBase + k,
@@ -214,8 +221,9 @@ class NotificationScheduler {
 
   /// The tail of the serialized-apply chain: resolves once whichever
   /// [applyDigestPlans] call is currently running -- from ANY caller --
-  /// has finished writing its own seven slots. A new call waits on this
-  /// before starting its own loop; see [applyDigestPlans]'s doc comment.
+  /// has finished writing its own [digestHorizonSlots] slots. A new call
+  /// waits on this before starting its own loop; see [applyDigestPlans]'s
+  /// doc comment.
   ///
   /// Deliberately never allowed to complete with an error: a failed apply
   /// must not permanently jam the queue for every apply that comes after
@@ -243,10 +251,12 @@ class NotificationScheduler {
   /// chore silences its day, and a day whose counts changed gets the fresh
   /// number, with no bookkeeping about what was armed before.
   ///
-  /// This call is one of SEVEN sequential platform-channel calls (one per
-  /// horizon day), and every `await` yields the isolate — so two calls
-  /// in flight at once, from any two callers, could otherwise interleave
-  /// their writes to the very same seven ids (`DigestRescheduleController`
+  /// This call fans out into [digestHorizonSlots] sequential
+  /// platform-channel calls (one per horizon SLOT — not per calendar day:
+  /// the horizon's trailing segment is sparse), and every `await` yields
+  /// the isolate — so two calls in flight at once, from any two callers,
+  /// could otherwise interleave their writes to the very same
+  /// [digestHorizonSlots] ids (`DigestRescheduleController`
   /// and `DigestPrepromptBanner._enable` both call this independently).
   /// This method therefore chains every call onto [_applyTail], so a call
   /// that arrives while another is still mid-loop waits for it to finish

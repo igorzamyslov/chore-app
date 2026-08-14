@@ -27,8 +27,9 @@ import '../features/settings/fake_auth_gateway.dart';
 /// Used only by the FIX A serialization test below, to hold one recompute
 /// mid-loop (after it has already written some slots but before it writes
 /// the rest) while a second recompute is triggered — the same shape as the
-/// bug it regression-tests: `applyDigestPlans` awaits seven sequential
-/// platform-channel calls, and every `await` yields the isolate.
+/// bug it regression-tests: `applyDigestPlans` awaits one sequential
+/// platform-channel call per horizon slot, and every `await` yields the
+/// isolate.
 class _PausingPlugin extends FakeDigestNotificationPlugin {
   _PausingPlugin({required this.pauseOnId});
 
@@ -370,7 +371,7 @@ void main() {
           );
       await tester.pump(digestRescheduleDebounce);
 
-      // The whole horizon is armed up front, one id per calendar day.
+      // The whole horizon is armed up front, one id per slot.
       expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
         plugin.pending[digestNotificationIdBase]!.fireAt,
@@ -613,7 +614,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       // Every one of the digestHorizonSlots ids must show Y's count. If the
-      // two recomputes had interleaved (the bug), ids 1004-1007 would
+      // two recomputes had interleaved (the bug), ids 1004 and up would
       // still show A's stale '1 chore today' -- A resuming after B would
       // overwrite them with counts that were already out of date.
       expect(plugin.pending, hasLength(digestHorizonSlots));

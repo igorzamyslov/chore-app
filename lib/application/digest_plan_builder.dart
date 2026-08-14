@@ -20,9 +20,11 @@ import 'package:chore_app/domain/recurrence/plain_date.dart';
 /// The digest plan for each of the next [digestHorizonSlots] slots.
 ///
 /// The returned list is ALWAYS exactly [digestHorizonSlots] long: index `k`
-/// is slot `k` (0 = the next slot), and a `null` entry means that day is
-/// silent and its notification id must be cancelled rather than scheduled
-/// (see `NotificationScheduler.applyDigestPlans`).
+/// is slot `k` (0 = the next slot), and a `null` entry means that slot's
+/// own date is silent and its notification id must be cancelled rather than
+/// scheduled (see `NotificationScheduler.applyDigestPlans`). Slot `k` is
+/// not necessarily `k` days out — see [digestSlots] for the segmented
+/// shape.
 ///
 /// [pending] is the household's current pending occurrences (i.e.
 /// `pendingOccurrencesProvider`'s value). [recipientMemberId] is the

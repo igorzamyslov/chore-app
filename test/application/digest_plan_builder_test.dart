@@ -91,7 +91,9 @@ void main() {
 
     expect(plans.every((plan) => plan != null), isTrue);
     expect(plans.first!.fireAt, DateTime(2026, 1, 5, 8));
-    expect(plans.last!.fireAt, DateTime(2026, 1, 11, 8));
+    // Offset 83 from the first slot: the far end of the segmented horizon,
+    // not the old flat seven days.
+    expect(plans.last!.fireAt, DateTime(2026, 3, 29, 8));
     for (final plan in plans) {
       expect(plan!.dueTodayCount, 1);
       expect(plan.overdueCount, 0);

@@ -100,7 +100,11 @@ DateTime nextDigestSlot({required DateTime now, required int digestMinutes}) {
 /// after it fires, for exactly the users a reminder exists to serve
 /// (`docs/feedback/2026-08-08-prerelease-audit.md` P0). These are the days
 /// on which the digest keeps its full daily cadence.
-const int digestDailyHorizonDays = 7;
+///
+/// Fourteen: two weeks of unbroken daily cadence matches a plausible
+/// holiday, which is the gap most likely to be survived without the user
+/// ever noticing the horizon exists.
+const int digestDailyHorizonDays = 14;
 
 /// How many *trailing* digest slots follow the daily segment, spaced
 /// [digestHorizonTailStepDays] apart.
@@ -110,7 +114,12 @@ const int digestDailyHorizonDays = 7;
 /// loses no coverage, because work cannot disappear while the app is
 /// closed, so a sampled slot still reports everything the skipped days
 /// would have (see `docs/plans/2026-08-14-digest-horizon-ceiling.md` §2).
-const int digestWeeklyHorizonSlots = 0;
+///
+/// Ten, at weekly spacing, is what takes the horizon's reach from days to
+/// months: the same id budget that would buy 24 flat days buys 83 days
+/// segmented. Someone who has not opened the app in a fortnight is not
+/// helped by a daily reminder they are already ignoring.
+const int digestWeeklyHorizonSlots = 10;
 
 /// The spacing, in days, between consecutive slots in the trailing segment.
 const int digestHorizonTailStepDays = 7;

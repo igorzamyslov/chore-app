@@ -841,9 +841,10 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
 /// after the last relevant change, rebuilds the digest's whole scheduling
 /// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
-/// current [clockProvider] time and pushes all [digestHorizonSlots] days of
-/// it to [notificationSchedulerProvider] at once — scheduling the days that
-/// have something to say and cancelling the days that don't. The horizon is
+/// current [clockProvider] time and pushes all [digestHorizonSlots] slots
+/// of it to [notificationSchedulerProvider] at once — scheduling the slots
+/// that have something to say and cancelling the ones that don't. The
+/// horizon is
 /// what makes the digest survive the app simply not being opened (spec
 /// `docs/specs/notifications.md` architecture #2): every trigger this class
 /// listens to requires a running app, so a single-slot schedule went
@@ -895,14 +896,15 @@ class DigestRescheduleController {
   /// The currently-running [_recompute] call, or `null` when idle.
   ///
   /// FIX A (review of the P0 digest-fix plan): `applyDigestPlans` awaits
-  /// SEVEN sequential platform-channel calls, one per horizon day, and
+  /// one sequential platform-channel call per horizon slot
+  /// ([digestHorizonSlots] of them), and
   /// every `await` yields the isolate. `triggerRecompute` only ever
   /// cancelled the *pending Timer* -- it had no idea whether a previous
   /// `_recompute` was still mid-flight -- so two debounce firings could run
   /// `_recompute` concurrently and interleave their writes: recompute A
   /// writes ids 1001-1003 from stale counts, yields; recompute B (newer
-  /// counts) runs to completion, writing all seven; A resumes and
-  /// overwrites 1004-1007 with its now-stale plans. The result is a
+  /// counts) runs to completion, writing the whole horizon; A resumes and
+  /// overwrites the slots after 1003 with its now-stale plans. The result is a
   /// horizon that's silently part-fresh, part-stale, with no bookkeeping
   /// that would ever notice.
   ///
@@ -1158,9 +1160,11 @@ class CatchUpController {
     }
     await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
     // Deliberately unconditional, and NOT gated on catch-up having changed
-    // something: the digest is armed only `digestHorizonSlots` days ahead,
-    // so an app left open longer than that with no mutations would run off
-    // the end of its own horizon and go silent. A day passing is itself a
+    // something: the digest is armed only a bounded horizon ahead
+    // (`digestHorizonSlots` slots, reaching `digestDailyHorizonDays - 1 +
+    // digestHorizonTailStepDays * digestWeeklyHorizonSlots` days), so an
+    // app left open longer than that with no mutations would run off the
+    // end of its own horizon and go silent. A day passing is itself a
     // reason to re-arm.
     _ref.read(digestRescheduleControllerProvider).triggerRecompute();
   }

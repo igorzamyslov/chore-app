@@ -131,14 +131,20 @@ void main() {
   });
 
   group('digestSlots', () {
-    test('returns digestHorizonSlots consecutive slots by default', () {
+    test('returns digestHorizonSlots slots by default, reaching day 83', () {
       final slots = digestSlots(
         now: DateTime(2026, 7, 24, 7),
         digestMinutes: 480,
       );
       expect(slots, hasLength(digestHorizonSlots));
       expect(slots.first, DateTime(2026, 7, 24, 8));
-      expect(slots.last, DateTime(2026, 7, 30, 8));
+      // Day offset (14 - 1) + 7 * 10 = 83 from the first slot.
+      expect(slots.last, DateTime(2026, 10, 15, 8));
+      // The two segments join with exactly one tail step between them:
+      // the last daily slot is offset 13, the first tail slot offset 20.
+      expect(slots[digestDailyHorizonDays - 1], DateTime(2026, 8, 6, 8));
+      expect(slots[digestDailyHorizonDays], DateTime(2026, 8, 13, 8));
+      expect(slots, orderedEquals(<DateTime>[...slots]..sort()));
     });
 
     test('the first slot is exactly nextDigestSlot', () {
@@ -146,7 +152,7 @@ void main() {
       final slots = digestSlots(now: now, digestMinutes: 480);
       expect(slots.first, nextDigestSlot(now: now, digestMinutes: 480));
       expect(slots.first, DateTime(2026, 7, 25, 8));
-      expect(slots.last, DateTime(2026, 7, 31, 8));
+      expect(slots.last, DateTime(2026, 10, 16, 8));
     });
 
     test('every slot keeps the same local wall-clock time across a DST '
@@ -168,7 +174,8 @@ void main() {
         now: DateTime(2026, 7, 30, 7),
         digestMinutes: 480,
       );
-      expect(slots.last, DateTime(2026, 8, 5, 8));
+      // Offset 83 from 2026-07-30, across four month boundaries.
+      expect(slots.last, DateTime(2026, 10, 21, 8));
     });
 
     test('rejects an out-of-range digestMinutes', () {
@@ -239,7 +246,6 @@ void main() {
           // Passed explicitly on purpose: this test pins that a zero tail
           // degenerates to a plain daily run, which must stay true
           // independently of whatever the shipped default happens to be.
-          // ignore: avoid_redundant_argument_values
           weeklySlots: 0,
         ),
         [

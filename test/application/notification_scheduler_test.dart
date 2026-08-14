@@ -217,7 +217,8 @@ void main() {
 
     test(
       'FIX 2: two concurrent calls from different callers cannot '
-      'interleave their seven-slot writes -- the later caller is not left '
+      'interleave their whole-horizon writes -- the later caller is not '
+      'left '
       'with slots clobbered by an earlier one resuming after it',
       () async {
         final gatedPlugin = _GatedPlugin();

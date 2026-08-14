@@ -10,7 +10,9 @@
 ///
 /// This exists because the digest is scheduled a whole horizon ahead
 /// (`digestHorizonSlots` in `lib/domain/digest_planner.dart`) and each of
-/// those days needs its own counts *and* its own silence decision. The
+/// those slots needs its own counts *and* its own silence decision — the
+/// slots are not all consecutive days, so no slot's answer can be reused
+/// for another's. The
 /// assumption "nothing happens in between" is exactly right for the case
 /// that matters: the app is not being opened, so nothing is completed,
 /// skipped, or created, and `ChoreService.catchUpOverdue` never runs.
