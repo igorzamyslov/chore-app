@@ -352,11 +352,10 @@ class SupabaseSyncEngine implements SyncEngine {
   /// try/catch exists specifically so a push failure can never prevent
   /// the pull that follows it.
   Future<void> _pollTick() async {
-    try {
-      await _pushAll();
-    } on Object catch (error, stackTrace) {
-      _logFailure('pushDirty', error, stackTrace);
-    }
+    // INVERSION EXPERIMENT (temporary, reverted in the next commit): the
+    // pre-B-6 pull-only tick, kept inside _pollTick so the method stays
+    // referenced and analyze still passes -- otherwise the run dies on
+    // unused_element and the test step never executes.
     await pullSince();
   }
 
@@ -372,10 +371,7 @@ class SupabaseSyncEngine implements SyncEngine {
     if (!_started || !_foreground) {
       return;
     }
-    // INVERSION EXPERIMENT (temporary, will be reverted): the pre-B-6
-    // pull-only tick, to prove Test A fails at the TEST step without the
-    // retry.
-    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(pullSince()));
+    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(_pollTick()));
   }
 
   void _scheduleDebouncedPush() {
