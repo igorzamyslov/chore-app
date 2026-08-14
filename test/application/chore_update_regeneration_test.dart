@@ -290,7 +290,7 @@ void main() {
           PlainDate(2026, 1, 2),
         ).completeOccurrence(pending.id, completedBy: m1);
         final after = await repo.pendingOccurrenceOf(chore.id);
-        expect(after!.assignedMemberId, m2); // MUTATION: was m3.
+        expect(after!.assignedMemberId, m3);
       },
     );
   });

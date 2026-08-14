@@ -117,7 +117,7 @@ void main() {
       );
       reorderable.onReorderItem!(0, 2);
 
-      expect(captured, (0, 1)); // MUTATION: was (0, 2).
+      expect(captured, (0, 2));
     },
   );
 

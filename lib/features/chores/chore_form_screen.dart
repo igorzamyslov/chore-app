@@ -442,7 +442,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     setState(() {
       final updated = List.of(_selectedMemberIds);
       final moved = updated.removeAt(oldIndex);
-      updated.insert(oldIndex, moved); // MUTATION: ignores newIndex.
+      updated.insert(newIndex, moved);
       _selectedMemberIds = updated;
     });
   }
