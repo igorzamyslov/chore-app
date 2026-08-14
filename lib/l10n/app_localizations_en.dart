@@ -795,8 +795,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
-  String categoryDeleteDialogBody(String categoryName) {
-    return 'This deletes \'$categoryName\'. Chores and items using it become uncategorized.';
+  String categoryDeleteDialogBodyChoresZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No chores use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No shopping items use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+    );
+    return '$_temp0';
   }
 
   @override

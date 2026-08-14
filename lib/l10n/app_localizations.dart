@@ -1218,11 +1218,29 @@ abstract class AppLocalizations {
   /// **'Delete category?'**
   String get categoryDeleteDialogTitle;
 
-  /// Body of the category delete-confirmation dialog, explaining the consequence.
+  /// Body of the category delete-confirmation dialog for a chore-kind category that no active chore currently references.
   ///
   /// In en, this message translates to:
-  /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
-  String categoryDeleteDialogBody(String categoryName);
+  /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
+  String categoryDeleteDialogBodyChoresZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
+  String categoryDeleteDialogBodyShoppingZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).
   ///
