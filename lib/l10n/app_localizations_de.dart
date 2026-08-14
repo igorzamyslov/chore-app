@@ -173,6 +173,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get actingMemberSheetTitle => 'Wer ist gerade dran?';
 
   @override
+  String actingMemberSignedInAs(String name) {
+    return 'Du bist als $name angemeldet';
+  }
+
+  @override
   String get actingManageMembers => 'Mitglieder verwalten';
 
   @override

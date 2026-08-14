@@ -326,6 +326,12 @@ abstract class AppLocalizations {
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
 
+  /// Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re signed in as {name}'**
+  String actingMemberSignedInAs(String name);
+
   /// Final row of the acting-member switcher sheet (spec docs/feedback/2026-08-01-ux-audit.md B2), pushing the Members management screen.
   ///
   /// In en, this message translates to:

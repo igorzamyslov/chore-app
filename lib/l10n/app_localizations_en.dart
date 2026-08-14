@@ -173,6 +173,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
 
   @override
+  String actingMemberSignedInAs(String name) {
+    return 'You\'re signed in as $name';
+  }
+
+  @override
   String get actingManageMembers => 'Manage members';
 
   @override

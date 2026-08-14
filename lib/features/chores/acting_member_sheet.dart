@@ -13,26 +13,55 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// The chores app bar's leading button: shows the current acting member's
-/// avatar and opens [showActingMemberSheet] on tap.
+/// The chores app bar's leading slot, in the three
+/// [MemberIdentityMode] states (A-5, spec
+/// `docs/feedback/2026-08-07-field-feedback.md` B1):
 ///
-/// Shown even with a single household member — it's also the affordance
-/// that teaches "the app knows who I am" (spec §4). Falls back to a plain
-/// disabled icon for the brief window before [actingMemberProvider] has
-/// resolved (before bootstrap / the first `membersProvider` emission).
+/// - [MemberIdentityMode.switching] (local-only, or linked but signed out):
+///   the acting-member switcher exactly as spec
+///   `docs/specs/members-management.md` §4 has always described it — an
+///   avatar button opening [showActingMemberSheet]. On a local-only
+///   household standing in for others IS the model.
+/// - [MemberIdentityMode.pinned] (linked AND signed in): a NON-interactive
+///   avatar of the claimed member. There is no switcher and no sheet:
+///   offering "become Anna" in the app bar of a synced household inverts
+///   the common case, and `settings.actingMemberId` is device-scoped, so
+///   acting on it makes multi-device data wrong. Crediting someone else
+///   moves to the chore action sheet's "Mark done for…" row.
+/// - [MemberIdentityMode.unknown] (either state still resolving): the plain
+///   disabled icon, which is also what every state renders before
+///   [actingMemberProvider] resolves.
+///
+/// The `chores.actingMember` semantic id is present in ALL THREE states, so
+/// no existing selector (widget test or Maestro flow) ever loses its
+/// target.
 class ActingMemberButton extends ConsumerWidget {
   /// Creates the acting-member button.
   const ActingMemberButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final mode = ref.watch(memberIdentityModeProvider);
     final member = ref.watch(actingMemberProvider);
+
+    if (mode == MemberIdentityMode.pinned && member != null) {
+      return semantic(
+        'chores.actingMember',
+        child: Tooltip(
+          message: l10n.actingMemberSignedInAs(member.name),
+          child: Center(child: MemberAvatar(member: member, radius: 14)),
+        ),
+      );
+    }
+
+    final canSwitch = mode == MemberIdentityMode.switching && member != null;
     return semantic(
       'chores.actingMember',
       child: IconButton(
-        tooltip: AppLocalizations.of(context).actingMemberButtonTooltip,
-        onPressed: member == null ? null : () => showActingMemberSheet(context),
-        icon: member == null
+        tooltip: l10n.actingMemberButtonTooltip,
+        onPressed: canSwitch ? () => showActingMemberSheet(context) : null,
+        icon: member == null || mode != MemberIdentityMode.switching
             ? const Icon(Icons.account_circle_outlined)
             : MemberAvatar(member: member, radius: 14),
       ),

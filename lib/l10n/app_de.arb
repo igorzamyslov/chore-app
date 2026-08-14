@@ -49,6 +49,7 @@
 
   "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
   "actingMemberSheetTitle": "Wer ist gerade dran?",
+  "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
