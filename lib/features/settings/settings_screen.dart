@@ -13,6 +13,7 @@ import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
 import 'package:chore_app/features/settings/reset_flow.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
+import 'package:chore_app/features/stats/stats_screen.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +34,11 @@ import 'package:permission_handler/permission_handler.dart';
 /// `docs/specs/sync-backend.md` §5), then the Members row, then the
 /// Categories row -- merging what used to be a separate top-level Account
 /// group (between Data and About) into Household.
+///
+/// The Household group also carries the Chore history row (spec
+/// `docs/specs/stats.md` §1) below Categories -- deliberately a quiet
+/// Settings entry rather than a fourth tab, since a family opens it monthly
+/// and the delete dialog names the path when it matters.
 class SettingsScreen extends ConsumerWidget {
   /// Creates the settings screen.
   const SettingsScreen({super.key});
@@ -79,6 +85,19 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const ManageCategoriesScreen(),
+                    ),
+                  ),
+                ),
+              ),
+              semantic(
+                'settings.stats',
+                child: SettingsRow(
+                  icon: Icons.history_outlined,
+                  label: l10n.statsSettingsEntry,
+                  showChevron: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const StatsScreen(),
                     ),
                   ),
                 ),
