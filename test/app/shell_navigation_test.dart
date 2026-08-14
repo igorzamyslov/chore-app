@@ -103,6 +103,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // CRITICAL: drop focus before leaving. `EditableText` mixes in
+      // `AutomaticKeepAliveClientMixin` with `wantKeepAlive => hasFocus`, so
+      // a focused text field keeps its own page alive all by itself. Leaving
+      // the field focused made every assertion below pass even with
+      // `_KeepAlivePage.wantKeepAlive` hard-coded to `false` -- verified on
+      // CI, not assumed. Unfocusing removes that confound so what follows
+      // tests the shell's keep-alive and nothing else.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+
+      // The State object itself, so "kept alive" means "the same State",
+      // not merely "a widget of this type is findable".
+      final stateBefore = tester
+          .element<StatefulElement>(
+            find.byType(ShoppingListScreen, skipOffstage: false),
+          )
+          .state;
+
       await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
       await tester.pumpAndSettle();
 
@@ -123,8 +141,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // The half-typed item survived the round trip -- the exact property
-      // the old IndexedStack provided (spec docs/specs/ui-shopping.md).
+      // the old IndexedStack provided (spec docs/specs/ui-shopping.md) --
+      // and it survived because the very same State was kept, not because
+      // an identical-looking screen was rebuilt from the database.
       expect(find.text('Milk'), findsOneWidget);
+      expect(
+        tester
+            .element<StatefulElement>(
+              find.byType(ShoppingListScreen, skipOffstage: false),
+            )
+            .state,
+        same(stateBefore),
+      );
 
       handle.dispose();
     },
