@@ -98,10 +98,18 @@ class ResetDataTile extends ConsumerWidget {
   /// Cancels the scheduled digest notification, if any. Best-effort: see
   /// the doc comment in [_confirmAndReset] on why a failure here must
   /// never block the wipe that follows.
+  ///
+  /// Catches [Object], not just [Exception], and this breadth is
+  /// load-bearing rather than lazy: the failure mode actually observed
+  /// here is `FlutterLocalNotificationsPlugin.initialize()` throwing a
+  /// `LateInitializationError` -- an [Error], not an [Exception] -- when
+  /// no platform implementation is registered. An `on Exception` clause
+  /// lets exactly that escape and takes the wipe down with it, which is
+  /// the one outcome this flow may never produce.
   Future<void> _cancelDigest(WidgetRef ref) async {
     try {
       await ref.read(notificationSchedulerProvider).cancelDigest();
-    } on Exception {
+    } on Object {
       // Best-effort -- see doc comment above.
     }
   }
@@ -111,11 +119,14 @@ class ResetDataTile extends ConsumerWidget {
   /// `NoopAuthGateway.signOut()` is a no-op; `SupabaseAuthGateway.
   /// signOut()` is wrapped the same way regardless). Best-effort: see the
   /// doc comment in [_confirmAndReset] on why a failure here must never
-  /// block the wipe that follows.
+  /// block the wipe that follows. Catches [Object] for the same reason
+  /// [_cancelDigest] does: the guarantee is about the wipe surviving, and
+  /// an [Error] thrown out of a plugin or transport blocks it just as
+  /// effectively as an [Exception] would.
   Future<void> _signOut(WidgetRef ref) async {
     try {
       await ref.read(authGatewayProvider).signOut();
-    } on Exception {
+    } on Object {
       // Best-effort -- see doc comment above.
     }
   }
