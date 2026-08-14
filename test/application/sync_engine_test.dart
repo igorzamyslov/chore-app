@@ -755,5 +755,88 @@ void main() {
 
       expect(await pullsDuring(const Duration(milliseconds: 100)), 0);
     });
+
+    test(
+      'foreground poll retries a push that failed earlier, without '
+      'waiting for another local write or app resume (B-6, '
+      'docs/backlog.md)',
+      () async {
+        var upsertAttempts = 0;
+        transport.beforeUpsert = () async {
+          upsertAttempts++;
+          if (upsertAttempts == 1) {
+            // Simulates the exact B-6 scenario: connectivity drops during
+            // the debounced push that follows a local write.
+            throw Exception('simulated connectivity drop');
+          }
+        };
+
+        engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        // Let the 20ms debounced push fire and fail against the simulated
+        // drop -- the row must still be dirty afterward, and nothing must
+        // have reached the fake server.
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        expect(
+          transport.serverRows['shopping_items'],
+          isEmpty,
+          reason: 'the first push attempt was made to fail on purpose',
+        );
+        final stillDirty = await (db.select(
+          db.shoppingItems,
+        )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
+        expect(stillDirty.syncDirty, isTrue);
+
+        // The 30ms foreground poll must retry it on its own -- no further
+        // local write, no resume.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          transport.serverRows['shopping_items']!.any(
+            (row) => row['name'] == 'Milk',
+          ),
+          isTrue,
+          reason:
+              'the foreground safety-net poll must retry a dirty row left '
+              'over from an earlier failed push (B-6) -- before this fix '
+              'only pull was retried on a timer',
+        );
+      },
+    );
+
+    test(
+      'foreground poll still pulls even when the push half keeps '
+      'failing forever -- a permanently-stuck dirty row must not '
+      'silence pull too (B-6, docs/backlog.md)',
+      () async {
+        transport.beforeUpsert = () async {
+          throw Exception('simulated permanent rejection, e.g. a 42501');
+        };
+
+        engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        // Let the debounced push fail (and keep failing -- beforeUpsert
+        // always throws), then measure whether pulls keep happening on
+        // the poll's own cadence regardless.
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        final before = transport.serverNowCalls;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(
+          transport.serverNowCalls,
+          greaterThan(before),
+          reason:
+              'a poll tick must ALWAYS pull, whether or not the push '
+              'half succeeded -- pointing the poll timer straight at '
+              'pushDirty() would make the pull conditional on push '
+              'success and turn one stuck row into a total pull '
+              'blackout, exactly what sync-freshness.md §2.2 exists to '
+              'prevent',
+        );
+      },
+    );
   });
 }
