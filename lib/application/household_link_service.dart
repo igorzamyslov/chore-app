@@ -10,13 +10,44 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:clock/clock.dart';
+import 'package:meta/meta.dart';
+
+/// [HouseholdLinkService.adopt] cannot put this household online, ever, from
+/// this device: its id already exists on the server AND this account cannot
+/// read it, so it is not a half-finished adopt to resume but a household
+/// this account has been removed from.
+///
+/// Terminal by construction, not by policy: household ids are preserved
+/// verbatim by `create_household`, and `SettingsRepository.clearSyncLink`
+/// (which the sync engine's revocation handling calls) keeps every local
+/// row, so every retry re-sends the same taken id and hits the same unique
+/// violation. The recourse is a fresh invite code redeemed through the P2c
+/// join flow, which is what the Account section's blocked adopt row names.
+///
+/// Turning the local copy into an INDEPENDENT online household instead
+/// ("fork") was considered and deliberately not built -- see OPD-1 in
+/// `docs/plans/2026-08-14-reconnect-adopt-hardening.md` and its backlog row,
+/// which records why a household-id-only re-key is insufficient.
+@immutable
+class HouseholdAlreadyOnlineFailure implements Exception {
+  /// Creates the failure.
+  const HouseholdAlreadyOnlineFailure();
+
+  @override
+  String toString() =>
+      'HouseholdAlreadyOnlineFailure: this household is already on the '
+      'server and this account is not a member of it, so adopting it from '
+      'this device can never succeed.';
+}
 
 /// Uploads the local household to Supabase and marks this device linked.
 ///
 /// [adopt] runs the spec's 4 steps in order and is safe to call again after
 /// a failure at any point: every step is either idempotent (the upsert-based
 /// step 2) or explicitly tolerant of having already run (step 1 -- see its
-/// doc comment).
+/// doc comment). The one exception is
+/// [HouseholdAlreadyOnlineFailure], which is terminal rather than
+/// retryable -- see that type.
 class HouseholdLinkService {
   /// Creates the service.
   HouseholdLinkService({
@@ -44,6 +75,10 @@ class HouseholdLinkService {
   /// is preserved verbatim on the server) and [actingMemberId] (the
   /// caller's own member profile within it), claimed locally by
   /// [authUserId] (the signed-in auth user driving the flow).
+  ///
+  /// Throws [HouseholdAlreadyOnlineFailure] when step 1 reports the id is
+  /// already taken AND the household is unreadable to this account -- a
+  /// permanent dead end for this device, not a failure to retry.
   Future<void> adopt({
     required String householdId,
     required String actingMemberId,
@@ -70,18 +105,43 @@ class HouseholdLinkService {
         memberName: actingMember.name,
         memberColor: actingMember.color,
       );
-    } on Exception {
-      // Resuming after a half-success: if the household already exists
-      // WITH the caller as a member (this exact retry already ran step 1
-      // successfully before failing later), treat it as success and
-      // continue to step 2. A genuine first-time failure instead finds no
-      // household yet (RLS hides rows from non-members, and this
-      // client-generated id can't collide with anyone else's), so it
-      // rethrows.
+    } on Exception catch (error) {
+      // Classify the step-1 failure. The readability probe is the same one
+      // this method has always used; what changed is that its FALSE branch
+      // is no longer assumed to be a retryable first-time failure.
+      //
+      // A network failure inside `downloadHousehold` itself propagates from
+      // here before any classification happens, and that is correct: an
+      // unreachable server is retryable, not terminal.
       final existing = await gateway.downloadHousehold(householdId);
       if (existing.household == null) {
+        // NOT READABLE, and the id is TAKEN => terminal for this device and
+        // this household id, forever. The household is on the server and
+        // this account is not a member of it -- the state a removed member
+        // reaches, because `SupabaseSyncEngine._pullSinceInner`'s
+        // revocation handling calls `clearSyncLink()`, which keeps every
+        // local row including the household's server id. Retrying re-sends
+        // the same id and hits the same unique violation, so offering a
+        // retry would be a lie.
+        //
+        // The comment this replaced claimed "a genuine first-time failure
+        // instead finds no household yet ... so it rethrows", reading the
+        // unreadable case as always-retryable. That is exactly what
+        // Finding 3 disproved: the one caller for whom the resume probe
+        // cannot fire is precisely the caller for whom retrying is
+        // hopeless.
+        if (error is HouseholdIdTakenFailure) {
+          throw const HouseholdAlreadyOnlineFailure();
+        }
+        // NOT READABLE, id NOT taken => retryable, unchanged. Step 1 can
+        // still succeed on a later attempt.
         rethrow;
       }
+      // READABLE => resume, unchanged. A previous attempt already completed
+      // step 1 and failed later, or this device disconnected (A1.2) and is
+      // re-adopting: Disconnect leaves the caller's `user_id` on the server
+      // member row, so `is_household_member` still passes and the household
+      // reads back. Fall through to step 2.
     }
 
     // Step 2: upload everything else. The acting member is excluded --

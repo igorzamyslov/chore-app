@@ -1428,6 +1428,18 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get settingsAccountAdoptRetry;
 
+  /// Title of the adopt row's TERMINAL state (HouseholdAlreadyOnlineFailure): the household's id already exists on the server and this account is not a member of it, so adopting can never succeed from this device. Deliberately not phrased as an error -- nothing went wrong, the situation is simply settled -- and deliberately not offering 'Try again', which is what this state replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is already online'**
+  String get settingsAccountAdoptBlockedTitle;
+
+  /// Body of the adopt row's terminal state. States exactly three things: the household is already online, this device is no longer part of it, and an invite code is the way back. It must NAME the recourse (the join row directly below it) -- a notice that reports a fault and offers nothing is the dead end this project has rejected twice (docs/backlog.md E-2, D-5). The quoted phrase must match settingsAccountJoinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.'**
+  String get settingsAccountAdoptBlockedBody;
+
   /// Inline error shown as the adopt row's subtitle after a failed attempt.
   ///
   /// In en, this message translates to:

@@ -918,6 +918,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountAdoptRetry => 'Try again';
 
   @override
+  String get settingsAccountAdoptBlockedTitle =>
+      'This household is already online';
+
+  @override
+  String get settingsAccountAdoptBlockedBody =>
+      'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.';
+
+  @override
   String get settingsAccountAdoptError =>
       'Couldn\'t put your household online. Please try again.';
 
