@@ -1,0 +1,79 @@
+# Runs the pgTAP suite in `supabase/tests/` against a real local Supabase
+# stack.
+#
+# WHY THIS EXISTS: until 2026-08-14 nothing ever executed these files. ci.yml
+# is Flutter-only and e2e.yml drives an emulator, so 69 assertions guarding
+# the RLS security boundary (`public.is_household_member`, the household
+# isolation matrix, the invite lifecycle) and the membership-exit RPCs were
+# committed but unrun. A test that has never executed is documentation, not a
+# gate — and `002`'s assertion D is a NEW contract the Dart client depends on
+# (`HouseholdIdTakenFailure`, lib/application/household_gateway.dart), not
+# characterization, so nobody had ever shown it can fail.
+#
+# NOT run on every PR: this boots a full local Supabase stack (Postgres 17
+# plus the API services), which costs minutes. `paths` keeps it to changes
+# that can actually affect it. That does mean a Dart-only change altering how
+# the client reads an RPC will not re-run these — the SQL contract is what is
+# gated here, not its callers.
+name: DB
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/db.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/db.yml"
+
+jobs:
+  pgtap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # PINNED, same reasoning as ci.yml's Flutter 3.44.8 and e2e.yml's
+      # Maestro 2.7.0: a floating toolchain turns an unrelated upstream
+      # release into a red build on someone else's PR. 2.114.0 is the latest
+      # stable as of 2026-08-14 (the newer tags were all prereleases). Bump
+      # deliberately.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+
+      # No flutter-action anywhere in this job, deliberately: pgTAP needs
+      # Postgres, not the Flutter SDK, and installing it would only add
+      # minutes.
+      - name: Start the local Supabase stack
+        run: supabase start
+
+      # NOT OPTIONAL, and not redundant with `supabase start` above.
+      # `supabase test db` does NOT apply migrations. Without a reset the
+      # suite can run against a database whose schema does not match
+      # supabase/migrations/, and pgTAP assertions over absent objects pass
+      # vacuously — a green suite proving nothing. `db reset` re-applies
+      # every migration from scratch.
+      #
+      # config.toml has `[db.seed] enabled = true` pointing at ./seed.sql,
+      # but that file does not exist in this repo, so the reset seeds
+      # nothing and the test fixtures are the only rows in play. If a
+      # seed.sql is ever added, check it cannot perturb these fixtures.
+      - name: Apply migrations from scratch
+        run: supabase db reset
+
+      # Fail-closed: `run:` uses `bash -e`, and the CLI exits non-zero when
+      # pg_prove reports a failing assertion, so a red suite fails the job.
+      # Do not pipe this through `tee`/`grep` — that would replace the CLI's
+      # exit status with the filter's and silently turn failures green.
+      - name: Run pgTAP suite
+        run: supabase test db
+
+      # Postgres logs are the only way to diagnose a CI-only failure here:
+      # pg_prove reports which assertion failed, but a migration or function
+      # error surfaces in the server log. Same reasoning as e2e.yml's
+      # Maestro artifact upload.
+      - name: Postgres logs (on failure)
+        if: failure()
+        run: docker logs supabase_db_chore-app --tail 300
