@@ -1,6 +1,8 @@
 /// The app's three-tab bottom navigation shell.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
@@ -81,6 +83,22 @@ class _AppShellState extends State<AppShell> {
   /// animation code, so `docs/specs/design-language.md`'s Motion rule holds.
   final _pageController = PageController();
 
+  /// One scroll controller per tab, published into that tab's subtree by
+  /// [_KeepAlivePage] via [PrimaryScrollController].
+  ///
+  /// The three tab screens' scroll views are all uncontrolled and vertical
+  /// (`ListView`/`CustomScrollView` with no `controller:` and no `primary:`),
+  /// so `ScrollView.effectivePrimary` makes them attach to whatever
+  /// `PrimaryScrollController` is in scope — which is how the shell reaches
+  /// a tab's scroll position for D-4 without any feature file exposing one.
+  /// Every scrollable INSIDE a tab that must not attach (the members list,
+  /// the categories reorder list, every bottom sheet) lives on a pushed
+  /// route or an overlay, i.e. a sibling of this shell under the `Navigator`
+  /// rather than a descendant of a page.
+  late final Map<_AppTab, ScrollController> _scrollControllers = {
+    for (final tab in _AppTab.values) tab: ScrollController(),
+  };
+
   /// Keyed so [_onPageChanged] can reach the nested [ScaffoldMessenger]'s
   /// state directly (it has no `BuildContext` of its own to look up via
   /// `ScaffoldMessenger.of`).
@@ -89,6 +107,9 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _pageController.dispose();
+    for (final controller in _scrollControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -119,7 +140,10 @@ class _AppShellState extends State<AppShell> {
           // test/app/shell_navigation_test.dart.
           children: [
             for (final tab in _AppTab.values)
-              _KeepAlivePage(child: _screenFor(tab)),
+              _KeepAlivePage(
+                scrollController: _scrollControllers[tab]!,
+                child: _screenFor(tab),
+              ),
           ],
         ),
       ),
@@ -142,11 +166,31 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  /// Switches the visible tab. Re-tapping the current tab is NOT a switch
-  /// and deliberately falls through to nothing here (Task 2 of backlog D-4
-  /// gives it scroll-to-top).
+  /// Switches the visible tab — or, when [tab] is already the visible one,
+  /// scrolls that tab's list back to the top (conventions audit C6 /
+  /// backlog D-4): the convention every list-based mobile app has taught
+  /// the user.
+  ///
+  /// `animateTo` rather than `jumpTo` because landing at the top from far
+  /// down a list without motion is disorienting, and it is a first-party
+  /// `ScrollController` API reached only from a user tap — not custom
+  /// animation code (spec `docs/specs/design-language.md`, Motion).
+  /// `animateTo` also iterates `positions` internally, so unlike `.offset`
+  /// it is safe even if a tab ever ends up with two attached scroll views;
+  /// `hasClients` covers the zero case (a tab with nothing scrollable in it
+  /// yet).
   void _onTabSelected(_AppTab tab) {
     if (tab == _selected) {
+      final controller = _scrollControllers[tab]!;
+      if (controller.hasClients) {
+        unawaited(
+          controller.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          ),
+        );
+      }
       return;
     }
     _pageController.jumpToPage(tab.index);
@@ -184,7 +228,11 @@ class _AppShellState extends State<AppShell> {
 /// is neither painted nor visited for semantics while off screen — see the
 /// note on `allowImplicitScrolling` above.
 class _KeepAlivePage extends StatefulWidget {
-  const _KeepAlivePage({required this.child});
+  const _KeepAlivePage({required this.scrollController, required this.child});
+
+  /// Published to [child]'s subtree as its [PrimaryScrollController], so the
+  /// tab screen's uncontrolled vertical scroll view attaches to it.
+  final ScrollController scrollController;
 
   /// The tab screen this page shows.
   final Widget child;
@@ -201,7 +249,10 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return widget.child;
+    return PrimaryScrollController(
+      controller: widget.scrollController,
+      child: widget.child,
+    );
   }
 }
 
