@@ -53,14 +53,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v10) column set, so a fresh v1 -> v10 jump already
+      // *current* (here, v11) column set, so a fresh v1 -> v11 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then
@@ -117,7 +117,7 @@ class AppDatabase extends _$AppDatabase {
           // revoked) -- no data rewrite. Lives here, inside the `else`
           // branch, rather than as an unconditional backfill below: unlike
           // `households`/`members`/etc (which existed since schemaVersion
-          // 1), `settings` itself didn't exist before v2, so a v1 -> v10
+          // 1), `settings` itself didn't exist before v2, so a v1 -> v11
           // jump already gets this column for free via [createTable]
           // above, and adding it again here would throw a
           // duplicate-column error.
@@ -152,6 +152,29 @@ class AppDatabase extends _$AppDatabase {
         // since schemaVersion 1, so this backfill runs unconditionally
         // whenever `from < 9`, mirroring the `syncDirty` backfill above.
         await migrator.addColumn(members, members.deletedAt);
+      }
+      if (from < 11) {
+        // v10 -> v11 (spec `docs/specs/stats.md` §2.3): adds the
+        // `(status, closed_on)` index on `chore_occurrences`, which serves
+        // the chore-history window aggregate. Index-only: no column is
+        // added and no row is rewritten.
+        //
+        // Flat and unconditional, NOT inside the `settings` `else` branch
+        // above — that branch exists solely because `settings` itself
+        // didn't exist before v2, so `createTable` there already builds it
+        // at full width and a second `addColumn` would duplicate-add.
+        // Nothing analogous applies to an index on `chore_occurrences`,
+        // which has existed since schemaVersion 1: this is the same
+        // unconditional shape the `syncDirty` (v8) and `members.deletedAt`
+        // (v9) backfills above use.
+        //
+        // A plain `CREATE INDEX` (drift's [Migrator.createIndex] offers no
+        // `IF NOT EXISTS` form) is correct rather than merely tolerable: no
+        // install at any shipped version 1..10 can already carry this
+        // index, since it is introduced here. A collision would therefore
+        // mean the upgrade path itself is wrong, and throwing is the right
+        // way to find that out.
+        await migrator.createIndex(choreOccurrencesStatusClosedOnIdx);
       }
     },
     beforeOpen: (details) async {
