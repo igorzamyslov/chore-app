@@ -267,6 +267,8 @@
   "settingsAccountAdoptTitle": "Meinen Haushalt online stellen",
   "settingsAccountAdoptIntro": "Macht deinen Haushalt auf deinen anderen Geräten verfügbar.",
   "settingsAccountAdoptRetry": "Erneut versuchen",
+  "settingsAccountAdoptBlockedTitle": "Dieser Haushalt ist schon online",
+  "settingsAccountAdoptBlockedBody": "Er ist bereits auf dem Server, und dieses Gerät gehört nicht mehr dazu. Frag jemanden im Haushalt nach einem Einladungscode und nutze dann unten „Einem bestehenden Haushalt beitreten“.",
   "settingsAccountAdoptError": "Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.",
   "settingsAccountLinkedSubtitle": "Synchronisiert mit {householdName}",
   "settingsAccountLastSyncedJustNow": "Zuletzt synchronisiert: gerade eben",
@@ -293,6 +295,7 @@
   "joinHouseholdImportAccept": "Mitnehmen",
   "joinHouseholdImportDecline": "Neu anfangen",
   "joinHouseholdWorkingError": "Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.",
+  "joinHouseholdNoLongerMemberError": "Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.",
 
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",

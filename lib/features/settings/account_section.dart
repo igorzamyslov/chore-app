@@ -15,6 +15,7 @@ import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
+import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
@@ -589,8 +590,14 @@ class _ReconnectRow extends ConsumerWidget {
 /// device is signed in but unlinked: one line of explanatory copy, a
 /// progress state while `HouseholdLinkService.adopt`
 /// (`lib/application/household_link_service.dart`) runs, and an inline
-/// error + 'Try again' state on failure -- rerunning is always safe (the
+/// error + 'Try again' state on retryable failure -- rerunning is safe (the
 /// service tolerates a half-succeeded previous attempt).
+///
+/// Plus one TERMINAL state ([HouseholdAlreadyOnlineFailure]): the household
+/// is already on the server and this account is no longer a member of it, so
+/// the row stops offering a retry, goes untappable, and names [_JoinRow]
+/// (directly below) as the recourse. See `_AdoptRowState._blocked` for why
+/// it is per-visit rather than persisted.
 ///
 /// [_JoinRow] (spec §7.4's P2c slice) is the sibling choice row, shown
 /// right below this one.
@@ -605,13 +612,29 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
   bool _running = false;
   bool _failed = false;
 
+  /// The terminal state ([HouseholdAlreadyOnlineFailure]): this household is
+  /// already on the server and this account is not a member of it, so no
+  /// number of retries can adopt it from this device.
+  ///
+  /// Deliberately per-visit rather than persisted -- it lives here in widget
+  /// state and resets on rebuild. Persisting it would be wrong: a user who
+  /// rejoins by code and later disconnects genuinely CAN adopt again (the
+  /// resume path fires, because Disconnect leaves their `user_id` on the
+  /// server member row). No schema change, no stored flag.
+  bool _blocked = false;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // Four states share one semantic id -- idle, running, failed-retryable,
+    // and blocked -- because this is one row, not four. `_blocked` is
+    // checked first: it is terminal, so it outranks the retryable error.
     return semantic(
       'settings.account.adopt',
       child: ListTile(
-        leading: _running
+        leading: _blocked
+            ? const Icon(Icons.cloud_off_outlined)
+            : _running
             ? const SizedBox(
                 height: 24,
                 width: 24,
@@ -619,20 +642,24 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
               )
             : const Icon(Icons.cloud_upload_outlined),
         title: Text(
-          _failed
+          _blocked
+              ? l10n.settingsAccountAdoptBlockedTitle
+              : _failed
               ? l10n.settingsAccountAdoptRetry
               : l10n.settingsAccountAdoptTitle,
         ),
         subtitle: Text(
-          _failed
+          _blocked
+              ? l10n.settingsAccountAdoptBlockedBody
+              : _failed
               ? l10n.settingsAccountAdoptError
               : l10n.settingsAccountAdoptIntro,
           style: _failed
               ? TextStyle(color: Theme.of(context).colorScheme.error)
               : null,
         ),
-        enabled: !_running,
-        onTap: _running ? null : _adopt,
+        enabled: !_running && !_blocked,
+        onTap: _running || _blocked ? null : _adopt,
       ),
     );
   }
@@ -660,6 +687,7 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
     setState(() {
       _running = true;
       _failed = false;
+      _blocked = false;
     });
     try {
       final householdId = await ref.read(bootstrapProvider.future);
@@ -670,6 +698,12 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
             actingMemberId: actingMemberId,
             authUserId: authUserId,
           );
+    } on HouseholdAlreadyOnlineFailure {
+      // Terminal, so this branch must come BEFORE the generic one: offering
+      // "Try again" here would invite a tap that cannot ever succeed.
+      if (mounted) {
+        setState(() => _blocked = true);
+      }
     } on Exception catch (_) {
       if (mounted) {
         setState(() => _failed = true);

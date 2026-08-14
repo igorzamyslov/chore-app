@@ -961,6 +961,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountAdoptRetry => 'Erneut versuchen';
 
   @override
+  String get settingsAccountAdoptBlockedTitle =>
+      'Dieser Haushalt ist schon online';
+
+  @override
+  String get settingsAccountAdoptBlockedBody =>
+      'Er ist bereits auf dem Server, und dieses Gerät gehört nicht mehr dazu. Frag jemanden im Haushalt nach einem Einladungscode und nutze dann unten „Einem bestehenden Haushalt beitreten“.';
+
+  @override
   String get settingsAccountAdoptError =>
       'Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.';
 
@@ -1069,6 +1077,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get joinHouseholdWorkingError =>
       'Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.';
+
+  @override
+  String get joinHouseholdNoLongerMemberError =>
+      'Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.';
 
   @override
   String get settingsAboutSectionTitle => 'Über die App';

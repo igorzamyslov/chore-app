@@ -1250,6 +1250,14 @@
   "@settingsAccountAdoptRetry": {
     "description": "Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe."
   },
+  "settingsAccountAdoptBlockedTitle": "This household is already online",
+  "@settingsAccountAdoptBlockedTitle": {
+    "description": "Title of the adopt row's TERMINAL state (HouseholdAlreadyOnlineFailure): the household's id already exists on the server and this account is not a member of it, so adopting can never succeed from this device. Deliberately not phrased as an error -- nothing went wrong, the situation is simply settled -- and deliberately not offering 'Try again', which is what this state replaced."
+  },
+  "settingsAccountAdoptBlockedBody": "It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.",
+  "@settingsAccountAdoptBlockedBody": {
+    "description": "Body of the adopt row's terminal state. States exactly three things: the household is already online, this device is no longer part of it, and an invite code is the way back. It must NAME the recourse (the join row directly below it) -- a notice that reports a fault and offers nothing is the dead end this project has rejected twice (docs/backlog.md E-2, D-5). The quoted phrase must match settingsAccountJoinTitle."
+  },
   "settingsAccountAdoptError": "Couldn't put your household online. Please try again.",
   "@settingsAccountAdoptError": {
     "description": "Inline error shown as the adopt row's subtitle after a failed attempt."
@@ -1389,6 +1397,10 @@
   "joinHouseholdWorkingError": "Something went wrong while joining the household. Please try again.",
   "@joinHouseholdWorkingError": {
     "description": "Inline error shown on the join sheet's working step if downloading/replacing the household fails; retrying re-runs the remaining flow, which is safe (the archive was already written and the old data is untouched until the replace transaction commits)."
+  },
+  "joinHouseholdNoLongerMemberError": "This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.",
+  "@joinHouseholdNoLongerMemberError": {
+    "description": "Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced."
   },
 
   "settingsAboutSectionTitle": "About",

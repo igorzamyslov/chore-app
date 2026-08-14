@@ -350,13 +350,22 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
         // anything here without this pop.
         Navigator.of(context).pop();
       }
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) {
         return;
       }
+      if (error is HouseholdSnapshotUnavailable) {
+        // Same reasoning as `join_household_sheet.dart`'s `_runJoin`: an
+        // offer the server refused must not survive the failure, and
+        // `myMembershipProvider` is non-autoDispose so it will not re-probe
+        // on its own.
+        ref.invalidate(myMembershipProvider);
+      }
       setState(() {
         _busy = false;
-        _inlineError = AppLocalizations.of(context).joinHouseholdWorkingError;
+        _inlineError = error is HouseholdSnapshotUnavailable
+            ? AppLocalizations.of(context).joinHouseholdNoLongerMemberError
+            : AppLocalizations.of(context).joinHouseholdWorkingError;
       });
     }
   }
