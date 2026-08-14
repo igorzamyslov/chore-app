@@ -771,21 +771,46 @@ void main() {
           }
         };
 
-        engine.start();
+        // This test needs to observe the window BETWEEN the failed
+        // debounced push and the first retry, so it drives its own engine
+        // through the same constructor seam the group's setUp uses, with
+        // the poll spaced far enough from the 20ms debounce that the
+        // pre-retry state is genuinely observable. At the group's 30ms
+        // interval the first tick lands before any such check could run,
+        // which would leave the test asserting the absence of the very
+        // retry it exists to prove.
+        final retryEngine = SupabaseSyncEngine(
+          db: db,
+          transport: transport,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+          pushDebounce: const Duration(milliseconds: 20),
+          pollInterval: const Duration(milliseconds: 200),
+        );
+        addTearDown(retryEngine.stop);
+
+        retryEngine.start();
         await Future<void>.delayed(const Duration(milliseconds: 5));
         await ShoppingRepository(db).addItem(household.id, name: 'Milk');
 
-        // The 20ms debounced push fires first and is made to fail, leaving
-        // the row dirty. Nothing else pushes from here -- no further local
-        // write, no app resume -- so only the 30ms foreground poll can
-        // move it.
-        //
-        // Deliberately NO intermediate "nothing has reached the server
-        // yet" assertion: the first poll tick lands at 30ms, before any
-        // such check could run, so asserting it would be asserting the
-        // absence of the very retry this test exists to prove.
-        await Future<void>.delayed(const Duration(milliseconds: 140));
+        // Let the 20ms debounced push fire and fail against the simulated
+        // drop -- the row must still be dirty afterward, and nothing must
+        // have reached the fake server. This is B-6's premise: without the
+        // retry, a write made as connectivity drops just sits here.
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(
+          transport.serverRows['shopping_items'],
+          isEmpty,
+          reason: 'the first push attempt was made to fail on purpose',
+        );
+        final stillDirty = await (db.select(
+          db.shoppingItems,
+        )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
+        expect(stillDirty.syncDirty, isTrue);
 
+        // The 200ms foreground poll must now retry it on its own -- no
+        // further local write, no resume.
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(
           upsertAttempts,
           greaterThanOrEqualTo(2),
@@ -795,14 +820,6 @@ void main() {
               'still dirty when that tick ran: FakeSyncTransport.upsertRows '
               'returns before calling beforeUpsert when there is nothing '
               'to push, so the hook is unreachable with a clean table',
-        );
-        final retried = await (db.select(
-          db.shoppingItems,
-        )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
-        expect(
-          retried.syncDirty,
-          isFalse,
-          reason: 'a successful retry must clear the dirty flag',
         );
         expect(
           transport.serverRows['shopping_items']!.any(
