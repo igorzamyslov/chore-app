@@ -83,6 +83,24 @@ void main() {
             updatedAt: 't0',
             syncDirty: false,
           ),
+          // Fixture correction, not a regression: reconnect now requires the
+          // reconnecting member to be present and active in the downloaded
+          // snapshot (spec §7.6 -- it is the only JoinChoice with no
+          // server-side authorization step). The two reconnect WIDGET tests
+          // (account_section_test.dart, welcome_join_test.dart) already seed
+          // exactly this member and needed no change.
+          members: [
+            Member(
+              id: 'm-anna',
+              householdId: 'joined-hh',
+              name: 'Anna',
+              color: 0xFF6D9F71,
+              role: MemberRole.member,
+              createdAt: 't0',
+              updatedAt: 't0',
+              syncDirty: false,
+            ),
+          ],
         );
       final service = HouseholdJoinService(
         gateway: gateway,
@@ -113,4 +131,161 @@ void main() {
       expect(settings.syncHouseholdId, 'joined-hh');
     },
   );
+
+  // The Finding 1 guard (plan
+  // `docs/plans/2026-08-14-reconnect-adopt-hardening.md` Task 1). RLS filters
+  // rows rather than erroring, so "the server refused you" arrives as a
+  // SUCCESSFUL download of an EMPTY snapshot. Before the guard, `join` then
+  // deleted the local household and inserted nothing.
+  group('unconfirmed snapshots never replace local data (spec §7.6)', () {
+    late HouseholdJoinService service;
+
+    void buildService(HouseholdSnapshot snapshot) {
+      service = HouseholdJoinService(
+        gateway: FakeHouseholdGateway()
+          ..claimResultHouseholdId = 'joined-hh'
+          ..downloadSnapshotOverride = snapshot,
+        database: db,
+        settings: SettingsRepository(db),
+        clock: Clock.fixed(DateTime.utc(2026, 7, 24)),
+      );
+    }
+
+    /// The local household must be intact and the device must NOT be linked.
+    Future<void> expectNothingDestroyed() async {
+      final households = await db.select(db.households).get();
+      expect(households.map((h) => h.id), ['old-hh']);
+      final settingsRows = await db.select(db.settings).get();
+      expect(
+        settingsRows.map((row) => row.syncHouseholdId),
+        everyElement(isNull),
+      );
+    }
+
+    test(
+      'reconnect against a household the caller can no longer read aborts '
+      'and destroys nothing',
+      () async {
+        buildService(const HouseholdSnapshot());
+
+        await expectLater(
+          service.join(
+            oldHouseholdId: 'old-hh',
+            choice: const ReconnectChoice(
+              householdId: 'joined-hh',
+              memberId: 'm-anna',
+            ),
+            importAccepted: false,
+          ),
+          throwsA(isA<HouseholdSnapshotUnavailable>()),
+        );
+
+        await expectNothingDestroyed();
+      },
+    );
+
+    test('reconnect whose own member row is missing from the snapshot '
+        'aborts', () async {
+      buildService(
+        const HouseholdSnapshot(
+          household: Household(
+            id: 'joined-hh',
+            name: 'Joined household',
+            createdAt: 't0',
+            updatedAt: 't0',
+            syncDirty: false,
+          ),
+        ),
+      );
+
+      await expectLater(
+        service.join(
+          oldHouseholdId: 'old-hh',
+          choice: const ReconnectChoice(
+            householdId: 'joined-hh',
+            memberId: 'm-anna',
+          ),
+          importAccepted: false,
+        ),
+        throwsA(isA<HouseholdSnapshotUnavailable>()),
+      );
+
+      await expectNothingDestroyed();
+    });
+
+    test('reconnect whose member row is present but soft-deleted '
+        'aborts', () async {
+      buildService(
+        const HouseholdSnapshot(
+          household: Household(
+            id: 'joined-hh',
+            name: 'Joined household',
+            createdAt: 't0',
+            updatedAt: 't0',
+            syncDirty: false,
+          ),
+          members: [
+            Member(
+              id: 'm-anna',
+              householdId: 'joined-hh',
+              name: 'Anna',
+              color: 0xFF6D9F71,
+              role: MemberRole.member,
+              createdAt: 't0',
+              updatedAt: 't0',
+              deletedAt: 't1',
+              syncDirty: false,
+            ),
+          ],
+        ),
+      );
+
+      await expectLater(
+        service.join(
+          oldHouseholdId: 'old-hh',
+          choice: const ReconnectChoice(
+            householdId: 'joined-hh',
+            memberId: 'm-anna',
+          ),
+          importAccepted: false,
+        ),
+        throwsA(isA<HouseholdSnapshotUnavailable>()),
+      );
+
+      await expectNothingDestroyed();
+    });
+
+    test('claim against an empty snapshot aborts', () async {
+      buildService(const HouseholdSnapshot());
+
+      await expectLater(
+        service.join(
+          oldHouseholdId: 'old-hh',
+          code: 'ABC12345',
+          choice: const ClaimMemberChoice('m-anna'),
+          importAccepted: false,
+        ),
+        throwsA(isA<HouseholdSnapshotUnavailable>()),
+      );
+
+      await expectNothingDestroyed();
+    });
+
+    test(
+      'joinFresh against an empty snapshot aborts without linking',
+      () async {
+        buildService(const HouseholdSnapshot());
+
+        await expectLater(
+          service.joinFresh(
+            code: 'ABC12345',
+            choice: const ClaimMemberChoice('m-anna'),
+          ),
+          throwsA(isA<HouseholdSnapshotUnavailable>()),
+        );
+
+        await expectNothingDestroyed();
+      },
+    );
+  });
 }

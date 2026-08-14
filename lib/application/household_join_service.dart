@@ -101,6 +101,41 @@ class HouseholdJoinResult {
   final String archiveFileName;
 }
 
+/// [HouseholdJoinService.join]/[HouseholdJoinService.joinFresh] downloaded a
+/// snapshot that does not confirm the caller's access to the household they
+/// asked to join, so the replace was abandoned BEFORE anything local was
+/// touched.
+///
+/// **Why this exists at all.** Supabase RLS *filters rows*; it does not
+/// error. `SupabaseSyncEngine._pullSinceInner`'s revocation probe is built on
+/// exactly that property and says so ("RLS stops returning rows rather than
+/// erroring", `lib/application/sync_engine.dart`). So a `downloadHousehold`
+/// for a household the caller is no longer a member of is a perfectly
+/// SUCCESSFUL call that resolves to `HouseholdSnapshot(household: null,
+/// members: [], ...)`. Without this check, `join`'s step-4 transaction would
+/// delete every local chore, occurrence, category, member and the household
+/// row, then insert nothing -- unrecoverable in-app, because the JSON archive
+/// written at step 1 has no importer (backlog G-3 / F12).
+///
+/// [ReconnectChoice] is the reason the check has to live here rather than
+/// being inferred from an RPC failure: it is the one [JoinChoice] variant
+/// that deliberately makes NO server call (spec §7.6), so the downloaded
+/// snapshot is the ONLY authorization evidence the flow ever sees.
+@immutable
+class HouseholdSnapshotUnavailable implements Exception {
+  /// Creates the failure for [householdId].
+  const HouseholdSnapshotUnavailable(this.householdId);
+
+  /// The household whose snapshot came back unconfirmed.
+  final String householdId;
+
+  @override
+  String toString() =>
+      'HouseholdSnapshotUnavailable: the downloaded snapshot for household '
+      '"$householdId" did not confirm this account\'s access, so nothing '
+      'local was replaced.';
+}
+
 /// Runs the P2c join flow (and, via [ReconnectChoice], the P2d reconnect
 /// flow -- spec §7.6): archives the local household, links this device's
 /// account to a member profile in the joined household (claiming an
