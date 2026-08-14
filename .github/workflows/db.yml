@@ -10,29 +10,70 @@
 # (`HouseholdIdTakenFailure`, lib/application/household_gateway.dart), not
 # characterization, so nobody had ever shown it can fail.
 #
-# NOT run on every PR: this boots a full local Supabase stack (Postgres 17
-# plus the API services), which costs minutes. `paths` keeps it to changes
-# that can actually affect it. That does mean a Dart-only change altering how
-# the client reads an RPC will not re-run these — the SQL contract is what is
-# gated here, not its callers.
+# WHY THERE IS NO `paths:` FILTER, despite this being expensive: `pgtap` is a
+# REQUIRED status check on main. GitHub reports no status at all for a
+# workflow skipped by a path filter, so a required + path-filtered check
+# leaves every PR that does not touch those paths stuck on "Expected —
+# waiting for status to be reported", permanently unmergeable. The job must
+# therefore always run and always report.
+#
+# The cost is kept off irrelevant PRs a different way: the job starts, works
+# out whether the diff touches the database at all, and skips the expensive
+# steps if not — reporting success in ~20s of checkout instead of minutes of
+# Supabase stack. Only a genuine database change pays for the stack.
+#
+# This does mean a Dart-only change altering how the client reads an RPC does
+# not re-run these — the SQL contract is what is gated here, not its callers.
 name: DB
 
 on:
   push:
     branches: [main]
-    paths:
-      - "supabase/**"
-      - ".github/workflows/db.yml"
   pull_request:
-    paths:
-      - "supabase/**"
-      - ".github/workflows/db.yml"
 
 jobs:
   pgtap:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the scope check below diffs against the merge base,
+          # which a shallow clone does not contain.
+          fetch-depth: 0
+
+      # Replaces the `paths:` trigger filter (see the header for why one
+      # cannot be used here). Fails OPEN, not closed: anything unexpected —
+      # a missing base ref, a diff that errors — runs the suite rather than
+      # skipping it. Skipping is the dangerous direction, because a skip
+      # reports success.
+      - name: Does this change touch the database?
+        id: scope
+        run: |
+          set -uo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "push to main — always run"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base=$(git merge-base "${{ github.event.pull_request.base.sha }}" HEAD 2>/dev/null) || base=""
+          if [ -z "$base" ]; then
+            echo "no merge base resolved — running rather than skipping"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$base" HEAD) || {
+            echo "diff failed — running rather than skipping"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          echo "changed files:"; echo "$changed"
+          if echo "$changed" | grep -qE '^(supabase/|\.github/workflows/db\.yml$)'; then
+            echo "database-relevant changes found — running the suite"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no supabase/** or db.yml changes — skipping the stack"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # PINNED, same reasoning as ci.yml's Flutter 3.44.8 and e2e.yml's
       # Maestro 2.7.0: a floating toolchain turns an unrelated upstream
@@ -40,6 +81,7 @@ jobs:
       # stable as of 2026-08-14 (the newer tags were all prereleases). Bump
       # deliberately.
       - uses: supabase/setup-cli@v1
+        if: steps.scope.outputs.run == 'true'
         with:
           version: 2.114.0
 
@@ -47,6 +89,7 @@ jobs:
       # Postgres, not the Flutter SDK, and installing it would only add
       # minutes.
       - name: Start the local Supabase stack
+        if: steps.scope.outputs.run == 'true'
         run: supabase start
 
       # NOT OPTIONAL, and not redundant with `supabase start` above.
@@ -61,6 +104,7 @@ jobs:
       # nothing and the test fixtures are the only rows in play. If a
       # seed.sql is ever added, check it cannot perturb these fixtures.
       - name: Apply migrations from scratch
+        if: steps.scope.outputs.run == 'true'
         run: supabase db reset
 
       # Fail-closed: `run:` uses `bash -e`, and the CLI exits non-zero when
@@ -68,6 +112,7 @@ jobs:
       # Do not pipe this through `tee`/`grep` — that would replace the CLI's
       # exit status with the filter's and silently turn failures green.
       - name: Run pgTAP suite
+        if: steps.scope.outputs.run == 'true'
         run: supabase test db
 
       # Postgres logs are the only way to diagnose a CI-only failure here:
@@ -75,5 +120,5 @@ jobs:
       # error surfaces in the server log. Same reasoning as e2e.yml's
       # Maestro artifact upload.
       - name: Postgres logs (on failure)
-        if: failure()
+        if: failure() && steps.scope.outputs.run == 'true'
         run: docker logs supabase_db_chore-app --tail 300
