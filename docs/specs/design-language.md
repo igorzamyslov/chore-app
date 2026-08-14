@@ -68,7 +68,9 @@ that spec for the current binding rule.*
    hope.
 3. **Destructive actions**: never in primary position; styled with error
    color; chore delete confirms via dialog (it erases a pending occurrence
-   and hides history); shopping-item delete doesn't confirm (cheap,
+   and removes the chore from every list; its completion history is kept and
+   stays readable under Settings → Chore history, spec
+   `docs/specs/stats.md`); shopping-item delete doesn't confirm (cheap,
    low-stakes) — prefer undo-snackbars over confirms when we add them
    (backlog, not v1).
 4. **Progressive disclosure**: forms show the simple case first (one-off

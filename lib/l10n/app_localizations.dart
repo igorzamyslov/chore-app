@@ -218,10 +218,10 @@ abstract class AppLocalizations {
   /// **'Delete chore?'**
   String get choresDeleteDialogTitle;
 
-  /// Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.
+  /// Body of the chore delete-confirmation dialog. Restored to the stronger promise when the chore-history screen shipped (docs/research/triage.md D2 step 2, docs/specs/stats.md §6): the claim that history is kept is now verifiable, because deleted chores are listed under Settings > Chore history and their completion log is readable there. Do NOT weaken or strengthen this copy without re-checking that screen still exists.
   ///
   /// In en, this message translates to:
-  /// **'This removes \'{choreTitle}\' from your list. You can\'t view it again yet.'**
+  /// **'This removes \'{choreTitle}\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.'**
   String choresDeleteDialogBody(String choreTitle);
 
   /// Tooltip for a chore occurrence tile's leading complete button.
@@ -1625,6 +1625,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.'**
   String get joinHouseholdNoLongerMemberError;
+
+  /// Settings > Household row opening the chore-history screen. Code namespace is 'stats' but user-visible copy is always 'Chore history' -- see docs/specs/stats.md §1.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore history'**
+  String get statsSettingsEntry;
+
+  /// App bar title of the chore-history overview screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore history'**
+  String get statsTitle;
+
+  /// Label above the household share card naming the window the counts cover.
+  ///
+  /// In en, this message translates to:
+  /// **'In the last 30 days'**
+  String get statsWindowLast30Days;
+
+  /// Replaces statsWindowLast30Days when the household is younger than the 30-day window, so a short history is never presented as a full month.
+  ///
+  /// In en, this message translates to:
+  /// **'Since you started, {date}'**
+  String statsWindowSinceStart(String date);
+
+  /// Total completions in the share window; also the single-member household's replacement for the whole share card.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore done} other{{count} chores done}}'**
+  String statsTotalDone(int count);
+
+  /// Label for the share bucket of completions whose completed_by is NULL (possible via sync or an imported archive).
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else'**
+  String get statsShareUnknownMember;
+
+  /// Header above the per-chore list on the chore-history overview.
+  ///
+  /// In en, this message translates to:
+  /// **'Chores'**
+  String get statsChoresSectionTitle;
+
+  /// First half of a chore row's metadata line: how many times it has ever been completed (all-time, not windowed).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Done once} other{Done {count} times}}'**
+  String statsChoreTimesDone(int count);
+
+  /// Second half of a chore row's metadata line, joined to statsChoreTimesDone with ' · '.
+  ///
+  /// In en, this message translates to:
+  /// **'last {date}'**
+  String statsChoreLastDone(String date);
+
+  /// Header of the collapsed section holding deleted chores that still have history -- the surface that makes the delete dialog's 'history is kept' promise verifiable (triage D2).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Deleted chores (1)} other{Deleted chores ({count})}}'**
+  String statsDeletedSectionHeader(int count);
+
+  /// Notice at the top of a deleted chore's history screen.
+  ///
+  /// In en, this message translates to:
+  /// **'This chore was deleted. Its history is kept here.'**
+  String get statsDeletedNotice;
+
+  /// Footer of a chore's history list when the completion count exceeds the 50-row cap.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the {shown} most recent of {total}'**
+  String statsHistoryTruncated(int shown, int total);
+
+  /// Empty-state headline on the chore-history overview when the household has never completed a chore.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed chores yet'**
+  String get statsEmptyTitle;
+
+  /// Empty-state body on the chore-history overview -- teaches what will appear rather than apologizing.
+  ///
+  /// In en, this message translates to:
+  /// **'As your household ticks chores off, this is where you\'ll see who did what.'**
+  String get statsEmptyBody;
+
+  /// Error state on the chore-history overview.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the history.'**
+  String get statsErrorMessage;
 
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///

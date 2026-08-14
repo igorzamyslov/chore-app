@@ -26,6 +26,16 @@ Future<void> openManageCategories(WidgetTester tester) async {
   handle.dispose();
 }
 
+/// Opens the Settings tab, then the chore-history screen (spec
+/// `docs/specs/stats.md` §1).
+Future<void> openChoreHistory(WidgetTester tester) async {
+  await openSettingsTab(tester);
+  final handle = tester.ensureSemantics();
+  await tester.tap(find.bySemanticsIdentifier('settings.stats'));
+  await tester.pumpAndSettle();
+  handle.dispose();
+}
+
 /// Opens the Settings tab, then the manage-members screen.
 Future<void> openManageMembers(WidgetTester tester) async {
   await openSettingsTab(tester);

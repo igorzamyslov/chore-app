@@ -102,7 +102,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'This removes \'$choreTitle\' from your list. You can\'t view it again yet.';
+    return 'This removes \'$choreTitle\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.';
   }
 
   @override
@@ -1073,6 +1073,83 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get joinHouseholdNoLongerMemberError =>
       'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.';
+
+  @override
+  String get statsSettingsEntry => 'Chore history';
+
+  @override
+  String get statsTitle => 'Chore history';
+
+  @override
+  String get statsWindowLast30Days => 'In the last 30 days';
+
+  @override
+  String statsWindowSinceStart(String date) {
+    return 'Since you started, $date';
+  }
+
+  @override
+  String statsTotalDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chores done',
+      one: '1 chore done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsShareUnknownMember => 'Someone else';
+
+  @override
+  String get statsChoresSectionTitle => 'Chores';
+
+  @override
+  String statsChoreTimesDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Done $count times',
+      one: 'Done once',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsChoreLastDone(String date) {
+    return 'last $date';
+  }
+
+  @override
+  String statsDeletedSectionHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted chores ($count)',
+      one: 'Deleted chores (1)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsDeletedNotice =>
+      'This chore was deleted. Its history is kept here.';
+
+  @override
+  String statsHistoryTruncated(int shown, int total) {
+    return 'Showing the $shown most recent of $total';
+  }
+
+  @override
+  String get statsEmptyTitle => 'No completed chores yet';
+
+  @override
+  String get statsEmptyBody =>
+      'As your household ticks chores off, this is where you\'ll see who did what.';
+
+  @override
+  String get statsErrorMessage => 'Couldn\'t load the history.';
 
   @override
   String get settingsAboutSectionTitle => 'About';

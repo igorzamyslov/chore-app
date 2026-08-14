@@ -5249,6 +5249,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'chore_occurrences_status_due_date_idx',
     'CREATE INDEX chore_occurrences_status_due_date_idx ON chore_occurrences (status, due_date)',
   );
+  late final Index choreOccurrencesStatusClosedOnIdx = Index(
+    'chore_occurrences_status_closed_on_idx',
+    'CREATE INDEX chore_occurrences_status_closed_on_idx ON chore_occurrences (status, closed_on)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5264,6 +5268,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     settings,
     choreOccurrencesChoreStatusIdx,
     choreOccurrencesStatusDueDateIdx,
+    choreOccurrencesStatusClosedOnIdx,
   ];
 }
 

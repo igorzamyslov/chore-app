@@ -114,9 +114,9 @@
   "@choresDeleteDialogTitle": {
     "description": "Title of the chore delete-confirmation dialog."
   },
-  "choresDeleteDialogBody": "This removes '{choreTitle}' from your list. You can't view it again yet.",
+  "choresDeleteDialogBody": "This removes '{choreTitle}' from your lists. Its history is kept — you'll find it under Settings › Chore history.",
   "@choresDeleteDialogBody": {
-    "description": "Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.",
+    "description": "Body of the chore delete-confirmation dialog. Restored to the stronger promise when the chore-history screen shipped (docs/research/triage.md D2 step 2, docs/specs/stats.md §6): the claim that history is kept is now verifiable, because deleted chores are listed under Settings > Chore history and their completion log is readable there. Do NOT weaken or strengthen this copy without re-checking that screen still exists.",
     "placeholders": {
       "choreTitle": {
         "type": "String",
@@ -1401,6 +1401,107 @@
   "joinHouseholdNoLongerMemberError": "This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.",
   "@joinHouseholdNoLongerMemberError": {
     "description": "Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced."
+  },
+
+  "statsSettingsEntry": "Chore history",
+  "@statsSettingsEntry": {
+    "description": "Settings > Household row opening the chore-history screen. Code namespace is 'stats' but user-visible copy is always 'Chore history' -- see docs/specs/stats.md §1."
+  },
+  "statsTitle": "Chore history",
+  "@statsTitle": {
+    "description": "App bar title of the chore-history overview screen."
+  },
+  "statsWindowLast30Days": "In the last 30 days",
+  "@statsWindowLast30Days": {
+    "description": "Label above the household share card naming the window the counts cover."
+  },
+  "statsWindowSinceStart": "Since you started, {date}",
+  "@statsWindowSinceStart": {
+    "description": "Replaces statsWindowLast30Days when the household is younger than the 30-day window, so a short history is never presented as a full month.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "9 August"
+      }
+    }
+  },
+  "statsTotalDone": "{count, plural, one{1 chore done} other{{count} chores done}}",
+  "@statsTotalDone": {
+    "description": "Total completions in the share window; also the single-member household's replacement for the whole share card.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "statsShareUnknownMember": "Someone else",
+  "@statsShareUnknownMember": {
+    "description": "Label for the share bucket of completions whose completed_by is NULL (possible via sync or an imported archive)."
+  },
+  "statsChoresSectionTitle": "Chores",
+  "@statsChoresSectionTitle": {
+    "description": "Header above the per-chore list on the chore-history overview."
+  },
+  "statsChoreTimesDone": "{count, plural, one{Done once} other{Done {count} times}}",
+  "@statsChoreTimesDone": {
+    "description": "First half of a chore row's metadata line: how many times it has ever been completed (all-time, not windowed).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "8"
+      }
+    }
+  },
+  "statsChoreLastDone": "last {date}",
+  "@statsChoreLastDone": {
+    "description": "Second half of a chore row's metadata line, joined to statsChoreTimesDone with ' · '.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "4 Aug"
+      }
+    }
+  },
+  "statsDeletedSectionHeader": "{count, plural, one{Deleted chores (1)} other{Deleted chores ({count})}}",
+  "@statsDeletedSectionHeader": {
+    "description": "Header of the collapsed section holding deleted chores that still have history -- the surface that makes the delete dialog's 'history is kept' promise verifiable (triage D2).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "statsDeletedNotice": "This chore was deleted. Its history is kept here.",
+  "@statsDeletedNotice": {
+    "description": "Notice at the top of a deleted chore's history screen."
+  },
+  "statsHistoryTruncated": "Showing the {shown} most recent of {total}",
+  "@statsHistoryTruncated": {
+    "description": "Footer of a chore's history list when the completion count exceeds the 50-row cap.",
+    "placeholders": {
+      "shown": {
+        "type": "int",
+        "example": "50"
+      },
+      "total": {
+        "type": "int",
+        "example": "218"
+      }
+    }
+  },
+  "statsEmptyTitle": "No completed chores yet",
+  "@statsEmptyTitle": {
+    "description": "Empty-state headline on the chore-history overview when the household has never completed a chore."
+  },
+  "statsEmptyBody": "As your household ticks chores off, this is where you'll see who did what.",
+  "@statsEmptyBody": {
+    "description": "Empty-state body on the chore-history overview -- teaches what will appear rather than apologizing."
+  },
+  "statsErrorMessage": "Couldn't load the history.",
+  "@statsErrorMessage": {
+    "description": "Error state on the chore-history overview."
   },
 
   "settingsAboutSectionTitle": "About",

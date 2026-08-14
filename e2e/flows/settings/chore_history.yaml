@@ -1,0 +1,74 @@
+# Chore history: a completed chore shows up, and a DELETED chore's history is
+# still findable -- the executable form of triage D2's promise
+# (docs/specs/stats.md §3.3, §6).
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+# First-frame settle (README convention 8).
+- extendedWaitUntil:
+    visible:
+      id: "welcome.create"
+    timeout: 60000
+- runFlow: ../../common/onboard_fresh.yaml
+
+# Create a chore and complete it, so there is history to show.
+#
+# DAILY rather than one-off, deliberately: completing a one-off chore leaves
+# no pending occurrence, and the Done-today section renders its tiles with
+# `chores.done.<id>.reopen` ids and no overflow menu
+# (lib/features/chores/chore_done_section.dart). The delete step below needs
+# a `chores.occurrence.<id>.menu`, which only a still-pending occurrence has
+# -- so the chore must recur for tomorrow's slot to exist after completion.
+- tapOn:
+    id: "chores.add"
+- tapOn:
+    id: "chore_form.title"
+- inputText: "Clean windows"
+- pressKey: Enter
+- tapOn:
+    id: "chore_form.repeat.toggle"
+- tapOn:
+    id: "chore_form.repeat.unit.day"
+- tapOn:
+    id: "chore_form.save"
+- assertVisible: "(?s).*Clean windows.*"
+- tapOn:
+    id: 'chores\.occurrence\..*\.complete'
+
+# The completion is visible in Chore history.
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.stats"
+- assertVisible: "(?s).*Clean windows.*"
+- assertVisible: "(?s).*Done once.*"
+
+# Delete the chore, then prove its history survived and is findable.
+#
+# Back out of the pushed Chore history screen first: like the members
+# screen, it covers the bottom tab bar, so `shell.tab.chores` is genuinely
+# not on screen until this route pops. Tap the app bar's BackButton
+# (semantics label 'Back' on both platforms) rather than Maestro's own
+# `back` command, which is a left-edge swipe on iOS and does not pop the
+# route there (README convention 7, and the same note in
+# members_and_acting.yaml).
+- tapOn: "Back"
+- tapOn:
+    id: "shell.tab.chores"
+- tapOn:
+    id: 'chores\.occurrence\..*\.menu'
+- tapOn:
+    id: "chores.menu.delete"
+- assertVisible: "(?s).*Chore history.*"
+- tapOn:
+    id: "chores.delete.confirm"
+- tapOn:
+    id: "shell.tab.settings"
+- tapOn:
+    id: "settings.stats"
+- tapOn:
+    id: "stats.deleted"
+- assertVisible: "(?s).*Clean windows.*"
