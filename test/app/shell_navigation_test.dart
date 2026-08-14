@@ -6,6 +6,7 @@ import 'package:chore_app/features/settings/settings_screen.dart';
 import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test_utils/pump_app.dart';
@@ -30,6 +31,17 @@ void main() {
   /// directions.
   Future<void> dragPage(WidgetTester tester, double dx) async {
     await tester.drag(find.byType(PageView), Offset(dx, 0));
+    await tester.pumpAndSettle();
+  }
+
+  /// Delivers the platform's `popRoute` message — what the Android system
+  /// back gesture/button actually sends the engine.
+  Future<void> pressSystemBack(WidgetTester tester) async {
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/navigation',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('popRoute')),
+      (_) {},
+    );
     await tester.pumpAndSettle();
   }
 
@@ -242,6 +254,67 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(position.pixels, scrolled);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'system back on a non-first tab returns to Chores instead of leaving the '
+    'app (backlog D-6)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.settings'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('settings.categories'), findsOneWidget);
+
+      await pressSystemBack(tester);
+
+      expect(find.bySemanticsIdentifier('chores.add'), findsOneWidget);
+      expect(find.bySemanticsIdentifier('settings.categories'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'system back on the first tab is not intercepted — it leaves the app '
+    '(Material: back exits from the start destination)',
+    today: today,
+    (tester, database) async {
+      final platformCalls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          platformCalls.add(call);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      final handle = tester.ensureSemantics();
+
+      // Go away and come back, so the tab really is "first" rather than
+      // merely "never left".
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.shopping'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
+      await tester.pumpAndSettle();
+
+      await pressSystemBack(tester);
+
+      expect(find.bySemanticsIdentifier('chores.add'), findsOneWidget);
+      expect(
+        platformCalls.map((call) => call.method),
+        contains('SystemNavigator.pop'),
+      );
 
       handle.dispose();
     },
