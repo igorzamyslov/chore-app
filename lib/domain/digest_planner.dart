@@ -18,7 +18,7 @@ library;
 /// A resolved decision to fire the digest notification at [fireAt] with the
 /// given content counts.
 ///
-/// `null` (returned by [planDigest] instead of an instance) means "don't
+/// `null` (returned by [planDigestSlot] instead of an instance) means "don't
 /// schedule anything": the digest is disabled, or there is nothing to say.
 class DigestPlan {
   /// Creates a plan.
@@ -74,10 +74,10 @@ class DigestPlan {
 /// `DateTime` constructor already normalizes an out-of-range day into the
 /// correct following month/year.
 ///
-/// Exposed separately from [planDigest] so callers can determine which
-/// calendar date's occurrence counts to fetch *before* calling [planDigest]
-/// (see that function's doc comment) — both use this exact same rule, so
-/// there's no duplicated "which slot" logic to keep in sync.
+/// Exposed separately from [planDigestSlot] so callers can determine which
+/// calendar date's occurrence counts to fetch *before* calling
+/// [planDigestSlot] — both use this exact same rule, so there's no
+/// duplicated "which slot" logic to keep in sync.
 ///
 /// [digestMinutes] must be in `0..1439` (minutes since local midnight);
 /// throws [ArgumentError] otherwise.
@@ -92,33 +92,65 @@ DateTime nextDigestSlot({required DateTime now, required int digestMinutes}) {
   return DateTime(now.year, now.month, now.day + 1, hour, minute);
 }
 
-/// Decides whether/when to (re)schedule the daily digest notification.
+/// How many consecutive daily digest slots are armed with the OS at once
+/// (spec `docs/specs/notifications.md` architecture #2).
 ///
-/// Returns `null` (don't schedule) when [enabled] is `false`, or when both
-/// [dueTodayCount] and [overdueCount] are zero — silence is a feature: a
-/// notification with nothing to say would make the signal meaningless, and
-/// this holds even when overdue-only (an overdue-only day still notifies,
-/// via a non-zero [overdueCount] with [dueTodayCount] at zero).
+/// The digest is a *one-shot* OS notification per day, and nothing re-arms
+/// it while the app is closed — so a single slot goes silent the morning
+/// after it fires, for exactly the users a reminder exists to serve
+/// (`docs/feedback/2026-08-08-prerelease-audit.md` P0). Arming a whole
+/// horizon means the digest only degrades after this many consecutive
+/// unopened days, and degrades into silence rather than into wrong counts.
 ///
-/// Otherwise returns a [DigestPlan] firing at [nextDigestSlot].
+/// Seven is comfortably inside iOS's 64-pending-notification cap and needs
+/// no new platform capability.
+const int digestHorizonDays = 7;
+
+/// The next [horizonDays] digest slots after [now]: [nextDigestSlot], then
+/// the same local wall-clock time on each following calendar day.
 ///
-/// [dueTodayCount] and [overdueCount] must already be computed by the
-/// caller for the correct date: whichever calendar date [nextDigestSlot]
-/// resolves to (today or tomorrow), not necessarily *now*'s calendar date.
-/// This function is pure and can't fetch that data itself — call
-/// [nextDigestSlot] first (with the same [now]/[digestMinutes]) to know
-/// which date to count occurrences for.
+/// Built from calendar components rather than `add(Duration(days: 1))` for
+/// the same DST reason [nextDigestSlot] documents — and the hour/minute are
+/// re-derived from [digestMinutes] rather than read off the first slot,
+/// because a spring-forward day can normalize a nonexistent wall-clock time
+/// into a different hour, which would then propagate to every later slot.
 ///
-/// [digestMinutes] must be in `0..1439` (minutes since local midnight);
-/// throws [ArgumentError] otherwise.
-DigestPlan? planDigest({
+/// [digestMinutes] must be in `0..1439`; [horizonDays] must be >= 1. Throws
+/// [ArgumentError] otherwise.
+List<DateTime> digestSlots({
   required DateTime now,
   required int digestMinutes,
+  int horizonDays = digestHorizonDays,
+}) {
+  _validateDigestMinutes(digestMinutes);
+  if (horizonDays < 1) {
+    throw ArgumentError.value(horizonDays, 'horizonDays', 'Must be >= 1');
+  }
+  final hour = digestMinutes ~/ 60;
+  final minute = digestMinutes % 60;
+  final first = nextDigestSlot(now: now, digestMinutes: digestMinutes);
+  return [
+    for (var k = 0; k < horizonDays; k++)
+      DateTime(first.year, first.month, first.day + k, hour, minute),
+  ];
+}
+
+/// Decides whether one already-chosen slot at [fireAt] should fire.
+///
+/// Returns `null` (don't schedule this day; the caller cancels that day's
+/// notification id instead) when [enabled] is `false`, or when both counts
+/// are zero — silence is a feature, and with a horizon it is now decided
+/// per day rather than once. An overdue-only day still notifies.
+///
+/// [dueTodayCount] and [overdueCount] must already be computed for
+/// [fireAt]'s own calendar date — see
+/// `lib/domain/digest_projection.dart`.
+DigestPlan? planDigestSlot({
+  required DateTime fireAt,
   required bool enabled,
   required int dueTodayCount,
   required int overdueCount,
 }) {
-  _validateDigestMinutes(digestMinutes);
   if (!enabled) {
     return null;
   }
@@ -126,7 +158,7 @@ DigestPlan? planDigest({
     return null;
   }
   return DigestPlan(
-    fireAt: nextDigestSlot(now: now, digestMinutes: digestMinutes),
+    fireAt: fireAt,
     dueTodayCount: dueTodayCount,
     overdueCount: overdueCount,
   );

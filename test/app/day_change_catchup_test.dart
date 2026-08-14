@@ -3,6 +3,10 @@
 /// day-change, followed by a digest recompute when catch-up actually
 /// changed something.
 ///
+/// Also covers what the same two triggers do for the UI's notion of the
+/// date — [todayProvider] and the [closedTodayOccurrencesProvider] rebuild
+/// that hangs off it (backlog A-2 / audit P1).
+///
 /// Same approach as `test/app/digest_reschedule_test.dart`: the real
 /// controller + real repositories/service against an in-memory database,
 /// with only the bottom-most OS-facing notification plugin faked. These
@@ -19,6 +23,7 @@ library;
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
@@ -212,8 +217,8 @@ void main() {
     );
 
     testWidgets(
-      'is a no-op (and triggers no digest recompute) when nothing is '
-      'overdue',
+      'leaves occurrences alone when nothing is overdue, but still rolls '
+      'the digest horizon forward',
       (tester) async {
         final currentTime = DateTime(2026, 1, 5, 9);
         final database = AppDatabase(NativeDatabase.memory());
@@ -244,6 +249,13 @@ void main() {
             );
         await tester.pump(digestRescheduleDebounce);
         plugin.scheduledCalls.clear();
+        // Captured right before triggerOnResume: bootstrap's own recompute
+        // and the chore creation above already pushed cancelCallCount past
+        // digestHorizonDays, so asserting an absolute floor would pass
+        // trivially regardless of whether triggerOnResume's catch-up path
+        // recomputes anything at all. The delta from here is what actually
+        // proves it.
+        final cancelCountBefore = plugin.cancelCallCount;
 
         catchUpController.triggerOnResume();
         // Nothing overdue: give the (no-op) transaction a moment to run,
@@ -254,7 +266,63 @@ void main() {
         final repo = container.read(choreRepositoryProvider);
         final pending = await repo.pendingOccurrenceOf(chore.id);
         expect(pending!.dueDate, PlainDate(2026, 1, 20));
+        // Nothing is due inside the horizon (the chore is 15 days out), so
+        // the recompute correctly arms nothing...
         expect(plugin.scheduledCalls, isEmpty);
+        // ...but it MUST have run: without an unconditional recompute, an
+        // app left open longer than digestHorizonDays runs off the end of
+        // its own horizon and goes silent.
+        expect(
+          plugin.cancelCallCount,
+          greaterThanOrEqualTo(cancelCountBefore + digestHorizonDays),
+        );
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
+
+    testWidgets(
+      'moves todayProvider even when catch-up changes nothing — the common '
+      'night, where no chore fell overdue',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 9);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        // Faked, like every other test in this file that lets catch-up run
+        // to completion: without it, the digest recompute `triggerOnResume`
+        // also kicks off would reach the real (unfaked) OS notification
+        // plugin, which throws in a `flutter_test` environment.
+        final plugin = FakeDigestNotificationPlugin();
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+            digestNotificationPluginProvider.overrideWithValue(plugin),
+          ],
+        );
+        final catchUpController = container.read(catchUpControllerProvider);
+        await _awaitBootstrap(tester, container);
+        expect(container.read(todayProvider), PlainDate(2026, 1, 5));
+
+        // Backgrounded overnight; no chores exist at all, so catch-up has
+        // nothing to change and reports `changed == false`.
+        currentTime = DateTime(2026, 1, 6, 9);
+        catchUpController.triggerOnResume();
+
+        // The refresh itself is synchronous, so this holds even before the
+        // unawaited catch-up below has had a chance to run.
+        expect(container.read(todayProvider), PlainDate(2026, 1, 6));
+
+        // Let the catch-up (and the digest recompute it unconditionally
+        // triggers) settle before disposing: otherwise that still-pending
+        // work resumes after `container.dispose()` below and tries to read
+        // from an already-disposed container.
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.pump(digestRescheduleDebounce);
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.
@@ -344,6 +412,112 @@ void main() {
 
         await tester.pump(digestRescheduleDebounce);
         expect(plugin.scheduledCalls, isNotEmpty);
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
+
+    testWidgets(
+      'moves todayProvider when it fires, with nothing overdue and no other '
+      'trigger — the regression backlog A-2 describes',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 23, 59, 50);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        // Faked, like every other test in this file that lets catch-up run
+        // to completion: without it, the digest recompute the day-change
+        // timer also kicks off would reach the real (unfaked) OS
+        // notification plugin, which throws in a `flutter_test`
+        // environment.
+        final plugin = FakeDigestNotificationPlugin();
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+            digestNotificationPluginProvider.overrideWithValue(plugin),
+          ],
+        )..read(catchUpControllerProvider);
+        await _awaitBootstrap(tester, container);
+        expect(container.read(todayProvider), PlainDate(2026, 1, 5));
+
+        // The fake Timer's countdown is governed purely by *pumped*
+        // duration, independent of what [currentTime] reads — so a short
+        // first pump (well under the ~11s countdown armed at bootstrap)
+        // lets us move the clock without racing it, and the second pump
+        // reaches the boundary. Same technique as the test above.
+        await tester.pump(const Duration(milliseconds: 500));
+        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+        await tester.pump(const Duration(seconds: 12));
+
+        expect(container.read(todayProvider), PlainDate(2026, 1, 6));
+
+        // Let the digest recompute the timer unconditionally triggers
+        // settle before disposing — see the identical comment in the test
+        // above.
+        await tester.pump(digestRescheduleDebounce);
+
+        // See [_disposeAndClose]'s doc comment for why a pump must separate
+        // `dispose()` from `close()`.
+        await _disposeAndClose(tester, container, database);
+      },
+    );
+  });
+
+  group('closedTodayOccurrencesProvider', () {
+    testWidgets(
+      'empties when the calendar day rolls over: a completion made '
+      'yesterday is no longer "closed today"',
+      (tester) async {
+        var currentTime = DateTime(2026, 1, 5, 9);
+        final database = AppDatabase(NativeDatabase.memory());
+        // Seed the household BEFORE the container exists — see the
+        // identical comment on the first test in this file.
+        await HouseholdRepository(database).createLocalHousehold('Me');
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+          ],
+        );
+        final householdId = await _awaitBootstrap(tester, container);
+        final me = await database.select(database.members).getSingle();
+
+        final service = container.read(choreServiceProvider);
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 5),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final repo = container.read(choreRepositoryProvider);
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        await service.completeOccurrence(pending!.id, completedBy: me.id);
+
+        // A StreamProvider only runs while something listens to it.
+        container.listen(closedTodayOccurrencesProvider, (_, _) {});
+        await _pumpUntil(
+          tester,
+          () async =>
+              container.read(closedTodayOccurrencesProvider).value?.length == 1,
+        );
+
+        // Midnight passes. Nothing else changes in the database at all.
+        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+        container.read(todayProvider.notifier).refresh();
+
+        // The provider re-subscribes against the new date; until its new
+        // stream emits, Riverpod keeps serving the previous value, which is
+        // exactly what _pumpUntil is for.
+        await _pumpUntil(
+          tester,
+          () async =>
+              container.read(closedTodayOccurrencesProvider).value?.isEmpty ??
+              false,
+        );
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.

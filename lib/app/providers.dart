@@ -4,7 +4,9 @@
 /// *widget* test or E2E run ever needs to override; every screen-facing
 /// provider is built on top of them, so overriding just those two is enough
 /// to make the whole app deterministic and hermetic (in-memory database,
-/// fixed clock). [digestNotificationPluginProvider] is a third override
+/// fixed clock). [todayProvider] in particular is DERIVED from
+/// `clockProvider` and must never be overridden directly — see its own doc
+/// comment. [digestNotificationPluginProvider] is a third override
 /// point used only by scheduler/reschedule tests (spec
 /// `docs/specs/notifications.md`), swapping the real OS-level plugin for a
 /// fake; see that provider's doc comment. [authGatewayProvider] is a
@@ -30,6 +32,7 @@ import 'dart:async';
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/application/household_create_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
@@ -86,6 +89,59 @@ Clock resolveClock(String e2eToday) {
   }
   final date = PlainDate.parse(e2eToday);
   return Clock.fixed(DateTime(date.year, date.month, date.day, 9));
+}
+
+/// Today's local calendar date — the single source of truth for every
+/// date-bucketed piece of UI: the chores list's Overdue / Today / Tomorrow /
+/// This week / This month / Later boundaries, the collapsed 'Done today'
+/// section, the day-progress card, and the chore form's start-date picker
+/// range.
+///
+/// Seeded from [clockProvider], so a fixed widget-test clock and the
+/// `--dart-define=E2E_TODAY` hook still decide what "today" means, and
+/// republished by [TodayNotifier.refresh] — which [CatchUpController] calls
+/// UNCONDITIONALLY on both of its day-boundary triggers (the
+/// [nextLocalMidnight] timer firing, and the app resuming). Without this,
+/// nothing in the widget tree ever re-reads the date: [clockProvider] is a
+/// plain [Provider] that never re-emits, so an app left open overnight kept
+/// showing yesterday's completions under 'Done today' indefinitely
+/// (backlog A-2 / audit P1).
+///
+/// Deliberately holds NO timer of its own. The widget tree watches this
+/// provider directly, and `flutter_test`'s "a Timer is still pending" leak
+/// check runs before the pumped tree is torn down — a provider-armed timer
+/// would therefore fail every widget test that renders the chores list.
+/// That is the same hazard [CatchUpController] and
+/// [DigestRescheduleController] document as the reason they are only ever
+/// activated from `main.dart`; the day-change timer stays there, where that
+/// discipline already holds.
+///
+/// NEVER override this in a test. It derives from [clockProvider] by
+/// construction — overriding it directly would let a test's UI disagree
+/// with the same test's domain layer.
+final todayProvider = NotifierProvider<TodayNotifier, PlainDate>(
+  TodayNotifier.new,
+);
+
+/// The notifier behind [todayProvider].
+class TodayNotifier extends Notifier<PlainDate> {
+  /// Reads the current local calendar date from [clockProvider].
+  @override
+  PlainDate build() => PlainDate.fromDateTime(ref.watch(clockProvider).now());
+
+  /// Re-reads [clockProvider] and republishes the current local date.
+  ///
+  /// A no-op when the calendar day hasn't actually changed: this is called
+  /// on every app resume, and an unguarded write would re-subscribe every
+  /// drift stream watching [todayProvider] (notably
+  /// [closedTodayOccurrencesProvider]) each time the user so much as
+  /// glances at another app.
+  void refresh() {
+    final today = PlainDate.fromDateTime(ref.read(clockProvider).now());
+    if (today != state) {
+      state = today;
+    }
+  }
 }
 
 /// The chore repository, built on [appDatabaseProvider].
@@ -542,10 +598,18 @@ final pendingOccurrencesProvider = StreamProvider<List<OccurrenceWithChore>>((
 ///
 /// Backs the chores list's collapsed 'Done today' section (spec
 /// `docs/specs/ux-round-2.md` A3).
+///
+/// Rebuilds at local midnight: the date comes from [todayProvider], not
+/// from a one-shot [clockProvider] read (backlog A-2 / audit P1).
 final closedTodayOccurrencesProvider =
     StreamProvider<List<ClosedOccurrenceWithChore>>((ref) async* {
+      // Watched BEFORE the await, deliberately: a `ref.watch` placed after
+      // an await registers its dependency late, and on the welcome gate
+      // `bootstrapProvider` parks on a future that never completes (see its
+      // doc comment) — the line after the await would then never run and
+      // this provider would never learn about a day change at all.
+      final today = ref.watch(todayProvider);
       final householdId = await ref.watch(bootstrapProvider.future);
-      final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
       yield* ref
           .watch(choreRepositoryProvider)
           .watchClosedOnDate(householdId, today);
@@ -607,26 +671,146 @@ final shoppingCategoriesProvider = StreamProvider<List<Category>>((ref) async* {
       .watchCategories(householdId, CategoryKind.shopping);
 });
 
-/// The member who acts on behalf of the user for single-user attribution
-/// flows (completing an unassigned occurrence, `createdBy` on a new chore,
-/// shopping `addedBy`), and the member the acting-member switcher (spec
+/// Whether this device can know, from the server, WHICH member is holding
+/// it (A-5; spec `docs/feedback/2026-08-07-field-feedback.md` B1).
+enum MemberIdentityMode {
+  /// Linked state or auth state hasn't resolved yet. Render the neutral
+  /// placeholder — deliberately NOT [switching], so a linked, signed-in
+  /// phone never flashes a "become someone else" switcher for one frame on
+  /// a cold start (`currentAuthUserProvider` is a stream: its first state
+  /// is always `AsyncLoading`).
+  unknown,
+
+  /// Local-only, or linked but signed out: the app genuinely does not know
+  /// who is holding the phone, so the acting-member switcher stays — for a
+  /// local-only household, standing in for others IS the model.
+  switching,
+
+  /// Linked AND signed in: the acting member is pinned to the claimed
+  /// member and the switcher is hidden. Crediting someone else moves to the
+  /// chore action sheet's "Mark done for…" row.
+  pinned,
+}
+
+/// [MemberIdentityMode] for the current linked/auth state.
+///
+/// Gated on `settings.syncHouseholdId` plus [currentAuthUserProvider]
+/// DIRECTLY, deliberately not on `syncEngineProvider is! NoopSyncEngine`:
+/// that additionally requires the compile-time [supabaseConfigured]
+/// constant, which would tie "who am I?" to "can I reach the network?" and
+/// force every widget test to override [syncTransportProvider] to reach the
+/// pinned branch. In production the two coincide — a household cannot
+/// become linked without a configured gateway.
+///
+/// **Watches a `select`ed record, never the bare [settingsProvider]** — see
+/// [syncEngineProvider]'s doc comment: a started sync engine writes
+/// `settings.syncLastPulledAt` on every pull, and an unscoped watch would
+/// rebuild this provider on each of them.
+final memberIdentityModeProvider = Provider<MemberIdentityMode>((ref) {
+  final linkState = ref.watch(
+    settingsProvider.select(
+      (settings) => (
+        loading: settings.isLoading,
+        householdId: settings.valueOrNull?.syncHouseholdId,
+      ),
+    ),
+  );
+  if (linkState.loading) {
+    return MemberIdentityMode.unknown;
+  }
+  if (linkState.householdId == null) {
+    return MemberIdentityMode.switching;
+  }
+  final auth = ref.watch(currentAuthUserProvider);
+  if (auth.isLoading) {
+    return MemberIdentityMode.unknown;
+  }
+  return auth.valueOrNull == null
+      ? MemberIdentityMode.switching
+      : MemberIdentityMode.pinned;
+});
+
+/// The member this device's signed-in account has claimed in the current
+/// household, resolved from the LOCAL `members.userId` mirror.
+///
+/// `user_id` is server-owned (the initial-schema grants exclude it from
+/// UPDATE; only the `create_household`/`claim_member`/`join_as_new_member`
+/// RPCs set it) and reaches this device three ways: the join snapshot
+/// (`HouseholdGateway.downloadHousehold`), the sync engine's pull
+/// (`applyPulledMember`), and `HouseholdLinkService.adopt`'s local mirror
+/// (spec `docs/specs/household-lifecycle.md` §3.1 G-B). Reading it locally
+/// is therefore offline-safe and survives process death — unlike a
+/// `findMyMembership()` round trip.
+///
+/// `null` whenever the mode isn't [MemberIdentityMode.pinned], or while the
+/// claim hasn't reached this device yet, or when this account is no longer
+/// a member of the household (revocation — handled by
+/// `docs/specs/household-lifecycle.md` §3.5, not here).
+final claimedMemberProvider = Provider<Member?>((ref) {
+  if (ref.watch(memberIdentityModeProvider) != MemberIdentityMode.pinned) {
+    return null;
+  }
+  final userId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
+  final members = ref.watch(membersProvider).value;
+  if (userId == null || members == null) {
+    return null;
+  }
+  for (final member in members) {
+    if (member.userId == userId) {
+      return member;
+    }
+  }
+  return null;
+});
+
+/// The member who acts on behalf of the user for attribution flows
+/// (completing an occurrence, `createdBy` on a new chore, shopping
+/// `addedBy`), and the member the acting-member switcher (spec
 /// `docs/specs/members-management.md` §4) shows as "current".
 ///
-/// Resolution order, re-run every time [settingsProvider] or
-/// [membersProvider] changes:
+/// Resolution order, re-run whenever [memberIdentityModeProvider],
+/// [claimedMemberProvider], [settingsProvider] or [membersProvider] change:
 ///
-/// 1. `settings.actingMemberId`, if it matches a member in
-///    [membersProvider]'s current list;
-/// 2. otherwise the household's first admin member, else its first member.
+/// 1. **Pinned** ([MemberIdentityMode.pinned] — linked AND signed in):
+///    [claimedMemberProvider], if the claim has reached this device. This
+///    is A-5 (spec `docs/feedback/2026-08-07-field-feedback.md` B1): on a
+///    synced household the phone IS a person, and `settings.actingMemberId`
+///    is device-scoped and never syncs, so trusting it there is exactly how
+///    two devices credit different people for the same work.
+/// 2. `settings.actingMemberId`, if it matches a member in
+///    [membersProvider]'s current list. While pinned this is only the
+///    pre-claim window (offline right after adopting, or before the first
+///    pull), and the value is safe there because every link path sets it to
+///    THIS device's own member: `HouseholdJoinService.join`/`joinFresh`
+///    call `setActingMember` with the claimed member id, and
+///    `HouseholdLinkService.adopt` is called with the current acting
+///    member.
+/// 3. Not pinned only: the household's first admin member, else its first
+///    member.
 ///
-/// `null` only while [membersProvider] hasn't loaded yet or has no members.
-/// A stored id that doesn't resolve to a current member (cleared, or
-/// dangling) silently falls through to the fallback — this is a read-time
-/// self-heal, not a repair: nothing is written back to settings.
+/// While pinned, step 3 is deliberately SKIPPED and this resolves to `null`
+/// instead: guessing "the first admin" on a synced household is the
+/// misattribution A-5 removes. `null` there means the caller falls back to
+/// the occurrence's assignee (`ChoresListScreen._complete`), and the state
+/// is transient by design — a signed-in account that is no longer a member
+/// is a revoked membership, which clears the sync link per
+/// `docs/specs/household-lifecycle.md` §3.5.
+///
+/// `null` also while [membersProvider] hasn't loaded yet or has no members.
+/// A stored id that doesn't resolve is a read-time self-heal, not a repair:
+/// nothing is ever written back to settings from here.
 final actingMemberProvider = Provider<Member?>((ref) {
   final members = ref.watch(membersProvider).value;
   if (members == null || members.isEmpty) {
     return null;
+  }
+  final pinned =
+      ref.watch(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+  if (pinned) {
+    final claimed = ref.watch(claimedMemberProvider);
+    if (claimed != null) {
+      return claimed;
+    }
   }
   final storedId = ref.watch(settingsProvider).value?.actingMemberId;
   if (storedId != null) {
@@ -635,6 +819,9 @@ final actingMemberProvider = Provider<Member?>((ref) {
         return member;
       }
     }
+  }
+  if (pinned) {
+    return null;
   }
   return members.firstWhere(
     (member) => member.role == MemberRole.admin,
@@ -652,10 +839,15 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// Listens to [pendingOccurrencesProvider] and [settingsProvider] (any
 /// occurrence/chore/settings mutation shows up through one of those two),
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
-/// after the last relevant change, recomputes the [DigestPlan] for the
-/// current [clockProvider] time and pushes it to
-/// [notificationSchedulerProvider] — scheduling or cancelling the digest
-/// notification as appropriate.
+/// after the last relevant change, rebuilds the digest's whole scheduling
+/// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
+/// current [clockProvider] time and pushes all [digestHorizonDays] days of
+/// it to [notificationSchedulerProvider] at once — scheduling the days that
+/// have something to say and cancelling the days that don't. The horizon is
+/// what makes the digest survive the app simply not being opened (spec
+/// `docs/specs/notifications.md` architecture #2): every trigger this class
+/// listens to requires a running app, so a single-slot schedule went
+/// silent the morning after it fired.
 ///
 /// [triggerRecompute] is also called directly by `main.dart`'s app-resume
 /// observer: an OS lifecycle transition isn't itself a Riverpod-watchable
@@ -686,22 +878,118 @@ class DigestRescheduleController {
       })
       ..listen(settingsProvider, (previous, next) {
         triggerRecompute();
+      })
+      // The digest is scoped to the acting member (triage T2.3), so a
+      // change of who that is must re-count. Most such changes arrive via
+      // `settingsProvider` (the stored id) — but a member being added,
+      // renamed or removed can change `actingMemberProvider`'s fallback
+      // resolution with no settings write at all.
+      ..listen(actingMemberProvider, (previous, next) {
+        triggerRecompute();
       });
   }
 
   final Ref _ref;
   Timer? _debounceTimer;
 
-  /// Cancels any pending debounce timer. Called via `ref.onDispose` when
-  /// the owning [ProviderContainer] is torn down.
-  void dispose() => _debounceTimer?.cancel();
+  /// The currently-running [_recompute] call, or `null` when idle.
+  ///
+  /// FIX A (review of the P0 digest-fix plan): `applyDigestPlans` awaits
+  /// SEVEN sequential platform-channel calls, one per horizon day, and
+  /// every `await` yields the isolate. `triggerRecompute` only ever
+  /// cancelled the *pending Timer* -- it had no idea whether a previous
+  /// `_recompute` was still mid-flight -- so two debounce firings could run
+  /// `_recompute` concurrently and interleave their writes: recompute A
+  /// writes ids 1001-1003 from stale counts, yields; recompute B (newer
+  /// counts) runs to completion, writing all seven; A resumes and
+  /// overwrites 1004-1007 with its now-stale plans. The result is a
+  /// horizon that's silently part-fresh, part-stale, with no bookkeeping
+  /// that would ever notice.
+  ///
+  /// Fixed by turning [_recompute] into a strict one-at-a-time queue of
+  /// depth 1, using this field plus [_recomputeQueued] -- chosen over
+  /// chaining every request onto a stored `Future` because a trailing
+  /// request must be *coalesced*, not queued arbitrarily deep: while one
+  /// recompute is in flight, any number of further triggers should collapse
+  /// into a single re-run afterward (dropping the request entirely would
+  /// lose the newer counts; a `Future`-chain would instead run once per
+  /// trigger, each redundant one re-reading identical state). A re-run
+  /// always re-reads `_ref.read(...)` from scratch when it actually
+  /// executes, so it reflects whatever is current at that moment -- not
+  /// whatever was current when it was requested.
+  ///
+  /// This queue is a one-at-a-time guarantee for triggers that reach
+  /// [_recompute] THROUGH THIS CONTROLLER -- it says nothing about a
+  /// second, independent caller of `NotificationScheduler.applyDigestPlans`
+  /// (e.g. `DigestPrepromptBanner._enable`), which does not go through
+  /// [_recompute] at all. FIX 2 (same review) closes that gap at its
+  /// actual source: `NotificationScheduler.applyDigestPlans` itself now
+  /// serializes every call it receives, from any caller, so the ids this
+  /// queue protects and the ids that method writes can never interleave
+  /// either way.
+  Future<void>? _inFlightRecompute;
+
+  /// Whether a trailing recompute is owed once [_inFlightRecompute]
+  /// finishes -- see that field's doc comment.
+  bool _recomputeQueued = false;
+
+  /// Set by [dispose]. Guards [_startRecompute] against starting a new
+  /// recompute once the owning [ProviderContainer] is gone.
+  ///
+  /// FIX 1 (review of the FIX A serialization work): before serialization,
+  /// [_debounceTimer] was the ONLY path into [_recompute], so cancelling it
+  /// in [dispose] was sufficient. Now a trailing recompute can also be
+  /// launched from [_startRecompute]'s own `whenComplete` callback, once
+  /// [_inFlightRecompute] finishes -- a path [dispose] does not touch by
+  /// cancelling the timer. Without this flag, disposing the container
+  /// while one recompute is in flight AND a trailing one is queued lets
+  /// that trailing recompute start after disposal, reading from `_ref`
+  /// (via [_recompute]) and throwing "Bad state: Tried to read a provider
+  /// from a ProviderContainer that was already disposed".
+  bool _disposed = false;
+
+  /// Cancels any pending debounce timer and prevents any further recompute
+  /// -- including a trailing one already queued -- from starting. Called
+  /// via `ref.onDispose` when the owning [ProviderContainer] is torn down.
+  void dispose() {
+    _disposed = true;
+    _debounceTimer?.cancel();
+    _recomputeQueued = false;
+  }
 
   /// (Re)starts the [digestRescheduleDebounce] timer; when it fires,
-  /// recomputes the digest plan and (re)schedules or cancels it. Called by
-  /// this controller's own listeners above, and externally on app resume.
+  /// starts (or queues, per [_startRecompute]) a recompute of the digest
+  /// plan. Called by this controller's own listeners above, and externally
+  /// on app resume.
   void triggerRecompute() {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(digestRescheduleDebounce, _recompute);
+    _debounceTimer = Timer(digestRescheduleDebounce, _startRecompute);
+  }
+
+  /// Runs [_recompute] if none is currently in flight; otherwise records
+  /// that one more run is owed once the in-flight one finishes (see
+  /// [_inFlightRecompute]'s doc comment for why this can't just run
+  /// concurrently or be dropped).
+  ///
+  /// Early-returns once [_disposed] -- see that field's doc comment. This
+  /// covers both the trailing re-run launched from the `whenComplete`
+  /// callback below and any call reachable while a recompute already
+  /// in-flight at dispose time is still winding down.
+  void _startRecompute() {
+    if (_disposed) {
+      return;
+    }
+    if (_inFlightRecompute != null) {
+      _recomputeQueued = true;
+      return;
+    }
+    _inFlightRecompute = _recompute().whenComplete(() {
+      _inFlightRecompute = null;
+      if (_recomputeQueued) {
+        _recomputeQueued = false;
+        _startRecompute();
+      }
+    });
   }
 
   /// Re-checks the OS notification permission immediately (no debounce:
@@ -729,33 +1017,14 @@ class DigestRescheduleController {
       return;
     }
 
-    final now = _ref.read(clockProvider).now();
-    final slotDate = PlainDate.fromDateTime(
-      nextDigestSlot(now: now, digestMinutes: settings.digestMinutes),
+    await scheduler.applyDigestPlans(
+      buildDigestPlans(
+        now: _ref.read(clockProvider).now(),
+        settings: settings,
+        pending: pending,
+        recipientMemberId: _ref.read(actingMemberProvider)?.id,
+      ),
     );
-    var dueTodayCount = 0;
-    var overdueCount = 0;
-    for (final occurrence in pending) {
-      final dueDate = occurrence.occurrence.dueDate;
-      if (dueDate == slotDate) {
-        dueTodayCount++;
-      } else if (dueDate.isBefore(slotDate)) {
-        overdueCount++;
-      }
-    }
-
-    final plan = planDigest(
-      now: now,
-      digestMinutes: settings.digestMinutes,
-      enabled: settings.digestEnabled,
-      dueTodayCount: dueTodayCount,
-      overdueCount: overdueCount,
-    );
-    if (plan == null) {
-      await scheduler.cancelDigest();
-    } else {
-      await scheduler.scheduleDigest(plan);
-    }
   }
 }
 
@@ -812,11 +1081,19 @@ DateTime nextLocalMidnight(DateTime now) {
 /// current time, since a backgrounded app's timers don't reliably fire on
 /// schedule and could otherwise go stale.
 ///
-/// Catch-up only triggers a digest recompute
-/// ([DigestRescheduleController.triggerRecompute]) when
-/// [ChoreService.catchUpOverdue] reports it actually changed something —
-/// the common case (nothing overdue) has nothing new for the digest to
-/// reflect.
+/// Every day-change (and every resume) triggers a digest recompute
+/// unconditionally — see [_runCatchUp]. This is what re-arms the digest's
+/// rolling horizon for an app that simply stays open, which no other
+/// trigger covers.
+///
+/// On the same two triggers this controller ALSO refreshes [todayProvider]
+/// — unconditionally, whether or not catch-up changed anything — which is
+/// what makes every date-bucketed screen roll over at local midnight
+/// (backlog A-2 / audit P1). The timer lives here rather than in
+/// [todayProvider] itself because this class is activated only from
+/// `main.dart`, never from the widget tree: see [todayProvider]'s doc
+/// comment for why a provider-armed timer would break every chores widget
+/// test.
 class CatchUpController {
   /// Starts listening immediately; arms the first day-change timer once
   /// [bootstrapProvider] resolves. The `ref` is retained for the lifetime
@@ -845,6 +1122,7 @@ class CatchUpController {
   /// Re-runs catch-up and re-arms the day-change timer from the current
   /// time. Called externally on app resume.
   void triggerOnResume() {
+    _refreshToday();
     unawaited(_runCatchUp());
     _armDayChangeTimer();
   }
@@ -856,22 +1134,35 @@ class CatchUpController {
     _dayChangeTimer?.cancel();
     final now = _ref.read(clockProvider).now();
     _dayChangeTimer = Timer(nextLocalMidnight(now).difference(now), () {
+      _refreshToday();
       unawaited(_runCatchUp());
       _armDayChangeTimer();
     });
   }
+
+  /// Republishes [todayProvider] from the clock.
+  ///
+  /// UNCONDITIONAL on both day-boundary triggers, unlike the digest
+  /// recompute below: the digest only has news when catch-up actually
+  /// changed rows, but the DATE changes every single night whether or not
+  /// anything fell overdue — and the common night is precisely the one
+  /// where nothing does (backlog A-2 / audit P1). [TodayNotifier.refresh]
+  /// is itself a no-op when the calendar day hasn't moved, so calling it on
+  /// every resume is free.
+  void _refreshToday() => _ref.read(todayProvider.notifier).refresh();
 
   Future<void> _runCatchUp() async {
     final householdId = _householdId;
     if (householdId == null) {
       return;
     }
-    final changed = await _ref
-        .read(choreServiceProvider)
-        .catchUpOverdue(householdId);
-    if (changed) {
-      _ref.read(digestRescheduleControllerProvider).triggerRecompute();
-    }
+    await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
+    // Deliberately unconditional, and NOT gated on catch-up having changed
+    // something: the digest is armed only `digestHorizonDays` days ahead,
+    // so an app left open longer than that with no mutations would run off
+    // the end of its own horizon and go silent. A day passing is itself a
+    // reason to re-arm.
+    _ref.read(digestRescheduleControllerProvider).triggerRecompute();
   }
 }
 

@@ -51,6 +51,22 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   /// Every [zonedSchedule] call, in order.
   final List<ScheduledCall> scheduledCalls = [];
 
+  /// Every currently-armed notification, keyed by id: [zonedSchedule]
+  /// replaces the entry for that id, [cancel] removes it, and [deliverDue]
+  /// removes the ones the OS would already have shown.
+  ///
+  /// This models what `pendingNotificationRequests()` reports on a real
+  /// device. [scheduledCalls] stays a full append-only history (used for
+  /// debounce/burst assertions); this is the *current state*.
+  final Map<int, ScheduledCall> pending = {};
+
+  /// Simulates the OS delivering every armed notification whose `fireAt` is
+  /// at or before [now], removing it from [pending]. Nothing re-arms them —
+  /// which is exactly the behaviour the horizon exists to survive.
+  void deliverDue(DateTime now) {
+    pending.removeWhere((_, call) => !call.fireAt.isAfter(now));
+  }
+
   @override
   Future<void> initialize() async {
     initializeCallCount++;
@@ -71,13 +87,19 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
     required String body,
     required DateTime fireAt,
   }) async {
-    scheduledCalls.add(
-      ScheduledCall(id: id, title: title, body: body, fireAt: fireAt),
+    final call = ScheduledCall(
+      id: id,
+      title: title,
+      body: body,
+      fireAt: fireAt,
     );
+    scheduledCalls.add(call);
+    pending[id] = call;
   }
 
   @override
   Future<void> cancel(int id) async {
     cancelCallCount++;
+    pending.remove(id);
   }
 }

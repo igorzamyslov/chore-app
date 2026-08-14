@@ -89,6 +89,14 @@
     "description": "Tooltip for the category picker's trailing icon button (chore form and shopping item edit sheet), which pushes the manage-categories screen filtered to the picker's kind (feedback round 3: an in-context entry point alongside the existing Settings one)."
   },
 
+  "choresMenuMarkDoneFor": "Mark done for…",
+  "@choresMenuMarkDoneFor": {
+    "description": "Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case."
+  },
+  "choresMarkDoneForTitle": "Who did this one?",
+  "@choresMarkDoneForTitle": {
+    "description": "Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is."
+  },
   "choresMenuSkip": "Skip",
   "@choresMenuSkip": {
     "description": "Chore occurrence action-sheet entry: skip the pending occurrence."
@@ -208,6 +216,13 @@
   "actingMemberSheetTitle": "Who's doing chores right now?",
   "@actingMemberSheetTitle": {
     "description": "Title of the acting-member switcher bottom sheet opened from the chores app bar."
+  },
+  "actingMemberSignedInAs": "You're signed in as {name}",
+  "@actingMemberSignedInAs": {
+    "description": "Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
   },
   "actingManageMembers": "Manage members",
   "@actingManageMembers": {
@@ -357,6 +372,13 @@
       }
     }
   },
+  "choresSnackbarDoneBy": "Done — credited to {name}",
+  "@choresSnackbarDoneBy": {
+    "description": "Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "choresSnackbarSkipped": "Skipped",
   "@choresSnackbarSkipped": {
     "description": "Undo snackbar message after skipping a one-off occurrence (no next occurrence is created)."
@@ -378,6 +400,10 @@
   "choresSnackbarPaused": "Paused",
   "@choresSnackbarPaused": {
     "description": "Undo snackbar message shown after pausing a chore (T1.5, triage.md), mirroring choresSnackbarDone/choresSnackbarSkipped's one-word tone. The UNDO action (choresSnackbarUndo) resumes the chore via ChoreService.unpauseChore."
+  },
+  "choresSnackbarNoActingMember": "This device doesn't know who you are yet. Sign in again or reopen the app.",
+  "@choresSnackbarNoActingMember": {
+    "description": "Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either."
   },
 
   "choresDoneHeader": "{count, plural, one{Done today (1)} other{Done today ({count})}}",

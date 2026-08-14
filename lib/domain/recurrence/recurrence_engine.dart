@@ -148,6 +148,39 @@ PlainDate nextDueDateAfterClosing({
   }
 }
 
+/// The latest schedule slot for [rule]/[startDate] that is on or before
+/// [notAfter] and strictly after [afterDueDate], or `null` if there is none
+/// (i.e. nothing has come due past [afterDueDate] by [notAfter]).
+///
+/// This is the rule `ChoreService.catchUpOverdue` applies to roll an
+/// overdue schedule-anchored chore forward, and the same rule
+/// `lib/domain/digest_projection.dart` applies to answer "what would this
+/// chore look like on day D" — extracted here so the two can never drift
+/// apart.
+///
+/// Walks forward one slot at a time from [afterDueDate] via
+/// [nextScheduledOnOrAfter], which is efficient per that function's
+/// performance contract; the number of steps is bounded by how many slots
+/// have been missed, not by the distance from [startDate].
+PlainDate? latestScheduledOnOrBefore({
+  required Recurrence rule,
+  required PlainDate startDate,
+  required PlainDate afterDueDate,
+  required PlainDate notAfter,
+}) {
+  var latest = nextScheduledOnOrAfter(rule, startDate, afterDueDate.addDays(1));
+  if (latest.isAfter(notAfter)) {
+    return null;
+  }
+  while (true) {
+    final next = nextScheduledOnOrAfter(rule, startDate, latest.addDays(1));
+    if (next.isAfter(notAfter)) {
+      return latest;
+    }
+    latest = next;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

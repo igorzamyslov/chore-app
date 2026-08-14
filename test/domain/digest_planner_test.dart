@@ -85,96 +85,6 @@ void main() {
     });
   });
 
-  group('planDigest', () {
-    final now = DateTime(2026, 7, 24, 7); // ahead of the 08:00 default
-
-    test('disabled always returns null, even with nonzero counts', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: false,
-        dueTodayCount: 3,
-        overdueCount: 2,
-      );
-      expect(plan, isNull);
-    });
-
-    test('zero counts returns null when enabled (silence is a feature)', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: true,
-        dueTodayCount: 0,
-        overdueCount: 0,
-      );
-      expect(plan, isNull);
-    });
-
-    test('due-today-only still schedules', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: true,
-        dueTodayCount: 3,
-        overdueCount: 0,
-      );
-      expect(plan, isNotNull);
-      expect(plan!.dueTodayCount, 3);
-      expect(plan.overdueCount, 0);
-      expect(plan.fireAt, DateTime(2026, 7, 24, 8));
-    });
-
-    test('overdue-only still schedules (must not silently rot)', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: true,
-        dueTodayCount: 0,
-        overdueCount: 1,
-      );
-      expect(plan, isNotNull);
-      expect(plan!.dueTodayCount, 0);
-      expect(plan.overdueCount, 1);
-      expect(plan.fireAt, DateTime(2026, 7, 24, 8));
-    });
-
-    test('both nonzero counts still schedules, carrying both counts', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: true,
-        dueTodayCount: 2,
-        overdueCount: 1,
-      );
-      expect(plan!.dueTodayCount, 2);
-      expect(plan.overdueCount, 1);
-    });
-
-    test('fireAt matches nextDigestSlot for the same now/digestMinutes', () {
-      final plan = planDigest(
-        now: now,
-        digestMinutes: 480,
-        enabled: true,
-        dueTodayCount: 1,
-        overdueCount: 0,
-      );
-      expect(plan!.fireAt, nextDigestSlot(now: now, digestMinutes: 480));
-    });
-
-    test('rejects an out-of-range digestMinutes', () {
-      expect(
-        () => planDigest(
-          now: now,
-          digestMinutes: 1440,
-          enabled: true,
-          dueTodayCount: 1,
-          overdueCount: 0,
-        ),
-        throwsArgumentError,
-      );
-    });
-  });
-
   group('DigestPlan equality', () {
     test('two plans with identical fields are equal', () {
       final a = DigestPlan(
@@ -217,6 +127,132 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('digestSlots', () {
+    test('returns digestHorizonDays consecutive slots by default', () {
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 24, 7),
+        digestMinutes: 480,
+      );
+      expect(slots, hasLength(digestHorizonDays));
+      expect(slots.first, DateTime(2026, 7, 24, 8));
+      expect(slots.last, DateTime(2026, 7, 30, 8));
+    });
+
+    test('the first slot is exactly nextDigestSlot', () {
+      final now = DateTime(2026, 7, 24, 9); // past 08:00
+      final slots = digestSlots(now: now, digestMinutes: 480);
+      expect(slots.first, nextDigestSlot(now: now, digestMinutes: 480));
+      expect(slots.first, DateTime(2026, 7, 25, 8));
+      expect(slots.last, DateTime(2026, 7, 31, 8));
+    });
+
+    test('every slot keeps the same local wall-clock time across a DST '
+        'transition', () {
+      // 2026-03-29 is the European spring-forward day. Built from calendar
+      // components, so 08:00 stays 08:00 rather than drifting to 09:00.
+      final slots = digestSlots(
+        now: DateTime(2026, 3, 27, 7),
+        digestMinutes: 480,
+      );
+      for (final slot in slots) {
+        expect(slot.hour, 8);
+        expect(slot.minute, 0);
+      }
+    });
+
+    test('rolls over the month boundary', () {
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 30, 7),
+        digestMinutes: 480,
+      );
+      expect(slots.last, DateTime(2026, 8, 5, 8));
+    });
+
+    test('rejects an out-of-range digestMinutes', () {
+      expect(
+        () => digestSlots(now: DateTime(2026), digestMinutes: 1440),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a horizon below one day', () {
+      expect(
+        () => digestSlots(
+          now: DateTime(2026),
+          digestMinutes: 480,
+          horizonDays: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('planDigestSlot', () {
+    final fireAt = DateTime(2026, 7, 25, 8);
+
+    test('disabled returns null even with nonzero counts', () {
+      expect(
+        planDigestSlot(
+          fireAt: fireAt,
+          enabled: false,
+          dueTodayCount: 3,
+          overdueCount: 2,
+        ),
+        isNull,
+      );
+    });
+
+    test('zero counts returns null (silence is a feature, per day)', () {
+      expect(
+        planDigestSlot(
+          fireAt: fireAt,
+          enabled: true,
+          dueTodayCount: 0,
+          overdueCount: 0,
+        ),
+        isNull,
+      );
+    });
+
+    test('overdue-only still schedules (must not silently rot)', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 0,
+        overdueCount: 1,
+      );
+      expect(
+        plan,
+        DigestPlan(fireAt: fireAt, dueTodayCount: 0, overdueCount: 1),
+      );
+    });
+
+    test('due-only, zero overdue, still schedules', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 1,
+        overdueCount: 0,
+      );
+      expect(
+        plan,
+        DigestPlan(fireAt: fireAt, dueTodayCount: 1, overdueCount: 0),
+      );
+    });
+
+    test('carries both counts and the exact fireAt through', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 2,
+        overdueCount: 1,
+      );
+      expect(plan!.fireAt, fireAt);
+      expect(plan.dueTodayCount, 2);
+      expect(plan.overdueCount, 1);
     });
   });
 }

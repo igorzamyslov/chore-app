@@ -124,4 +124,60 @@ void main() {
       expect(after.userId, 'auth-user-1');
     },
   );
+
+  test(
+    'adopt mirrors the server claim onto the local member row (G-B, spec '
+    'docs/specs/household-lifecycle.md §3.1) without dirtying it',
+    () async {
+      final household = await HouseholdRepository(db).createLocalHousehold(
+        'Me',
+      );
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+      expect(me.userId, isNull);
+
+      await service.adopt(
+        householdId: household.id,
+        actingMemberId: me.id,
+        authUserId: 'auth-user-1',
+      );
+
+      final claimed = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(claimed.userId, 'auth-user-1');
+      // Still admin (step 3's existing role mirror) and still marked dirty
+      // by that role write -- setMemberClaim itself must not bump
+      // updatedAt or syncDirty, because user_id is server-owned and is not
+      // even UPDATE-granted (initial schema grants).
+      expect(claimed.role, MemberRole.admin);
+      expect(claimed.updatedAt, isNot(equals(me.updatedAt)));
+    },
+  );
+
+  test(
+    "adopt sets settings.actingMemberId to the caller's own member id, "
+    'matching what HouseholdJoinService.join/joinFresh already do -- '
+    'without it, actingMemberProvider has no stored id to fall back on '
+    'before the first claim-carrying pull, and can resolve to null (spec '
+    'docs/specs/members-management.md §4.2, pre-claim window)',
+    () async {
+      final household = await HouseholdRepository(db).createLocalHousehold(
+        'Me',
+      );
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+
+      await service.adopt(
+        householdId: household.id,
+        actingMemberId: me.id,
+        authUserId: 'auth-user-1',
+      );
+
+      final settings = await db.select(db.settings).getSingle();
+      expect(settings.actingMemberId, me.id);
+    },
+  );
 }

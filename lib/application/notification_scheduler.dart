@@ -3,6 +3,7 @@
 /// architecture #2/#3).
 library;
 
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:chore_app/domain/digest_planner.dart';
@@ -10,10 +11,19 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-/// The fixed notification id used for the single daily digest notification;
-/// every reschedule cancels and re-schedules this same id (spec
+/// The lowest notification id the daily digest owns; horizon slot `k`
+/// (0 = the next slot) uses `digestNotificationIdBase + k` (spec
 /// `docs/specs/notifications.md` architecture #2).
-const int digestNotificationId = 1001;
+const int digestNotificationIdBase = 1001;
+
+/// Every notification id the digest horizon owns, in slot order.
+///
+/// Fixed and exhaustive on purpose: every reschedule rewrites ALL of these
+/// (scheduling some, cancelling the rest), so a day that stops having
+/// anything to say can never keep a stale notification armed.
+final List<int> digestNotificationIds = List<int>.unmodifiable([
+  for (var k = 0; k < digestHorizonDays; k++) digestNotificationIdBase + k,
+]);
 
 /// The Android notification channel the digest notification is posted on.
 const String digestChannelId = 'digest';
@@ -44,6 +54,13 @@ abstract class DigestNotificationPlugin {
   /// Schedules a one-shot notification titled [title] with body [body], to
   /// fire at [fireAt] (device-local wall-clock time), replacing any
   /// previously-scheduled notification with the same [id].
+  ///
+  /// Still deliberately one-shot per id: the daily repeat comes from
+  /// [NotificationScheduler] arming a whole horizon of distinct ids at
+  /// once, NOT from a repeating OS alarm — a repeating alarm could not
+  /// honour the spec's "no notification when nothing is due" rule, and
+  /// would freeze its body text at whatever the counts were when it was
+  /// armed.
   Future<void> zonedSchedule({
     required int id,
     required String title,
@@ -195,6 +212,17 @@ class NotificationScheduler {
 
   bool _initialized = false;
 
+  /// The tail of the serialized-apply chain: resolves once whichever
+  /// [applyDigestPlans] call is currently running -- from ANY caller --
+  /// has finished writing its own seven slots. A new call waits on this
+  /// before starting its own loop; see [applyDigestPlans]'s doc comment.
+  ///
+  /// Deliberately never allowed to complete with an error: a failed apply
+  /// must not permanently jam the queue for every apply that comes after
+  /// it. The error itself still reaches the caller that made THAT call,
+  /// via the future [applyDigestPlans] returns to them.
+  Future<void> _applyTail = Future<void>.value();
+
   /// Initializes the underlying plugin. Idempotent: only the first call
   /// does anything. Safe to call on every bootstrap/resume.
   Future<void> ensureInitialized() async {
@@ -205,35 +233,75 @@ class NotificationScheduler {
     _initialized = true;
   }
 
-  /// (Re)schedules the digest notification per [plan]: fixed id
-  /// [digestNotificationId], localized title (the app name) and body (the
-  /// due/overdue counts).
+  /// Rewrites the digest's ENTIRE scheduling horizon in one go: [plans] is
+  /// indexed by slot (0 = the next slot), a non-null entry is scheduled on
+  /// id `digestNotificationIdBase + index`, and a `null` entry cancels that
+  /// id.
   ///
-  /// Deliberately never requests the OS notification permission itself
-  /// (spec `docs/specs/polish-round-1.md` A3): that dialog is intrusive
-  /// enough that it must only ever fire from an explicit user tap (the
-  /// digest pre-prompt banner's 'Turn on', or the Settings digest
-  /// permission hint's recovery path) — never as a side effect of a
-  /// schedule attempt that could be triggered automatically (e.g. at
-  /// bootstrap, with the digest enabled by default). Callers that DO want
-  /// the permission requested call [DigestNotificationPlugin.
-  /// requestPermission] directly, before or after this method, as
-  /// appropriate.
-  Future<void> scheduleDigest(DigestPlan plan) async {
-    await ensureInitialized();
-    final l10n = lookupAppLocalizations(localeResolver());
-    await plugin.zonedSchedule(
-      id: digestNotificationId,
-      title: l10n.appTitle,
-      body: _digestBody(l10n, plan),
-      fireAt: plan.fireAt,
-    );
+  /// Rewriting every id on every call — rather than only touching the days
+  /// that changed — is what makes the horizon self-correcting: a completed
+  /// chore silences its day, and a day whose counts changed gets the fresh
+  /// number, with no bookkeeping about what was armed before.
+  ///
+  /// This call is one of SEVEN sequential platform-channel calls (one per
+  /// horizon day), and every `await` yields the isolate — so two calls
+  /// in flight at once, from any two callers, could otherwise interleave
+  /// their writes to the very same seven ids (`DigestRescheduleController`
+  /// and `DigestPrepromptBanner._enable` both call this independently).
+  /// This method therefore chains every call onto [_applyTail], so a call
+  /// that arrives while another is still mid-loop waits for it to finish
+  /// completely before writing a single slot of its own, no matter which
+  /// caller either one is. `DigestRescheduleController`'s own in-flight/
+  /// queued bookkeeping (`_inFlightRecompute`/`_recomputeQueued`) is a
+  /// separate, narrower guarantee on top of this one: it *coalesces*
+  /// redundant triggers from that one call site into a single re-run, it
+  /// does not by itself protect the horizon from a second, independent
+  /// caller such as the banner.
+  ///
+  /// Deliberately never requests the OS notification permission itself; see
+  /// the class doc and spec `docs/specs/polish-round-1.md` A3.
+  ///
+  /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonDays]
+  /// long.
+  Future<void> applyDigestPlans(List<DigestPlan?> plans) {
+    if (plans.length != digestHorizonDays) {
+      throw ArgumentError.value(
+        plans.length,
+        'plans.length',
+        'Must be exactly digestHorizonDays ($digestHorizonDays)',
+      );
+    }
+    final waitForPrevious = _applyTail.catchError((_) {});
+    final thisApply = waitForPrevious.then((_) => _applyDigestPlansNow(plans));
+    _applyTail = thisApply.catchError((_) {});
+    return thisApply;
   }
 
-  /// Cancels the digest notification, if scheduled.
+  Future<void> _applyDigestPlansNow(List<DigestPlan?> plans) async {
+    await ensureInitialized();
+    final l10n = lookupAppLocalizations(localeResolver());
+    for (var k = 0; k < plans.length; k++) {
+      final plan = plans[k];
+      final id = digestNotificationIdBase + k;
+      if (plan == null) {
+        await plugin.cancel(id);
+      } else {
+        await plugin.zonedSchedule(
+          id: id,
+          title: l10n.appTitle,
+          body: _digestBody(l10n, plan),
+          fireAt: plan.fireAt,
+        );
+      }
+    }
+  }
+
+  /// Cancels every day of the digest horizon.
   Future<void> cancelDigest() async {
     await ensureInitialized();
-    await plugin.cancel(digestNotificationId);
+    for (final id in digestNotificationIds) {
+      await plugin.cancel(id);
+    }
   }
 
   String _digestBody(AppLocalizations l10n, DigestPlan plan) {

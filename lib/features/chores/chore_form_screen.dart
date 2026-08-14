@@ -128,7 +128,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   @override
   void initState() {
     super.initState();
-    _startDate = PlainDate.fromDateTime(ref.read(clockProvider).now());
+    // read, not watch: the default start date is captured ONCE, when the
+    // form opens. A day rollover moves the picker's range reference (see
+    // `today` in build) but must never move a date the user is looking at.
+    _startDate = ref.read(todayProvider);
     // RepeatControls reads the interval's live text (to pluralize the unit
     // label and the after-last-completion subtitle, field feedback
     // G3 stage 1); typing into the field doesn't otherwise trigger a
@@ -218,7 +221,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     }
     final categories = ref.watch(choreCategoriesProvider).value ?? const [];
     final members = ref.watch(membersProvider).value ?? const [];
-    final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
+    // One definition of "today" across the whole UI (backlog A-2 / audit
+    // P1): this is the StartDateField picker's range reference, min =
+    // today - 1 year.
+    final today = ref.watch(todayProvider);
 
     // The category picker's "edit categories" entry point (feedback round
     // 3) can push the manage-categories screen and come back having

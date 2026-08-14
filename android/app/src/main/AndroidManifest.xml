@@ -1,8 +1,32 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Auto-backup posture (decision D-B1, docs/backlog.md; implementation
+         plan docs/plans/2026-08-08-android-backup.md): this app's answer to
+         "don't lose my data" is sync plus the JSON export (Settings ->
+         Export data), not the OS. Left unconfigured, Auto Backup defaults
+         to ON with no rules — Android would copy the live SQLite file
+         (chore_app.sqlite) plus its -wal/-shm sidecars uncoordinated (a
+         restore can land a torn database) and restore the Supabase
+         refresh token, the sync pull cursor (settings.syncLastPulledAt)
+         and the device-scoped settings.actingMemberId onto a second
+         device — under this app's last-push-wins conflict rule that
+         clobbers data rather than merely confusing.
+         allowBackup="false" disables BOTH classic cloud Auto Backup and
+         Android 12+'s device-to-device transfer for every API level this
+         app supports (minSdk 24). android:fullBackupContent and
+         android:dataExtractionRules are backup-content FILTERS the
+         platform only consults when allowBackup is true, so they are
+         deliberately not declared — there would be nothing for them to
+         filter. Asserted on the built release APK in
+         .github/workflows/release.yml so this can never silently
+         regress, same pattern as the INTERNET permission check below.
+         iOS is a separate, tracked gap (docs/backlog.md A-3b) — iCloud
+         backs up Documents/, where this database also lives, by
+         default. -->
     <application
         android:label="Famdo"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

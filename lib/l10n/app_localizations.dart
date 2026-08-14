@@ -182,6 +182,18 @@ abstract class AppLocalizations {
   /// **'Edit categories'**
   String get categoryPickerManageTooltip;
 
+  /// Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark done for…'**
+  String get choresMenuMarkDoneFor;
+
+  /// Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is.
+  ///
+  /// In en, this message translates to:
+  /// **'Who did this one?'**
+  String get choresMarkDoneForTitle;
+
   /// Chore occurrence action-sheet entry: skip the pending occurrence.
   ///
   /// In en, this message translates to:
@@ -325,6 +337,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
+
+  /// Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re signed in as {name}'**
+  String actingMemberSignedInAs(String name);
 
   /// Final row of the acting-member switcher sheet (spec docs/feedback/2026-08-01-ux-audit.md B2), pushing the Members management screen.
   ///
@@ -506,6 +524,12 @@ abstract class AppLocalizations {
   /// **'Done — next due {dueText}'**
   String choresSnackbarDoneNextDue(String dueText);
 
+  /// Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.
+  ///
+  /// In en, this message translates to:
+  /// **'Done — credited to {name}'**
+  String choresSnackbarDoneBy(String name);
+
   /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
   ///
   /// In en, this message translates to:
@@ -529,6 +553,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paused'**
   String get choresSnackbarPaused;
+
+  /// Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either.
+  ///
+  /// In en, this message translates to:
+  /// **'This device doesn\'t know who you are yet. Sign in again or reopen the app.'**
+  String get choresSnackbarNoActingMember;
 
   /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
   ///

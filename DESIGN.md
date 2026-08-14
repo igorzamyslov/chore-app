@@ -90,7 +90,18 @@ with one tap; swipe for skip/snooze.
 - **Per-user settings** (not per-household): digest time, quiet hours,
   evening re-reminder if chores remain, overdue behavior (badge only / one
   repeat / silent).
-- Scope: "my chores" by default; "unassigned chores" opt-in.
+- Scope: the digest counts **the recipient's own chores plus unassigned
+  ("anyone") chores**. *Amended 2026-08-08 (decision OPD-1,
+  `docs/plans/2026-08-08-daily-digest-scheduling.md`); this line previously
+  read "'my chores' by default; 'unassigned chores' opt-in".* The opt-in
+  framing was retired because it was written for the pre-sync,
+  single-device era — one phone stood in for the whole household, so
+  "unassigned" barely differed from "everything". With per-recipient
+  scoping actually implemented (triage T2.3), defaulting "anyone" chores
+  OFF would leave a household that assigns everything to "anyone" — the
+  common case — with a permanently silent digest, which is a worse failure
+  than slight over-inclusion. A genuine per-device toggle remains possible
+  later; see backlog G-9.
 - Per-chore override: individual reminder for the important ones.
 - Notification actions: **Done ✓** and **Snooze to tomorrow** directly on the
   notification (supported on both platforms).

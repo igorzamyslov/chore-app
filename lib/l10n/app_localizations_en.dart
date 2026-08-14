@@ -83,6 +83,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryPickerManageTooltip => 'Edit categories';
 
   @override
+  String get choresMenuMarkDoneFor => 'Mark done for…';
+
+  @override
+  String get choresMarkDoneForTitle => 'Who did this one?';
+
+  @override
   String get choresMenuSkip => 'Skip';
 
   @override
@@ -171,6 +177,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
+
+  @override
+  String actingMemberSignedInAs(String name) {
+    return 'You\'re signed in as $name';
+  }
 
   @override
   String get actingManageMembers => 'Manage members';
@@ -281,6 +292,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String choresSnackbarDoneBy(String name) {
+    return 'Done — credited to $name';
+  }
+
+  @override
   String get choresSnackbarSkipped => 'Skipped';
 
   @override
@@ -293,6 +309,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choresSnackbarPaused => 'Paused';
+
+  @override
+  String get choresSnackbarNoActingMember =>
+      'This device doesn\'t know who you are yet. Sign in again or reopen the app.';
 
   @override
   String choresDoneHeader(int count) {

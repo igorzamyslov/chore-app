@@ -23,6 +23,7 @@ import 'package:chore_app/features/chores/chore_progress_card.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
+import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -50,7 +51,11 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
-    final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
+    // todayProvider, not a one-shot clock read: this is what re-buckets the
+    // list at local midnight while the app stays open (backlog A-2 / audit
+    // P1). It flows down to ChoreSection, every tile's due text, and the
+    // progress card as a plain parameter, so this single watch covers them.
+    final today = ref.watch(todayProvider);
     // C1 (spec docs/specs/sync-freshness.md §2.3): the pull-to-refresh
     // indicator is shown only when there's actually a remote to pull from --
     // the same linked-AND-signed-in gate `syncEngineProvider` itself applies
@@ -204,6 +209,19 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final completedBy =
         ref.read(actingMemberProvider)?.id ?? occurrence.assignedMember?.id;
     if (completedBy == null) {
+      // Reachable since T1.3: pinned mode with no claim resolved yet (e.g.
+      // right after adopting, before the first pull -- spec
+      // `docs/specs/members-management.md` §4.2) and no assignee to fall
+      // back on. Before T1.3, actingMemberProvider could never be null
+      // while members existed, so this was a silent no-op; now it must say
+      // something rather than let the tap vanish with no feedback.
+      if (!mounted) {
+        return;
+      }
+      showAppSnackbar(
+        context,
+        message: AppLocalizations.of(context).choresSnackbarNoActingMember,
+      );
       return;
     }
     await ref
@@ -222,12 +240,57 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     await _showCloseSnackbar(occurrence: occurrence, skipped: false);
   }
 
+  /// The rare "I finished something for someone else" path (A-5, spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` B1): pick a member, then
+  /// close the occurrence crediting THEM.
+  ///
+  /// Deliberately NOT a new `ChoreService` method: `completeOccurrence`
+  /// already takes the credited member, and rotation advances on
+  /// `assigned_member_id` rather than `completed_by`, so this differs from
+  /// [_complete] only in which id it passes. It also never writes
+  /// `settings.actingMemberId` — crediting somebody is not becoming them.
+  Future<void> _markDoneFor(OccurrenceWithChore occurrence) async {
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final picked = await showMarkDoneForSheet(
+      context,
+      members: members,
+      excludeMemberId: ref.read(claimedMemberProvider)?.id,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    await ref
+        .read(choreServiceProvider)
+        .completeOccurrence(occurrence.occurrence.id, completedBy: picked.id);
+    unawaited(HapticFeedback.mediumImpact());
+    if (!mounted) {
+      return;
+    }
+    await _showCloseSnackbar(
+      occurrence: occurrence,
+      skipped: false,
+      creditedTo: picked,
+    );
+  }
+
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
-    final action = await showChoreActionSheet(context);
+    // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
+    // "Mark done for…" replaces the app-bar switcher, so it is offered in
+    // exactly the state where that switcher is gone -- and only when there
+    // is somebody else to credit.
+    final pinned =
+        ref.read(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+    final memberCount = ref.read(membersProvider).value?.length ?? 0;
+    final action = await showChoreActionSheet(
+      context,
+      showMarkDoneFor: pinned && memberCount > 1,
+    );
     if (!mounted || action == null) {
       return;
     }
     switch (action) {
+      case ChoreMenuAction.markDoneFor:
+        await _markDoneFor(occurrence);
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)
@@ -294,6 +357,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   Future<void> _showCloseSnackbar({
     required OccurrenceWithChore occurrence,
     required bool skipped,
+    Member? creditedTo,
   }) async {
     final choreId = occurrence.chore.id;
     final occurrenceId = occurrence.occurrence.id;
@@ -305,12 +369,35 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
 
     final l10n = AppLocalizations.of(context);
+    // A-5: on the "Mark done for…" path the credited member is NOT the
+    // person holding the phone, so the confirmation says whose credit it
+    // was. The next-due variants are skipped here deliberately — WHO got
+    // the credit is the fact worth confirming on this path, and the chore's
+    // next occurrence is visible in the list behind the bar anyway.
+    if (creditedTo != null) {
+      showAppSnackbar(
+        context,
+        message: l10n.choresSnackbarDoneBy(creditedTo.name),
+        action: SnackBarAction(
+          label: l10n.choresSnackbarUndo,
+          onPressed: () {
+            unawaited(
+              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
+            );
+          },
+        ),
+      );
+      return;
+    }
     final String message;
     if (nextPending == null) {
       message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
     } else {
       final localeName = Localizations.localeOf(context).toString();
-      final today = PlainDate.fromDateTime(ref.read(clockProvider).now());
+      // The same "today" the list itself is bucketing on, so the snackbar's
+      // "next due …" text can never contradict the section the chore lands
+      // in a frame later.
+      final today = ref.read(todayProvider);
       final dueText = futureDueText(
         l10n,
         localeName,

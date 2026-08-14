@@ -18,7 +18,7 @@ the app shows is true.
 | --- | --- | --- | --- |
 | T1.1 | **The progress card and the list under it disagree.** The card counts the whole household unfiltered (`chores_list_screen.dart:62-74`); the sections below respect the active member/category filter (`:353-391`). Filter to yourself and the ring says "3 of 8" over a list of 2 | Anna 1, Ben 2 | A number contradicting the list directly beneath it, on the most-opened screen |
 | T1.2 | **"Its history is kept" is unverifiable.** True in the DB (`chore_repository.dart:232-249`), but every read path filters `deletedAt IS NULL` and no history screen exists. The dialog invites a destructive tap by promising a safety net that has no mechanism | Anna 2, Ben 3 | Same "promise without a mechanism" class as ux-audit A4 |
-| T1.3 | **Acting-member misattribution.** The switcher still shows for linked households (B1 decided, unbuilt), AND `actingMemberId` is device-scoped and never syncs — so two devices can silently credit different people for the same work | Anna 4, Ben 6 | Multi-device makes B1 worse than the single-phone case it was written for |
+| T1.3 | **DONE 2026-08-08 (A-5,** `docs/plans/2026-08-08-acting-member-pinning.md`**).** Acting-member misattribution. The switcher still shows for linked households (B1 decided, unbuilt), AND `actingMemberId` is device-scoped and never syncs — so two devices can silently credit different people for the same work | Anna 4, Ben 6 | Multi-device makes B1 worse than the single-phone case it was written for |
 | T1.4 | **"Clear checked" is the only destructive action with no undo** (`shopping_checked_section.dart:113-119`), while single-item delete has one | Ben 4, Mia | Inconsistent exactly where the bulk action is riskier |
 | T1.5 | **Pause gives no feedback at all** (`chores_list_screen.dart:226-227`) — every other state change snackbars. Its undo lives in a collapsed section the user doesn't know exists | Ben 7 | Silent state change + hidden recovery |
 | T1.6 | **Join errors can't be self-corrected.** Typo, expired, and revoked all produce one string (`app_en.arb:1203`) on the screen where a new member is most anxious | Ben 9 | First real interaction; failure here loses the user entirely |
@@ -130,7 +130,7 @@ otherwise. Added to `future-improvements.md`'s trade-offs section.
 
 1. **T1.1, T1.4, T1.5, T1.7** — small, self-contained, all trust bugs.
 2. **T1.2** cheap copy fix now; D2 decides whether F19 follows.
-3. **T1.3** — the B1 work (pin acting member, add "Mark done for…"), now
-   with the device-scoped-drift finding folded in.
+3. **T1.3** — DONE 2026-08-08 (A-5): the B1 work (pin acting member, add
+   "Mark done for…"), with the device-scoped-drift finding folded in.
 4. **T1.6**, then Tier 2 in listed order.
 5. **D1** once you've picked (a), (b) or (c) — it touches migrations.

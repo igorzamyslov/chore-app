@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:chore_app/application/notification_scheduler.dart';
@@ -5,6 +6,43 @@ import 'package:chore_app/domain/digest_planner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_digest_notification_plugin.dart';
+
+/// A [FakeDigestNotificationPlugin] that pauses the very FIRST
+/// [zonedSchedule] call it ever receives -- across ANY caller -- until
+/// [release] is called, then behaves normally forever after.
+///
+/// Used only by the FIX 2 serialization test below, to force two
+/// concurrent [NotificationScheduler.applyDigestPlans] calls to actually
+/// overlap in time, deterministically: a fake with uniform latency would
+/// make both calls proceed in lockstep and prove nothing about ordering.
+/// Mirrors `_PausingPlugin` in `test/app/digest_reschedule_test.dart`,
+/// gated on call order rather than notification id since both callers'
+/// plans use the same ids.
+class _GatedPlugin extends FakeDigestNotificationPlugin {
+  final Completer<void> _gate = Completer<void>();
+  bool _hasPaused = false;
+
+  /// Lets the paused call (if any) proceed.
+  void release() {
+    if (!_gate.isCompleted) {
+      _gate.complete();
+    }
+  }
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime fireAt,
+  }) async {
+    if (!_hasPaused) {
+      _hasPaused = true;
+      await _gate.future;
+    }
+    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+  }
+}
 
 void main() {
   late FakeDigestNotificationPlugin plugin;
@@ -27,72 +65,109 @@ void main() {
     });
   });
 
-  group('scheduleDigest', () {
-    final plan = DigestPlan(
-      fireAt: DateTime(2026, 7, 25, 8),
-      dueTodayCount: 3,
-      overdueCount: 0,
-    );
+  group('applyDigestPlans', () {
+    List<DigestPlan?> plansOf(Map<int, DigestPlan> byIndex) => [
+      for (var k = 0; k < digestHorizonDays; k++) byIndex[k],
+    ];
 
-    test('initializes the plugin implicitly if not done already', () async {
-      await scheduler.scheduleDigest(plan);
+    test('rejects a list that is not exactly digestHorizonDays long', () {
+      expect(
+        () => scheduler.applyDigestPlans(const []),
+        throwsArgumentError,
+      );
+    });
+
+    test('slot k schedules id digestNotificationIdBase + k', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 1,
+            overdueCount: 0,
+          ),
+          2: DigestPlan(
+            fireAt: DateTime(2026, 7, 26, 8),
+            dueTodayCount: 2,
+            overdueCount: 0,
+          ),
+        }),
+      );
+
+      expect(plugin.pending.keys, unorderedEquals([1001, 1003]));
+      expect(plugin.pending[1001]!.fireAt, DateTime(2026, 7, 24, 8));
+      expect(plugin.pending[1003]!.body, '2 chores today');
+    });
+
+    test('a null slot cancels that day rather than scheduling it', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 1,
+            overdueCount: 0,
+          ),
+        }),
+      );
+      expect(plugin.cancelCallCount, digestHorizonDays - 1);
+      expect(plugin.pending.keys, [1001]);
+    });
+
+    test('a later apply overwrites the whole horizon, silencing days that '
+        'no longer have anything to say', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          for (var k = 0; k < digestHorizonDays; k++)
+            k: DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: 1,
+              overdueCount: 0,
+            ),
+        }),
+      );
+      expect(plugin.pending, hasLength(digestHorizonDays));
+
+      await scheduler.applyDigestPlans(plansOf({}));
+      expect(plugin.pending, isEmpty);
+    });
+
+    test('initializes the plugin implicitly, and never requests permission '
+        '(spec polish-round-1.md A3)', () async {
+      await scheduler.applyDigestPlans(plansOf({}));
       expect(plugin.initializeCallCount, 1);
+      expect(plugin.requestPermissionCallCount, 0);
     });
 
-    test(
-      'never requests permission itself (spec polish-round-1.md A3: the '
-      'OS dialog only ever fires from an explicit user tap)',
-      () async {
-        await scheduler.scheduleDigest(plan);
-        await scheduler.scheduleDigest(plan);
-        await scheduler.scheduleDigest(plan);
-        expect(plugin.requestPermissionCallCount, 0);
-      },
-    );
-
-    test('schedules with the fixed digest notification id', () async {
-      await scheduler.scheduleDigest(plan);
-      expect(plugin.scheduledCalls, hasLength(1));
-      expect(plugin.scheduledCalls.single.id, digestNotificationId);
-      expect(plugin.scheduledCalls.single.id, 1001);
-    });
-
-    test('title is the app name', () async {
-      await scheduler.scheduleDigest(plan);
-      expect(plugin.scheduledCalls.single.title, 'Famdo');
-    });
-
-    test("passes the plan's fireAt through unchanged", () async {
-      await scheduler.scheduleDigest(plan);
-      expect(plugin.scheduledCalls.single.fireAt, plan.fireAt);
-    });
-
-    test('due-only body, singular', () async {
-      await scheduler.scheduleDigest(
-        DigestPlan(fireAt: plan.fireAt, dueTodayCount: 1, overdueCount: 0),
+    test('due-only body uses the ICU singular form for a count of 1', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 1,
+            overdueCount: 0,
+          ),
+        }),
       );
-      expect(plugin.scheduledCalls.single.body, '1 chore today');
+      expect(plugin.pending[1001]!.body, '1 chore today');
     });
 
-    test('due-only body, plural', () async {
-      await scheduler.scheduleDigest(
-        DigestPlan(fireAt: plan.fireAt, dueTodayCount: 3, overdueCount: 0),
+    test('overdue-only and combined bodies survive the move', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 0,
+            overdueCount: 1,
+          ),
+          1: DigestPlan(
+            fireAt: DateTime(2026, 7, 25, 8),
+            dueTodayCount: 2,
+            overdueCount: 1,
+          ),
+        }),
       );
-      expect(plugin.scheduledCalls.single.body, '3 chores today');
-    });
-
-    test('overdue-only body (overdue-only days still notify)', () async {
-      await scheduler.scheduleDigest(
-        DigestPlan(fireAt: plan.fireAt, dueTodayCount: 0, overdueCount: 1),
-      );
-      expect(plugin.scheduledCalls.single.body, '1 overdue chore');
-    });
-
-    test('combined due + overdue body', () async {
-      await scheduler.scheduleDigest(
-        DigestPlan(fireAt: plan.fireAt, dueTodayCount: 2, overdueCount: 1),
-      );
-      expect(plugin.scheduledCalls.single.body, '2 chores today · 1 overdue');
+      expect(plugin.pending[1001]!.body, '1 overdue chore');
+      expect(plugin.pending[1002]!.body, '2 chores today · 1 overdue');
+      expect(plugin.pending[1001]!.title, 'Famdo');
     });
 
     test('German locale produces German copy', () async {
@@ -100,15 +175,100 @@ void main() {
         plugin: plugin,
         localeResolver: () => const Locale('de'),
       );
-      await germanScheduler.scheduleDigest(
-        DigestPlan(fireAt: plan.fireAt, dueTodayCount: 2, overdueCount: 1),
-      );
-      expect(plugin.scheduledCalls.single.title, 'Famdo');
-      expect(
-        plugin.scheduledCalls.single.body,
-        '2 Aufgaben heute · 1 überfällig',
-      );
+      await germanScheduler.applyDigestPlans([
+        DigestPlan(
+          fireAt: DateTime(2026, 7, 24, 8),
+          dueTodayCount: 2,
+          overdueCount: 1,
+        ),
+        for (var k = 1; k < digestHorizonDays; k++) null,
+      ]);
+      expect(plugin.pending[1001]!.body, '2 Aufgaben heute · 1 überfällig');
     });
+
+    test(
+      'FIX 2: two concurrent calls from different callers cannot '
+      'interleave their seven-slot writes -- the later caller is not left '
+      'with slots clobbered by an earlier one resuming after it',
+      () async {
+        final gatedPlugin = _GatedPlugin();
+        final gatedScheduler = NotificationScheduler(
+          plugin: gatedPlugin,
+          localeResolver: () => const Locale('en'),
+        );
+
+        List<DigestPlan?> plansWithCount(int count) => [
+          for (var k = 0; k < digestHorizonDays; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: count,
+              overdueCount: 0,
+            ),
+        ];
+
+        // Caller A (e.g. the controller's recompute) starts first; its
+        // very first `zonedSchedule` call blocks on the gate.
+        final callA = gatedScheduler.applyDigestPlans(plansWithCount(1));
+        // Give A's Future chain a turn to actually run up to the gate.
+        await Future<void>.delayed(Duration.zero);
+
+        // Caller B (e.g. the pre-prompt banner's own apply) starts while A
+        // is still paused mid-loop.
+        final callB = gatedScheduler.applyDigestPlans(plansWithCount(2));
+        await Future<void>.delayed(Duration.zero);
+
+        // The gate only pauses the very first `zonedSchedule` call ever
+        // (A's). If B's loop could run concurrently with A's, B -- being
+        // unblocked -- would already have written its whole horizon by
+        // now. Serialized correctly, B is still queued behind A and has
+        // written nothing yet.
+        expect(
+          gatedPlugin.pending,
+          isEmpty,
+          reason: 'caller B must wait behind caller A, not run concurrently',
+        );
+
+        gatedPlugin.release();
+        await callA;
+        await callB;
+
+        // The final horizon is entirely B's. If the two loops had
+        // interleaved (the bug this guards against), A resuming after B
+        // had already written would overwrite some slots with A's stale
+        // count.
+        expect(
+          gatedPlugin.pending.values.every(
+            (call) => call.body == '2 chores today',
+          ),
+          isTrue,
+          reason: 'no slot may be left over from the earlier, stale call',
+        );
+      },
+    );
+
+    test(
+      'day 1 firing leaves days 2-7 armed, with nothing to re-arm them — '
+      'this is the whole point of the horizon (audit P0)',
+      () async {
+        await scheduler.applyDigestPlans([
+          for (var k = 0; k < digestHorizonDays; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: 1,
+              overdueCount: 0,
+            ),
+        ]);
+
+        // The OS delivers day 1's notification a minute after it fires.
+        // Nothing re-arms it, but days 2-7 must remain untouched.
+        plugin.deliverDue(DateTime(2026, 7, 24, 8, 1));
+
+        expect(
+          plugin.pending.keys,
+          unorderedEquals([1002, 1003, 1004, 1005, 1006, 1007]),
+        );
+      },
+    );
   });
 
   group('cancelDigest', () {
@@ -117,9 +277,23 @@ void main() {
       expect(plugin.initializeCallCount, 1);
     });
 
-    test('cancels the fixed digest notification id', () async {
+    test('cancels every id in the horizon, not just the first', () async {
       await scheduler.cancelDigest();
-      expect(plugin.cancelCallCount, 1);
+      expect(plugin.cancelCallCount, digestHorizonDays);
+      expect(digestNotificationIds, [1001, 1002, 1003, 1004, 1005, 1006, 1007]);
+    });
+
+    test('leaves nothing armed', () async {
+      await scheduler.applyDigestPlans([
+        for (var k = 0; k < digestHorizonDays; k++)
+          DigestPlan(
+            fireAt: DateTime(2026, 7, 24 + k, 8),
+            dueTodayCount: 1,
+            overdueCount: 0,
+          ),
+      ]);
+      await scheduler.cancelDigest();
+      expect(plugin.pending, isEmpty);
     });
 
     test('does not request permission (no schedule attempt)', () async {

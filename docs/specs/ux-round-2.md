@@ -45,6 +45,11 @@ strikethrough title, who closed them, done-vs-skipped marker, and a
   pending (clear closed_on/completed_by, keep assignee). Throws StateError
   if the chore is deleted or the occurrence isn't closed-today.
 - Needs `ChoreRepository.watchClosedOnDate(householdId, PlainDate)`.
+- Amended 2026-08-08 (backlog A-2 / audit P1): the `today` passed to
+  `watchClosedOnDate` comes from `todayProvider`, and
+  `closedTodayOccurrencesProvider` watches it — so at local midnight the
+  section empties on its own. Silently: no snackbar, no marker (product
+  decision, `docs/plans/2026-08-08-day-rollover.md`).
 - Amended 2026-08-01 (field feedback B2): with several closed-today rows
   for ONE chore, the Reopen action is rendered only on that chore's
   latest row (due date, then close time) — see the LIFO rule in

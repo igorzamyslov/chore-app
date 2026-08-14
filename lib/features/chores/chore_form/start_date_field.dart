@@ -30,8 +30,9 @@ class StartDateField extends StatelessWidget {
   /// The currently-selected start date.
   final PlainDate value;
 
-  /// Today, per `clockProvider` — the reference point for the picker's
-  /// selectable range.
+  /// Today, per `todayProvider` — the reference point for the picker's
+  /// selectable range. Derived from `clockProvider` and refreshed at local
+  /// midnight, so a form left open overnight gets an honest range.
   final PlainDate today;
 
   /// Called with the newly-picked date.

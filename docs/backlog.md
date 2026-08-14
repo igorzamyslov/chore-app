@@ -9,9 +9,10 @@ documents listed that is in fact implemented has been dropped here.*
 
 **Closed since they were written, verified in code:** the entire
 `2026-08-01-ux-audit.md` (A1–A6, B1–B3), all of `polish-round-1.md` (A1–A3,
-B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 except
-T1.3, the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
+B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full,
+the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
 `next-session-plan.md` backlog bullet except `Recurrence` equality.
+Also closed: **A-5 (acting-member pinning + Mark done for…, 2026-08-08)**.
 
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
@@ -118,7 +119,6 @@ the local recommendation contradicted something else in the app.*
 | --- | --- | --- | --- |
 | **A-2b** | Settings "Last synced" text goes stale while open | Needs a periodic ticker; deliberately excluded from A-2 because a provider-armed timer trips `flutter_test`'s pending-timer check | S |
 | **A-3b** | iOS: the database is in `Documents/`, which iCloud backs up by default | The iOS counterpart to A-3's `allowBackup="false"`. Needs per-file `NSURLIsExcludedFromBackupKey` at runtime, not a manifest flag — deliberately out of A-3's scope | S |
-| **G-9** | A per-device "include unassigned chores in my digest" toggle | The genuine opt-in that `DESIGN.md` §3 originally implied, retired by the A-1 decision. Build only if someone actually complains about "anyone" chores in their digest | S |
 
 ## Suggested execution order
 
@@ -191,11 +191,11 @@ would catch by eye.*
 
 | ID | Title | What's wrong | Files | Effort |
 | --- | --- | --- | --- | --- |
-| **A-1** | **The daily digest is not daily** | `planDigest` returns one `fireAt` and `zonedSchedule` is one-shot; every reschedule trigger requires the app to be running, so the digest fires once and then goes silent until the app is next opened. Fold **T2.3** (the digest counts every pending occurrence household-wide, with no per-recipient scoping) into the same work | `lib/domain/digest_planner.dart`, `lib/application/notification_scheduler.dart`, `lib/app/providers.dart:672-760`, `docs/specs/notifications.md` | M |
+| **A-1** | **The daily digest is not daily** | **DONE 2026-08-08** (`docs/plans/2026-08-08-daily-digest-scheduling.md`): the digest is now armed as a rolling 7-day horizon of distinct ids, rewritten on every trigger, with counts projected per date and scoped to the acting member. **T2.3 closed with it** | `lib/domain/digest_planner.dart`, `lib/application/notification_scheduler.dart`, `lib/app/providers.dart:650-856`, `docs/specs/notifications.md` | M |
 | **A-2** | **Date-derived UI never rolls over at midnight** | `clockProvider` never re-emits. `closedTodayOccurrencesProvider` captures `today` at build time and watches nothing that changes at midnight — an app left open overnight shows yesterday's completions under "Done today" forever, and the progress ring with it. Section buckets only refresh if catch-up happens to change something. `CatchUpController` already owns a DST-safe midnight timer; its only consumer is catch-up | `lib/app/providers.dart:545-552,820-884`, `lib/features/chores/chores_list_screen.dart:53` | S |
-| **A-3** | **Android auto-backup unconfigured** | No `allowBackup`, no `dataExtractionRules`, no `fullBackupContent` anywhere under `android/`, so backup defaults on with no rules: a live SQLite file plus WAL sidecars copied uncoordinated, and the Supabase refresh token + pull cursor restored onto a second device. Under last-push-wins that is a data-clobbering configuration. Invisible in every emulator and E2E run — same blind-spot class as the v0.2.0 `INTERNET` miss. **Needs a product decision — see below** | `android/app/src/main/AndroidManifest.xml`, `docs/app-lifecycle.md` G8 | XS–S |
+| **A-3** | **Android auto-backup unconfigured** | No `allowBackup`, no `dataExtractionRules`, no `fullBackupContent` anywhere under `android/`, so backup defaults on with no rules: a live SQLite file plus WAL sidecars copied uncoordinated, and the Supabase refresh token + pull cursor restored onto a second device. Under last-push-wins that is a data-clobbering configuration. Invisible in every emulator and E2E run — same blind-spot class as the v0.2.0 `INTERNET` miss. **Decided (D-B1): `allowBackup="false"`. Planned in `docs/plans/2026-08-08-android-backup.md`, ready to execute** | `android/app/src/main/AndroidManifest.xml`, `docs/app-lifecycle.md` G8 | XS–S |
+| **A-3b** | **iOS: no backup exclusion on the local DB** | `chore_app.sqlite` (+ `-wal`/`-shm`) lives under `getApplicationDocumentsDirectory()` (`drift_flutter`'s native default, no iOS/Android branch), which iCloud/iTunes backs up by default — same torn-restore and cross-device session-clobber shape as A-3, but the fix is per-file (`NSURLIsExcludedFromBackupKey` at runtime), not a manifest flag, so it needs its own scoping pass. Deliberately excluded from A-3/D-B1, which is Android-only | `ios/Runner/Info.plist`, wherever the DB file is opened (`lib/data/db/app_database.dart`) | S |
 | **A-4** | **"Reset app data" leaves the account signed in** | `resetAppData` wipes eight tables and nothing else; the Supabase session survives, so the user lands on the welcome screen still authenticated and *Join* skips the email step. The linked confirm copy says "You can reconnect by signing in again", describing a sign-out that never happens. Should also cancel the scheduled digest | `lib/application/data_reset.dart`, `lib/features/settings/reset_flow.dart` | S |
-| **A-5** | **Acting-member misattribution** (triage T1.3 / field-feedback B1) | The last open Tier 1 item, and the only one that makes *synced multi-device* data wrong rather than merely confusing. `ActingMemberButton` is still the unconditional app-bar `leading` with no linked-household gate, and `markDoneFor` exists nowhere in `lib/`. Design already agreed: pin the acting member to the claimed member when linked+signed-in, hide the switcher, and add **Mark done for…** as one ordinary row in the chore action sheet. Igor's constraint: it must stay rare — no tile placement, no prompt on the common path, completing as yourself stays exactly one tap | `lib/features/chores/acting_member_sheet.dart`, `chore_action_sheet.dart`, `chores_list_screen.dart:96`, `lib/app/providers.dart:626-643` | M |
 
 ---
 
@@ -281,6 +281,7 @@ distribution question below.
 | **G-6** | Finer-grained notifications — N2: per-chore reminders, evening re-reminder (F16) | Own spec; depends on A-1 landing first | L |
 | **G-7** | Search in long lists (F18) | Low value at family scale | M |
 | **G-8** | Multiple shopping lists (F20) | Schema is single-list today | XL |
+| **G-9** | Digest scope toggle — a per-device "include unassigned chores in my digest" opt-in | The opt-in that `DESIGN.md` §3 originally promised, retired as a *default* by OPD-1 (`docs/plans/2026-08-08-daily-digest-scheduling.md`) rather than as a *capability*. Would be a per-device `settings` boolean feeding `projectDigestCounts`'s recipient predicate — genuinely small, but it is a new settings row, new l10n and new widget tests, and nobody has asked for it. Build it if a real household reports the over-inclusion as noise, not before | S |
 
 ---
 

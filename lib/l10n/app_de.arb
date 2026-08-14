@@ -19,6 +19,8 @@
   "categoryPickerNone": "Keine",
   "categoryPickerManageTooltip": "Kategorien bearbeiten",
 
+  "choresMenuMarkDoneFor": "Für jemand anderen erledigen …",
+  "choresMarkDoneForTitle": "Wer hat das gemacht?",
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",
   "choresMenuPause": "Pausieren",
@@ -49,6 +51,7 @@
 
   "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
   "actingMemberSheetTitle": "Wer ist gerade dran?",
+  "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
   "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
@@ -85,10 +88,12 @@
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
+  "choresSnackbarDoneBy": "Erledigt — {name} gutgeschrieben",
   "choresSnackbarSkipped": "Übersprungen",
   "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
   "choresSnackbarUndo": "Rückgängig",
   "choresSnackbarPaused": "Pausiert",
+  "choresSnackbarNoActingMember": "Dieses Gerät weiß noch nicht, wer du bist. Melde dich erneut an oder öffne die App neu.",
 
   "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
   "choresDoneStatusDone": "Erledigt",

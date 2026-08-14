@@ -8,8 +8,7 @@ library;
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
-import 'package:chore_app/domain/digest_planner.dart';
-import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/features/chores/active_chores_presence.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -105,14 +104,12 @@ class DigestPrepromptBanner extends ConsumerWidget {
     await _recomputeDigest(ref);
   }
 
-  /// Re-runs the same plan-and-(re)schedule logic as
-  /// `DigestRescheduleController._recompute` (`lib/app/providers.dart`),
-  /// duplicated here rather than shared: that controller is deliberately
-  /// never read from the widget tree (see its own doc comment — it starts
-  /// a persistent debounced `Timer` meant to be activated exactly once,
-  /// from `main.dart`), and `lib/app/providers.dart` is owned by a
-  /// different work stream in this round, so its private recompute logic
-  /// can't be extracted and shared from here either.
+  /// Re-runs the same horizon build the `DigestRescheduleController`
+  /// (`lib/app/providers.dart`) runs, via the shared
+  /// [buildDigestPlans] — this used to be a hand-copied duplicate of that
+  /// controller's private recompute, which it cannot call directly (the
+  /// controller owns a persistent debounced `Timer` and is activated
+  /// exactly once, from `main.dart`, never from the widget tree).
   Future<void> _recomputeDigest(WidgetRef ref) async {
     final scheduler = ref.read(notificationSchedulerProvider);
     await scheduler.ensureInitialized();
@@ -123,32 +120,13 @@ class DigestPrepromptBanner extends ConsumerWidget {
       return;
     }
 
-    final now = ref.read(clockProvider).now();
-    final slotDate = PlainDate.fromDateTime(
-      nextDigestSlot(now: now, digestMinutes: settings.digestMinutes),
+    await scheduler.applyDigestPlans(
+      buildDigestPlans(
+        now: ref.read(clockProvider).now(),
+        settings: settings,
+        pending: pending,
+        recipientMemberId: ref.read(actingMemberProvider)?.id,
+      ),
     );
-    var dueTodayCount = 0;
-    var overdueCount = 0;
-    for (final occurrence in pending) {
-      final dueDate = occurrence.occurrence.dueDate;
-      if (dueDate == slotDate) {
-        dueTodayCount++;
-      } else if (dueDate.isBefore(slotDate)) {
-        overdueCount++;
-      }
-    }
-
-    final plan = planDigest(
-      now: now,
-      digestMinutes: settings.digestMinutes,
-      enabled: settings.digestEnabled,
-      dueTodayCount: dueTodayCount,
-      overdueCount: overdueCount,
-    );
-    if (plan == null) {
-      await scheduler.cancelDigest();
-    } else {
-      await scheduler.scheduleDigest(plan);
-    }
   }
 }

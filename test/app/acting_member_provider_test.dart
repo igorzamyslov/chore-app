@@ -1,11 +1,15 @@
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../features/settings/fake_auth_gateway.dart';
 
 /// `actingMemberProvider` fallback-resolution tests (spec
 /// `docs/specs/members-management.md` §2): a valid stored id wins; a NULL
@@ -172,6 +176,133 @@ void main() {
       );
 
       expect(container.read(actingMemberProvider)?.name, 'Me');
+
+      await database.close();
+    },
+  );
+
+  testWidgets(
+    'a linked, signed-in device pins to the CLAIMED member, ignoring a '
+    'stored actingMemberId that points at someone else',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 9)),
+          ),
+          authGatewayProvider.overrideWithValue(
+            FakeAuthGateway(
+              currentUser: const AuthUser(id: 'u-1', email: 'me@example.com'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await _pumpUntil(
+        tester,
+        () => container.read(bootstrapProvider).hasValue,
+      );
+      final householdId = container.read(bootstrapProvider).requireValue;
+      await _pumpUntil(
+        tester,
+        () =>
+            container.read(membersProvider).hasValue &&
+            container.read(settingsProvider).hasValue,
+      );
+      final me = container.read(membersProvider).requireValue.single;
+
+      final anna = await container
+          .read(householdRepositoryProvider)
+          .addMember(householdId, name: 'Anna', color: 0xFF112233);
+      // The device-scoped leftover this ticket exists to defeat: this phone
+      // still thinks it is Anna.
+      await container.read(settingsRepositoryProvider).setActingMember(anna.id);
+      await (database.update(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(userId: Value('u-1')),
+      );
+      await SettingsRepository(database).setSyncLinked(
+        householdId: householdId,
+        linkedAt: DateTime.utc(2026, 7, 24),
+      );
+
+      await _pumpUntil(
+        tester,
+        () => container.read(actingMemberProvider)?.id == me.id,
+      );
+      expect(container.read(actingMemberProvider)?.name, 'Me');
+
+      await database.close();
+    },
+  );
+
+  testWidgets(
+    'while pinned with no claim yet, falls back to the stored member and '
+    'NEVER to the first-admin guess',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 9)),
+          ),
+          authGatewayProvider.overrideWithValue(
+            FakeAuthGateway(
+              currentUser: const AuthUser(id: 'u-1', email: 'me@example.com'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await _pumpUntil(
+        tester,
+        () => container.read(bootstrapProvider).hasValue,
+      );
+      final householdId = container.read(bootstrapProvider).requireValue;
+      await _pumpUntil(
+        tester,
+        () =>
+            container.read(membersProvider).hasValue &&
+            container.read(settingsProvider).hasValue,
+      );
+
+      final anna = await container
+          .read(householdRepositoryProvider)
+          .addMember(householdId, name: 'Anna', color: 0xFF112233);
+      await container.read(settingsRepositoryProvider).setActingMember(anna.id);
+      await SettingsRepository(database).setSyncLinked(
+        householdId: householdId,
+        linkedAt: DateTime.utc(2026, 7, 24),
+      );
+      await _pumpUntil(
+        tester,
+        () =>
+            container.read(memberIdentityModeProvider) ==
+            MemberIdentityMode.pinned,
+      );
+
+      // Stored id still resolves: use it (both link paths set it to this
+      // device's own member).
+      expect(container.read(actingMemberProvider)?.id, anna.id);
+
+      // Stored id dangles: return null rather than crediting 'Me' (the
+      // first admin) — that guess is exactly the A-5 misattribution.
+      await container
+          .read(settingsRepositoryProvider)
+          .setActingMember('does-not-exist');
+      await _pumpUntil(
+        tester,
+        () => container.read(actingMemberProvider) == null,
+      );
+      expect(container.read(actingMemberProvider), isNull);
 
       await database.close();
     },
