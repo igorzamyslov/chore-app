@@ -671,6 +671,98 @@ final shoppingCategoriesProvider = StreamProvider<List<Category>>((ref) async* {
       .watchCategories(householdId, CategoryKind.shopping);
 });
 
+/// Whether this device can know, from the server, WHICH member is holding
+/// it (A-5; spec `docs/feedback/2026-08-07-field-feedback.md` B1).
+enum MemberIdentityMode {
+  /// Linked state or auth state hasn't resolved yet. Render the neutral
+  /// placeholder — deliberately NOT [switching], so a linked, signed-in
+  /// phone never flashes a "become someone else" switcher for one frame on
+  /// a cold start (`currentAuthUserProvider` is a stream: its first state
+  /// is always `AsyncLoading`).
+  unknown,
+
+  /// Local-only, or linked but signed out: the app genuinely does not know
+  /// who is holding the phone, so the acting-member switcher stays — for a
+  /// local-only household, standing in for others IS the model.
+  switching,
+
+  /// Linked AND signed in: the acting member is pinned to the claimed
+  /// member and the switcher is hidden. Crediting someone else moves to the
+  /// chore action sheet's "Mark done for…" row.
+  pinned,
+}
+
+/// [MemberIdentityMode] for the current linked/auth state.
+///
+/// Gated on `settings.syncHouseholdId` plus [currentAuthUserProvider]
+/// DIRECTLY, deliberately not on `syncEngineProvider is! NoopSyncEngine`:
+/// that additionally requires the compile-time [supabaseConfigured]
+/// constant, which would tie "who am I?" to "can I reach the network?" and
+/// force every widget test to override [syncTransportProvider] to reach the
+/// pinned branch. In production the two coincide — a household cannot
+/// become linked without a configured gateway.
+///
+/// **Watches a `select`ed record, never the bare [settingsProvider]** — see
+/// [syncEngineProvider]'s doc comment: a started sync engine writes
+/// `settings.syncLastPulledAt` on every pull, and an unscoped watch would
+/// rebuild this provider on each of them.
+final memberIdentityModeProvider = Provider<MemberIdentityMode>((ref) {
+  final linkState = ref.watch(
+    settingsProvider.select(
+      (settings) => (
+        loading: settings.isLoading,
+        householdId: settings.valueOrNull?.syncHouseholdId,
+      ),
+    ),
+  );
+  if (linkState.loading) {
+    return MemberIdentityMode.unknown;
+  }
+  if (linkState.householdId == null) {
+    return MemberIdentityMode.switching;
+  }
+  final auth = ref.watch(currentAuthUserProvider);
+  if (auth.isLoading) {
+    return MemberIdentityMode.unknown;
+  }
+  return auth.valueOrNull == null
+      ? MemberIdentityMode.switching
+      : MemberIdentityMode.pinned;
+});
+
+/// The member this device's signed-in account has claimed in the current
+/// household, resolved from the LOCAL `members.userId` mirror.
+///
+/// `user_id` is server-owned (the initial-schema grants exclude it from
+/// UPDATE; only the `create_household`/`claim_member`/`join_as_new_member`
+/// RPCs set it) and reaches this device three ways: the join snapshot
+/// (`HouseholdGateway.downloadHousehold`), the sync engine's pull
+/// (`applyPulledMember`), and `HouseholdLinkService.adopt`'s local mirror
+/// (spec `docs/specs/household-lifecycle.md` §3.1 G-B). Reading it locally
+/// is therefore offline-safe and survives process death — unlike a
+/// `findMyMembership()` round trip.
+///
+/// `null` whenever the mode isn't [MemberIdentityMode.pinned], or while the
+/// claim hasn't reached this device yet, or when this account is no longer
+/// a member of the household (revocation — handled by
+/// `docs/specs/household-lifecycle.md` §3.5, not here).
+final claimedMemberProvider = Provider<Member?>((ref) {
+  if (ref.watch(memberIdentityModeProvider) != MemberIdentityMode.pinned) {
+    return null;
+  }
+  final userId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
+  final members = ref.watch(membersProvider).value;
+  if (userId == null || members == null) {
+    return null;
+  }
+  for (final member in members) {
+    if (member.userId == userId) {
+      return member;
+    }
+  }
+  return null;
+});
+
 /// The member who acts on behalf of the user for single-user attribution
 /// flows (completing an unassigned occurrence, `createdBy` on a new chore,
 /// shopping `addedBy`), and the member the acting-member switcher (spec
