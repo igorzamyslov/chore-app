@@ -188,6 +188,72 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('a weekly tail follows the daily segment at one tail step of '
+        'spacing', () {
+      // Explicit parameters rather than the shipped constants, so this
+      // test pins the SHAPE and survives any later change to the shipped
+      // horizon size.
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 24, 7),
+        digestMinutes: 480,
+        dailyDays: 3,
+        weeklySlots: 2,
+      );
+      // Daily offsets 0,1,2; then weekly at (3-1)+7*(j+1) = 9 and 16.
+      expect(slots, [
+        DateTime(2026, 7, 24, 8),
+        DateTime(2026, 7, 25, 8),
+        DateTime(2026, 7, 26, 8),
+        DateTime(2026, 8, 2, 8),
+        DateTime(2026, 8, 9, 8),
+      ]);
+    });
+
+    test('the weekly tail keeps the same local wall-clock time across a DST '
+        'transition', () {
+      // 2026-03-29 is the European spring-forward day, and it falls
+      // between the daily segment and the first tail slot — so this covers
+      // what the daily-only DST test above cannot.
+      final slots = digestSlots(
+        now: DateTime(2026, 3, 27, 7),
+        digestMinutes: 480,
+        dailyDays: 3,
+        weeklySlots: 2,
+      );
+      expect(slots, hasLength(5));
+      for (final slot in slots) {
+        expect(slot.hour, 8);
+        expect(slot.minute, 0);
+      }
+    });
+
+    test('weeklySlots: 0 is exactly a plain daily run — the tail is '
+        'genuinely optional', () {
+      final now = DateTime(2026, 7, 24, 7);
+      expect(
+        digestSlots(
+          now: now,
+          digestMinutes: 480,
+          dailyDays: 5,
+          weeklySlots: 0,
+        ),
+        [
+          for (var k = 0; k < 5; k++) DateTime(2026, 7, 24 + k, 8),
+        ],
+      );
+    });
+
+    test('rejects a negative weekly tail', () {
+      expect(
+        () => digestSlots(
+          now: DateTime(2026),
+          digestMinutes: 480,
+          weeklySlots: -1,
+        ),
+        throwsArgumentError,
+      );
+    });
   });
 
   group('planDigestSlot', () {
