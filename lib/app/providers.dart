@@ -763,26 +763,54 @@ final claimedMemberProvider = Provider<Member?>((ref) {
   return null;
 });
 
-/// The member who acts on behalf of the user for single-user attribution
-/// flows (completing an unassigned occurrence, `createdBy` on a new chore,
-/// shopping `addedBy`), and the member the acting-member switcher (spec
+/// The member who acts on behalf of the user for attribution flows
+/// (completing an occurrence, `createdBy` on a new chore, shopping
+/// `addedBy`), and the member the acting-member switcher (spec
 /// `docs/specs/members-management.md` §4) shows as "current".
 ///
-/// Resolution order, re-run every time [settingsProvider] or
-/// [membersProvider] changes:
+/// Resolution order, re-run whenever [memberIdentityModeProvider],
+/// [claimedMemberProvider], [settingsProvider] or [membersProvider] change:
 ///
-/// 1. `settings.actingMemberId`, if it matches a member in
-///    [membersProvider]'s current list;
-/// 2. otherwise the household's first admin member, else its first member.
+/// 1. **Pinned** ([MemberIdentityMode.pinned] — linked AND signed in):
+///    [claimedMemberProvider], if the claim has reached this device. This
+///    is A-5 (spec `docs/feedback/2026-08-07-field-feedback.md` B1): on a
+///    synced household the phone IS a person, and `settings.actingMemberId`
+///    is device-scoped and never syncs, so trusting it there is exactly how
+///    two devices credit different people for the same work.
+/// 2. `settings.actingMemberId`, if it matches a member in
+///    [membersProvider]'s current list. While pinned this is only the
+///    pre-claim window (offline right after adopting, or before the first
+///    pull), and the value is safe there because every link path sets it to
+///    THIS device's own member: `HouseholdJoinService.join`/`joinFresh`
+///    call `setActingMember` with the claimed member id, and
+///    `HouseholdLinkService.adopt` is called with the current acting
+///    member.
+/// 3. Not pinned only: the household's first admin member, else its first
+///    member.
 ///
-/// `null` only while [membersProvider] hasn't loaded yet or has no members.
-/// A stored id that doesn't resolve to a current member (cleared, or
-/// dangling) silently falls through to the fallback — this is a read-time
-/// self-heal, not a repair: nothing is written back to settings.
+/// While pinned, step 3 is deliberately SKIPPED and this resolves to `null`
+/// instead: guessing "the first admin" on a synced household is the
+/// misattribution A-5 removes. `null` there means the caller falls back to
+/// the occurrence's assignee (`ChoresListScreen._complete`), and the state
+/// is transient by design — a signed-in account that is no longer a member
+/// is a revoked membership, which clears the sync link per
+/// `docs/specs/household-lifecycle.md` §3.5.
+///
+/// `null` also while [membersProvider] hasn't loaded yet or has no members.
+/// A stored id that doesn't resolve is a read-time self-heal, not a repair:
+/// nothing is ever written back to settings from here.
 final actingMemberProvider = Provider<Member?>((ref) {
   final members = ref.watch(membersProvider).value;
   if (members == null || members.isEmpty) {
     return null;
+  }
+  final pinned =
+      ref.watch(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+  if (pinned) {
+    final claimed = ref.watch(claimedMemberProvider);
+    if (claimed != null) {
+      return claimed;
+    }
   }
   final storedId = ref.watch(settingsProvider).value?.actingMemberId;
   if (storedId != null) {
@@ -791,6 +819,9 @@ final actingMemberProvider = Provider<Member?>((ref) {
         return member;
       }
     }
+  }
+  if (pinned) {
+    return null;
   }
   return members.firstWhere(
     (member) => member.role == MemberRole.admin,
