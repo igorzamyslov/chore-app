@@ -65,6 +65,14 @@ class StatsShareCard extends StatelessWidget {
     String nameOf(MemberShare share) =>
         share.member?.name ?? l10n.statsShareUnknownMember;
 
+    // Extracted rather than inlined into the row below: at four levels of
+    // widget nesting the interpolation runs past the 80-column limit, and
+    // `dart format` cannot break a string literal to fix it.
+    String countAndPercent(MemberShare share) {
+      final fraction = totalDone == 0 ? 0.0 : share.doneCount / totalDone;
+      return '${share.doneCount} · ${percentFormat.format(fraction)}';
+    }
+
     return semantic(
       'stats.share',
       child: Semantics(
@@ -135,8 +143,7 @@ class StatsShareCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${share.doneCount} · '
-                            '${percentFormat.format(totalDone == 0 ? 0 : share.doneCount / totalDone)}',
+                            countAndPercent(share),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
