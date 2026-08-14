@@ -29,10 +29,18 @@ superseded; see that spec for the current behavior.
   (NULL clears back to the automatic default), included in the existing
   watched settings stream.
 - **actingMemberProvider** (lib/app/providers.dart): resolve in order —
-  1. `settings.actingMemberId` if it matches a current household member;
-  2. otherwise the existing fallback (first admin, else first member).
-  A dangling/NULL id therefore silently falls back; nothing crashes and
-  nothing writes back to settings (self-healing read, not a repair).
+  1. **Pinned** (§4.2 — linked AND signed in): `claimedMemberProvider`, if
+     the claim has reached this device;
+  2. `settings.actingMemberId`, if it matches a current household member;
+  3. **Not pinned only**: the existing fallback (first admin, else first
+     member). While pinned, this step is deliberately SKIPPED — the
+     provider resolves to `null` instead of guessing "the first admin",
+     which is exactly the misattribution §4.2's pinning exists to remove.
+  A dangling/NULL stored id therefore silently falls back while not
+  pinned (or resolves to `null` while pinned); nothing crashes and
+  nothing writes back to settings (self-healing read, not a repair). See
+  §4.2 for the full pinned-mode rationale and the transitional-state
+  details step 3's skip depends on.
 - Ordering: members are listed everywhere in `createdAt` order (stable,
   matches the chore-form chips).
 
@@ -182,9 +190,15 @@ selectors):
 
 - Rotation semantics unchanged: rotation order remains the chore's
   assignee list order and advances on `assigned_member_id`. The acting
-  member owns `completedBy` for EVERY UI completion — assigned or not
-  (user decision 2026-07-31: credit records who actually did the work;
-  see ui-foundation-chores.md tile contract).
+  member owns `completedBy` for every ORDINARY UI completion — assigned or
+  not (user decision 2026-07-31: credit records who actually did the work;
+  see ui-foundation-chores.md tile contract) — **except** §4.2's "Mark done
+  for…" path, which is a deliberate carve-out: it writes
+  `completedBy: picked.id` for a member that is, by construction, NOT the
+  acting member, and it never calls `setActingMember`. That is intentional
+  — crediting someone else is not becoming them — so do not "fix"
+  `_markDoneFor` to also update the acting member; doing so would
+  reintroduce the device-scoped attribution drift §4.2 exists to remove.
 - Bootstrap unchanged: 'Me' is still created on first run (renaming it
   is exactly what this screen is for; the G2 name prompt stays a
   separate, later task).
