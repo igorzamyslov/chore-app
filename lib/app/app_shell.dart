@@ -115,41 +115,58 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // A nested ScaffoldMessenger so tab screens' `ScaffoldMessenger.of
-      // (context)` lookups resolve to it instead of the root one:
-      // ScaffoldMessenger only ever presents in the topmost Scaffold among
-      // its registered descendants, so without this the root messenger
-      // would present tab-screen snackbars in THIS Scaffold (the one below,
-      // owning `bottomNavigationBar`) — flush against `_BottomTabBar` with
-      // no room to breathe. Nesting it here makes each tab's own inner
-      // Scaffold the topmost one instead, so its snackbars present above
-      // the tab bar with margin (see `lib/app/snackbars.dart`).
-      body: ScaffoldMessenger(
-        key: _messengerKey,
-        child: PageView(
-          controller: _pageController,
-          onPageChanged: _onPageChanged,
-          // `allowImplicitScrolling` is deliberately left at its default
-          // (false) and must stay there: it widens the viewport's cache
-          // extent so the neighbouring page is laid out INSIDE the
-          // semantics clip, which would leak that tab's
-          // `Semantics(identifier: ...)` nodes into every
-          // `find.bySemanticsIdentifier` and every Maestro `assertVisible`
-          // while another tab is on screen. Covered by
-          // test/app/shell_navigation_test.dart.
-          children: [
-            for (final tab in _AppTab.values)
-              _KeepAlivePage(
-                scrollController: _scrollControllers[tab]!,
-                child: _screenFor(tab),
-              ),
-          ],
+    // Backlog D-6: Material's rule is that back returns to the start
+    // destination before it leaves the app, and today a back press on any
+    // tab quits outright. `canPop` is true only on the first tab, so the
+    // first-tab case is left entirely alone — the framework bubbles it and
+    // calls `SystemNavigator.pop()` exactly as before. (Side effect: with
+    // `canPop: false` Android's predictive-back preview is suppressed on the
+    // other two tabs, which is the documented cost of intercepting a pop.)
+    return PopScope(
+      canPop: _selected == _AppTab.chores,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        _onTabSelected(_AppTab.chores);
+      },
+      child: Scaffold(
+        // A nested ScaffoldMessenger so tab screens' `ScaffoldMessenger.of
+        // (context)` lookups resolve to it instead of the root one:
+        // ScaffoldMessenger only ever presents in the topmost Scaffold among
+        // its registered descendants, so without this the root messenger
+        // would present tab-screen snackbars in THIS Scaffold (the one
+        // below, owning `bottomNavigationBar`) — flush against
+        // `_BottomTabBar` with no room to breathe. Nesting it here makes
+        // each tab's own inner Scaffold the topmost one instead, so its
+        // snackbars present above the tab bar with margin (see
+        // `lib/app/snackbars.dart`).
+        body: ScaffoldMessenger(
+          key: _messengerKey,
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            // `allowImplicitScrolling` is deliberately left at its default
+            // (false) and must stay there: it widens the viewport's cache
+            // extent so the neighbouring page is laid out INSIDE the
+            // semantics clip, which would leak that tab's
+            // `Semantics(identifier: ...)` nodes into every
+            // `find.bySemanticsIdentifier` and every Maestro
+            // `assertVisible` while another tab is on screen. Covered by
+            // test/app/shell_navigation_test.dart.
+            children: [
+              for (final tab in _AppTab.values)
+                _KeepAlivePage(
+                  scrollController: _scrollControllers[tab]!,
+                  child: _screenFor(tab),
+                ),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: _BottomTabBar(
-        selected: _selected,
-        onSelected: _onTabSelected,
+        bottomNavigationBar: _BottomTabBar(
+          selected: _selected,
+          onSelected: _onTabSelected,
+        ),
       ),
     );
   }
