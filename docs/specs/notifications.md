@@ -22,8 +22,8 @@ push) — that covers the single-device household until the sync phase.*
 > — do not re-open them:
 > - **Horizon shape:** 14 daily + 10 weekly = **24 slots, reaching day 83**.
 >   Two weeks of daily cadence matches a plausible holiday, and the weekly
->   tail is where the reach comes from — the same id budget that buys 27 flat
->   days buys 83 segmented.
+>   tail is where the reach comes from — the same 24 ids spent as
+>   consecutive days would reach only day 23.
 > - **Tail spacing: weekly** (`digestHorizonTailStepDays = 7`). Someone who
 >   has not opened the app in a fortnight is not helped by a daily reminder
 >   they are already ignoring. Costs up to 7 days' delay on the first

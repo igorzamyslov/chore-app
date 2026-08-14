@@ -116,8 +116,9 @@ const int digestDailyHorizonDays = 14;
 /// would have (see `docs/plans/2026-08-14-digest-horizon-ceiling.md` §2).
 ///
 /// Ten, at weekly spacing, is what takes the horizon's reach from days to
-/// months: the same id budget that would buy 24 flat days buys 83 days
-/// segmented. Someone who has not opened the app in a fortnight is not
+/// months: the same 24 ids spent as consecutive days would reach only day
+/// 23, where segmented they reach day 83. Someone who has not opened the
+/// app in a fortnight is not
 /// helped by a daily reminder they are already ignoring.
 const int digestWeeklyHorizonSlots = 10;
 
