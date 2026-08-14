@@ -1,0 +1,7 @@
+Tägliche Erinnerungen kommen jetzt wirklich jeden Tag. Vorher hörten sie nach der ersten auf, bis du die App wieder geöffnet hast.
+
+Die App zeigt nicht mehr die Liste von gestern, wenn sie über Nacht offen bleibt.
+
+In einem geteilten Haushalt weiß dein Gerät jetzt, wer du bist. Zwei Geräte können dieselbe Aufgabe nicht mehr verschiedenen Personen gutschreiben. Mit "Erledigt für ..." schreibst du sie jemand anderem gut.
+
+Android-Backup ist jetzt deaktiviert.

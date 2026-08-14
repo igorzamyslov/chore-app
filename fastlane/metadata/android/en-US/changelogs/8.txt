@@ -1,0 +1,7 @@
+Daily reminders now actually arrive every day. Before, they stopped after the first one until you reopened the app.
+
+The app no longer shows yesterday's list if you leave it open overnight.
+
+In a shared household your phone now knows who you are, so two phones can't credit different people for the same chore. Use "Mark done for..." to credit someone else.
+
+Android auto-backup is now switched off, so your household data is never copied off the device automatically.
