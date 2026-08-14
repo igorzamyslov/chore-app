@@ -36,8 +36,8 @@ from it: this plan starts at **Task 12**. Concretely it consumes:
 | Task 9 | `showExitConfirmSheet` / `ExitConfirmResult` (§3.3, D-L3) |
 | Task 10 | `SettingsRepository.clearMembershipRevoked()` |
 
-Tasks 12–18 (slices 4 and 5) are executable the moment slices 1–3 are green.
-Tasks 19–22 (slice 6) depend on Task 1's gate, which has since been **proven**
+Tasks 12–20 (slices 4 and 5) are executable the moment slices 1–3 are green.
+Tasks 21–24 (slice 6) depend on Task 1's gate, which has since been **proven**
 — see the next section.
 
 ## Framing: delete-account is required, but it is not a launch gate
@@ -77,11 +77,11 @@ matter to the tasks below:
 
 **Consequences for this plan:**
 
-- **D-L4 resolves to the single-RPC path.** Task 20's gateway method is one
+- **D-L4 resolves to the single-RPC path.** Task 22's gateway method is one
   `rpc('delete_account')` call. There is no edge function, no service-role
   key anywhere, and the established no-credentials-in-chat paste-SQL handoff
   is preserved exactly as D-L4 intended.
-- **Task 19 is a verification-and-record task, not an implementation task.**
+- **Task 21 is a verification-and-record task, not an implementation task.**
 - **The edge-function fallback is retained but demoted** to Appendix A at the
   end of this plan. It is not a branch to choose between; it is the recovery
   route if the proven RPC ever regresses (a Supabase platform change to
@@ -136,7 +136,7 @@ Following the precedent of the slices 1–3 plan, which recorded three.
    then the action — and that shape is used unchanged for all three exits. §5
    adds a FINAL confirmation AFTER it, for the one exit that is irreversible.
    Leave and remove-a-member keep the single sheet. See **D-L6** for the full
-   rationale; Task 22 implements it.
+   rationale; Task 24 implements it.
 2. **§3.2 says `MemberService.deleteMember`'s `userId != null` guard "is
    replaced by this routing".** This plan performs the `remove_member` RPC
    *before* opening the drift transaction rather than inside it (see the last
@@ -273,8 +273,24 @@ first" is still actionable.
 deliberately keeps the profile claimable so returning is a supported path.
 This differs from delete-account, where sign-out is forced because the session
 is invalid the instant the auth row is gone — that asymmetry is intentional.
-Task 17's `HouseholdExitService.leaveHousehold` therefore never calls
+Task 19's `HouseholdExitService.leaveHousehold` therefore never calls
 `auth.signOut()`, and a test pins that.
+
+### Two carried findings, not decisions
+
+Unlike D-L6/D-L7/D-L8 above, the following two items were never open
+questions needing a product call — they are defects surfaced by review
+during the v0.5.0 work, after this plan was first drafted, and recorded in
+`docs/handover-2026-08-14-planning.md` §4:
+
+- **Task 12** gives `exit_confirm_sheet` a `SingleChildScrollView` before
+  slices 5–6 add copy long enough to overflow it on a small phone. This is
+  slice 4's one hard ordering constraint, hence its placement as slice 4's
+  FIRST task rather than at the point one of the longer strings is added.
+- **Task 17** gives a revoked pull-to-refresh its own string
+  (`syncRefreshErrorRevoked`), since the existing `syncRefreshError`'s "will
+  sync later" is false the instant `refreshNow()` has already unlinked the
+  device.
 
 ---
 
@@ -284,24 +300,30 @@ Task 17's `HouseholdExitService.leaveHousehold` therefore never calls
 
 | Path | What |
 | --- | --- |
-| `lib/application/household_exit_service.dart` | `HouseholdExitService` — leave + delete-account orchestration (Task 21) |
-| `test/application/household_exit_service_test.dart` | Its unit tests (Task 21) |
-| `test/features/settings/account_exit_rows_test.dart` | Widget tests for the Leave / Delete account rows (Tasks 18, 22) |
+| `lib/application/household_exit_service.dart` | `HouseholdExitService` — leave + delete-account orchestration (Task 19, extended Task 23) |
+| `test/application/household_exit_service_test.dart` | Its unit tests (Task 19, extended Task 23) |
+| `test/features/settings/account_exit_rows_test.dart` | Widget tests for the Leave / Delete account rows (Tasks 20, 24) |
 | `supabase/functions/delete-user/index.ts` | **NOT implemented** — Appendix A's regression fallback only |
 
 **Modified:**
 
 | Path | What |
 | --- | --- |
+| `lib/features/settings/exit_confirm_sheet.dart` | Wraps the sheet's `Column` in a `SingleChildScrollView` (Task 12 — carried finding, `docs/handover-2026-08-14-planning.md` §4) |
 | `lib/application/household_gateway.dart` | `removeMember`, `leaveHousehold`, `deleteAccount` on the interface, `NoopHouseholdGateway`, `SupabaseHouseholdGateway` |
 | `lib/application/member_service.dart` | Claim-state routing replacing the claimed guard; `ClaimedMemberRemovalFailure` |
 | `lib/app/providers.dart` | `memberServiceProvider` gains the gateway; new `householdExitServiceProvider`, `claimedMemberCountProvider` |
 | `lib/features/settings/member_edit_sheet.dart` | `_canDelete` / `_deleteBlockedReason` split by claim state; inline removal error |
 | `lib/features/settings/member_delete_dialog.dart` | `claimed` variant of the body copy |
 | `lib/features/settings/account_section.dart` | `_LeaveRow`, `_DeleteAccountRow` |
-| `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb` | All new strings |
+| `lib/features/chores/chores_list_screen.dart` | `_refresh` picks `syncRefreshErrorRevoked` over `syncRefreshError` when the pull discovered revocation (Task 17 — carried finding, §4) |
+| `lib/features/shopping/shopping_list_screen.dart` | Same `_refresh` change as the chores screen (Task 17) |
+| `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb` | All new strings, including `syncRefreshErrorRevoked` (Task 17) |
+| `test/features/settings/exit_confirm_sheet_test.dart` | Overflow regression test (Task 12) |
+| `test/features/chores/chores_refresh_indicator_test.dart` | Revoked-refresh string test (Task 17) |
+| `test/features/shopping/shopping_refresh_indicator_test.dart` | Revoked-refresh string test (Task 17) |
 | `test/features/settings/fake_household_gateway.dart` | The three new methods + call records + error hooks |
-| `test/features/settings/fake_auth_gateway.dart` | `signOutError` hook (Task 21) |
+| `test/features/settings/fake_auth_gateway.dart` | `signOutError` hook (Task 23) |
 | `test/application/member_service_test.dart` | The claimed-member guard test becomes a routing test |
 | `supabase/migrations/20260808120000_membership_exit.sql` | **Unchanged** — slice 1 / commit `f184f4a` finished it; Appendix A only |
 | `supabase/tests/002_membership_exit_test.sql` | **Unchanged** — Appendix A only |
@@ -319,7 +341,188 @@ replaces that flat refusal with a split by claim state.
 exactly the operation that produces the §0.1 trap on the removed person's
 device; slice 3's notice is what makes it honest.
 
-### Task 12: `removeMember` on the gateway
+### Task 12: Give `exit_confirm_sheet` a scroll view
+
+**Carried finding, not new scope** (`docs/handover-2026-08-14-planning.md`
+§4): this is slice 4's one hard ordering constraint, and it must land BEFORE
+any of the tasks below it in this slice, let alone slices 5–6.
+
+`showExitConfirmSheet` (`lib/features/settings/exit_confirm_sheet.dart`) is
+already live in production: `MembershipRevokedNotice._acknowledge`
+(`lib/features/settings/membership_revoked_notice.dart:75-84`) calls it
+today with `membershipRevokedTitle`/`membershipRevokedBody`, and those two
+strings fit. But the sheet itself has no scroll view anywhere:
+`showModalBottomSheet` is called with `isScrollControlled: true`
+(`exit_confirm_sheet.dart:38-40`) and `_ExitConfirmSheetState.build`
+(`exit_confirm_sheet.dart:80-136`) puts the title, body, checkbox and
+button row straight into a `Column` with `mainAxisSize: MainAxisSize.min`,
+wrapped only in a `Padding` — no `SingleChildScrollView`, no
+`ConstrainedBox` that could scroll. `isScrollControlled: true` lets the
+sheet grow up to the full screen height, but once content taller than that
+is asked for, there is nothing left to absorb the difference.
+
+Task 20's `householdLeaveConfirmBodyLastMember` (D-L5's cascade warning)
+and Task 22/24's `accountDeleteConfirmBodyLastMember` /
+`accountDeleteFinalBodyDeletePhone` are all explicitly longer than either
+of today's two strings, and every one of them is longer again in German
+(spec `docs/handover-2026-08-14-planning.md` §4). That is a render overflow
+on a small phone the moment any of them ships, so this task fixes the
+sheet itself before slice 4's own tasks add a THIRD caller.
+
+**Files:**
+- Modify: `lib/features/settings/exit_confirm_sheet.dart`
+- Modify: `test/features/settings/exit_confirm_sheet_test.dart`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: no new symbol — `showExitConfirmSheet`'s signature and
+  `ExitConfirmResult` are unchanged; this is a pure internal layout fix.
+
+- [ ] **Step 1: Write the failing test**
+
+`test/features/settings/exit_confirm_sheet_test.dart` already pumps a bare
+`MaterialApp` (no `ProviderScope`, no database) via its own `showAndTap`
+helper — reuse that pattern, not `testChoreApp`/`pump_app.dart`: this file
+has no drift database in the tree at all, so none of the stream-cleanup
+hang §5 of the handover warns about applies here, and `pump_app.dart`'s own
+default 800×2400 tall surface would defeat the point of this test by
+giving the sheet more room than a real small phone has.
+
+Add a new test that overrides the test surface DOWN (mirroring
+`test/features/settings/theme_and_scale_test.dart`'s
+`textScaleFactorTestValue` pattern, combined with a small physical size)
+and passes a body long enough to reproduce the real regression:
+
+```dart
+testWidgets(
+  'a long body at a large text scale on a small phone does not overflow '
+  '(regression: exit_confirm_sheet has no scroll view, and D-L5/D-L6 add '
+  'copy longer than either of the two strings live today)',
+  (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    // The longest real string this cluster adds (Task 24's
+    // accountDeleteFinalBodyDeletePhone, German -- German runs longer
+    // again per the handover finding). Literal text, not the l10n getter:
+    // that key doesn't exist until Task 24 runs, and this regression guard
+    // must not depend on task order.
+    const longBody =
+        'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, '
+        'und die Kopie auf diesem Handy — Mitglieder, Aufgaben und '
+        'Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. '
+        'Beides lässt sich nicht rückgängig machen. Wenn du vorher eine '
+        'Kopie deiner Daten willst, nutze „Exportieren“ unter '
+        'Einstellungen → Daten.';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => showExitConfirmSheet(
+                context,
+                title: 'Delete your account?',
+                body: longBody,
+                actionLabel: 'Delete account',
+                semanticPrefix: 'settings.account.deleteAccount',
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  },
+);
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/exit_confirm_sheet_test.dart
+```
+
+Expected RED: NOT a normal assertion failure — `tester.takeException()`
+returns a `FlutterError` (so the `expect(..., isNull)` fails), reporting "A
+RenderFlex overflowed by ... pixels on the bottom". The sheet's `Column` is
+asked to lay out `title + body + checkbox tile + button row` at 2× text
+scale inside a 640-logical-pixel-tall surface, and `isScrollControlled:
+true` only lets the modal grow up to that surface's height — there is
+nothing narrower than the whole screen for the content to spill into, and
+no scroll view to absorb the excess. If the run instead fails on a normal
+`expect` line rather than via `tester.takeException()`, the fixture text
+was not long enough at this scale/size to reproduce it — do not shrink the
+surface or raise the text scale further without first re-checking that the
+real strings in Task 20/24 haven't changed length.
+
+- [ ] **Step 3: Add the scroll view**
+
+In `lib/features/settings/exit_confirm_sheet.dart`, wrap the existing
+`Column` in a `SingleChildScrollView` — nothing else in `build` changes:
+
+```dart
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ... existing children, unchanged ...
+          ],
+        ),
+      ),
+    );
+```
+
+`Column`'s `mainAxisSize: MainAxisSize.min` is exactly what
+`SingleChildScrollView` needs from its child in the scroll direction, so no
+other widget in the tree changes shape when the content already fits (the
+existing three tests in this file, which pump at the default test surface
+and never come close to overflowing, must stay green unchanged).
+
+- [ ] **Step 4: Run to verify it passes**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/exit_confirm_sheet_test.dart
+```
+
+Expected: PASS, all four tests in the file (the three pre-existing ones
+plus the new regression guard).
+
+- [ ] **Step 5: Analyze**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos
+```
+
+Expected: `No issues found!`
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lib/features/settings/exit_confirm_sheet.dart test/features/settings/exit_confirm_sheet_test.dart
+git commit -m "Give exit_confirm_sheet a scroll view before slices 5-6 add longer copy"
+```
+
+---
+
+### Task 13: `removeMember` on the gateway
 
 **Files:**
 - Modify: `lib/application/household_gateway.dart`
@@ -420,7 +623,7 @@ git commit -m "Add removeMember to HouseholdGateway (spec §2.2, F10)"
 
 ---
 
-### Task 13: `MemberService.deleteMember` routes by claim state
+### Task 14: `MemberService.deleteMember` routes by claim state
 
 **Files:**
 - Modify: `lib/application/member_service.dart`
@@ -428,7 +631,7 @@ git commit -m "Add removeMember to HouseholdGateway (spec §2.2, F10)"
 - Modify: `test/application/member_service_test.dart`
 
 **Interfaces:**
-- Consumes: `HouseholdGateway.removeMember` (Task 12).
+- Consumes: `HouseholdGateway.removeMember` (Task 13).
 - Produces: `MemberService({required database, required chores, required gateway, clock})` — **the `gateway` parameter is new and every construction site must pass it**; `ClaimedMemberRemovalFailure` (exported from the same library). `deleteMember`'s signature is unchanged.
 
 - [ ] **Step 1: Rewrite the claimed-member guard test as a routing test**
@@ -731,7 +934,7 @@ git commit -m "Route member removal by claim state (spec §3.2, F10)"
 
 ---
 
-### Task 14: The member edit sheet stops hiding Delete for claimed members
+### Task 15: The member edit sheet stops hiding Delete for claimed members
 
 **Files:**
 - Modify: `lib/features/settings/member_edit_sheet.dart`
@@ -1023,7 +1226,7 @@ git commit -m "Show Delete for a claimed member when removal is possible (spec �
 
 ---
 
-### Task 15: Claimed-removal copy and the inline failure surface
+### Task 16: Claimed-removal copy and the inline failure surface
 
 **Files:**
 - Modify: `lib/features/settings/member_delete_dialog.dart`
@@ -1032,7 +1235,7 @@ git commit -m "Show Delete for a claimed member when removal is possible (spec �
 - Modify: `test/features/settings/members_screen_test.dart`
 
 **Interfaces:**
-- Consumes: `ClaimedMemberRemovalFailure` (Task 13).
+- Consumes: `ClaimedMemberRemovalFailure` (Task 14).
 - Produces: `showMemberDeleteDialog(context, {required String memberName, required bool claimed})` — **the `claimed` parameter is new**; the sheet gains an inline error region with semantic id `members.remove.error`.
 
 - [ ] **Step 1: Add the l10n strings**
@@ -1301,14 +1504,228 @@ git add lib/features/settings/ lib/l10n/ test/features/settings/members_screen_t
 git commit -m "Confirm and surface claimed-member removal inline (spec §3.2, F10)"
 ```
 
+---
+
+### Task 17: `syncRefreshError` gets a revoked-specific string
+
+**Carried finding, not new scope** (`docs/handover-2026-08-14-planning.md`
+§4): `syncRefreshError` (`lib/l10n/app_en.arb:1166`) reads "Couldn't reach
+the household. Your changes are saved here and will sync later." — true
+for an ordinary offline pull-to-refresh, false for a device that this same
+refresh just discovered was revoked. Slice 4 is where this cluster starts
+touching sync/membership state again, so it is the right place to close it
+rather than leaving it for slice 5 or 6 to rediscover.
+
+Both call sites are identical private `_refresh` helpers:
+`lib/features/chores/chores_list_screen.dart:453-462` and
+`lib/features/shopping/shopping_list_screen.dart:202-211`. Each awaits
+`ref.read(syncEngineProvider).refreshNow()` and, on `false`, shows
+`syncRefreshError` via `showAppSnackbar` — with no distinction between "the
+network is down" and "this device is no longer in the household."
+
+The distinction already exists, just not at the call site.
+`SupabaseSyncEngine.refreshNow()` (`lib/application/sync_engine.dart:353-368`)
+returns `false` for both cases, but `_pullSinceInner`
+(`sync_engine.dart:402-417`) has, by the time it returns `true` for
+"revoked" (which `refreshNow` folds into its own `false`), ALREADY called
+`settings.setMembershipRevoked()` and `settings.clearSyncLink()`. So the
+moment `_refresh` sees `ok == false`, the device may already be unlinked —
+and if it is, "will sync later" is not a delay, it is simply wrong until
+the user reconnects.
+
+**Files:**
+- Modify: `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb`
+- Modify: `lib/features/chores/chores_list_screen.dart`
+- Modify: `lib/features/shopping/shopping_list_screen.dart`
+- Modify: `test/features/chores/chores_refresh_indicator_test.dart`
+- Modify: `test/features/shopping/shopping_refresh_indicator_test.dart`
+
+**Interfaces:**
+- Consumes: `SettingsRepository.ensureSettings()` (existing,
+  `lib/data/repositories/settings_repository.dart:34`),
+  `settingsRepositoryProvider` (existing, `lib/app/providers.dart:178`;
+  already imported in both screens via `package:chore_app/app/providers.dart`),
+  `FakeSyncTransport.membershipPresent` (existing,
+  `test/application/fake_sync_transport.dart:48`).
+- Produces: new l10n key `syncRefreshErrorRevoked`. `_refresh`'s
+  string-picking logic changes in both screens; no new public symbol.
+
+- [ ] **Step 1: Add the l10n string**
+
+**Mechanical trap:** `lib/l10n/app_de.arb`'s `syncRefreshError` line stores
+its umlauts as JSON `\u` escapes (`Änderungen`, `später`) while
+every other line in the file (~65 of them) uses literal ä/ö/ü/ß. Locate the
+insertion point by grepping the literal key, not the rendered German text:
+
+```bash
+grep -n '"syncRefreshError"' lib/l10n/app_de.arb
+```
+
+Insert the new key right after it, using ordinary literal umlauts (matching
+every other line, NOT the escaped style of the line above it).
+
+In `lib/l10n/app_en.arb`, next to `syncRefreshError`:
+
+```json
+  "syncRefreshErrorRevoked": "This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.",
+  "@syncRefreshErrorRevoked": {
+    "description": "Snackbar shown instead of syncRefreshError when a USER-INITIATED pull-to-refresh discovers this device's membership was revoked (spec docs/specs/household-lifecycle.md §3.5). SupabaseSyncEngine.refreshNow() has already cleared the sync link by the time it returns false for this case, so syncRefreshError's 'will sync later' would be untrue here."
+  },
+```
+
+In `lib/l10n/app_de.arb` (du-form, literal umlauts):
+
+```json
+  "syncRefreshErrorRevoked": "Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.",
+```
+
+Regenerate:
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Extend `test/features/chores/chores_refresh_indicator_test.dart` with a
+case that drives `FakeSyncTransport.membershipPresent = false` (the same
+fake and override this file already uses) and reads the snackbar text.
+Trigger `_refresh` directly through the `RefreshIndicator`'s own callback
+rather than a drag gesture — it is the same widget the `chores.refresh`
+semantic id already wraps. `RefreshIndicator` comes from
+`package:flutter/material.dart`, which this test file does not currently
+import — add it:
+
+```dart
+Future<void> _triggerRefresh(WidgetTester tester) async {
+  final indicator = tester.widget<RefreshIndicator>(
+    find.descendant(
+      of: find.bySemanticsIdentifier('chores.refresh'),
+      matching: find.byType(RefreshIndicator),
+    ),
+  );
+  await indicator.onRefresh();
+  await tester.pumpAndSettle();
+}
+```
+
+```dart
+testChoreApp(
+  'a pull-to-refresh that discovers revocation shows the revoked-specific '
+  "string, not syncRefreshError's now-inaccurate \"will sync later\" "
+  '(carried finding, docs/handover-2026-08-14-planning.md §4)',
+  today: today,
+  overrides: [
+    syncTransportProvider.overrideWithValue(
+      FakeSyncTransport()..membershipPresent = false,
+    ),
+    authGatewayProvider.overrideWithValue(
+      FakeAuthGateway(
+        currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+      ),
+    ),
+  ],
+  (tester, database) async {
+    final handle = tester.ensureSemantics();
+    final householdId = await currentHouseholdId(database);
+    await SettingsRepository(
+      database,
+    ).setSyncLinked(householdId: householdId, linkedAt: DateTime.now());
+    await _pumpUntilRefreshIndicator(tester, expectPresent: true);
+
+    await _triggerRefresh(tester);
+
+    expect(find.textContaining('so nothing will sync'), findsOneWidget);
+    expect(find.textContaining('will sync later'), findsNothing);
+
+    handle.dispose();
+  },
+);
+```
+
+Add the equivalent test to
+`test/features/shopping/shopping_refresh_indicator_test.dart`, swapping
+`chores.refresh` for `shopping.refresh` (that file's existing tests already
+establish the household via `openShoppingTab`, not a bare pump).
+
+This task deliberately does NOT add a widget-level test for the ordinary
+(non-revoked) failure path — that path is unchanged and already covered at
+the `SyncEngine` level by `test/application/refresh_now_test.dart`'s
+`_OfflineTransport`/`_PushFailsTransport` cases. Adding widget-level
+failure injection for the ordinary path would need a new capability on
+`FakeSyncTransport` this task has no other reason to add.
+
+- [ ] **Step 3: Run to verify it fails**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/chores/chores_refresh_indicator_test.dart test/features/shopping/shopping_refresh_indicator_test.dart
+```
+
+Expected: FAIL — both new tests find the OLD `syncRefreshError` text
+("will sync later") instead of the new revoked-specific string, since
+`_refresh` does not yet distinguish the two cases.
+
+- [ ] **Step 4: Implement**
+
+In BOTH `lib/features/chores/chores_list_screen.dart` and
+`lib/features/shopping/shopping_list_screen.dart` (the two `_refresh`
+functions are already near-identical; keep them that way rather than
+introducing a shared helper neither file currently has):
+
+```dart
+Future<void> _refresh(BuildContext context, WidgetRef ref) async {
+  final ok = await ref.read(syncEngineProvider).refreshNow();
+  if (ok || !context.mounted) {
+    return;
+  }
+  // refreshNow() already cleared the sync link before returning false if
+  // the failure was a revocation (sync_engine.dart's _pullSinceInner) --
+  // read the just-written row directly with a one-shot query, not
+  // settingsProvider's stream (which may not have re-emitted the write
+  // yet), to tell that apart from an ordinary network failure, where
+  // syncRefreshError's "will sync later" still holds.
+  final revoked = (await ref
+          .read(settingsRepositoryProvider)
+          .ensureSettings())
+      .membershipRevoked;
+  if (!context.mounted) {
+    return;
+  }
+  showAppSnackbar(
+    context,
+    message: revoked
+        ? AppLocalizations.of(context).syncRefreshErrorRevoked
+        : AppLocalizations.of(context).syncRefreshError,
+  );
+}
+```
+
+- [ ] **Step 5: Run to verify it passes**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/chores/chores_refresh_indicator_test.dart test/features/shopping/shopping_refresh_indicator_test.dart
+```
+
+Expected: PASS, all tests in both files.
+
+- [ ] **Step 6: Analyze and commit**
+
+```bash
+env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos
+git add lib/l10n/ lib/features/chores/chores_list_screen.dart lib/features/shopping/shopping_list_screen.dart test/features/chores/chores_refresh_indicator_test.dart test/features/shopping/shopping_refresh_indicator_test.dart
+git commit -m "Give a revoked pull-to-refresh its own string instead of syncRefreshError's inaccurate 'will sync later'"
+```
+
 **Slice 4 is now complete.** A member can remove any other member, claimed or
-not; the removed person's device shows slice 3's notice on its next pull.
+not; the removed person's device shows slice 3's notice on its next pull;
+and a pull-to-refresh that discovers revocation no longer promises a sync
+that will not happen.
 
 ---
 
 ## Slice 5 — Leave household (F9) + the cascade warning (§3.4, D-L5)
 
-### Task 16: `leaveHousehold` on the gateway
+### Task 18: `leaveHousehold` on the gateway
 
 **Files:**
 - Modify: `lib/application/household_gateway.dart`
@@ -1384,7 +1801,7 @@ git commit -m "Add leaveHousehold to HouseholdGateway (spec §2.2, F9)"
 
 ---
 
-### Task 17: `HouseholdExitService.leaveHousehold`
+### Task 19: `HouseholdExitService.leaveHousehold`
 
 **Files:**
 - Create: `lib/application/household_exit_service.dart`
@@ -1392,8 +1809,8 @@ git commit -m "Add leaveHousehold to HouseholdGateway (spec §2.2, F9)"
 - Modify: `lib/app/providers.dart`
 
 **Interfaces:**
-- Consumes: `HouseholdGateway.leaveHousehold` (Task 16), `SettingsRepository.clearSyncLink()` (slice 2 Task 7 — which also nulls every local `members.userId`), `SettingsRepository.clearMembershipRevoked()` (slice 3 Task 10), `resetAppData` (`lib/application/data_reset.dart`).
-- Produces: `HouseholdExitService`, `householdExitServiceProvider`, `claimedMemberCountProvider`. `deleteAccount` is added to the same class in Task 21.
+- Consumes: `HouseholdGateway.leaveHousehold` (Task 18), `SettingsRepository.clearSyncLink()` (slice 2 Task 7 — which also nulls every local `members.userId`), `SettingsRepository.clearMembershipRevoked()` (slice 3 Task 10), `resetAppData` (`lib/application/data_reset.dart`).
+- Produces: `HouseholdExitService`, `householdExitServiceProvider`, `claimedMemberCountProvider`. `deleteAccount` is added to the same class in Task 23.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1675,7 +2092,7 @@ git commit -m "Add HouseholdExitService.leaveHousehold (spec §2.2, F9)"
 
 ---
 
-### Task 18: The Leave row, its confirm, and the cascade warning
+### Task 20: The Leave row, its confirm, and the cascade warning
 
 **Files:**
 - Modify: `lib/features/settings/account_section.dart`
@@ -1683,7 +2100,7 @@ git commit -m "Add HouseholdExitService.leaveHousehold (spec §2.2, F9)"
 - Create: `test/features/settings/account_exit_rows_test.dart`
 
 **Interfaces:**
-- Consumes: `showExitConfirmSheet` / `ExitConfirmResult` (slice 2 Task 9), `householdExitServiceProvider`, `claimedMemberCountProvider` (Task 17), `showAppSnackbar`.
+- Consumes: `showExitConfirmSheet` / `ExitConfirmResult` (slice 2 Task 9), `householdExitServiceProvider`, `claimedMemberCountProvider` (Task 19), `showAppSnackbar`.
 - Produces: `_LeaveRow` in the Account section's linked branch, semantic ids `settings.account.leave` / `settings.account.leave.{deleteLocal,cancel,confirm}` (the last three come from the shared sheet's `semanticPrefix`).
 
 - [ ] **Step 1: Add the l10n strings**
@@ -1933,7 +2350,7 @@ void main() {
 }
 ```
 
-Declare the shared fakes at the top of `main()`, as in Task 15:
+Declare the shared fakes at the top of `main()`, as in Task 16:
 
 ```dart
   final leaveGateway = FakeHouseholdGateway();
@@ -2079,7 +2496,7 @@ RESOLVED" above). Slice 6 is a single, linear path: one RPC, no edge function.
 Appendix A keeps the fallback analysis for the day the RPC regresses; it is
 not part of this slice's work.
 
-### Task 19: Server side — verify and record, do not re-implement
+### Task 21: Server side — verify and record, do not re-implement
 
 Slice 1 Task 6 plus commit `f184f4a` already shipped the final
 `delete_account()`. This task exists to confirm that on the machine doing
@@ -2132,7 +2549,7 @@ git commit -m "Record the D-L4 gate result: the in-RPC auth.users delete works"
 
 ---
 
-### Task 20: `deleteAccount` on the gateway
+### Task 22: `deleteAccount` on the gateway
 
 **Files:**
 - Modify: `lib/application/household_gateway.dart`
@@ -2211,7 +2628,7 @@ git commit -m "Add deleteAccount to HouseholdGateway (spec §2.2, F11)"
 
 ---
 
-### Task 21: `HouseholdExitService.deleteAccount`
+### Task 23: `HouseholdExitService.deleteAccount`
 
 **Files:**
 - Modify: `lib/application/household_exit_service.dart`
@@ -2219,7 +2636,7 @@ git commit -m "Add deleteAccount to HouseholdGateway (spec §2.2, F11)"
 - Modify: `test/features/settings/fake_auth_gateway.dart`
 
 **Interfaces:**
-- Consumes: `HouseholdGateway.deleteAccount` (Task 20), `AuthGateway.signOut`.
+- Consumes: `HouseholdGateway.deleteAccount` (Task 22), `AuthGateway.signOut`.
 - Produces: `HouseholdExitService.deleteAccount({required bool alsoDeleteLocalData})`; `FakeAuthGateway.signOutError`.
 
 - [ ] **Step 1: Give the auth fake a failure hook**
@@ -2366,7 +2783,7 @@ git commit -m "Add HouseholdExitService.deleteAccount (spec §2.2, F11)"
 
 ---
 
-### Task 22: The Delete account row, its exit sheet, and the final confirmation
+### Task 24: The Delete account row, its exit sheet, and the final confirmation
 
 **Files:**
 - Modify: `lib/features/settings/account_section.dart`
@@ -2374,7 +2791,7 @@ git commit -m "Add HouseholdExitService.deleteAccount (spec §2.2, F11)"
 - Modify: `test/features/settings/account_exit_rows_test.dart`
 
 **Interfaces:**
-- Consumes: `showExitConfirmSheet` (slice 2 Task 9), `householdExitServiceProvider` (Task 21), `claimedMemberCountProvider` (Task 17), `ResetDataTile`'s two-dialog shape (`lib/features/settings/reset_flow.dart`) as the pattern to mirror.
+- Consumes: `showExitConfirmSheet` (slice 2 Task 9), `householdExitServiceProvider` (Task 23), `claimedMemberCountProvider` (Task 19), `ResetDataTile`'s two-dialog shape (`lib/features/settings/reset_flow.dart`) as the pattern to mirror.
 - Produces: `_DeleteAccountRow`, semantic ids `settings.account.deleteAccount` (the row) plus `settings.account.deleteAccount.final.cancel` / `settings.account.deleteAccount.final.confirm` for D-L6's final dialog. The shared sheet contributes `.deleteLocal`, `.cancel` and `.confirm` from its `semanticPrefix` — the `.final.` segment keeps the two apart and names the dialog for what it is, a single last gate rather than one of a pair.
 
 **The full order the user walks through (D-L6):** row tap → the shared exit
@@ -2921,8 +3338,17 @@ git commit -m "Add the Delete account action (spec §2.2, F11, D-L4)"
 - `flutter analyze --fatal-infos` clean; `flutter test` green.
 - `supabase test db` still green, with no SQL changed by these slices: the
   server surface was finished in slice 1 and commit `f184f4a`.
-- Every string added here exists in BOTH `app_en.arb` and `app_de.arb`, and
+- Every string added here exists in BOTH `app_en.arb` and `app_de.arb`,
+  including `syncRefreshErrorRevoked` (Task 17), and
   `memberEditDeleteBlockedClaimed` is gone from both.
+- `exit_confirm_sheet` has a scroll view (Task 12) and its overflow
+  regression test in `test/features/settings/exit_confirm_sheet_test.dart`
+  is green: long copy at a large text scale on a small surface no longer
+  throws a `RenderFlex overflowed` `FlutterError`.
+- A pull-to-refresh that discovers revocation shows `syncRefreshErrorRevoked`
+  (Task 17), never `syncRefreshError`'s "will sync later" — which is untrue
+  the instant the device is unlinked. An ordinary offline refresh still
+  shows the original `syncRefreshError`.
 - No role check was introduced anywhere (D-L2/D1). Grep to be sure:
   `grep -rn "MemberRole" lib/features/ lib/application/household_exit_service.dart`
   should return nothing new.
@@ -2963,7 +3389,7 @@ git commit -m "Add the Delete account action (spec §2.2, F11, D-L4)"
 
 **Do not implement any of this as part of slices 4–6.** D-L4 is proven
 (commit `f184f4a`): `delete_account()` deletes the `auth.users` row itself,
-and Task 20 is a single `rpc('delete_account')`. This appendix is kept only
+and Task 22 is a single `rpc('delete_account')`. This appendix is kept only
 for one scenario: **the proven RPC regresses** — realistically, a Supabase
 platform change to `auth` schema permissions that makes a `postgres`-owned
 `SECURITY DEFINER` function unable to delete from `auth.users` again. It is
@@ -2977,7 +3403,7 @@ and drops the `auth.users` delete; an edge function holding the service-role
 key finishes the job. The client seam does not change: `HouseholdGateway.
 deleteAccount()` keeps its signature, and only `SupabaseHouseholdGateway`'s
 body swaps the RPC for a `functions.invoke('delete-user')` (the code for
-that body is in A.2 below). Tasks 21 and 22 — the service, the rows, the
+that body is in A.2 below). Tasks 23 and 24 — the service, the rows, the
 copy, the confirmations, the tests — are untouched either way.
 
 **What the fallback costs, stated plainly so it is not rediscovered late:**
@@ -2995,7 +3421,7 @@ copy, the confirmations, the tests — are untouched either way.
    unclaimed, households cascaded) and the admin delete can then fail,
    leaving an account that owns nothing. Recovery is simply retrying
    `deleteAccount()`: the RPC's loop finds no memberships and is a no-op, and
-   the admin delete runs again. Task 21's service and Task 22's error copy
+   the admin delete runs again. Task 23's service and Task 24's error copy
    already make a retry the obvious next step, so they need no change.
 3. **`supabase/tests/` cannot prove the last step.** pgTAP has no way to
    invoke an edge function, so the `delete_account removes the auth user`
@@ -3197,7 +3623,7 @@ git commit -m "Fall back to the delete-user edge function for account erasure (D
 ### A.2 — Client: the gateway body that would replace the single RPC
 
 `HouseholdGateway.deleteAccount()`'s signature, `NoopHouseholdGateway`, the
-fake, `HouseholdExitService` and every widget stay exactly as Tasks 20–22
+fake, `HouseholdExitService` and every widget stay exactly as Tasks 22–24
 built them. Only this one method body changes:
 
 ```dart
