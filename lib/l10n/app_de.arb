@@ -147,6 +147,7 @@
   "choreFormAssignmentNeedsOneError": "Wähle ein Mitglied aus",
   "choreFormAssignmentNeedsTwoError": "Wähle mindestens zwei aus",
   "choreFormAddMember": "Mitglied hinzufügen…",
+  "choreFormAssigneeRemoveTooltip": "{name} aus der Rotation entfernen",
 
   "choreFormStartDateLabel": "Startdatum",
 

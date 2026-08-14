@@ -858,6 +858,12 @@ abstract class AppLocalizations {
   /// **'Add member…'**
   String get choreFormAddMember;
 
+  /// Tooltip on the rotation reorder list's per-row remove button (chore form, assignment section).
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from the rotation'**
+  String choreFormAssigneeRemoveTooltip(String name);
+
   /// Label of the chore form's start-date field.
   ///
   /// In en, this message translates to:

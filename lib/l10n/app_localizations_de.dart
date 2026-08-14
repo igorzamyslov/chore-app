@@ -588,6 +588,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormAddMember => 'Mitglied hinzufügen…';
 
   @override
+  String choreFormAssigneeRemoveTooltip(String name) {
+    return '$name aus der Rotation entfernen';
+  }
+
+  @override
   String get choreFormStartDateLabel => 'Startdatum';
 
   @override
