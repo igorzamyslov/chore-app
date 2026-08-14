@@ -218,10 +218,10 @@ abstract class AppLocalizations {
   /// **'Delete chore?'**
   String get choresDeleteDialogTitle;
 
-  /// Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.
+  /// Body of the chore delete-confirmation dialog. Restored to the stronger promise when the chore-history screen shipped (docs/research/triage.md D2 step 2, docs/specs/stats.md §6): the claim that history is kept is now verifiable, because deleted chores are listed under Settings > Chore history and their completion log is readable there. Do NOT weaken or strengthen this copy without re-checking that screen still exists.
   ///
   /// In en, this message translates to:
-  /// **'This removes \'{choreTitle}\' from your list. You can\'t view it again yet.'**
+  /// **'This removes \'{choreTitle}\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.'**
   String choresDeleteDialogBody(String choreTitle);
 
   /// Tooltip for a chore occurrence tile's leading complete button.

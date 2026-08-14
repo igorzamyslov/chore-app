@@ -102,7 +102,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'Damit entfernst du \'$choreTitle\' aus deiner Liste. Wieder ansehen kannst du es noch nicht.';
+    return 'Damit entfernst du \'$choreTitle\' aus deinen Listen. Der Verlauf bleibt erhalten — du findest ihn unter Einstellungen › Aufgaben-Verlauf.';
   }
 
   @override

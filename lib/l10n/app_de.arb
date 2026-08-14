@@ -26,7 +26,7 @@
   "choresMenuPause": "Pausieren",
 
   "choresDeleteDialogTitle": "Aufgabe löschen?",
-  "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deiner Liste. Wieder ansehen kannst du es noch nicht.",
+  "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deinen Listen. Der Verlauf bleibt erhalten — du findest ihn unter Einstellungen › Aufgaben-Verlauf.",
 
   "choresOccurrenceCompleteTooltip": "Erledigen",
   "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",

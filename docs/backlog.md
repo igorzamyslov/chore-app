@@ -158,11 +158,14 @@ go/no-go, not code; H-2 is closed by D-B2.
 inside a single plan, and the schema one is not a merge conflict a reviewer
 would catch by eye.*
 
-- **Two plans both claim schema v10.** B-3 adds `settings.pendingJoinCode`;
-  G-1 adds a `(status, closed_on)` index. Current schema is v9. Whichever
-  lands second must become **v11**, along with its migration test. Two
-  migrations sharing a version number is a corrupt upgrade path, not a
-  conflict git will surface.
+- **Two plans both claim schema v10.** ~~B-3 adds `settings.pendingJoinCode`;
+  G-1 adds a `(status, closed_on)` index. Current schema is v9.~~ **Resolved
+  for G-1.** v10 went to `settings.membershipRevoked`
+  (`docs/specs/household-lifecycle.md` §3.5), so G-1's index landed as
+  **v11** with a v10 → v11 migration test. B-3 must now take **v12**.
+  Whichever lands next must keep claiming the next free number: two
+  migrations sharing a version is a corrupt upgrade path, not a conflict git
+  will surface.
 - **A-4 before E-2.** Both rewrite `reset_flow.dart`: A-4 adds sign-out and
   digest-cancel to `_confirmAndReset`, E-2 extracts that method. Extracting
   first silently drops the sign-out.
@@ -279,7 +282,7 @@ distribution question below.
 
 | ID | Title | Notes | Effort |
 | --- | --- | --- | --- |
-| **G-1** | Stats — "who actually does the chores" (F19) | **Promoted out of the backlog by decision D2**: the delete copy was softened on the promise that this gets built, at which point the stronger "its history is kept" copy comes back | L |
+| **G-1** | Stats — "who actually does the chores" (F19) | **SHIPPED** as `docs/specs/stats.md` (Settings → Chore history). D2 step 2 closed with it: the stronger "its history is kept — you'll find it under Settings › Chore history" delete copy is restored and now true. Landed the `(status, closed_on)` index as schema **v11**, not v10 — see the execution hazard below, which v10 (`settings.membershipRevoked`) had already claimed | L |
 | **G-2** | Repeat-form structural redesign (F14) | G3 stage 2 — the wording was fixed, the structure was not | M |
 | **G-3** | Restore from a backup file (F12) | Export exists, import does not. Explicitly a non-goal of the P4 spec, so it stands alone | M |
 | **G-4** | Custom avatars — photo or colour-as-border (F15) | User request, round 1 | M |

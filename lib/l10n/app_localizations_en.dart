@@ -102,7 +102,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'This removes \'$choreTitle\' from your list. You can\'t view it again yet.';
+    return 'This removes \'$choreTitle\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.';
   }
 
   @override
