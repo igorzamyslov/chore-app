@@ -236,6 +236,10 @@ void main() {
           now: now,
           digestMinutes: 480,
           dailyDays: 5,
+          // Passed explicitly on purpose: this test pins that a zero tail
+          // degenerates to a plain daily run, which must stay true
+          // independently of whatever the shipped default happens to be.
+          // ignore: avoid_redundant_argument_values
           weeklySlots: 0,
         ),
         [
