@@ -4,6 +4,7 @@ import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,6 +141,87 @@ void main() {
   group('unconfirmed snapshots never replace local data (spec §7.6)', () {
     late HouseholdJoinService service;
 
+    /// Fills `old-hh` with one row in every table `_deleteHousehold` wipes,
+    /// so the survival assertions below cover the ACTUAL blast radius of the
+    /// bug rather than just the households row. Without this, a guard that
+    /// deleted the chores/occurrences/categories/members/shopping items and
+    /// merely left the household row standing would still pass.
+    Future<void> seedOldHouseholdContents() async {
+      await db
+          .into(db.members)
+          .insert(
+            MembersCompanion.insert(
+              id: 'old-m1',
+              householdId: 'old-hh',
+              name: 'Me',
+              color: 0xFF6D9F71,
+              role: MemberRole.admin,
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await db
+          .into(db.categories)
+          .insert(
+            CategoriesCompanion.insert(
+              id: 'old-c1',
+              householdId: 'old-hh',
+              kind: CategoryKind.chore,
+              name: 'Kitchen',
+              icon: 'cleaning_services',
+              color: 0xFF8C7BC9,
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await db
+          .into(db.chores)
+          .insert(
+            ChoresCompanion.insert(
+              id: 'old-ch1',
+              householdId: 'old-hh',
+              title: 'Dishes',
+              startDate: PlainDate(2026, 7, 20),
+              assignmentMode: AssignmentMode.anyone,
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await db
+          .into(db.choreAssignees)
+          .insert(
+            ChoreAssigneesCompanion.insert(
+              choreId: 'old-ch1',
+              memberId: 'old-m1',
+              position: 0,
+            ),
+          );
+      await db
+          .into(db.choreOccurrences)
+          .insert(
+            ChoreOccurrencesCompanion.insert(
+              id: 'old-o1',
+              choreId: 'old-ch1',
+              dueDate: PlainDate(2026, 7, 24),
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await db
+          .into(db.shoppingItems)
+          .insert(
+            ShoppingItemsCompanion.insert(
+              id: 'old-s1',
+              householdId: 'old-hh',
+              name: 'Milk',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+    }
+
+    setUp(seedOldHouseholdContents);
+
     void buildService(HouseholdSnapshot snapshot) {
       service = HouseholdJoinService(
         gateway: FakeHouseholdGateway()
@@ -151,10 +233,39 @@ void main() {
       );
     }
 
-    /// The local household must be intact and the device must NOT be linked.
+    /// EVERY local row must be intact -- not just the household -- and the
+    /// device must NOT be linked. This is the assertion the whole task
+    /// exists for: before the guard, `_deleteHousehold` emptied all six of
+    /// these tables and `_insertSnapshot` put nothing back.
     Future<void> expectNothingDestroyed() async {
-      final households = await db.select(db.households).get();
-      expect(households.map((h) => h.id), ['old-hh']);
+      expect(
+        (await db.select(db.households).get()).map((row) => row.id),
+        ['old-hh'],
+      );
+      expect(
+        (await db.select(db.members).get()).map((row) => row.id),
+        ['old-m1'],
+      );
+      expect(
+        (await db.select(db.categories).get()).map((row) => row.id),
+        ['old-c1'],
+      );
+      expect(
+        (await db.select(db.chores).get()).map((row) => row.id),
+        ['old-ch1'],
+      );
+      expect(
+        (await db.select(db.choreAssignees).get()).map((row) => row.choreId),
+        ['old-ch1'],
+      );
+      expect(
+        (await db.select(db.choreOccurrences).get()).map((row) => row.id),
+        ['old-o1'],
+      );
+      expect(
+        (await db.select(db.shoppingItems).get()).map((row) => row.id),
+        ['old-s1'],
+      );
       final settingsRows = await db.select(db.settings).get();
       expect(
         settingsRows.map((row) => row.syncHouseholdId),
