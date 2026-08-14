@@ -56,6 +56,35 @@ void main() {
     );
   });
 
+  group('the notification id budget', () {
+    test('the digest leaves at least 32 of iOS\'s 64 pending slots for '
+        'per-chore reminders', () {
+      // iOS caps an app at 64 pending notifications. The number the digest
+      // actually competes with is NOT 64 -- it is whatever N2 / per-chore
+      // reminders (backlog G-6 / F16) will need, and those are unbuilt, so
+      // nothing else can defend their share. Raising the horizon past this
+      // guard means renegotiating that split, not editing this number.
+      // Documented in docs/specs/notifications.md, "Notification id
+      // budget".
+      expect(
+        digestHorizonSlots,
+        lessThanOrEqualTo(32),
+        reason:
+            'at least 32 of iOS\'s 64 pending notification slots must stay '
+            'available for N2 / per-chore reminders (backlog G-6 / F16)',
+      );
+    });
+
+    test('the ids are exactly digestHorizonSlots consecutive ids from the '
+        'base', () {
+      expect(digestNotificationIds, hasLength(digestHorizonSlots));
+      expect(digestNotificationIds, [
+        for (var k = 0; k < digestHorizonSlots; k++)
+          digestNotificationIdBase + k,
+      ]);
+    });
+  });
+
   group('ensureInitialized', () {
     test('initializes the plugin exactly once across repeated calls', () async {
       await scheduler.ensureInitialized();

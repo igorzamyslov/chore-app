@@ -416,6 +416,90 @@ void main() {
   );
 
   testWidgets(
+    'THE REGRESSION (A-1b): the digest survives ~12 weeks unopened, not 8 '
+    'days -- with NO app interaction at all, something is still armed two '
+    'months out',
+    (tester) async {
+      // The day-8 analogue of the P0 test above. Under the old flat 7-day
+      // horizon the furthest armed slot was 2026-01-11, so the
+      // furthest-fireAt assertion below fails against roughly
+      // `2026-01-11 08:00` where it expects a date on or after
+      // `2026-03-26 08:00`, and `pending` is empty after the 60-day
+      // delivery.
+      var currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Water the plants',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      // A daily chore gives every slot something to say, so the whole
+      // horizon is armed.
+      expect(plugin.pending, hasLength(digestHorizonSlots));
+
+      // THE POINT OF THIS PLAN: the reach, not the slot count. Asserted
+      // against an absolute date rather than a constant-derived one, so
+      // this cannot follow a shrinking horizon downwards without failing.
+      final furthest = plugin.pending.values
+          .map((call) => call.fireAt)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      expect(
+        furthest.isBefore(DateTime(2026, 3, 26, 8)),
+        isFalse,
+        reason:
+            'the furthest armed slot must be at least 80 days out, so an '
+            'app left unopened for months still has a digest coming — got '
+            '$furthest',
+      );
+
+      // The OS delivers everything due in the next 60 days. Then NOTHING
+      // happens: no mutation, no resume, no launch.
+      plugin.deliverDue(DateTime(2026, 3, 6, 8));
+      currentTime = DateTime(2026, 3, 6, 9);
+      // Captured before the pump, exactly as the P0 test does, so the
+      // assertion below cannot be satisfied by some other recompute
+      // quietly re-arming the horizon during it.
+      final scheduledCallsBefore = plugin.scheduledCalls.length;
+      await tester.pump(const Duration(hours: 1));
+
+      expect(
+        plugin.scheduledCalls.length,
+        scheduledCallsBefore,
+        reason:
+            'no app interaction occurred, so no recompute should have run '
+            'at all during this pump',
+      );
+      expect(
+        plugin.pending,
+        isNotEmpty,
+        reason:
+            'after 60 unopened days the digest must still have something '
+            'armed — this is the whole of A-1b',
+      );
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
     'completing the last chore silences the entire horizon',
     (tester) async {
       final currentTime = DateTime(2026, 1, 5, 7);
