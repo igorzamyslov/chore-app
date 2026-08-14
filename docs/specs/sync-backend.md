@@ -460,7 +460,13 @@ provider `syncEngineProvider` re-evaluates on the linked state
   `postgres_changes` event for the household (the event only
   short-circuits the timer — the payload is ignored; data always comes
   from the pull path). Push on: any local write while linked (debounced
-  ~2s), app resume, reconnect.
+  ~2s), app resume, reconnect, and (B-6, `docs/backlog.md`) the 60s
+  foreground safety-net poll defined below in `sync-freshness.md` §2.2 --
+  the same timer already used for the pull safety net now retries anything
+  still dirty on every tick too, not only on resume. The poll's pull half
+  is unconditional: a push failure on one tick must never suppress that
+  tick's pull (see `sync-freshness.md` §2.2 and
+  `SupabaseSyncEngine._pollTick`'s doc comment for why).
 - **Failure posture**: every engine error is swallowed into a silent
   retry-later (log in debug); the app NEVER surfaces sync errors in P3
   (local-first: the UI is always consistent with the local db).
