@@ -57,7 +57,7 @@ void main() {
   });
 
   group('the notification id budget', () {
-    test('the digest leaves at least 32 of iOS\'s 64 pending slots for '
+    test("the digest leaves at least 32 of iOS's 64 pending slots for "
         'per-chore reminders', () {
       // iOS caps an app at 64 pending notifications. The number the digest
       // actually competes with is NOT 64 -- it is whatever N2 / per-chore
@@ -70,7 +70,7 @@ void main() {
         digestHorizonSlots,
         lessThanOrEqualTo(32),
         reason:
-            'at least 32 of iOS\'s 64 pending notification slots must stay '
+            "at least 32 of iOS's 64 pending notification slots must stay "
             'available for N2 / per-chore reminders (backlog G-6 / F16)',
       );
     });
