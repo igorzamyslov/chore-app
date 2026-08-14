@@ -1,0 +1,62 @@
+# Shell navigation: swipe left/right between the three tabs (backlog D-1,
+# field feedback 2026-08-07 B3).
+#
+# The suite's FIRST flow to use `swipe:` — see README convention 9. Two
+# things are deliberate here:
+#   * both endpoints sit well inside the screen (20%/80%), so the gesture
+#     can never be mistaken for iOS's left-edge interactive-pop or an
+#     Android system edge gesture (same danger class as README convention 3);
+#   * the shopping list is left EMPTY. Once
+#     docs/plans/2026-08-08-shopping-gestures.md lands, a horizontal drag
+#     starting on a shopping ROW is claimed by that row's Dismissible, not
+#     by the page (spec docs/specs/ui-shopping.md). Swiping over an empty
+#     list keeps this flow correct whichever order the two land in.
+#
+# Android back (D-6) is intentionally NOT covered here: README convention 7
+# bans Maestro's bare `back`, and `pressKey: Back` is Android-only while
+# e2e/flows/config.yaml runs every flow on both platforms. It is covered in
+# test/app/shell_navigation_test.dart via the real `popRoute` platform
+# message instead.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+# First-frame settle (README convention 8).
+- extendedWaitUntil:
+    visible:
+      id: "welcome.create"
+    timeout: 60000
+- runFlow: ../../common/onboard_fresh.yaml
+- assertVisible:
+    id: "chores.add"
+# Chores -> Shopping.
+- swipe:
+    start: "80%, 45%"
+    end: "20%, 45%"
+- assertVisible:
+    id: "shopping.empty"
+# Shopping -> Settings.
+- swipe:
+    start: "80%, 45%"
+    end: "20%, 45%"
+- assertVisible:
+    id: "settings.categories"
+# Swiping past the last tab does nothing (no wrap-around).
+- swipe:
+    start: "80%, 45%"
+    end: "20%, 45%"
+- assertVisible:
+    id: "settings.categories"
+# ...and back again, one tab at a time.
+- swipe:
+    start: "20%, 45%"
+    end: "80%, 45%"
+- assertVisible:
+    id: "shopping.empty"
+- swipe:
+    start: "20%, 45%"
+    end: "80%, 45%"
+- assertVisible:
+    id: "chores.add"

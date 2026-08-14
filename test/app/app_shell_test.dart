@@ -5,8 +5,8 @@ import '../test_utils/pump_app.dart';
 
 void main() {
   testChoreApp(
-    'three tabs render; switching swaps content and IndexedStack '
-    "preserves each tab's state",
+    'three tabs render; switching swaps content and the shell keeps every '
+    "visited tab's state alive",
     today: DateTime(2026, 7, 24, 9),
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -18,11 +18,10 @@ void main() {
       // Chores is the default tab; the other two aren't shown yet.
       expect(find.bySemanticsIdentifier('settings.categories'), findsNothing);
 
-      // IndexedStack keeps every tab's widget subtree alive at all times
-      // (rather than rebuilding it on selection), so it should already be
-      // present offstage.
-      final stack = tester.widget<IndexedStack>(find.byType(IndexedStack));
-      expect(stack.children, hasLength(3));
+      // The content is a PageView (backlog D-1: horizontal swipe between
+      // tabs). Per-page keep-alive -- the property the old IndexedStack
+      // provided -- is covered in test/app/shell_navigation_test.dart.
+      expect(find.byType(PageView), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('shell.tab.shopping'));
       await tester.pumpAndSettle();

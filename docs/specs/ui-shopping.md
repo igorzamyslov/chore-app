@@ -60,8 +60,30 @@ Opened by tapping an item tile. Controls:
   repository stream's existing order — do NOT re-sort client-side.
 - Check/uncheck writes through immediately (optimistic UI unnecessary —
   local DB is fast); no animations beyond defaults.
-- The tab must keep its scroll position when switching tabs (IndexedStack
-  already guarantees this — don't break it).
+- The tab must keep its scroll position when switching tabs. Guaranteed by
+  the shell's per-page keep-alive (`docs/specs/ui-foundation-chores.md`,
+  "App shell navigation") — don't break it, and don't give this screen's
+  `ListView` its own `controller:`, which would also detach it from the
+  re-tap-to-scroll-to-top handle the shell publishes.
+- **A horizontal drag that starts on an item row belongs to that row, not to
+  the tab `PageView`.** The row's `Dismissible` is deeper in the tree, so it
+  wins the gesture arena: swipe-left deletes, and swipe-right does nothing
+  (the row declines the disallowed direction after already winning). This is
+  the same model Gmail and WhatsApp ship — a row's horizontal gesture beats
+  the pager — and it is a deliberate, accepted trade-off, not a defect
+  (decision D-S2, `docs/plans/2026-08-08-shell-navigation.md`).
+- **The accepted cost, stated plainly:** Shopping is the MIDDLE tab and its
+  rows cover most of the screen, so *paging away from this tab by swipe
+  mostly won't work*. It works only from the app bar, the pinned quick-add
+  row, category headers, the cart-section header, the empty state and the
+  bottom padding; the tab bar is always available and is the reliable route.
+- **The escape hatch, if this annoys in the field:** remove the `Dismissible`
+  from `ShoppingItemTile` and keep D-3's long-press → Delete menu. That
+  restores page-swiping everywhere at the cost of exactly one gesture, and
+  delete still has a tap-reachable path — which is the reason D-3 exists.
+  Do NOT instead try to give the `PageView` priority over rows: that needs a
+  custom `RawGestureDetector` and makes the swipe undiscoverable (rejected
+  in decision D-S2).
 
 ## Widget test matrix (minimum)
 

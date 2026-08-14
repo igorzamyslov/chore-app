@@ -39,11 +39,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   /// `docs/feedback/2026-08-01-field-feedback.md`): checking/unchecking an
   /// item rebuilds and re-parents `ShoppingCheckedSection` within the
   /// `ListView` below, which can reset a bare `ExpansionTile`'s expansion.
-  /// This screen stays mounted for the tab's entire lifetime (see the
-  /// `IndexedStack` in `lib/app/app_shell.dart`), so this field survives
-  /// every such rebuild. Reset to `false` in [build] whenever the section
-  /// itself unmounts (no checked items left) — its next appearance always
-  /// starts collapsed, by design.
+  /// This screen stays mounted for the tab's entire lifetime once first
+  /// visited (each page of the `PageView` in `lib/app/app_shell.dart` is
+  /// kept alive), so this field survives every such rebuild. Reset to
+  /// `false` in [build] whenever the section itself unmounts (no checked
+  /// items left) — its next appearance always starts collapsed, by design.
   bool _cartExpanded = false;
 
   @override
