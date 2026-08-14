@@ -62,6 +62,9 @@ class StatsShareCard extends StatelessWidget {
         : l10n.statsWindowLast30Days;
     final totalLabel = l10n.statsTotalDone(totalDone);
 
+    final shares = [...this.shares]
+      ..sort((a, b) => b.doneCount.compareTo(a.doneCount));
+
     String nameOf(MemberShare share) =>
         share.member?.name ?? l10n.statsShareUnknownMember;
 
