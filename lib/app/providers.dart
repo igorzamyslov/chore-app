@@ -661,12 +661,16 @@ final statsServiceProvider = Provider<StatsService>((ref) {
 /// this screen is a snapshot of the past, so a drift `.watch()` would re-run
 /// a whole-history aggregate on every unrelated occurrence write for the rest
 /// of the session. Leaving the screen drops the result; re-entering re-reads.
-final statsOverviewProvider = FutureProvider.autoDispose<StatsOverview>((
-  ref,
-) async {
-  final householdId = await ref.watch(bootstrapProvider.future);
-  return ref.watch(statsServiceProvider).overview(householdId);
-});
+// Explicitly annotated (and likewise [choreHistoryProvider] below): these
+// are the codebase's first `autoDispose` providers, and
+// `FutureProvider.autoDispose<T>` is a static-getter call rather than a
+// constructor invocation, so `specify_nonobvious_property_types` cannot
+// infer the declared type from the right-hand side.
+final AutoDisposeFutureProvider<StatsOverview> statsOverviewProvider =
+    FutureProvider.autoDispose<StatsOverview>((ref) async {
+      final householdId = await ref.watch(bootstrapProvider.future);
+      return ref.watch(statsServiceProvider).overview(householdId);
+    });
 
 /// The row cap on a single chore's completion log (spec
 /// `docs/specs/stats.md` §5) -- an honest total is shown alongside it rather
@@ -694,7 +698,8 @@ class ChoreHistoryView {
 
 /// One chore's completion log, keyed by chore id. `autoDispose` for the same
 /// reason as [statsOverviewProvider].
-final choreHistoryProvider = FutureProvider.autoDispose
+final AutoDisposeFutureProviderFamily<ChoreHistoryView, String>
+choreHistoryProvider = FutureProvider.autoDispose
     .family<ChoreHistoryView, String>((ref, choreId) async {
       await ref.watch(bootstrapProvider.future);
       final database = ref.watch(appDatabaseProvider);

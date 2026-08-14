@@ -209,9 +209,15 @@ class StatsRepository {
   /// The `members` join is a DISPLAY join and deliberately does NOT filter
   /// `deleted_at`: a removed member's past work stays attributed (spec
   /// §2.1).
+  ///
+  /// [limit] is required rather than defaulted to 50: the cap is a product
+  /// decision that belongs to one place (`choreHistoryLimit`, spec §5), and
+  /// a default here would restate it -- two constants that must agree, and
+  /// which `avoid_redundant_argument_values` would then flag at the one
+  /// call site that passes it deliberately.
   Future<List<ChoreCompletion>> recentCompletions(
     String choreId, {
-    int limit = 50,
+    required int limit,
   }) async {
     final query =
         db.select(db.choreOccurrences).join([
