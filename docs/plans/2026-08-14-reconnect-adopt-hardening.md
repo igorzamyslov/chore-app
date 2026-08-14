@@ -221,12 +221,16 @@ edit anchored on its rendered German text will not match.
 
 ---
 
-## Open product decisions
+## Product decisions — both RESOLVED 2026-08-14
 
-Both are genuinely open, user-visible, and not derivable from any binding
-spec. Each states what this plan assumes so it stays executable either way.
+Both were genuinely open when this plan was drafted: user-visible, and not
+derivable from any binding spec. **Both recommendations were accepted**, OPD-2
+with one added requirement (see its "Determinism alone is not sufficient"
+block). They are recorded below as decisions, not proposals; the options and
+reasoning are kept so the choice can be re-opened on evidence rather than
+re-derived.
 
-### OPD-1 — May a removed member take their local copy online as a household of their own?
+### OPD-1 — May a removed member take their local copy online as a household of their own? → **NO for now; backlogged**
 
 A user removed from household H keeps their local copy by design (D-L3). They
 now want to be online again. Two legitimate intents: *"get me back into my
@@ -265,9 +269,13 @@ member. It would only move the client's existing resume heuristic
 (`household_link_service.dart:73-85`) server-side, where it is admittedly
 tidier — a separate, optional cleanup, not this.
 
-**Recommendation: Option 1 now, Option 2 as a backlog row** (Task 7 adds it).
-The fork is a new product capability, not a bug fix, and it should be decided
-on evidence that someone wants it.
+**DECIDED: Option 1 now, Option 2 as a backlog row** (Task 7 adds it).
+Rationale as accepted: a removed member **keeping** their local copy is already
+the D-L3 default, so nothing is being taken away; turning that copy into an
+*independent online household* is a genuinely bigger feature than this ticket.
+The re-key finding above is precisely why it must not be improvised inside an
+adopt-failure branch — Task 7's backlog row carries that finding verbatim so
+whoever picks it up does not rediscover it.
 
 **What the plan assumes:** Tasks 4–5 build the typed conflict signal
 (`HouseholdIdTakenFailure`, pinned by pgTAP) regardless of the answer. Task 6
@@ -275,7 +283,7 @@ consumes it as a terminal state. If Igor picks Option 2, Tasks 4–5 are
 unchanged and Task 6's blocked state becomes the entry point for a re-key task
 appended after it. Nothing has to be undone.
 
-### OPD-2 — What should reconnect offer when the account is a claimed member of several households?
+### OPD-2 — What should reconnect offer when the account is a claimed member of several households? → **Deterministic most-recent-first now; chooser backlogged**
 
 Legitimate and reachable: adopt on device 1, then join a second household by
 code on device 2, and the account claims a member in both — `delete_account`'s
@@ -1068,6 +1076,11 @@ git commit -m "Record the reconnect/adopt contracts and the two deferred capabil
       a confirmed snapshot (Task 1) — the one behaviour a reviewer should
       re-derive from the code rather than trust the tests for
 - [ ] The adopt row has no state in which it invites a retry that cannot succeed
+- [ ] Every path that reaches the reconnect offer still displays the household
+      NAME (`settingsAccountReconnectTitle`) — the deterministic auto-pick of
+      OPD-2 is only acceptable because the user can read it and decline
+- [ ] The OPD-1 backlog row carries the **re-key finding** (household-id-only
+      is insufficient; the full list of tables), not just a title
 - [ ] No migration was added; client schema version unchanged (do not collide
       with the pending v10 contention in `docs/backlog.md`)
 - [ ] `is_household_member` and the `members` grants are untouched
