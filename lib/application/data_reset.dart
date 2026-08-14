@@ -17,6 +17,15 @@ import 'package:chore_app/data/db/app_database.dart';
 /// production, `ResetDataTile` does this): its device-settings row (and the
 /// first-run banner shown-once flags on it) was also just deleted out from
 /// under its already-running watch stream.
+///
+/// Deliberately does not touch the Supabase session or the scheduled
+/// digest notification -- both are the caller's responsibility
+/// (`ResetDataTile._confirmAndReset` in production, spec
+/// `docs/feedback/2026-08-08-prerelease-audit.md` P3), the same pattern
+/// this function already follows for `settingsProvider` invalidation.
+/// Keeping this function DB-only means its own tests
+/// (`test/application/data_reset_test.dart`) never need an `AuthGateway`
+/// or `NotificationScheduler` fake.
 Future<void> resetAppData(AppDatabase database) {
   return database.transaction(() async {
     await database.delete(database.choreOccurrences).go();

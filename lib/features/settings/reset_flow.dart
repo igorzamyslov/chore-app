@@ -24,8 +24,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// the whole screen drawn in `error`.
 ///
 /// Tapping it runs the spec's double-confirm (two chained dialogs; a
-/// cancel anywhere is a no-op and leaves the database untouched). Only
-/// after both confirms does it call [resetAppData] and invalidate
+/// cancel anywhere is a no-op and leaves the database untouched).
+/// Only after both confirms does it cancel the scheduled digest
+/// notification, sign out of the current Supabase session (spec
+/// `docs/feedback/2026-08-08-prerelease-audit.md` P3 -- unlike the A1.2
+/// Disconnect action in `account_section.dart`, which deliberately keeps
+/// the session and only unlinks the device, Reset is the clean-slate
+/// operation and ends it), call [resetAppData], and invalidate
 /// [settingsProvider] (whose device-settings row the reset just deleted out
 /// from under its already-running watch stream, needed regardless of
 /// household state since `ChoreApp` watches it unconditionally for
@@ -69,9 +74,50 @@ class ResetDataTile extends ConsumerWidget {
       return;
     }
 
+    // Two side effects that live OUTSIDE the database transaction
+    // resetAppData wipes (spec docs/feedback/2026-08-08-prerelease-audit.md
+    // P3): the scheduled digest notification, and -- unlike Disconnect
+    // (household_link_service.dart's deliberate keep-the-session inverse
+    // of this action) -- the Supabase session itself. Reset is the "clean
+    // slate" operation: double-confirmed, and the one most likely to be
+    // used right before handing a phone to someone else, so a surviving
+    // session for the previous account is the wrong default here, unlike
+    // for Disconnect. Both run BEFORE the wipe and are individually
+    // best-effort (wrapped below): a network hiccup signing out, or an OS
+    // plugin hiccup cancelling a notification, must never block the wipe
+    // itself -- the double-confirmed delete is the one promise in this
+    // flow that must always be kept.
+    await _cancelDigest(ref);
+    await _signOut(ref);
+
     final database = ref.read(appDatabaseProvider);
     await resetAppData(database);
     ref.invalidate(settingsProvider);
+  }
+
+  /// Cancels the scheduled digest notification, if any. Best-effort: see
+  /// the doc comment in [_confirmAndReset] on why a failure here must
+  /// never block the wipe that follows.
+  Future<void> _cancelDigest(WidgetRef ref) async {
+    try {
+      await ref.read(notificationSchedulerProvider).cancelDigest();
+    } on Exception {
+      // Best-effort -- see doc comment above.
+    }
+  }
+
+  /// Signs out of the current Supabase session, if any. Safe to call
+  /// unconditionally even when already signed out (spec's analysis:
+  /// `NoopAuthGateway.signOut()` is a no-op; `SupabaseAuthGateway.
+  /// signOut()` is wrapped the same way regardless). Best-effort: see the
+  /// doc comment in [_confirmAndReset] on why a failure here must never
+  /// block the wipe that follows.
+  Future<void> _signOut(WidgetRef ref) async {
+    try {
+      await ref.read(authGatewayProvider).signOut();
+    } on Exception {
+      // Best-effort -- see doc comment above.
+    }
   }
 
   Future<bool> _showFirstDialog(
