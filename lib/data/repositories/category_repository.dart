@@ -218,7 +218,7 @@ class CategoryRepository {
                   (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
                 ))
                 .get();
-        return rows.length;
+        return rows.length > 2 ? 2 : rows.length;
       case CategoryKind.shopping:
         final rows =
             await (db.select(db.shoppingItems)..where(
