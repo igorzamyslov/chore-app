@@ -796,8 +796,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryDeleteDialogTitle => 'Kategorie löschen?';
 
   @override
-  String categoryDeleteDialogBody(String categoryName) {
-    return 'Damit löschst du \'$categoryName\'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.';
+  String categoryDeleteDialogBodyChoresZero(String categoryName) {
+    return 'Damit löschst du \'$categoryName\'. Sie wird gerade von keiner Aufgabe verwendet.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und werden danach unkategorisiert.',
+      one:
+          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und wird danach unkategorisiert.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingZero(String categoryName) {
+    return 'Damit löschst du \'$categoryName\'. Sie wird gerade von keinem Artikel verwendet.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und werden danach unkategorisiert.',
+      one:
+          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und wird danach unkategorisiert.',
+    );
+    return '$_temp0';
   }
 
   @override

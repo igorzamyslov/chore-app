@@ -198,14 +198,24 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
     if (existing == null) {
       return;
     }
+    final repo = ref.read(categoryRepositoryProvider);
+    final referenceCount = await repo.countActiveReferences(
+      existing.id,
+      existing.kind,
+    );
+    if (!mounted) {
+      return;
+    }
     final confirmed = await showCategoryDeleteDialog(
       context,
       categoryName: existing.name,
+      kind: existing.kind,
+      referenceCount: referenceCount,
     );
     if (!confirmed) {
       return;
     }
-    await ref.read(categoryRepositoryProvider).softDeleteCategory(existing.id);
+    await repo.softDeleteCategory(existing.id);
     if (!mounted) {
       return;
     }

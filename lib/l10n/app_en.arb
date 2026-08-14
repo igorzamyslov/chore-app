@@ -1023,13 +1023,51 @@
   "@categoryDeleteDialogTitle": {
     "description": "Title of the category delete-confirmation dialog."
   },
-  "categoryDeleteDialogBody": "This deletes '{categoryName}'. Chores and items using it become uncategorized.",
-  "@categoryDeleteDialogBody": {
-    "description": "Body of the category delete-confirmation dialog, explaining the consequence.",
+  "categoryDeleteDialogBodyChoresZero": "This deletes '{categoryName}'. No chores use it right now.",
+  "@categoryDeleteDialogBodyChoresZero": {
+    "description": "Body of the category delete-confirmation dialog for a chore-kind category that no active chore currently references.",
     "placeholders": {
       "categoryName": {
         "type": "String",
-        "example": "Produce"
+        "example": "Cleaning"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{This deletes '{categoryName}'. 1 chore uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} chores use it and will become uncategorized.}}",
+  "@categoryDeleteDialogBodyChoresCount": {
+    "description": "Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Cleaning"
+      },
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyShoppingZero": "This deletes '{categoryName}'. No shopping items use it right now.",
+  "@categoryDeleteDialogBodyShoppingZero": {
+    "description": "Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Dairy"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{This deletes '{categoryName}'. 1 shopping item uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} shopping items use it and will become uncategorized.}}",
+  "@categoryDeleteDialogBodyShoppingCount": {
+    "description": "Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Dairy"
+      },
+      "count": {
+        "type": "int",
+        "example": "5"
       }
     }
   },

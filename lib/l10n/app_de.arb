@@ -224,7 +224,10 @@
   "categoryEditColorLabel": "Farbe",
 
   "categoryDeleteDialogTitle": "Kategorie löschen?",
-  "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.",
+  "categoryDeleteDialogBodyChoresZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keiner Aufgabe verwendet.",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und wird danach unkategorisiert.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und werden danach unkategorisiert.}}",
+  "categoryDeleteDialogBodyShoppingZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keinem Artikel verwendet.",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und wird danach unkategorisiert.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und werden danach unkategorisiert.}}",
 
   "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",
