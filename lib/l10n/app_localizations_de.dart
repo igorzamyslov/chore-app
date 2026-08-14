@@ -86,6 +86,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Für jemand anderen erledigen …';
 
   @override
+  String get choresMarkDoneForTitle => 'Wer hat das gemacht?';
+
+  @override
   String get choresMenuSkip => 'Überspringen';
 
   @override
@@ -289,6 +292,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String choresSnackbarDoneNextDue(String dueText) {
     return 'Erledigt — nächste Fälligkeit $dueText';
+  }
+
+  @override
+  String choresSnackbarDoneBy(String name) {
+    return 'Erledigt — $name gutgeschrieben';
   }
 
   @override

@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Mark done for…'**
   String get choresMenuMarkDoneFor;
 
+  /// Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is.
+  ///
+  /// In en, this message translates to:
+  /// **'Who did this one?'**
+  String get choresMarkDoneForTitle;
+
   /// Chore occurrence action-sheet entry: skip the pending occurrence.
   ///
   /// In en, this message translates to:
@@ -517,6 +523,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done — next due {dueText}'**
   String choresSnackbarDoneNextDue(String dueText);
+
+  /// Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.
+  ///
+  /// In en, this message translates to:
+  /// **'Done — credited to {name}'**
+  String choresSnackbarDoneBy(String name);
 
   /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
   ///

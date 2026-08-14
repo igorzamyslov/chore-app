@@ -86,6 +86,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Mark done for…';
 
   @override
+  String get choresMarkDoneForTitle => 'Who did this one?';
+
+  @override
   String get choresMenuSkip => 'Skip';
 
   @override
@@ -286,6 +289,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String choresSnackbarDoneNextDue(String dueText) {
     return 'Done — next due $dueText';
+  }
+
+  @override
+  String choresSnackbarDoneBy(String name) {
+    return 'Done — credited to $name';
   }
 
   @override

@@ -20,6 +20,7 @@
   "categoryPickerManageTooltip": "Kategorien bearbeiten",
 
   "choresMenuMarkDoneFor": "Für jemand anderen erledigen …",
+  "choresMarkDoneForTitle": "Wer hat das gemacht?",
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",
   "choresMenuPause": "Pausieren",
@@ -87,6 +88,7 @@
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
+  "choresSnackbarDoneBy": "Erledigt — {name} gutgeschrieben",
   "choresSnackbarSkipped": "Übersprungen",
   "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
   "choresSnackbarUndo": "Rückgängig",

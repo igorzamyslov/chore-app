@@ -93,6 +93,10 @@
   "@choresMenuMarkDoneFor": {
     "description": "Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case."
   },
+  "choresMarkDoneForTitle": "Who did this one?",
+  "@choresMarkDoneForTitle": {
+    "description": "Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is."
+  },
   "choresMenuSkip": "Skip",
   "@choresMenuSkip": {
     "description": "Chore occurrence action-sheet entry: skip the pending occurrence."
@@ -366,6 +370,13 @@
         "type": "String",
         "example": "Tomorrow"
       }
+    }
+  },
+  "choresSnackbarDoneBy": "Done — credited to {name}",
+  "@choresSnackbarDoneBy": {
+    "description": "Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.",
+    "placeholders": {
+      "name": { "type": "String" }
     }
   },
   "choresSnackbarSkipped": "Skipped",

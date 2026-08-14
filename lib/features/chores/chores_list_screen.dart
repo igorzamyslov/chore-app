@@ -23,6 +23,7 @@ import 'package:chore_app/features/chores/chore_progress_card.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
+import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -226,6 +227,39 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     await _showCloseSnackbar(occurrence: occurrence, skipped: false);
   }
 
+  /// The rare "I finished something for someone else" path (A-5, spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` B1): pick a member, then
+  /// close the occurrence crediting THEM.
+  ///
+  /// Deliberately NOT a new `ChoreService` method: `completeOccurrence`
+  /// already takes the credited member, and rotation advances on
+  /// `assigned_member_id` rather than `completed_by`, so this differs from
+  /// [_complete] only in which id it passes. It also never writes
+  /// `settings.actingMemberId` — crediting somebody is not becoming them.
+  Future<void> _markDoneFor(OccurrenceWithChore occurrence) async {
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final picked = await showMarkDoneForSheet(
+      context,
+      members: members,
+      excludeMemberId: ref.read(claimedMemberProvider)?.id,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    await ref
+        .read(choreServiceProvider)
+        .completeOccurrence(occurrence.occurrence.id, completedBy: picked.id);
+    unawaited(HapticFeedback.mediumImpact());
+    if (!mounted) {
+      return;
+    }
+    await _showCloseSnackbar(
+      occurrence: occurrence,
+      skipped: false,
+      creditedTo: picked,
+    );
+  }
+
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
     // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
     // "Mark done for…" replaces the app-bar switcher, so it is offered in
@@ -243,8 +277,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
     switch (action) {
       case ChoreMenuAction.markDoneFor:
-        // Filled in by the next task.
-        return;
+        await _markDoneFor(occurrence);
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)
@@ -311,6 +344,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   Future<void> _showCloseSnackbar({
     required OccurrenceWithChore occurrence,
     required bool skipped,
+    Member? creditedTo,
   }) async {
     final choreId = occurrence.chore.id;
     final occurrenceId = occurrence.occurrence.id;
@@ -322,6 +356,26 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
 
     final l10n = AppLocalizations.of(context);
+    // A-5: on the "Mark done for…" path the credited member is NOT the
+    // person holding the phone, so the confirmation says whose credit it
+    // was. The next-due variants are skipped here deliberately — WHO got
+    // the credit is the fact worth confirming on this path, and the chore's
+    // next occurrence is visible in the list behind the bar anyway.
+    if (creditedTo != null) {
+      showAppSnackbar(
+        context,
+        message: l10n.choresSnackbarDoneBy(creditedTo.name),
+        action: SnackBarAction(
+          label: l10n.choresSnackbarUndo,
+          onPressed: () {
+            unawaited(
+              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
+            );
+          },
+        ),
+      );
+      return;
+    }
     final String message;
     if (nextPending == null) {
       message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
