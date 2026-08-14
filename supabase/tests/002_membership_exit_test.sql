@@ -451,7 +451,7 @@ select throws_ok(
   $$select create_household(
       '10000000-0000-0000-0000-0000000000a2'::uuid, 'Haus Dup',
       '20000000-0000-0000-0000-0000000000cf'::uuid, 'Outsider', 4278190080)$$,
-  '23505', null,
+  '42501', null,
   'create_household on a taken household id raises unique_violation');
 
 select * from finish();
