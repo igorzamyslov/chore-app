@@ -50,7 +50,11 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
-    final today = PlainDate.fromDateTime(ref.watch(clockProvider).now());
+    // todayProvider, not a one-shot clock read: this is what re-buckets the
+    // list at local midnight while the app stays open (backlog A-2 / audit
+    // P1). It flows down to ChoreSection, every tile's due text, and the
+    // progress card as a plain parameter, so this single watch covers them.
+    final today = ref.watch(todayProvider);
     // C1 (spec docs/specs/sync-freshness.md §2.3): the pull-to-refresh
     // indicator is shown only when there's actually a remote to pull from --
     // the same linked-AND-signed-in gate `syncEngineProvider` itself applies
@@ -310,7 +314,10 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
     } else {
       final localeName = Localizations.localeOf(context).toString();
-      final today = PlainDate.fromDateTime(ref.read(clockProvider).now());
+      // The same "today" the list itself is bucketing on, so the snackbar's
+      // "next due …" text can never contradict the section the chore lands
+      // in a frame later.
+      final today = ref.read(todayProvider);
       final dueText = futureDueText(
         l10n,
         localeName,

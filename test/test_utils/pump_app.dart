@@ -45,11 +45,18 @@ import 'package:flutter_test/flutter_test.dart';
 /// tests (`test/features/chores/onboarding_name_banner_test.dart`) rely on
 /// that flag staying NULL for the fresh bootstrap shape, matching the old
 /// silent-bootstrap behavior exactly.
+///
+/// [clock] replaces the default `Clock.fixed(today)` for the rare test that
+/// needs "now" to actually MOVE — day rollover
+/// (`test/features/chores/day_rollover_widget_test.dart`). [today] is still
+/// required: it is the date the test starts on. Pass a `Clock(() => myVar)`
+/// over a mutable variable and assign that variable to move time.
 void testChoreApp(
   String description,
   Future<void> Function(WidgetTester tester, AppDatabase database) body, {
   required DateTime today,
   List<Override> overrides = const [],
+  Clock? clock,
 }) {
   testWidgets(description, (tester) async {
     final database = await _pumpChoreApp(
@@ -57,6 +64,7 @@ void testChoreApp(
       today: today,
       overrides: overrides,
       seedHousehold: true,
+      clock: clock,
     );
 
     await body(tester, database);
@@ -99,6 +107,7 @@ Future<AppDatabase> _pumpChoreApp(
   required DateTime today,
   required List<Override> overrides,
   required bool seedHousehold,
+  Clock? clock,
 }) async {
   // Every test opens its own fresh in-memory AppDatabase, so drift's
   // "you've created this database class multiple times" warning (aimed
@@ -122,7 +131,7 @@ Future<AppDatabase> _pumpChoreApp(
     ProviderScope(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(Clock.fixed(today)),
+        clockProvider.overrideWithValue(clock ?? Clock.fixed(today)),
         ...overrides,
       ],
       child: const ChoreApp(),
