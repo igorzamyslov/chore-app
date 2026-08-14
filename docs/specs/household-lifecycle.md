@@ -266,6 +266,14 @@ same step. Without it the row is dirty-and-unclaimed, and `_applyPulled`
 skips dirty rows, so the window stays open until a push/pull round trip
 closes it.
 
+**Landed 2026-08-08 with A-5** (`docs/plans/2026-08-08-acting-member-pinning.md`
+Task 3): `HouseholdRepository.setMemberClaim` plus `adopt`'s new
+`authUserId` parameter. A-5's `claimedMemberProvider` depends on it, so it
+was pulled out of this cluster rather than blocking on it. **G-A is still
+open here** — nulling every local `members.userId` on `clearSyncLink` is
+untouched by A-5, whose gate is linked-and-signed-in and so already ignores
+a stale flag on an unlinked household.
+
 Push is unchanged: `user_id` is server-owned: `_pushMembers` sends only
 the four granted columns, and the local value exists to be READ by the
 §3.2 routing and the §3.4 count.

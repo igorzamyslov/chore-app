@@ -9,9 +9,10 @@ documents listed that is in fact implemented has been dropped here.*
 
 **Closed since they were written, verified in code:** the entire
 `2026-08-01-ux-audit.md` (A1–A6, B1–B3), all of `polish-round-1.md` (A1–A3,
-B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 except
-T1.3, the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
+B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full,
+the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
 `next-session-plan.md` backlog bullet except `Recurrence` equality.
+Also closed: **A-5 (acting-member pinning + Mark done for…, 2026-08-08)**.
 
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
@@ -195,7 +196,6 @@ would catch by eye.*
 | **A-3** | **Android auto-backup unconfigured** | No `allowBackup`, no `dataExtractionRules`, no `fullBackupContent` anywhere under `android/`, so backup defaults on with no rules: a live SQLite file plus WAL sidecars copied uncoordinated, and the Supabase refresh token + pull cursor restored onto a second device. Under last-push-wins that is a data-clobbering configuration. Invisible in every emulator and E2E run — same blind-spot class as the v0.2.0 `INTERNET` miss. **Decided (D-B1): `allowBackup="false"`. Planned in `docs/plans/2026-08-08-android-backup.md`, ready to execute** | `android/app/src/main/AndroidManifest.xml`, `docs/app-lifecycle.md` G8 | XS–S |
 | **A-3b** | **iOS: no backup exclusion on the local DB** | `chore_app.sqlite` (+ `-wal`/`-shm`) lives under `getApplicationDocumentsDirectory()` (`drift_flutter`'s native default, no iOS/Android branch), which iCloud/iTunes backs up by default — same torn-restore and cross-device session-clobber shape as A-3, but the fix is per-file (`NSURLIsExcludedFromBackupKey` at runtime), not a manifest flag, so it needs its own scoping pass. Deliberately excluded from A-3/D-B1, which is Android-only | `ios/Runner/Info.plist`, wherever the DB file is opened (`lib/data/db/app_database.dart`) | S |
 | **A-4** | **"Reset app data" leaves the account signed in** | `resetAppData` wipes eight tables and nothing else; the Supabase session survives, so the user lands on the welcome screen still authenticated and *Join* skips the email step. The linked confirm copy says "You can reconnect by signing in again", describing a sign-out that never happens. Should also cancel the scheduled digest | `lib/application/data_reset.dart`, `lib/features/settings/reset_flow.dart` | S |
-| **A-5** | **Acting-member misattribution** (triage T1.3 / field-feedback B1) | The last open Tier 1 item, and the only one that makes *synced multi-device* data wrong rather than merely confusing. `ActingMemberButton` is still the unconditional app-bar `leading` with no linked-household gate, and `markDoneFor` exists nowhere in `lib/`. Design already agreed: pin the acting member to the claimed member when linked+signed-in, hide the switcher, and add **Mark done for…** as one ordinary row in the chore action sheet. Igor's constraint: it must stay rare — no tile placement, no prompt on the common path, completing as yourself stays exactly one tap | `lib/features/chores/acting_member_sheet.dart`, `chore_action_sheet.dart`, `chores_list_screen.dart:96`, `lib/app/providers.dart:626-643` | M |
 
 ---
 

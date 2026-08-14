@@ -64,22 +64,67 @@ superseded; see that spec for the current behavior.
   that spec for the current delete affordance (visibility guards,
   referential cleanup) and `lib/application/member_service.dart`.
 
-## 4. Acting-member switcher
+## 4. Who the app acts as
+
+Two modes, decided by `memberIdentityModeProvider` (`lib/app/providers.dart`)
+from the linked state (`settings.syncHouseholdId`) and the auth state
+(`currentAuthUserProvider`). Amended 2026-08-08 by A-5 / field feedback
+`docs/feedback/2026-08-07-field-feedback.md` B1.
+
+### 4.1 Switching mode — local-only, or linked but signed out
+
+Unchanged from this spec's original text: on a local-only household the
+phone stands in for everybody, so standing in for others IS the model.
 
 - The chores tab app bar gets a leading avatar button showing the CURRENT
   acting member (color + initial). Semantic id: `chores.actingMember`.
 - Tap → modal bottom sheet: title ("Who's doing chores right now?" /
-  German du-form equivalent), one row per member (avatar + name +
-  check on the current one). Selecting persists via
-  `setActingMember(id)` and closes the sheet. Sheet ids:
-  `actingMember.sheet`, rows `actingMember.sheet.row.<memberId>`.
+  German du-form equivalent), one row per member (avatar + name + check on
+  the current one). Selecting persists via `setActingMember(id)` and closes
+  the sheet. Sheet ids: `actingMember.sheet`, rows
+  `actingMember.sheet.row.<memberId>`, plus the `acting.manage` row.
 - The switcher is GLOBAL (one settings value): chore completions
   (`completedBy`) and any other actingMember reads (shopping quick-add,
-  chore form defaults) all follow it. It appears only on the chores tab
-  in this version.
+  chore form defaults) all follow it.
 - One member in household: the switcher still shows (it is also the
   affordance that teaches "the app knows who I am") but the sheet just
   lists the single member.
+
+### 4.2 Pinned mode — linked AND signed in
+
+On a synced household the phone IS a person, and `settings.actingMemberId`
+is device-scoped and never syncs, so acting on it lets two devices credit
+different people for the same work.
+
+- The acting member is PINNED to the claimed member —
+  `claimedMemberProvider`, resolved from the local `members.userId` mirror
+  against the signed-in auth user id. There is no switcher and no switcher
+  sheet.
+- The `chores.actingMember` slot stays, as a NON-interactive avatar of the
+  claimed member with the accessible label "You're signed in as {name}".
+  The id is present in every mode, so no selector ever loses its target.
+- Crediting someone else moves to the chore action sheet's **Mark done
+  for…** row (`chores.menu.markDoneFor`), which opens a member picker
+  (`chores.markDoneFor.sheet`, rows `chores.markDoneFor.row.<memberId>`)
+  and calls `ChoreService.completeOccurrence(..., completedBy: <picked>)`.
+  It never writes `settings.actingMemberId`: crediting somebody is not
+  becoming them.
+- **Binding constraint (Igor, 2026-08-07):** "Mark done for… shouldn't be
+  annoying." One ordinary row, in a sheet the user opened deliberately, on
+  a linked household with at least two members. No tile placement, no
+  prompt or confirmation on a normal completion, no "who did this?" on the
+  common path, no banner/tooltip/first-run hint. **Completing a chore as
+  yourself is exactly one tap.**
+- `settings.actingMemberId` is never written or cleared by pinning; it is
+  simply not read while a claim resolves, and it is correct again the
+  moment the device disconnects.
+- Transitional states: while either the linked or the auth state is still
+  resolving, the slot renders the neutral placeholder (never a switcher
+  that would vanish a frame later). While pinned with no claim yet (adopted
+  offline, or before the first pull) the stored acting member is used, and
+  if it dangles the acting member resolves to `null` rather than guessing
+  "the first admin". A signed-in account that is no longer a member of the
+  household is a revoked membership — see `household-lifecycle.md` §3.5.
 
 ## 5. l10n
 
@@ -96,6 +141,13 @@ Unit/repository:
 Provider:
 - actingMemberProvider honors a valid stored id; falls back on NULL and
   on a dangling id (member id that doesn't exist).
+- memberIdentityModeProvider: local-only and linked-but-signed-out are
+  `switching`; linked + signed in is `pinned`.
+- claimedMemberProvider resolves the member whose `userId` matches the
+  signed-in auth user, and stays null for another account's claim.
+- While pinned, actingMemberProvider returns the claimed member even when a
+  stored actingMemberId points elsewhere, and returns null (never the
+  first-admin guess) when neither resolves.
 
 Widget (integration-style, only `appDatabaseProvider` + `clockProvider`
 overrides, drift streams never awaited outside pump):
@@ -106,12 +158,25 @@ overrides, drift streams never awaited outside pump):
 - Switcher: switch to a second member → complete a chore → Done-today
   attribution shows the second member's name; switch persists across a
   fresh ProviderScope over the same database (app-restart simulation).
+- Pinning: a local-only household keeps the tappable switcher and its
+  sheet; once linked AND signed in the same id is present but not a
+  control, and tapping it opens nothing.
+- Mark done for…: absent local-only and absent in a linked household of
+  one; present when linked, signed in and ≥2 members; picking a member
+  credits THEM (`completed_by`), leaves `settings.actingMemberId` untouched,
+  and confirms with a snackbar naming them. Completing normally stays one
+  tap and never opens the picker.
 
 E2E (e2e/flows/settings/, follows e2e/README.md conventions, id-first
 selectors):
 - Journey: Settings → Members → add 'Anna' → back to Chores → tap
   `chores.actingMember` → pick Anna → complete a seeded chore → assert
   the done-today entry attributes Anna.
+- Pinned mode gets NO Maestro coverage: E2E runs with empty Supabase
+  dart-defines, so `NoopHouseholdGateway` makes linking unreachable and
+  `settings.syncHouseholdId` is always NULL. The existing switcher journey
+  is therefore unchanged and still valid. Same conclusion, same reason as
+  `household-lifecycle.md` §4.
 
 ## 7. Non-goals / invariants
 
