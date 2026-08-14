@@ -225,7 +225,7 @@ class CategoryRepository {
                   (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
                 ))
                 .get();
-        return rows.isEmpty ? 0 : 0;
+        return rows.length;
     }
   }
 
