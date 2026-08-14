@@ -143,7 +143,7 @@ class StatsService {
       for (final member in roster)
         if (member.deletedAt == null || (countById[member.id] ?? 0) > 0)
           MemberShare(member: member, doneCount: countById[member.id] ?? 0),
-    ]..sort((a, b) => b.doneCount.compareTo(a.doneCount));
+    ];
     final unattributed = countById[null] ?? 0;
     if (unattributed > 0) {
       shares.add(MemberShare(member: null, doneCount: unattributed));

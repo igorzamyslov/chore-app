@@ -101,6 +101,7 @@ class StatsRepository {
       ])
       ..where(
         db.chores.householdId.equals(householdId) &
+            db.choreOccurrences.status.equalsValue(OccurrenceStatus.done) &
             db.choreOccurrences.closedOn.isBiggerOrEqualValue(
               windowStart.toIso8601(),
             ) &
