@@ -226,9 +226,9 @@
 
   "categoryDeleteDialogTitle": "Kategorie löschen?",
   "categoryDeleteDialogBodyChoresZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keiner Aufgabe verwendet.",
-  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und wird danach unkategorisiert.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und werden danach unkategorisiert.}}",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und sind danach ohne Kategorie.}}",
   "categoryDeleteDialogBodyShoppingZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keinem Artikel verwendet.",
-  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und wird danach unkategorisiert.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und werden danach unkategorisiert.}}",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und sind danach ohne Kategorie.}}",
 
   "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",

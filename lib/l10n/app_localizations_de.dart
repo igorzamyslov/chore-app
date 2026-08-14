@@ -811,9 +811,9 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und werden danach unkategorisiert.',
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und sind danach ohne Kategorie.',
       one:
-          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und wird danach unkategorisiert.',
+          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.',
     );
     return '$_temp0';
   }
@@ -829,9 +829,9 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und werden danach unkategorisiert.',
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und sind danach ohne Kategorie.',
       one:
-          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und wird danach unkategorisiert.',
+          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.',
     );
     return '$_temp0';
   }
