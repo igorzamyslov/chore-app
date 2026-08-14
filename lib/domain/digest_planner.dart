@@ -130,9 +130,27 @@ const int digestHorizonTailStepDays = 7;
 /// Note the unit is *slots*, not days — [digestSlots] no longer returns a
 /// flat run of calendar days. The horizon's reach in days is
 /// `digestDailyHorizonDays - 1 + digestHorizonTailStepDays *
-/// digestWeeklyHorizonSlots`. Arming a whole horizon means the digest only
-/// degrades after that many unopened days, and degrades into silence rather
-/// than into wrong counts.
+/// digestWeeklyHorizonSlots` — 83 days at the shipped values. Arming a
+/// whole horizon means the digest only degrades after that many unopened
+/// days, and degrades into silence rather than into wrong counts.
+///
+/// **What this number actually trades: notification ids against
+/// unopened-day coverage.** Horizon length buys no *accuracy* — the
+/// projection assumes the local database does not change, which is exactly
+/// true while the app is closed, so staleness is binary and applies equally
+/// at day 2. What a longer horizon buys is the difference between a
+/// possibly-stale count and no notification at all.
+///
+/// The budget it spends is iOS's 64-pending-notification cap, but the
+/// number to protect is NOT 64: it is the share left for the unbuilt
+/// per-chore reminders (backlog G-6 / F16), which nothing else defends.
+/// 24 here leaves 40 for them, and
+/// `test/application/notification_scheduler_test.dart` asserts
+/// `digestHorizonSlots <= 32` so a future raise renegotiates that split
+/// rather than silently eating it. See "Notification id budget" in
+/// `docs/specs/notifications.md`, and
+/// `docs/plans/2026-08-14-digest-horizon-ceiling.md` for the full
+/// reasoning.
 const int digestHorizonSlots =
     digestDailyHorizonDays + digestWeeklyHorizonSlots;
 
