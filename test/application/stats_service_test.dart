@@ -130,6 +130,26 @@ void main() {
   );
 
   test(
+    'a household whose created_at is in the future never inverts the window',
+    () async {
+      // Reachable in the field: a restored backup, a corrected device
+      // clock, or a synced row written by a device running ahead. Before
+      // the floor in StatsService, windowStart landed after windowEnd and
+      // the aggregate matched nothing.
+      await _household(db, 'hh', createdAt: '2026-09-20T10:00:00.000Z');
+      final overview = await serviceAt(DateTime(2026, 8, 11, 9)).overview('hh');
+
+      expect(overview.windowStart, PlainDate(2026, 8, 11));
+      expect(overview.windowEnd, PlainDate(2026, 8, 11));
+      expect(
+        overview.windowStart.isAfter(overview.windowEnd),
+        isFalse,
+        reason: 'the window must never invert',
+      );
+    },
+  );
+
+  test(
     'shares are in roster order, keep zero-count members, append a departed '
     'contributor, and put the unattributed bucket last',
     () async {

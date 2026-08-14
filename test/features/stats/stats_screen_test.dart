@@ -48,6 +48,14 @@ Future<void> _pumpCard(
 
 /// Seeds one chore with exactly one `done` occurrence closed on [closedOn],
 /// credited to the bootstrap member. Returns the chore id.
+///
+/// Also backdates the household's `created_at`. `testChoreApp` seeds the
+/// household through `HouseholdRepository`'s DEFAULT `nowUtc`, i.e. the real
+/// wall clock, while the app under test runs on a clock fixed in 2026 -- so
+/// on any machine whose real date is later than the fixed clock, the
+/// household would look younger than the chore completions it supposedly
+/// recorded. That is incoherent data, not a scenario worth testing: the
+/// share window would clamp to the household's start and count nothing.
 Future<String> seedDoneChore(
   AppDatabase database, {
   required String title,
@@ -55,6 +63,11 @@ Future<String> seedDoneChore(
   bool deleted = false,
 }) async {
   final householdId = await currentHouseholdId(database);
+  await (database.update(
+    database.households,
+  )..where((tbl) => tbl.id.equals(householdId))).write(
+    const HouseholdsCompanion(createdAt: Value('2026-01-01T00:00:00.000Z')),
+  );
   final member = await (database.select(
     database.members,
   )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();

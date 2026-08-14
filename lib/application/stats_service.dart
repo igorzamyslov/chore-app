@@ -99,9 +99,19 @@ class StatsService {
     final household = await (database.select(
       database.households,
     )..where((tbl) => tbl.id.equals(householdId))).getSingle();
-    final householdStart = PlainDate.fromDateTime(
+    final rawHouseholdStart = PlainDate.fromDateTime(
       DateTime.parse(household.createdAt).toLocal(),
     );
+    // Floor the household's own start at today so the window can never
+    // invert. A `created_at` in the future relative to the clock is not
+    // hypothetical -- a restored backup, a device whose clock was wrong and
+    // then corrected, or a synced row written by a device running ahead all
+    // produce one. Without this, `windowStart` could exceed `windowEnd`,
+    // which matches no rows at all and labels the card "Since you started"
+    // with a date that has not happened yet.
+    final householdStart = rawHouseholdStart.isAfter(today)
+        ? today
+        : rawHouseholdStart;
     final clamped = householdStart.isAfter(naturalStart);
     final windowStart = clamped ? householdStart : naturalStart;
 
