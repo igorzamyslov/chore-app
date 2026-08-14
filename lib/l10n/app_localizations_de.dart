@@ -83,6 +83,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryPickerManageTooltip => 'Kategorien bearbeiten';
 
   @override
+  String get choresMenuMarkDoneFor => 'Für jemand anderen erledigen …';
+
+  @override
   String get choresMenuSkip => 'Überspringen';
 
   @override

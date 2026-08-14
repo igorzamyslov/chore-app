@@ -8,6 +8,11 @@ import 'package:flutter/material.dart';
 /// The action a user picked from [showChoreActionSheet], or `null` if they
 /// dismissed it without picking one.
 enum ChoreMenuAction {
+  /// Complete the pending occurrence crediting ANOTHER member (A-5, spec
+  /// `docs/feedback/2026-08-07-field-feedback.md` B1). Offered only when
+  /// `showMarkDoneFor` is true.
+  markDoneFor,
+
   /// Skip the pending occurrence.
   skip,
 
@@ -21,14 +26,26 @@ enum ChoreMenuAction {
   delete,
 }
 
-/// Shows the tile-level bottom sheet offering skip/edit/pause/delete, and
-/// resolves to the chosen [ChoreMenuAction] (or `null` if dismissed).
+/// Shows the tile-level bottom sheet offering (optionally) mark-done-for,
+/// then skip/edit/pause/delete, and resolves to the chosen
+/// [ChoreMenuAction] (or `null` if dismissed).
 ///
 /// Rows are full-width with 22dp icons and a ≥48dp height (spec
 /// `docs/specs/theme-v2.md` §4.5); delete sits last, in `error`. The drag
 /// handle comes from the app-wide `BottomSheetThemeData`
 /// (`lib/app/theme.dart`) -- never hand-rolled here.
-Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
+///
+/// [showMarkDoneFor] adds ONE ordinary row at the top (A-5, spec
+/// `docs/feedback/2026-08-07-field-feedback.md` B1). It is deliberately
+/// nothing more than that: the constraint on this feature is that it stays
+/// rare — no tile placement, no prompt on the common path, no banner, and
+/// completing a chore as yourself stays exactly one tap. The caller
+/// computes the gate (linked + signed in, ≥2 members) so this sheet stays
+/// Riverpod-free.
+Future<ChoreMenuAction?> showChoreActionSheet(
+  BuildContext context, {
+  required bool showMarkDoneFor,
+}) {
   return showModalBottomSheet<ChoreMenuAction>(
     context: context,
     builder: (sheetContext) {
@@ -38,6 +55,17 @@ Future<ChoreMenuAction?> showChoreActionSheet(BuildContext context) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (showMarkDoneFor)
+              semantic(
+                'chores.menu.markDoneFor',
+                child: ListTile(
+                  leading: const Icon(Icons.how_to_reg_outlined, size: 22),
+                  title: Text(l10n.choresMenuMarkDoneFor),
+                  onTap: () {
+                    Navigator.pop(sheetContext, ChoreMenuAction.markDoneFor);
+                  },
+                ),
+              ),
             semantic(
               'chores.menu.skip',
               child: ListTile(

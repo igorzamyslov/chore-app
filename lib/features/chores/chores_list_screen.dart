@@ -227,11 +227,24 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
-    final action = await showChoreActionSheet(context);
+    // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
+    // "Mark done for…" replaces the app-bar switcher, so it is offered in
+    // exactly the state where that switcher is gone -- and only when there
+    // is somebody else to credit.
+    final pinned =
+        ref.read(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+    final memberCount = ref.read(membersProvider).value?.length ?? 0;
+    final action = await showChoreActionSheet(
+      context,
+      showMarkDoneFor: pinned && memberCount > 1,
+    );
     if (!mounted || action == null) {
       return;
     }
     switch (action) {
+      case ChoreMenuAction.markDoneFor:
+        // Filled in by the next task.
+        return;
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)

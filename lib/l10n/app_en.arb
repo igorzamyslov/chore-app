@@ -89,6 +89,10 @@
     "description": "Tooltip for the category picker's trailing icon button (chore form and shopping item edit sheet), which pushes the manage-categories screen filtered to the picker's kind (feedback round 3: an in-context entry point alongside the existing Settings one)."
   },
 
+  "choresMenuMarkDoneFor": "Mark done for…",
+  "@choresMenuMarkDoneFor": {
+    "description": "Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case."
+  },
   "choresMenuSkip": "Skip",
   "@choresMenuSkip": {
     "description": "Chore occurrence action-sheet entry: skip the pending occurrence."

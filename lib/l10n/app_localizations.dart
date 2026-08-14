@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'Edit categories'**
   String get categoryPickerManageTooltip;
 
+  /// Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark done for…'**
+  String get choresMenuMarkDoneFor;
+
   /// Chore occurrence action-sheet entry: skip the pending occurrence.
   ///
   /// In en, this message translates to:
