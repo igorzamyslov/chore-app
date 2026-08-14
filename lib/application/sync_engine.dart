@@ -372,7 +372,10 @@ class SupabaseSyncEngine implements SyncEngine {
     if (!_started || !_foreground) {
       return;
     }
-    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(_pollTick()));
+    // INVERSION EXPERIMENT (temporary, will be reverted): the pre-B-6
+    // pull-only tick, to prove Test A fails at the TEST step without the
+    // retry.
+    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(pullSince()));
   }
 
   void _scheduleDebouncedPush() {
