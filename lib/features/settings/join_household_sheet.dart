@@ -306,13 +306,24 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
         return;
       }
       Navigator.of(context).pop(result.archiveFileName);
-    } on Exception {
+    } on Exception catch (error) {
       if (!mounted) {
         return;
       }
+      if (error is HouseholdSnapshotUnavailable) {
+        // An offer the server just refused to honour must not stay on
+        // screen: `myMembershipProvider` is a plain, non-autoDispose
+        // FutureProvider, so without this the reconnect row keeps rendering
+        // (and keeps inviting the same refusal) until the whole app
+        // restarts. Re-probing is also what turns "removed while you were
+        // away" into a row that simply disappears.
+        ref.invalidate(myMembershipProvider);
+      }
       setState(() {
         _busy = false;
-        _inlineError = AppLocalizations.of(context).joinHouseholdWorkingError;
+        _inlineError = error is HouseholdSnapshotUnavailable
+            ? AppLocalizations.of(context).joinHouseholdNoLongerMemberError
+            : AppLocalizations.of(context).joinHouseholdWorkingError;
       });
     }
   }

@@ -9,10 +9,12 @@ documents listed that is in fact implemented has been dropped here.*
 
 **Closed since they were written, verified in code:** the entire
 `2026-08-01-ux-audit.md` (A1–A6, B1–B3), all of `polish-round-1.md` (A1–A3,
-B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full,
-the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
-`next-session-plan.md` backlog bullet except `Recurrence` equality.
+B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full
+(and T2.2 from Tier 2), the `2026-08-07` field-feedback C1/C2/C3 and A1/B2,
+and every `next-session-plan.md` backlog bullet except `Recurrence`
+equality.
 Also closed: **A-5 (acting-member pinning + Mark done for…, 2026-08-08)**.
+Also closed: **B-2 (category delete states its impact count, 2026-08-08)**.
 
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
@@ -135,7 +137,7 @@ section; within a wave, items are independent and can run in parallel.*
 4. **A-4** reset signs out — must precede E.
 5. **A-5** acting member — must precede G-1.
 
-**Wave 2 — trust gaps.** B-1, B-2, B-3, B-4, B-6 are mutually independent.
+**Wave 2 — trust gaps.** B-1, B-3, B-4, B-6 are mutually independent.
 B-5 waits for the shell (wave 3).
 
 **Wave 3 — conventions.** Shell (D-1/D-4/D-6) **first**, because two other
@@ -208,7 +210,6 @@ would catch by eye.*
 | ID | Title | What's wrong | Files | Effort |
 | --- | --- | --- | --- | --- |
 | **B-1** | Catch-up after a lapse is invisible (T2.1) | `catchUpOverdue` silently converts a backlog to "missed" before the list renders, with no explanation. To a returning user it reads as an accusation | `lib/application/chore_service.dart:138-178`, `lib/features/chores/` | S |
-| **B-2** | Category delete never says how much it affects (T2.2) | No "3 chores and 5 items" before an irreversible tap. Zero counting code in the dialog | `lib/features/settings/category_delete_dialog.dart` | S |
 | **B-3** | Join wizard keeps no persisted state (T2.4) | Switching to Mail to tap the magic link can drop the user back to the welcome screen mid-join; the route is not restored across process death | `lib/features/onboarding/welcome_join_page.dart` | M |
 | **B-4** | Rotation order can't be edited, only rebuilt (T2.5) | Re-tapping always re-appends; no reorder handle, while Categories next door has drag-reorder | `lib/features/chores/chore_form/assignment_fields.dart` | S |
 | **B-5** | A denied notification permission is permanent in practice (T2.6) | The only nudge is a one-shot banner; recovery lives in Settings, which the user who most needs it never opens | `lib/features/chores/digest_preprompt_banner.dart`, `lib/features/settings/digest_section.dart` | S |
@@ -291,6 +292,8 @@ distribution question below.
 | **G-7** | Search in long lists (F18) | Low value at family scale | M |
 | **G-8** | Multiple shopping lists (F20) | Schema is single-list today | XL |
 | **G-9** | Digest scope toggle — a per-device "include unassigned chores in my digest" opt-in | The opt-in that `DESIGN.md` §3 originally promised, retired as a *default* by OPD-1 (`docs/plans/2026-08-08-daily-digest-scheduling.md`) rather than as a *capability*. Would be a per-device `settings` boolean feeding `projectDigestCounts`'s recipient predicate — genuinely small, but it is a new settings row, new l10n and new widget tests, and nobody has asked for it. Build it if a real household reports the over-inclusion as noise, not before | S |
+| **G-10** | Fork a removed member's local copy into a new online household | From **OPD-1** of `docs/plans/2026-08-14-reconnect-adopt-hardening.md` (option 2, deliberately not built there). **Not a bug fix**: keeping the local copy after a removal is already the D-L3 default, so nothing is missing — turning that copy into an *independent online household* is a new capability. **Carry this finding, it is the whole reason this is not a small task:** after a revocation the local rows are copies of the original household's SERVER rows and share their ids, so minting a fresh **household** id alone is insufficient. `create_household` inserts the acting member *by id* and PK-conflicts too, and `uploadHouseholdData` would then be silently skipped for members (`ignoreDuplicates: true`) or RLS-rejected for the other tables. The smallest correct version re-keys **every** local row carrying an id or FK, in one local transaction: `households`, `members`, `categories`, `chores`, `chore_assignees` (composite `chore_id, member_id`), `chore_occurrences` (`id`, `chore_id`, `assignedMemberId`, `completedBy`), `shopping_items` (`id`, `categoryId`, `addedBy`), plus `settings.actingMemberId`. A missed FK is silently orphaned history. Must NOT be improvised inside an adopt-failure branch. Entry point: the terminal adopt state added by that plan's Task 6. Build on evidence of demand | S–M |
+| **G-11** | Reconnect chooser for an account in several households | From **OPD-2** of `docs/plans/2026-08-14-reconnect-adopt-hardening.md` (option b). An account can legitimately claim a member in several households (`delete_account`'s own comment in `20260808120000_membership_exit.sql` relies on it). Today `findMyMembership` returns one deterministic answer — most recent membership first, by `members.created_at` descending — and the offer always names the household so the user can decline. But it can still be the wrong one, and tapping it runs a destructive local replace. The fix is to return a list and make the reconnect row a picker: a gateway signature change plus one new UI surface, l10n and tests | S |
 
 ---
 

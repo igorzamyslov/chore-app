@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(37);
 
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d1', 'dana@test.local');
@@ -366,6 +366,93 @@ select is(
     'authenticated', 'public._valid_invite(text)', 'EXECUTE'),
   false,
   '_valid_invite is never granted to authenticated');
+
+-- ---------------------------------------------------------------------------
+-- The boundary the P2d RECONNECT PROBE rests on (spec
+-- docs/specs/sync-backend.md §7.6). `SupabaseHouseholdGateway
+-- .findMyMembership` runs `select ... from members where user_id = auth.uid()`
+-- and, on a hit, renders a row whose tap runs a DESTRUCTIVE local replace.
+-- The client also filters `deleted_at` on both selects, but those predicates
+-- are defense in depth: the thing that actually closes this is
+-- `public.is_household_member`'s `deleted_at is null` clause.
+--
+-- HONESTY NOTE, so nobody mistakes these for a fix: assertions A, B and C
+-- are CHARACTERIZATION tests. They passed the moment they were written,
+-- because they pin behaviour that already holds. There is no red phase for
+-- them and none was manufactured. Their value is regression -- weaken
+-- `is_household_member`'s `deleted_at` clause, or the households/members
+-- SELECT policies, and they go red instead of a destructive replace quietly
+-- going live. Assertion D is different: it is a genuinely NEW contract that
+-- the Dart client's `HouseholdIdTakenFailure` branch depends on.
+
+-- A. A removed member's own row is gone from the probe's query.
+-- Gil removed Hana from Haus G above. Note honestly what this does and does
+-- not isolate: `remove_member` BOTH unclaims (user_id -> null) AND
+-- soft-deletes, so either one alone would produce 0 here. This pins the
+-- PROBE's result -- exactly the query findMyMembership issues -- while
+-- assertion B is the one that isolates RLS.
+select test_login('00000000-0000-0000-0000-0000000000b2');
+select is(
+  (select count(*) from members
+   where user_id = '00000000-0000-0000-0000-0000000000b2'),
+  0::bigint,
+  'a removed member''s account finds no membership row (the reconnect '
+  'probe''s own query)');
+
+-- B. A soft-deleted-but-STILL-CLAIMED row is invisible to its claimant.
+-- This is the case the reconnect probe genuinely depends on RLS for: the
+-- row keeps its user_id, so nothing but `is_household_member`'s
+-- `deleted_at is null` clause can hide it. Build it the only way it is
+-- reachable -- a direct `deleted_at` update through the members UPDATE
+-- grant, the state 20260808120000_membership_exit.sql:45-61 documents.
+-- Uli is used because her auth row still exists (Lena's and Hana's paths
+-- above both end with the account or the claim gone).
+reset role;
+update members set deleted_at = now()
+  where id = '20000000-0000-0000-0000-0000000000d6';
+
+select test_login('00000000-0000-0000-0000-0000000000d6');
+select is(
+  (select count(*) from members
+   where user_id = '00000000-0000-0000-0000-0000000000d6'),
+  0::bigint,
+  'a soft-deleted-but-still-claimed row is invisible to its own claimant '
+  '-- only is_household_member''s deleted_at clause can do this, since '
+  'user_id is untouched');
+
+-- C. After the cascade, the departed account sees no household row either.
+-- Fran left Haus E last, so E cascaded (asserted above). Her members row
+-- survives, unclaimed and NOT soft-deleted (leaving keeps it claimable), so
+-- `is_household_member(E)` is false for her and households_select filters
+-- the row out. Asserted as count(*), never as a column against null: a
+-- scalar subquery over no rows yields NULL and pgTAP's is() treats NULL as
+-- equal to NULL, so `is(<col>, null)` would pass vacuously here.
+select test_login('00000000-0000-0000-0000-0000000000f1');
+select is(
+  (select count(*) from households
+   where id = '10000000-0000-0000-0000-0000000000e1'),
+  0::bigint,
+  'the account that left last cannot read the cascaded household row');
+
+-- D. NEW CONTRACT (not characterization): create_household on an id that
+-- already exists raises 23505. Its first statement is a plain
+-- `insert into households (id, name, created_by)`
+-- (20260731120000_initial_schema.sql), so a taken id is a unique_violation.
+-- Run as the outsider, who is NOT a member of Haus G -- the revoked user's
+-- exact position, and the only position in which this matters: after a
+-- revocation the device still holds the household's id locally, so adopt
+-- re-sends it. lib/application/household_gateway.dart maps precisely this
+-- SQLSTATE to HouseholdIdTakenFailure, which
+-- HouseholdLinkService.adopt turns into its terminal state. If this code
+-- ever changes, that branch silently stops firing and adopt goes back to
+-- offering a retry that can never succeed.
+select test_login('00000000-0000-0000-0000-00000000000c');
+select throws_ok(
+  $$select create_household(
+      '10000000-0000-0000-0000-0000000000a2'::uuid, 'Haus Dup',
+      '20000000-0000-0000-0000-0000000000cf'::uuid, 'Outsider', 4278190080)$$,
+  '23505', null,
+  'create_household on a taken household id raises unique_violation');
 
 select * from finish();
 rollback;

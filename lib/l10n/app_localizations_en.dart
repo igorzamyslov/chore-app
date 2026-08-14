@@ -585,6 +585,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAddMember => 'Add member…';
 
   @override
+  String choreFormAssigneeRemoveTooltip(String name) {
+    return 'Remove $name from the rotation';
+  }
+
+  @override
   String get choreFormStartDateLabel => 'Start date';
 
   @override
@@ -790,8 +795,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
-  String categoryDeleteDialogBody(String categoryName) {
-    return 'This deletes \'$categoryName\'. Chores and items using it become uncategorized.';
+  String categoryDeleteDialogBodyChoresZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No chores use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No shopping items use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -918,6 +954,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountAdoptRetry => 'Try again';
 
   @override
+  String get settingsAccountAdoptBlockedTitle =>
+      'This household is already online';
+
+  @override
+  String get settingsAccountAdoptBlockedBody =>
+      'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.';
+
+  @override
   String get settingsAccountAdoptError =>
       'Couldn\'t put your household online. Please try again.';
 
@@ -1025,6 +1069,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get joinHouseholdWorkingError =>
       'Something went wrong while joining the household. Please try again.';
+
+  @override
+  String get joinHouseholdNoLongerMemberError =>
+      'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.';
 
   @override
   String get statsSettingsEntry => 'Chore history';
@@ -1140,7 +1188,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.';
+      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>

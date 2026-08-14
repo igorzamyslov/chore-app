@@ -92,46 +92,115 @@ DateTime nextDigestSlot({required DateTime now, required int digestMinutes}) {
   return DateTime(now.year, now.month, now.day + 1, hour, minute);
 }
 
-/// How many consecutive daily digest slots are armed with the OS at once
-/// (spec `docs/specs/notifications.md` architecture #2).
+/// How many *consecutive daily* digest slots the horizon opens with (spec
+/// `docs/specs/notifications.md` architecture #2).
 ///
-/// The digest is a *one-shot* OS notification per day, and nothing re-arms
+/// The digest is a *one-shot* OS notification per slot, and nothing re-arms
 /// it while the app is closed — so a single slot goes silent the morning
 /// after it fires, for exactly the users a reminder exists to serve
-/// (`docs/feedback/2026-08-08-prerelease-audit.md` P0). Arming a whole
-/// horizon means the digest only degrades after this many consecutive
-/// unopened days, and degrades into silence rather than into wrong counts.
+/// (`docs/feedback/2026-08-08-prerelease-audit.md` P0). These are the days
+/// on which the digest keeps its full daily cadence.
 ///
-/// Seven is comfortably inside iOS's 64-pending-notification cap and needs
-/// no new platform capability.
-const int digestHorizonDays = 7;
+/// Fourteen: two weeks of unbroken daily cadence matches a plausible
+/// holiday, which is the gap most likely to be survived without the user
+/// ever noticing the horizon exists.
+const int digestDailyHorizonDays = 14;
 
-/// The next [horizonDays] digest slots after [now]: [nextDigestSlot], then
-/// the same local wall-clock time on each following calendar day.
+/// How many *trailing* digest slots follow the daily segment, spaced
+/// [digestHorizonTailStepDays] apart.
 ///
-/// Built from calendar components rather than `add(Duration(days: 1))` for
-/// the same DST reason [nextDigestSlot] documents — and the hour/minute are
-/// re-derived from [digestMinutes] rather than read off the first slot,
-/// because a spring-forward day can normalize a nonexistent wall-clock time
-/// into a different hour, which would then propagate to every later slot.
+/// The tail trades cadence for reach: it costs one notification id per
+/// [digestHorizonTailStepDays] days of coverage instead of one per day. It
+/// loses no coverage, because work cannot disappear while the app is
+/// closed, so a sampled slot still reports everything the skipped days
+/// would have (see `docs/plans/2026-08-14-digest-horizon-ceiling.md` §2).
 ///
-/// [digestMinutes] must be in `0..1439`; [horizonDays] must be >= 1. Throws
-/// [ArgumentError] otherwise.
+/// Ten, at weekly spacing, is what takes the horizon's reach from days to
+/// months: the same 24 ids spent as consecutive days would reach only day
+/// 23, where segmented they reach day 83. Someone who has not opened the
+/// app in a fortnight is not
+/// helped by a daily reminder they are already ignoring.
+const int digestWeeklyHorizonSlots = 10;
+
+/// The spacing, in days, between consecutive slots in the trailing segment.
+const int digestHorizonTailStepDays = 7;
+
+/// How many digest notification slots are armed with the OS at once: the
+/// daily segment plus the trailing segment.
+///
+/// Note the unit is *slots*, not days — [digestSlots] no longer returns a
+/// flat run of calendar days. The horizon's reach in days is
+/// `digestDailyHorizonDays - 1 + digestHorizonTailStepDays *
+/// digestWeeklyHorizonSlots` — 83 days at the shipped values. Arming a
+/// whole horizon means the digest only degrades after that many unopened
+/// days, and degrades into silence rather than into wrong counts.
+///
+/// **What this number actually trades: notification ids against
+/// unopened-day coverage.** Horizon length buys no *accuracy* — the
+/// projection assumes the local database does not change, which is exactly
+/// true while the app is closed, so staleness is binary and applies equally
+/// at day 2. What a longer horizon buys is the difference between a
+/// possibly-stale count and no notification at all.
+///
+/// The budget it spends is iOS's 64-pending-notification cap, but the
+/// number to protect is NOT 64: it is the share left for the unbuilt
+/// per-chore reminders (backlog G-6 / F16), which nothing else defends.
+/// 24 here leaves 40 for them, and
+/// `test/application/notification_scheduler_test.dart` asserts
+/// `digestHorizonSlots <= 32` so a future raise renegotiates that split
+/// rather than silently eating it. See "Notification id budget" in
+/// `docs/specs/notifications.md`, and
+/// `docs/plans/2026-08-14-digest-horizon-ceiling.md` for the full
+/// reasoning.
+const int digestHorizonSlots =
+    digestDailyHorizonDays + digestWeeklyHorizonSlots;
+
+/// The next [digestHorizonSlots] digest slots after [now]: [nextDigestSlot],
+/// then [dailyDays] - 1 further slots on each following calendar day, then
+/// [weeklySlots] further slots at [digestHorizonTailStepDays] spacing.
+///
+/// Daily slot `k` (`0 <= k < dailyDays`) sits at day offset `k` from the
+/// first slot; tail slot `j` (`0 <= j < weeklySlots`) sits at day offset
+/// `(dailyDays - 1) + digestHorizonTailStepDays * (j + 1)`, so exactly one
+/// tail step separates the last daily slot from the first tail one. The
+/// result is always in ascending `fireAt` order.
+///
+/// Every slot — daily or tail — is built from calendar components rather
+/// than `add(Duration(days: n))` for the same DST reason [nextDigestSlot]
+/// documents, and the hour/minute are re-derived from [digestMinutes]
+/// rather than read off the first slot, because a spring-forward day can
+/// normalize a nonexistent wall-clock time into a different hour, which
+/// would then propagate to every later slot.
+///
+/// [digestMinutes] must be in `0..1439`; [dailyDays] must be >= 1;
+/// [weeklySlots] must be >= 0. Throws [ArgumentError] otherwise.
 List<DateTime> digestSlots({
   required DateTime now,
   required int digestMinutes,
-  int horizonDays = digestHorizonDays,
+  int dailyDays = digestDailyHorizonDays,
+  int weeklySlots = digestWeeklyHorizonSlots,
 }) {
   _validateDigestMinutes(digestMinutes);
-  if (horizonDays < 1) {
-    throw ArgumentError.value(horizonDays, 'horizonDays', 'Must be >= 1');
+  if (dailyDays < 1) {
+    throw ArgumentError.value(dailyDays, 'dailyDays', 'Must be >= 1');
+  }
+  if (weeklySlots < 0) {
+    throw ArgumentError.value(weeklySlots, 'weeklySlots', 'Must be >= 0');
   }
   final hour = digestMinutes ~/ 60;
   final minute = digestMinutes % 60;
   final first = nextDigestSlot(now: now, digestMinutes: digestMinutes);
   return [
-    for (var k = 0; k < horizonDays; k++)
+    for (var k = 0; k < dailyDays; k++)
       DateTime(first.year, first.month, first.day + k, hour, minute),
+    for (var j = 0; j < weeklySlots; j++)
+      DateTime(
+        first.year,
+        first.month,
+        first.day + (dailyDays - 1) + digestHorizonTailStepDays * (j + 1),
+        hour,
+        minute,
+      ),
   ];
 }
 

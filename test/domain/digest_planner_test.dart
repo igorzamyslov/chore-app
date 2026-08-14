@@ -131,14 +131,20 @@ void main() {
   });
 
   group('digestSlots', () {
-    test('returns digestHorizonDays consecutive slots by default', () {
+    test('returns digestHorizonSlots slots by default, reaching day 83', () {
       final slots = digestSlots(
         now: DateTime(2026, 7, 24, 7),
         digestMinutes: 480,
       );
-      expect(slots, hasLength(digestHorizonDays));
+      expect(slots, hasLength(digestHorizonSlots));
       expect(slots.first, DateTime(2026, 7, 24, 8));
-      expect(slots.last, DateTime(2026, 7, 30, 8));
+      // Day offset (14 - 1) + 7 * 10 = 83 from the first slot.
+      expect(slots.last, DateTime(2026, 10, 15, 8));
+      // The two segments join with exactly one tail step between them:
+      // the last daily slot is offset 13, the first tail slot offset 20.
+      expect(slots[digestDailyHorizonDays - 1], DateTime(2026, 8, 6, 8));
+      expect(slots[digestDailyHorizonDays], DateTime(2026, 8, 13, 8));
+      expect(slots, orderedEquals(<DateTime>[...slots]..sort()));
     });
 
     test('the first slot is exactly nextDigestSlot', () {
@@ -146,7 +152,7 @@ void main() {
       final slots = digestSlots(now: now, digestMinutes: 480);
       expect(slots.first, nextDigestSlot(now: now, digestMinutes: 480));
       expect(slots.first, DateTime(2026, 7, 25, 8));
-      expect(slots.last, DateTime(2026, 7, 31, 8));
+      expect(slots.last, DateTime(2026, 10, 16, 8));
     });
 
     test('every slot keeps the same local wall-clock time across a DST '
@@ -168,7 +174,8 @@ void main() {
         now: DateTime(2026, 7, 30, 7),
         digestMinutes: 480,
       );
-      expect(slots.last, DateTime(2026, 8, 5, 8));
+      // Offset 83 from 2026-07-30, across four month boundaries.
+      expect(slots.last, DateTime(2026, 10, 21, 8));
     });
 
     test('rejects an out-of-range digestMinutes', () {
@@ -178,12 +185,81 @@ void main() {
       );
     });
 
-    test('rejects a horizon below one day', () {
+    test('rejects a daily segment below one day', () {
       expect(
         () => digestSlots(
           now: DateTime(2026),
           digestMinutes: 480,
-          horizonDays: 0,
+          dailyDays: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('a weekly tail follows the daily segment at one tail step of '
+        'spacing', () {
+      // Explicit parameters rather than the shipped constants, so this
+      // test pins the SHAPE and survives any later change to the shipped
+      // horizon size.
+      final slots = digestSlots(
+        now: DateTime(2026, 7, 24, 7),
+        digestMinutes: 480,
+        dailyDays: 3,
+        weeklySlots: 2,
+      );
+      // Daily offsets 0,1,2; then weekly at (3-1)+7*(j+1) = 9 and 16.
+      expect(slots, [
+        DateTime(2026, 7, 24, 8),
+        DateTime(2026, 7, 25, 8),
+        DateTime(2026, 7, 26, 8),
+        DateTime(2026, 8, 2, 8),
+        DateTime(2026, 8, 9, 8),
+      ]);
+    });
+
+    test('the weekly tail keeps the same local wall-clock time across a DST '
+        'transition', () {
+      // 2026-03-29 is the European spring-forward day, and it falls
+      // between the daily segment and the first tail slot — so this covers
+      // what the daily-only DST test above cannot.
+      final slots = digestSlots(
+        now: DateTime(2026, 3, 27, 7),
+        digestMinutes: 480,
+        dailyDays: 3,
+        weeklySlots: 2,
+      );
+      expect(slots, hasLength(5));
+      for (final slot in slots) {
+        expect(slot.hour, 8);
+        expect(slot.minute, 0);
+      }
+    });
+
+    test('weeklySlots: 0 is exactly a plain daily run — the tail is '
+        'genuinely optional', () {
+      final now = DateTime(2026, 7, 24, 7);
+      expect(
+        digestSlots(
+          now: now,
+          digestMinutes: 480,
+          dailyDays: 5,
+          // Passed explicitly on purpose: this test pins that a zero tail
+          // degenerates to a plain daily run, which must stay true
+          // independently of whatever the shipped default happens to be.
+          weeklySlots: 0,
+        ),
+        [
+          for (var k = 0; k < 5; k++) DateTime(2026, 7, 24 + k, 8),
+        ],
+      );
+    });
+
+    test('rejects a negative weekly tail', () {
+      expect(
+        () => digestSlots(
+          now: DateTime(2026),
+          digestMinutes: 480,
+          weeklySlots: -1,
         ),
         throwsArgumentError,
       );

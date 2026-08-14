@@ -588,6 +588,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormAddMember => 'Mitglied hinzufügen…';
 
   @override
+  String choreFormAssigneeRemoveTooltip(String name) {
+    return '$name aus der Rotation entfernen';
+  }
+
+  @override
   String get choreFormStartDateLabel => 'Startdatum';
 
   @override
@@ -796,8 +801,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryDeleteDialogTitle => 'Kategorie löschen?';
 
   @override
-  String categoryDeleteDialogBody(String categoryName) {
-    return 'Damit löschst du \'$categoryName\'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.';
+  String categoryDeleteDialogBodyChoresZero(String categoryName) {
+    return 'Damit löschst du \'$categoryName\'. Sie wird gerade von keiner Aufgabe verwendet.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und werden danach unkategorisiert.',
+      one:
+          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und wird danach unkategorisiert.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingZero(String categoryName) {
+    return 'Damit löschst du \'$categoryName\'. Sie wird gerade von keinem Artikel verwendet.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und werden danach unkategorisiert.',
+      one:
+          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und wird danach unkategorisiert.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -925,6 +961,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountAdoptRetry => 'Erneut versuchen';
 
   @override
+  String get settingsAccountAdoptBlockedTitle =>
+      'Dieser Haushalt ist schon online';
+
+  @override
+  String get settingsAccountAdoptBlockedBody =>
+      'Er ist bereits auf dem Server, und dieses Gerät gehört nicht mehr dazu. Frag jemanden im Haushalt nach einem Einladungscode und nutze dann unten „Einem bestehenden Haushalt beitreten“.';
+
+  @override
   String get settingsAccountAdoptError =>
       'Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.';
 
@@ -1033,6 +1077,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get joinHouseholdWorkingError =>
       'Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.';
+
+  @override
+  String get joinHouseholdNoLongerMemberError =>
+      'Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.';
 
   @override
   String get statsSettingsEntry => 'Aufgaben-Verlauf';
@@ -1148,7 +1196,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.';
+      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>

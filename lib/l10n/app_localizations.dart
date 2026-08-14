@@ -858,6 +858,12 @@ abstract class AppLocalizations {
   /// **'Add member…'**
   String get choreFormAddMember;
 
+  /// Tooltip on the rotation reorder list's per-row remove button (chore form, assignment section).
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from the rotation'**
+  String choreFormAssigneeRemoveTooltip(String name);
+
   /// Label of the chore form's start-date field.
   ///
   /// In en, this message translates to:
@@ -1212,11 +1218,29 @@ abstract class AppLocalizations {
   /// **'Delete category?'**
   String get categoryDeleteDialogTitle;
 
-  /// Body of the category delete-confirmation dialog, explaining the consequence.
+  /// Body of the category delete-confirmation dialog for a chore-kind category that no active chore currently references.
   ///
   /// In en, this message translates to:
-  /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
-  String categoryDeleteDialogBody(String categoryName);
+  /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
+  String categoryDeleteDialogBodyChoresZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
+  String categoryDeleteDialogBodyShoppingZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).
   ///
@@ -1428,6 +1452,18 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get settingsAccountAdoptRetry;
 
+  /// Title of the adopt row's TERMINAL state (HouseholdAlreadyOnlineFailure): the household's id already exists on the server and this account is not a member of it, so adopting can never succeed from this device. Deliberately not phrased as an error -- nothing went wrong, the situation is simply settled -- and deliberately not offering 'Try again', which is what this state replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is already online'**
+  String get settingsAccountAdoptBlockedTitle;
+
+  /// Body of the adopt row's terminal state. States exactly three things: the household is already online, this device is no longer part of it, and an invite code is the way back. It must NAME the recourse (the join row directly below it) -- a notice that reports a fault and offers nothing is the dead end this project has rejected twice (docs/backlog.md E-2, D-5). The quoted phrase must match settingsAccountJoinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.'**
+  String get settingsAccountAdoptBlockedBody;
+
   /// Inline error shown as the adopt row's subtitle after a failed attempt.
   ///
   /// In en, this message translates to:
@@ -1583,6 +1619,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong while joining the household. Please try again.'**
   String get joinHouseholdWorkingError;
+
+  /// Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.'**
+  String get joinHouseholdNoLongerMemberError;
 
   /// Settings > Household row opening the chore-history screen. Code namespace is 'stats' but user-visible copy is always 'Chore history' -- see docs/specs/stats.md §1.
   ///
@@ -1740,10 +1782,10 @@ abstract class AppLocalizations {
   /// **'Reset app data?'**
   String get settingsResetConfirm1Title;
 
-  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
+  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.'**
+  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
   String get settingsResetConfirm1Body;
 
   /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.
