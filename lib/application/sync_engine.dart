@@ -352,11 +352,11 @@ class SupabaseSyncEngine implements SyncEngine {
   /// try/catch exists specifically so a push failure can never prevent
   /// the pull that follows it.
   Future<void> _pollTick() async {
-    // INVERSION EXPERIMENT (temporary, reverted in the next commit): the
-    // pre-B-6 pull-only tick, kept inside _pollTick so the method stays
-    // referenced and analyze still passes -- otherwise the run dies on
-    // unused_element and the test step never executes.
-    await pullSince();
+    // INVERSION EXPERIMENT 2 (temporary, reverted in the next commit):
+    // the NAIVE fix -- point the tick straight at pushDirty(), which
+    // returns early without pulling when the push fails. Test B exists to
+    // catch exactly this, so Test B must go red here while Test A passes.
+    await pushDirty();
   }
 
   /// (Re)arms the foreground safety-net poll, but only while the engine is
