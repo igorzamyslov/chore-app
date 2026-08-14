@@ -326,6 +326,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
               members: members,
               selectedMemberIds: _selectedMemberIds,
               onMemberTap: _onMemberTap,
+              onReorder: _onReorderMember,
               errorText: _assignmentErrorText(l10n, _assignmentError),
             ),
           ],
@@ -426,6 +427,23 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         case AssignmentMode.anyone:
           break;
       }
+    });
+  }
+
+  /// Moves the rotation assignee at [oldIndex] to [newIndex].
+  ///
+  /// `ReorderableListView.onReorderItem` already adjusts [newIndex] for the
+  /// item removed at [oldIndex], so no manual "minus one when moving down"
+  /// correction belongs here (same as `manage_categories_screen.dart`'s
+  /// `_reorder`). Nothing is persisted until `_save()` -- reordering is
+  /// just another edit to `_selectedMemberIds`, which the save path already
+  /// writes out wholesale as the chore's ordered assignee list.
+  void _onReorderMember(int oldIndex, int newIndex) {
+    setState(() {
+      final updated = List.of(_selectedMemberIds);
+      final moved = updated.removeAt(oldIndex);
+      updated.insert(newIndex, moved);
+      _selectedMemberIds = updated;
     });
   }
 
