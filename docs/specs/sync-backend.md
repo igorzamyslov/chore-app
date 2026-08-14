@@ -252,6 +252,34 @@ rerunning is safe (RPC failure on rerun after a half-success: treat
 "household already exists with my user as member" as step-1 success and
 continue with 2).
 
+**Step-1 failure taxonomy (added 2026-08-14).** The resume rule above
+stands, and its complement is now specified. `create_household` inserts
+`households` by the client's own id, so a taken id raises SQLSTATE `23505`;
+the client types that as `HouseholdIdTakenFailure`
+(`supabase/tests/002_membership_exit_test.sql` pins the code). Combined with
+the readability probe the resume rule already performs:
+
+- **readable ⇒ resume.** Unchanged. Covers both a half-succeeded retry and
+  a Disconnect → Adopt, since A1.2 disconnect leaves the caller's `user_id`
+  on the server member row, so `is_household_member` still passes.
+- **id taken AND not readable ⇒ TERMINAL** for this device and this
+  household id. The household is online and this account is not a member of
+  it — the state a removed member reaches, because the revocation handling
+  clears the sync link but keeps every local row, server household id
+  included. Retrying re-sends the same id forever. Surfaced as a
+  non-retryable, untappable state on the same `settings.account.adopt` row
+  that names join-by-code as the recourse; it is per-visit widget state, not
+  persisted, because a user who rejoins and later disconnects genuinely can
+  adopt again.
+- **anything else ⇒ retryable.** Unchanged. In particular a network failure
+  inside the readability probe propagates before any classification, which
+  is correct: an unreachable server is not a dead end.
+
+Turning a removed member's local copy into an INDEPENDENT online household
+("fork") was considered and deliberately NOT built — see OPD-1 in
+`docs/plans/2026-08-14-reconnect-adopt-hardening.md` and its backlog row,
+which records why re-keying the household id alone is insufficient.
+
 Invite: once linked, the Members screen gains an "Invite" row
 (`settings.members.invite`), and the Account section's signed-in tile
 gains a "linked" subtitle (household name) plus its own "Invite a
@@ -324,6 +352,46 @@ already grants full read access.
   completes the replace; returns null → adopt/join rows as today;
   linked → no reconnect row.
 
+**The probe contract (added 2026-08-14).**
+
+- `findMyMembership` filters `deleted_at` on BOTH selects, orders the
+  `members` select by `created_at` descending before its `limit(1)`, and
+  returns `null` rather than a `MyMembership` with a blank household name.
+  The ordering makes the legitimate multi-household case (an account may
+  claim a member in several households — `delete_account`'s own comment
+  relies on it) deterministic instead of dependent on Postgres row order:
+  the household joined last is the one a returning device is most likely
+  returning to. `created_at` is exact for join-as-new and adopt and
+  approximate for `claim_member`; `updated_at` is NOT a substitute, being
+  trigger-maintained and therefore a recency signal for activity rather
+  than for joining. A chooser is the real answer and is backlogged; the
+  auto-pick is acceptable meanwhile only because every path that renders
+  the offer displays the household NAME, so the user can decline it.
+- Those `deleted_at` predicates are **defense in depth, not the boundary**.
+  `public.is_household_member` is the boundary — it requires the caller's
+  own `members` row to be active, and `_cascade_if_orphaned` never
+  soft-deletes a household that still has a claimed active member, so
+  neither predicate changes a reachable result today.
+  `supabase/tests/002_membership_exit_test.sql` now proves both directions,
+  so weakening `is_household_member` turns a test red rather than turning a
+  destructive replace live.
+- **The replace is CONDITIONAL.** Reconnect skips the claim RPC (as specced
+  above), so the downloaded snapshot is the ONLY authorization evidence the
+  flow ever sees — and RLS filters rows rather than erroring, so a refusal
+  arrives as a *successful* download of an empty snapshot. An absent
+  household row (all three `JoinChoice` variants), or an absent or
+  soft-deleted member row for the reconnecting member (`ReconnectChoice`
+  only, since it is the sole variant with no server-side authorization
+  step), aborts the whole flow **before** anything local is deleted. This
+  is the one place §7.4's "the whole replace is one local transaction"
+  needs a precondition stated OUTSIDE the transaction: the guard runs
+  before it opens, so the failure is provably non-destructive rather than
+  merely rolled back. The already-written archive is left in place — a
+  spare archive file is harmless, a deleted household is not (there is no
+  in-app importer; backlog G-3 / F12). The failure is surfaced with its own
+  copy, and the offer that produced it is retired by re-probing
+  `findMyMembership`.
+
 ### 7.7 P2 verification record
 
 2026-08-01: full live smoke test against the local stack passed —
@@ -392,7 +460,13 @@ provider `syncEngineProvider` re-evaluates on the linked state
   `postgres_changes` event for the household (the event only
   short-circuits the timer — the payload is ignored; data always comes
   from the pull path). Push on: any local write while linked (debounced
-  ~2s), app resume, reconnect.
+  ~2s), app resume, reconnect, and (B-6, `docs/backlog.md`) the 60s
+  foreground safety-net poll defined below in `sync-freshness.md` §2.2 --
+  the same timer already used for the pull safety net now retries anything
+  still dirty on every tick too, not only on resume. The poll's pull half
+  is unconditional: a push failure on one tick must never suppress that
+  tick's pull (see `sync-freshness.md` §2.2 and
+  `SupabaseSyncEngine._pollTick`'s doc comment for why).
 - **Failure posture**: every engine error is swallowed into a silent
   retry-later (log in debug); the app NEVER surfaces sync errors in P3
   (local-first: the UI is always consistent with the local db).

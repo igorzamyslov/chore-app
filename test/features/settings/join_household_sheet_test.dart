@@ -628,4 +628,96 @@ void main() {
       handle.dispose();
     },
   );
+
+  // The Finding 1 failure surface (plan
+  // `docs/plans/2026-08-14-reconnect-adopt-hardening.md` Task 2). The
+  // gateway offers a membership, so the reconnect row renders -- but the
+  // download comes back EMPTY, which is what RLS produces for an account
+  // that has since been removed from that household.
+  final staleReconnectGateway = FakeHouseholdGateway()
+    ..membership = const MyMembership(
+      householdId: 'joined-hh',
+      memberId: 'm-anna',
+      memberName: 'Anna',
+      householdName: 'Joined household',
+    )
+    ..downloadSnapshotOverride = const HouseholdSnapshot();
+
+  testChoreApp(
+    'stale reconnect (spec §7.6): a download that confirms nothing shows '
+    'the "no longer available" copy instead of the generic one, changes '
+    'nothing locally, and retires the offer that caused it',
+    today: today,
+    overrides: [
+      ...signedInAuth,
+      householdGatewayProvider.overrideWithValue(staleReconnectGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final oldHouseholdId = await currentHouseholdId(database);
+
+      await openSettingsTab(tester);
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsOneWidget,
+      );
+      final probeCallsBeforeFailure =
+          staleReconnectGateway.findMyMembershipCallCount;
+
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+      );
+      await tester.pumpAndSettle();
+
+      // The fake answers `findMyMembership` unconditionally, so an
+      // invalidation alone would just re-offer the same membership. Drop it
+      // here, immediately before the failing tap, so the RE-PROBE is what
+      // decides whether the row comes back -- which is the behaviour under
+      // test, not the invalidation call by itself.
+      staleReconnectGateway.membership = null;
+
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.join.import.decline'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'This household is no longer available to your account. Nothing '
+          'on this device was changed. Ask someone in the household for a '
+          'new invite code.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Something went wrong while joining the household. Please try '
+          'again.',
+        ),
+        findsNothing,
+      );
+
+      // Task 1's guard, re-asserted from the UI side.
+      final households = await database.select(database.households).get();
+      expect(households.map((h) => h.id), [oldHouseholdId]);
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, isNull);
+
+      // The offer the server refused to honour must not survive it.
+      expect(
+        staleReconnectGateway.findMyMembershipCallCount,
+        greaterThan(probeCallsBeforeFailure),
+      );
+
+      // Dismiss the sheet by tapping its barrier.
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.account.reconnect'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
 }

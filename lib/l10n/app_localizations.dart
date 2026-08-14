@@ -218,10 +218,10 @@ abstract class AppLocalizations {
   /// **'Delete chore?'**
   String get choresDeleteDialogTitle;
 
-  /// Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.
+  /// Body of the chore delete-confirmation dialog. Restored to the stronger promise when the chore-history screen shipped (docs/research/triage.md D2 step 2, docs/specs/stats.md §6): the claim that history is kept is now verifiable, because deleted chores are listed under Settings > Chore history and their completion log is readable there. Do NOT weaken or strengthen this copy without re-checking that screen still exists.
   ///
   /// In en, this message translates to:
-  /// **'This removes \'{choreTitle}\' from your list. You can\'t view it again yet.'**
+  /// **'This removes \'{choreTitle}\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.'**
   String choresDeleteDialogBody(String choreTitle);
 
   /// Tooltip for a chore occurrence tile's leading complete button.
@@ -858,6 +858,12 @@ abstract class AppLocalizations {
   /// **'Add member…'**
   String get choreFormAddMember;
 
+  /// Tooltip on the rotation reorder list's per-row remove button (chore form, assignment section).
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from the rotation'**
+  String choreFormAssigneeRemoveTooltip(String name);
+
   /// Label of the chore form's start-date field.
   ///
   /// In en, this message translates to:
@@ -1212,11 +1218,29 @@ abstract class AppLocalizations {
   /// **'Delete category?'**
   String get categoryDeleteDialogTitle;
 
-  /// Body of the category delete-confirmation dialog, explaining the consequence.
+  /// Body of the category delete-confirmation dialog for a chore-kind category that no active chore currently references.
   ///
   /// In en, this message translates to:
-  /// **'This deletes \'{categoryName}\'. Chores and items using it become uncategorized.'**
-  String categoryDeleteDialogBody(String categoryName);
+  /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
+  String categoryDeleteDialogBodyChoresZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
+  String categoryDeleteDialogBodyShoppingZero(String categoryName);
+
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).
   ///
@@ -1428,6 +1452,18 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get settingsAccountAdoptRetry;
 
+  /// Title of the adopt row's TERMINAL state (HouseholdAlreadyOnlineFailure): the household's id already exists on the server and this account is not a member of it, so adopting can never succeed from this device. Deliberately not phrased as an error -- nothing went wrong, the situation is simply settled -- and deliberately not offering 'Try again', which is what this state replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is already online'**
+  String get settingsAccountAdoptBlockedTitle;
+
+  /// Body of the adopt row's terminal state. States exactly three things: the household is already online, this device is no longer part of it, and an invite code is the way back. It must NAME the recourse (the join row directly below it) -- a notice that reports a fault and offers nothing is the dead end this project has rejected twice (docs/backlog.md E-2, D-5). The quoted phrase must match settingsAccountJoinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.'**
+  String get settingsAccountAdoptBlockedBody;
+
   /// Inline error shown as the adopt row's subtitle after a failed attempt.
   ///
   /// In en, this message translates to:
@@ -1584,6 +1620,102 @@ abstract class AppLocalizations {
   /// **'Something went wrong while joining the household. Please try again.'**
   String get joinHouseholdWorkingError;
 
+  /// Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.'**
+  String get joinHouseholdNoLongerMemberError;
+
+  /// Settings > Household row opening the chore-history screen. Code namespace is 'stats' but user-visible copy is always 'Chore history' -- see docs/specs/stats.md §1.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore history'**
+  String get statsSettingsEntry;
+
+  /// App bar title of the chore-history overview screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore history'**
+  String get statsTitle;
+
+  /// Label above the household share card naming the window the counts cover.
+  ///
+  /// In en, this message translates to:
+  /// **'In the last 30 days'**
+  String get statsWindowLast30Days;
+
+  /// Replaces statsWindowLast30Days when the household is younger than the 30-day window, so a short history is never presented as a full month.
+  ///
+  /// In en, this message translates to:
+  /// **'Since you started, {date}'**
+  String statsWindowSinceStart(String date);
+
+  /// Total completions in the share window; also the single-member household's replacement for the whole share card.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore done} other{{count} chores done}}'**
+  String statsTotalDone(int count);
+
+  /// Label for the share bucket of completions whose completed_by is NULL (possible via sync or an imported archive).
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else'**
+  String get statsShareUnknownMember;
+
+  /// Header above the per-chore list on the chore-history overview.
+  ///
+  /// In en, this message translates to:
+  /// **'Chores'**
+  String get statsChoresSectionTitle;
+
+  /// First half of a chore row's metadata line: how many times it has ever been completed (all-time, not windowed).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Done once} other{Done {count} times}}'**
+  String statsChoreTimesDone(int count);
+
+  /// Second half of a chore row's metadata line, joined to statsChoreTimesDone with ' · '.
+  ///
+  /// In en, this message translates to:
+  /// **'last {date}'**
+  String statsChoreLastDone(String date);
+
+  /// Header of the collapsed section holding deleted chores that still have history -- the surface that makes the delete dialog's 'history is kept' promise verifiable (triage D2).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Deleted chores (1)} other{Deleted chores ({count})}}'**
+  String statsDeletedSectionHeader(int count);
+
+  /// Notice at the top of a deleted chore's history screen.
+  ///
+  /// In en, this message translates to:
+  /// **'This chore was deleted. Its history is kept here.'**
+  String get statsDeletedNotice;
+
+  /// Footer of a chore's history list when the completion count exceeds the 50-row cap.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the {shown} most recent of {total}'**
+  String statsHistoryTruncated(int shown, int total);
+
+  /// Empty-state headline on the chore-history overview when the household has never completed a chore.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed chores yet'**
+  String get statsEmptyTitle;
+
+  /// Empty-state body on the chore-history overview -- teaches what will appear rather than apologizing.
+  ///
+  /// In en, this message translates to:
+  /// **'As your household ticks chores off, this is where you\'ll see who did what.'**
+  String get statsEmptyBody;
+
+  /// Error state on the chore-history overview.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the history.'**
+  String get statsErrorMessage;
+
   /// Settings screen section header above the About rows (app version, licenses, donate placeholder), matching the digest section header's style.
   ///
   /// In en, this message translates to:
@@ -1650,10 +1782,10 @@ abstract class AppLocalizations {
   /// **'Reset app data?'**
   String get settingsResetConfirm1Title;
 
-  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2).
+  /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.'**
+  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
   String get settingsResetConfirm1Body;
 
   /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.

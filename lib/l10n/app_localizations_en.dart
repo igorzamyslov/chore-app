@@ -102,7 +102,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String choresDeleteDialogBody(String choreTitle) {
-    return 'This removes \'$choreTitle\' from your list. You can\'t view it again yet.';
+    return 'This removes \'$choreTitle\' from your lists. Its history is kept — you\'ll find it under Settings › Chore history.';
   }
 
   @override
@@ -585,6 +585,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAddMember => 'Add member…';
 
   @override
+  String choreFormAssigneeRemoveTooltip(String name) {
+    return 'Remove $name from the rotation';
+  }
+
+  @override
   String get choreFormStartDateLabel => 'Start date';
 
   @override
@@ -790,8 +795,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
-  String categoryDeleteDialogBody(String categoryName) {
-    return 'This deletes \'$categoryName\'. Chores and items using it become uncategorized.';
+  String categoryDeleteDialogBodyChoresZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No chores use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyChoresCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingZero(String categoryName) {
+    return 'This deletes \'$categoryName\'. No shopping items use it right now.';
+  }
+
+  @override
+  String categoryDeleteDialogBodyShoppingCount(String categoryName, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
+      one:
+          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -918,6 +954,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountAdoptRetry => 'Try again';
 
   @override
+  String get settingsAccountAdoptBlockedTitle =>
+      'This household is already online';
+
+  @override
+  String get settingsAccountAdoptBlockedBody =>
+      'It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.';
+
+  @override
   String get settingsAccountAdoptError =>
       'Couldn\'t put your household online. Please try again.';
 
@@ -1027,6 +1071,87 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong while joining the household. Please try again.';
 
   @override
+  String get joinHouseholdNoLongerMemberError =>
+      'This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.';
+
+  @override
+  String get statsSettingsEntry => 'Chore history';
+
+  @override
+  String get statsTitle => 'Chore history';
+
+  @override
+  String get statsWindowLast30Days => 'In the last 30 days';
+
+  @override
+  String statsWindowSinceStart(String date) {
+    return 'Since you started, $date';
+  }
+
+  @override
+  String statsTotalDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chores done',
+      one: '1 chore done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsShareUnknownMember => 'Someone else';
+
+  @override
+  String get statsChoresSectionTitle => 'Chores';
+
+  @override
+  String statsChoreTimesDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Done $count times',
+      one: 'Done once',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsChoreLastDone(String date) {
+    return 'last $date';
+  }
+
+  @override
+  String statsDeletedSectionHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted chores ($count)',
+      one: 'Deleted chores (1)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statsDeletedNotice =>
+      'This chore was deleted. Its history is kept here.';
+
+  @override
+  String statsHistoryTruncated(int shown, int total) {
+    return 'Showing the $shown most recent of $total';
+  }
+
+  @override
+  String get statsEmptyTitle => 'No completed chores yet';
+
+  @override
+  String get statsEmptyBody =>
+      'As your household ticks chores off, this is where you\'ll see who did what.';
+
+  @override
+  String get statsErrorMessage => 'Couldn\'t load the history.';
+
+  @override
   String get settingsAboutSectionTitle => 'About';
 
   @override
@@ -1063,7 +1188,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone.';
+      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>

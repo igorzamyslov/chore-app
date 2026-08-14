@@ -1,0 +1,11 @@
+Important fix: if you had been removed from a household, tapping Reconnect could erase everything on your phone. It now stops safely instead, without touching your data.
+
+New: Settings, then Chore history, shows who did what over the last 30 days.
+
+Swipe between tabs, and tap a tab again to jump to the top.
+
+Daily reminders now keep arriving for months instead of about a week.
+
+Deleting a category tells you how many chores it affects first.
+
+Drag to reorder whose turn is next.

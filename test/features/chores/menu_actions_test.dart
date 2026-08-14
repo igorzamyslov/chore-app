@@ -191,4 +191,40 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'the delete dialog now promises history is kept AND names where to find '
+    'it (triage D2 step 2 -- the promise is only made once the mechanism '
+    'exists)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Deletable chore',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chores.menu.delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('history is kept'), findsOneWidget);
+      expect(find.textContaining('Chore history'), findsOneWidget);
+      expect(find.textContaining("can't view it again yet"), findsNothing);
+
+      handle.dispose();
+    },
+  );
 }

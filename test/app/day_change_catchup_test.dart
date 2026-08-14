@@ -243,7 +243,13 @@ void main() {
             .createChore(
               householdId: householdId,
               title: 'Far ahead',
-              startDate: PlainDate(2026, 1, 20),
+              // Must sit beyond the LAST horizon slot for this test to mean
+              // what it says. `now` is 2026-01-05 09:00, so slot 0 is
+              // 2026-01-06 and the furthest slot is offset 83 =
+              // 2026-03-30. A date inside the horizon would make the
+              // "arms nothing" assertion below fail — as it did when the
+              // horizon grew from 7 slots to 24.
+              startDate: PlainDate(2026, 6, 1),
               assignmentMode: AssignmentMode.anyone,
               recurrence: Recurrence.everyNDays(1),
             );
@@ -251,7 +257,7 @@ void main() {
         plugin.scheduledCalls.clear();
         // Captured right before triggerOnResume: bootstrap's own recompute
         // and the chore creation above already pushed cancelCallCount past
-        // digestHorizonDays, so asserting an absolute floor would pass
+        // digestHorizonSlots, so asserting an absolute floor would pass
         // trivially regardless of whether triggerOnResume's catch-up path
         // recomputes anything at all. The delta from here is what actually
         // proves it.
@@ -265,16 +271,16 @@ void main() {
 
         final repo = container.read(choreRepositoryProvider);
         final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.dueDate, PlainDate(2026, 1, 20));
-        // Nothing is due inside the horizon (the chore is 15 days out), so
+        expect(pending!.dueDate, PlainDate(2026, 6, 1));
+        // Nothing is due inside the horizon (the chore is months out), so
         // the recompute correctly arms nothing...
         expect(plugin.scheduledCalls, isEmpty);
         // ...but it MUST have run: without an unconditional recompute, an
-        // app left open longer than digestHorizonDays runs off the end of
+        // app left open longer than digestHorizonSlots runs off the end of
         // its own horizon and goes silent.
         expect(
           plugin.cancelCallCount,
-          greaterThanOrEqualTo(cancelCountBefore + digestHorizonDays),
+          greaterThanOrEqualTo(cancelCountBefore + digestHorizonSlots),
         );
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate

@@ -379,6 +379,13 @@ class ChoreAssignees extends Table with SyncDirtyColumn {
 /// Hard-deleted only via a chore's soft-delete cleanup (its pending
 /// occurrence, if any) — history rows (done/skipped/missed) are otherwise
 /// retained forever.
+///
+/// The `(status, closed_on)` index (schema v11, spec `docs/specs/stats.md`
+/// §2.3) serves the chore-history window query — `status = 'done' AND
+/// closed_on BETWEEN ? AND ?`. Neither existing index covers it:
+/// `(chore_id, status)` leads with the wrong column and `(status, due_date)`
+/// ranges over the wrong date. `closed_on` is `yyyy-mm-dd` TEXT, so the range
+/// is a lexicographic scan.
 @TableIndex(
   name: 'chore_occurrences_chore_status_idx',
   columns: {#choreId, #status},
@@ -386,6 +393,10 @@ class ChoreAssignees extends Table with SyncDirtyColumn {
 @TableIndex(
   name: 'chore_occurrences_status_due_date_idx',
   columns: {#status, #dueDate},
+)
+@TableIndex(
+  name: 'chore_occurrences_status_closed_on_idx',
+  columns: {#status, #closedOn},
 )
 @DataClassName('ChoreOccurrence')
 class ChoreOccurrences extends Table with SyncDirtyColumn {

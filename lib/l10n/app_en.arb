@@ -114,9 +114,9 @@
   "@choresDeleteDialogTitle": {
     "description": "Title of the chore delete-confirmation dialog."
   },
-  "choresDeleteDialogBody": "This removes '{choreTitle}' from your list. You can't view it again yet.",
+  "choresDeleteDialogBody": "This removes '{choreTitle}' from your lists. Its history is kept — you'll find it under Settings › Chore history.",
   "@choresDeleteDialogBody": {
-    "description": "Body of the chore delete-confirmation dialog. Deliberately states only what the user can verify (the chore leaves every list) -- it used to claim 'its history is kept', which is true in the DB but unobservable: every read path filters deletedAt IS NULL and no history screen exists, so the claim invited a destructive tap on a safety net that didn't exist (triage.md T1.2/D2). Not worded as permanent either, since the data genuinely is retained. TODO(F19): once the chore history view ships, restore stronger copy that also states history is kept and viewable -- see triage.md D2's two-step ordering.",
+    "description": "Body of the chore delete-confirmation dialog. Restored to the stronger promise when the chore-history screen shipped (docs/research/triage.md D2 step 2, docs/specs/stats.md §6): the claim that history is kept is now verifiable, because deleted chores are listed under Settings > Chore history and their completion log is readable there. Do NOT weaken or strengthen this copy without re-checking that screen still exists.",
     "placeholders": {
       "choreTitle": {
         "type": "String",
@@ -739,6 +739,17 @@
     "description": "Trailing chip in the chore form's assignee picker (spec docs/feedback/2026-08-01-ux-audit.md B2), opening the new-member sheet inline so a missing person can be added without abandoning the form."
   },
 
+  "choreFormAssigneeRemoveTooltip": "Remove {name} from the rotation",
+  "@choreFormAssigneeRemoveTooltip": {
+    "description": "Tooltip on the rotation reorder list's per-row remove button (chore form, assignment section).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+
   "choreFormStartDateLabel": "Start date",
   "@choreFormStartDateLabel": {
     "description": "Label of the chore form's start-date field."
@@ -1023,13 +1034,51 @@
   "@categoryDeleteDialogTitle": {
     "description": "Title of the category delete-confirmation dialog."
   },
-  "categoryDeleteDialogBody": "This deletes '{categoryName}'. Chores and items using it become uncategorized.",
-  "@categoryDeleteDialogBody": {
-    "description": "Body of the category delete-confirmation dialog, explaining the consequence.",
+  "categoryDeleteDialogBodyChoresZero": "This deletes '{categoryName}'. No chores use it right now.",
+  "@categoryDeleteDialogBodyChoresZero": {
+    "description": "Body of the category delete-confirmation dialog for a chore-kind category that no active chore currently references.",
     "placeholders": {
       "categoryName": {
         "type": "String",
-        "example": "Produce"
+        "example": "Cleaning"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{This deletes '{categoryName}'. 1 chore uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} chores use it and will become uncategorized.}}",
+  "@categoryDeleteDialogBodyChoresCount": {
+    "description": "Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Cleaning"
+      },
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyShoppingZero": "This deletes '{categoryName}'. No shopping items use it right now.",
+  "@categoryDeleteDialogBodyShoppingZero": {
+    "description": "Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Dairy"
+      }
+    }
+  },
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{This deletes '{categoryName}'. 1 shopping item uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} shopping items use it and will become uncategorized.}}",
+  "@categoryDeleteDialogBodyShoppingCount": {
+    "description": "Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.",
+    "placeholders": {
+      "categoryName": {
+        "type": "String",
+        "example": "Dairy"
+      },
+      "count": {
+        "type": "int",
+        "example": "5"
       }
     }
   },
@@ -1201,6 +1250,14 @@
   "@settingsAccountAdoptRetry": {
     "description": "Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe."
   },
+  "settingsAccountAdoptBlockedTitle": "This household is already online",
+  "@settingsAccountAdoptBlockedTitle": {
+    "description": "Title of the adopt row's TERMINAL state (HouseholdAlreadyOnlineFailure): the household's id already exists on the server and this account is not a member of it, so adopting can never succeed from this device. Deliberately not phrased as an error -- nothing went wrong, the situation is simply settled -- and deliberately not offering 'Try again', which is what this state replaced."
+  },
+  "settingsAccountAdoptBlockedBody": "It is already on the server, and this device is no longer part of it. Ask someone in the household for an invite code, then use \"Join an existing household\" below.",
+  "@settingsAccountAdoptBlockedBody": {
+    "description": "Body of the adopt row's terminal state. States exactly three things: the household is already online, this device is no longer part of it, and an invite code is the way back. It must NAME the recourse (the join row directly below it) -- a notice that reports a fault and offers nothing is the dead end this project has rejected twice (docs/backlog.md E-2, D-5). The quoted phrase must match settingsAccountJoinTitle."
+  },
   "settingsAccountAdoptError": "Couldn't put your household online. Please try again.",
   "@settingsAccountAdoptError": {
     "description": "Inline error shown as the adopt row's subtitle after a failed attempt."
@@ -1341,6 +1398,111 @@
   "@joinHouseholdWorkingError": {
     "description": "Inline error shown on the join sheet's working step if downloading/replacing the household fails; retrying re-runs the remaining flow, which is safe (the archive was already written and the old data is untouched until the replace transaction commits)."
   },
+  "joinHouseholdNoLongerMemberError": "This household is no longer available to your account. Nothing on this device was changed. Ask someone in the household for a new invite code.",
+  "@joinHouseholdNoLongerMemberError": {
+    "description": "Inline error shown on the join sheet's working step when the downloaded snapshot did not confirm this account's access (HouseholdSnapshotUnavailable) -- almost always a reconnect offer that went stale because the account was removed from the household in the meantime. Unlike joinHouseholdWorkingError this is NOT retryable, so the copy names the one recourse that can work: someone still in the household sends a fresh invite code, which the join row redeems. It also states explicitly that nothing local changed, because the alternative reading -- that the device was just wiped -- is precisely the bug this replaced."
+  },
+
+  "statsSettingsEntry": "Chore history",
+  "@statsSettingsEntry": {
+    "description": "Settings > Household row opening the chore-history screen. Code namespace is 'stats' but user-visible copy is always 'Chore history' -- see docs/specs/stats.md §1."
+  },
+  "statsTitle": "Chore history",
+  "@statsTitle": {
+    "description": "App bar title of the chore-history overview screen."
+  },
+  "statsWindowLast30Days": "In the last 30 days",
+  "@statsWindowLast30Days": {
+    "description": "Label above the household share card naming the window the counts cover."
+  },
+  "statsWindowSinceStart": "Since you started, {date}",
+  "@statsWindowSinceStart": {
+    "description": "Replaces statsWindowLast30Days when the household is younger than the 30-day window, so a short history is never presented as a full month.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "9 August"
+      }
+    }
+  },
+  "statsTotalDone": "{count, plural, one{1 chore done} other{{count} chores done}}",
+  "@statsTotalDone": {
+    "description": "Total completions in the share window; also the single-member household's replacement for the whole share card.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "statsShareUnknownMember": "Someone else",
+  "@statsShareUnknownMember": {
+    "description": "Label for the share bucket of completions whose completed_by is NULL (possible via sync or an imported archive)."
+  },
+  "statsChoresSectionTitle": "Chores",
+  "@statsChoresSectionTitle": {
+    "description": "Header above the per-chore list on the chore-history overview."
+  },
+  "statsChoreTimesDone": "{count, plural, one{Done once} other{Done {count} times}}",
+  "@statsChoreTimesDone": {
+    "description": "First half of a chore row's metadata line: how many times it has ever been completed (all-time, not windowed).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "8"
+      }
+    }
+  },
+  "statsChoreLastDone": "last {date}",
+  "@statsChoreLastDone": {
+    "description": "Second half of a chore row's metadata line, joined to statsChoreTimesDone with ' · '.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "4 Aug"
+      }
+    }
+  },
+  "statsDeletedSectionHeader": "{count, plural, one{Deleted chores (1)} other{Deleted chores ({count})}}",
+  "@statsDeletedSectionHeader": {
+    "description": "Header of the collapsed section holding deleted chores that still have history -- the surface that makes the delete dialog's 'history is kept' promise verifiable (triage D2).",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "statsDeletedNotice": "This chore was deleted. Its history is kept here.",
+  "@statsDeletedNotice": {
+    "description": "Notice at the top of a deleted chore's history screen."
+  },
+  "statsHistoryTruncated": "Showing the {shown} most recent of {total}",
+  "@statsHistoryTruncated": {
+    "description": "Footer of a chore's history list when the completion count exceeds the 50-row cap.",
+    "placeholders": {
+      "shown": {
+        "type": "int",
+        "example": "50"
+      },
+      "total": {
+        "type": "int",
+        "example": "218"
+      }
+    }
+  },
+  "statsEmptyTitle": "No completed chores yet",
+  "@statsEmptyTitle": {
+    "description": "Empty-state headline on the chore-history overview when the household has never completed a chore."
+  },
+  "statsEmptyBody": "As your household ticks chores off, this is where you'll see who did what.",
+  "@statsEmptyBody": {
+    "description": "Empty-state body on the chore-history overview -- teaches what will appear rather than apologizing."
+  },
+  "statsErrorMessage": "Couldn't load the history.",
+  "@statsErrorMessage": {
+    "description": "Error state on the chore-history overview."
+  },
 
   "settingsAboutSectionTitle": "About",
   "@settingsAboutSectionTitle": {
@@ -1397,9 +1559,9 @@
   "@settingsResetConfirm1Title": {
     "description": "Title of the first reset confirmation dialog (spec docs/specs/polish-round-1.md B2)."
   },
-  "settingsResetConfirm1Body": "This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can't be undone.",
+  "settingsResetConfirm1Body": "This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can't be undone. If you're signed in, this also signs you out of this phone.",
   "@settingsResetConfirm1Body": {
-    "description": "Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent and there is no cloud copy (spec docs/specs/polish-round-1.md B2)."
+    "description": "Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2)."
   },
   "settingsResetConfirm1BodyLinked": "Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone's local members, chores, and shopping list.",
   "@settingsResetConfirm1BodyLinked": {

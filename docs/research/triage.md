@@ -96,6 +96,12 @@ This ordering matters: shipping the strong copy before the screen exists
 would mean deliberately keeping a promise we know is empty, which is the
 opposite of the decision.
 
+**Shipped**: step 2 is done — `docs/specs/stats.md` /
+`docs/plans/2026-08-08-stats-screen.md`. The stronger copy is back in
+`choresDeleteDialogBody`, and it is now true: a deleted chore is listed
+under Settings → Chore history → Deleted chores, and its completion log is
+readable there.
+
 ### D3 — Should the progress card follow the filter?
 
 **DECIDED (Igor, 2026-08-07): the card follows the filter.**

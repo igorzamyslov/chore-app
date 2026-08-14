@@ -63,7 +63,9 @@ EVERY interactive widget gets one. IDs used in this spec are normative:
   `chore_form.repeat.weekday.<1..7>`,
   `chore_form.repeat.monthly_mode.<day_of_month|nth_weekday>`,
   `chore_form.start_date`, `chore_form.assignment.<fixed|rotation|anyone>`,
-  `chore_form.assignee.<memberId>`, `chore_form.save`
+  `chore_form.assignee.<memberId>`, `chore_form.assignee.<memberId>.drag`
+  (rotation reorder drag handle), `chore_form.assignee.<memberId>.remove`
+  (rotation reorder remove button), `chore_form.save`
 
 ### Theme (`lib/app/theme.dart`)
 Material 3, `ColorScheme.fromSeed(seedColor: Color(0xFF26A69A))`, light +
@@ -140,9 +142,17 @@ error text `semantic('app.bootstrap_error')`.
     chips.
 - Start date: date picker, defaults to today, min today - 1 year.
 - Assignment: segmented fixed/rotation/anyone; fixed → single-select member
-  chips; rotation → multi-select member chips in tap order with visible
-  order badges (1, 2, …), each chip showing the member's `MemberAvatar`
-  before their name (field feedback F3). Validation errors inline: fixed
+  chips, each showing the member's `MemberAvatar` before their name (field
+  feedback F3). rotation (backlog B-4 / triage T2.5,
+  `docs/plans/2026-08-08-rotation-reorder.md`) → already-selected members
+  render as a compact reorderable list (drag handle, avatar, visible order
+  label "1. Anna" etc., remove button), directly editable by dragging a
+  row or tapping its remove button — not only rebuildable by deselecting
+  and reselecting; not-yet-selected members stay a tap-to-add chip row
+  below, appending to the end of the order, same as fixed mode's picker.
+  Reordering is a widget-tested interaction only (not E2E: Maestro can't
+  drive `ReorderableListView` reliably, same limitation already accepted
+  for `manage_categories_screen.dart`). Validation errors inline: fixed
   needs exactly one ('Pick one member'), rotation at least two ('Pick at
   least two').
 - Save: create via `ChoreService.createChore` (or update via
@@ -160,7 +170,7 @@ Streams → `AsyncValue` with loading (skeleton-free plain
 ## Widget test matrix (minimum)
 
 1. Shell: three tabs render; switching tabs swaps content and preserves
-   state per tab (IndexedStack).
+   state per tab (keep-alive `PageView` — see "App shell navigation" below).
 2. Bootstrap: loading → list; bootstrap error → error state.
 3. List grouping: fabricated occurrences land in the right sections
    (overdue/today/tomorrow/this-week/later boundaries — use a fixed
@@ -179,6 +189,39 @@ Streams → `AsyncValue` with loading (skeleton-free plain
 10. Both themes render the list screen without exceptions (smoke,
     `ThemeMode.dark`).
 11. Text scale 2.0 renders the list + form without overflow exceptions.
+
+## App shell navigation (added 2026-08-08 — backlog D-1 / D-4 / D-6)
+
+Binding for `lib/app/app_shell.dart`.
+
+1. **Content is a `PageView`**, one page per tab in `_AppTab.values` order,
+   each page kept alive (`AutomaticKeepAliveClientMixin`) so leaving a tab
+   preserves its scroll position and in-flight state. Horizontal swipe moves
+   one tab at a time; there is no wrap-around.
+2. **`allowImplicitScrolling` must stay `false`.** Setting it true lays the
+   neighbouring page out inside the viewport's semantics clip, leaking that
+   tab's `Semantics(identifier: ...)` nodes into `find.bySemanticsIdentifier`
+   and Maestro's `assertVisible` while another tab is on screen. Regression
+   test: `test/app/shell_navigation_test.dart`.
+3. **A tab TAP switches instantly (`jumpToPage`); only a user's drag
+   animates.** Material 3 does not slide between bottom-navigation
+   destinations, and an instant tap keeps every E2E flow deterministic
+   (`docs/specs/testing-strategy.md` §2.4). Never change this to
+   `animateToPage` without re-timing the suite.
+4. **Re-tapping the active tab scrolls that tab's list to the top**
+   (conventions audit C6). The shell owns one `ScrollController` per tab and
+   publishes it through `PrimaryScrollController`; the tab screens' scroll
+   views stay uncontrolled and inherit it. A screen that ever needs its own
+   `controller:` must instead accept one, or D-4 silently stops working for
+   that tab.
+5. **Re-tapping the active tab does NOT clear its snackbar.** Clearing is
+   tied to *leaving* a tab (field feedback B1) and lives in `onPageChanged`,
+   which a re-tap never reaches.
+6. **System back on a non-first tab returns to the Chores tab**; on the
+   Chores tab it is not intercepted and the app exits (Material's
+   start-destination rule). No "press back again" confirmation.
+7. **The hand-rolled `_BottomTabBar` and every `shell.tab.*` id are
+   unchanged** by all of the above (`docs/specs/theme-v2.md` §4.5).
 
 All tests use in-memory AppDatabase + fixed clock via provider overrides —
 no mocks of repositories/services (integration-style, same as data layer).

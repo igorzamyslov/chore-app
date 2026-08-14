@@ -27,8 +27,9 @@ import '../features/settings/fake_auth_gateway.dart';
 /// Used only by the FIX A serialization test below, to hold one recompute
 /// mid-loop (after it has already written some slots but before it writes
 /// the rest) while a second recompute is triggered — the same shape as the
-/// bug it regression-tests: `applyDigestPlans` awaits seven sequential
-/// platform-channel calls, and every `await` yields the isolate.
+/// bug it regression-tests: `applyDigestPlans` awaits one sequential
+/// platform-channel call per horizon slot, and every `await` yields the
+/// isolate.
 class _PausingPlugin extends FakeDigestNotificationPlugin {
   _PausingPlugin({required this.pauseOnId});
 
@@ -211,9 +212,9 @@ void main() {
       // Past the debounce window: exactly one reschedule, with the fresh
       // occurrence counted. A one-off due today is also overdue on every
       // later horizon day, so the whole horizon has something to say —
-      // one recompute now means digestHorizonDays plugin calls, not one.
+      // one recompute now means digestHorizonSlots plugin calls, not one.
       await tester.pump(const Duration(milliseconds: 450));
-      expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
+      expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
       expect(plugin.pending[digestNotificationIdBase]!.body, '1 chore today');
 
       await _disposeAndClose(tester, container, database);
@@ -271,19 +272,172 @@ void main() {
     // mutation) fully elapse.
     await tester.pump(digestRescheduleDebounce);
 
-    // One recompute call now means digestHorizonDays plugin calls (both
+    // One recompute call now means digestHorizonSlots plugin calls (both
     // one-offs are overdue on every later horizon day), not one — the
     // count still proves the burst collapsed into a single reschedule
     // rather than two (which would double it).
     expect(
       plugin.scheduledCalls,
-      hasLength(digestHorizonDays),
+      hasLength(digestHorizonSlots),
       reason: 'the burst must collapse into a single reschedule call',
     );
     expect(plugin.pending[digestNotificationIdBase]!.body, '2 chores today');
 
     await _disposeAndClose(tester, container, database);
   });
+
+  // THE COST OF A LARGER HORIZON, PINNED.
+  //
+  // The arithmetic these two tests defend (plan §4): one apply is now
+  // digestHorizonSlots = 24 sequential platform-channel calls rather than
+  // 7, each one channel round trip plus one inexact
+  // AlarmManager.setAndAllowWhileIdle. That growth is only acceptable
+  // because the work per mutation BURST is bounded twice over — the 500ms
+  // digestRescheduleDebounce collapses a burst into one firing, and
+  // DigestRescheduleController's depth-1 _inFlightRecompute/_recomputeQueued
+  // queue collapses everything arriving mid-run into ONE trailing re-run.
+  // Worst case per burst is therefore 2 applies = 48 calls, never one apply
+  // per mutation. (Projection cost grows too: ~600 PlainDate steps per
+  // schedule-anchored occurrence per recompute, so ~30k steps for 50 of
+  // them — single-digit milliseconds, and the reason the horizon stops at
+  // 24 slots rather than 60.)
+  //
+  // Both assertions below are EXACT counts on purpose. An isNotEmpty or
+  // greaterThan(0) here would pass whether the debounce and the queue work
+  // or not, which is precisely the class of never-failing assertion that
+  // makes a cost claim worthless.
+  testWidgets(
+    'five mutations in one debounce window cost exactly ONE apply, not five',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+      plugin.scheduledCalls.clear();
+
+      final today = PlainDate.fromDateTime(container.read(clockProvider).now());
+      final choreService = container.read(choreServiceProvider);
+
+      // Five mutations, with NO pump between them, so every one of them
+      // lands inside a single debounce window.
+      for (var i = 0; i < 5; i++) {
+        await choreService.createChore(
+          householdId: householdId,
+          title: 'Chore $i',
+          startDate: today,
+          assignmentMode: AssignmentMode.anyone,
+        );
+      }
+      expect(
+        plugin.scheduledCalls,
+        isEmpty,
+        reason: 'still inside the debounce window',
+      );
+
+      await tester.pump(digestRescheduleDebounce);
+
+      expect(
+        plugin.scheduledCalls,
+        // Observed empirically: pinning this at 2 * digestHorizonSlots
+        // failed with a real count of exactly digestHorizonSlots (24), so
+        // this bound is live, not vacuous.
+        hasLength(digestHorizonSlots),
+        reason:
+            'five mutations must cost ONE apply of the whole horizon; five '
+            'applies would be 5 * digestHorizonSlots calls',
+      );
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'recomputes arriving while an apply is in flight coalesce into ONE '
+    'trailing re-run -- a burst costs at most two applies, not one per '
+    'trigger',
+    (tester) async {
+      final currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final plugin = _PausingPlugin(pauseOnId: digestNotificationIdBase + 3);
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      // Baseline recompute (no chores yet): every slot is null, so this
+      // only ever calls `cancel`, never `zonedSchedule` -- the pause guard
+      // stays armed for the apply below.
+      await tester.pump(digestRescheduleDebounce);
+
+      final choreService = container.read(choreServiceProvider);
+      // This apply pauses mid-horizon, blocked on id 1004.
+      await choreService.createChore(
+        householdId: householdId,
+        title: 'Chore 0',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(1),
+      );
+      await tester.pump(digestRescheduleDebounce);
+
+      // Three further recomputes, each fully debounced, all arriving while
+      // the first apply is still blocked. Each one finds a recompute in
+      // flight and must be coalesced into the SAME single trailing re-run.
+      for (var i = 1; i <= 3; i++) {
+        await choreService.createChore(
+          householdId: householdId,
+          title: 'Chore $i',
+          startDate: PlainDate(2026, 1, 5),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        await tester.pump(digestRescheduleDebounce);
+      }
+
+      plugin.release();
+      await tester.pump(const Duration(milliseconds: 5));
+      await tester.pump(digestRescheduleDebounce);
+
+      expect(
+        plugin.scheduledCalls.length,
+        // Observed empirically: pinning this at digestHorizonSlots failed
+        // with a real count of exactly 48 = 2 * digestHorizonSlots, so the
+        // bound is tight — the in-flight apply plus ONE trailing re-run,
+        // with the three triggers genuinely coalesced.
+        lessThanOrEqualTo(2 * digestHorizonSlots),
+        reason:
+            'the in-flight apply plus exactly one coalesced trailing '
+            're-run; one apply per trigger would be 4 * digestHorizonSlots',
+      );
+      // And it really did re-run: the final horizon carries all four
+      // chores, so the trailing re-run used the LATEST counts.
+      expect(plugin.pending, hasLength(digestHorizonSlots));
+      expect(
+        plugin.pending.values.every((call) => call.body == '4 chores today'),
+        isTrue,
+      );
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
 
   testWidgets('disabling the digest cancels the scheduled notification', (
     tester,
@@ -319,9 +473,9 @@ void main() {
         );
     await tester.pump(digestRescheduleDebounce);
     // A one-off due today is overdue on every later horizon day, so the
-    // whole horizon has something to say: digestHorizonDays plugin calls
+    // whole horizon has something to say: digestHorizonSlots plugin calls
     // for this one recompute, not one.
-    expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
+    expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
 
     final cancelCountBefore = plugin.cancelCallCount;
     await container
@@ -331,8 +485,8 @@ void main() {
 
     expect(plugin.cancelCallCount, greaterThan(cancelCountBefore));
     // No further schedule call after disabling.
-    expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
-    // The direct proof that disabling silences all digestHorizonDays days,
+    expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
+    // The direct proof that disabling silences all digestHorizonSlots days,
     // not just that some cancels happened somewhere.
     expect(plugin.pending, isEmpty);
 
@@ -370,8 +524,8 @@ void main() {
           );
       await tester.pump(digestRescheduleDebounce);
 
-      // The whole horizon is armed up front, one id per calendar day.
-      expect(plugin.pending, hasLength(digestHorizonDays));
+      // The whole horizon is armed up front, one id per slot.
+      expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
         plugin.pending[digestNotificationIdBase]!.fireAt,
         DateTime(2026, 1, 5, 8),
@@ -409,6 +563,90 @@ void main() {
       expect(
         plugin.pending.values.every((call) => call.body == '1 chore today'),
         isTrue,
+      );
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'THE REGRESSION (A-1b): the digest survives ~12 weeks unopened, not 8 '
+    'days -- with NO app interaction at all, something is still armed two '
+    'months out',
+    (tester) async {
+      // The day-8 analogue of the P0 test above. Under the old flat 7-day
+      // horizon the furthest armed slot was 2026-01-11, so the
+      // furthest-fireAt assertion below fails against roughly
+      // `2026-01-11 08:00` where it expects a date on or after
+      // `2026-03-26 08:00`, and `pending` is empty after the 60-day
+      // delivery.
+      var currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Water the plants',
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.anyone,
+            recurrence: Recurrence.everyNDays(1),
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      // A daily chore gives every slot something to say, so the whole
+      // horizon is armed.
+      expect(plugin.pending, hasLength(digestHorizonSlots));
+
+      // THE POINT OF THIS PLAN: the reach, not the slot count. Asserted
+      // against an absolute date rather than a constant-derived one, so
+      // this cannot follow a shrinking horizon downwards without failing.
+      final furthest = plugin.pending.values
+          .map((call) => call.fireAt)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      expect(
+        furthest.isBefore(DateTime(2026, 3, 26, 8)),
+        isFalse,
+        reason:
+            'the furthest armed slot must be at least 80 days out, so an '
+            'app left unopened for months still has a digest coming — got '
+            '$furthest',
+      );
+
+      // The OS delivers everything due in the next 60 days. Then NOTHING
+      // happens: no mutation, no resume, no launch.
+      plugin.deliverDue(DateTime(2026, 3, 6, 8));
+      currentTime = DateTime(2026, 3, 6, 9);
+      // Captured before the pump, exactly as the P0 test does, so the
+      // assertion below cannot be satisfied by some other recompute
+      // quietly re-arming the horizon during it.
+      final scheduledCallsBefore = plugin.scheduledCalls.length;
+      await tester.pump(const Duration(hours: 1));
+
+      expect(
+        plugin.scheduledCalls.length,
+        scheduledCallsBefore,
+        reason:
+            'no app interaction occurred, so no recompute should have run '
+            'at all during this pump',
+      );
+      expect(
+        plugin.pending,
+        isNotEmpty,
+        reason:
+            'after 60 unopened days the digest must still have something '
+            'armed — this is the whole of A-1b',
       );
 
       await _disposeAndClose(tester, container, database);
@@ -528,11 +766,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 5));
       await tester.pump(digestRescheduleDebounce);
 
-      // Every one of the digestHorizonDays ids must show Y's count. If the
-      // two recomputes had interleaved (the bug), ids 1004-1007 would
+      // Every one of the digestHorizonSlots ids must show Y's count. If the
+      // two recomputes had interleaved (the bug), ids 1004 and up would
       // still show A's stale '1 chore today' -- A resuming after B would
       // overwrite them with counts that were already out of date.
-      expect(plugin.pending, hasLength(digestHorizonDays));
+      expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
         plugin.pending.values.every((call) => call.body == '2 chores today'),
         isTrue,

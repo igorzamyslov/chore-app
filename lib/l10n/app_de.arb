@@ -26,7 +26,7 @@
   "choresMenuPause": "Pausieren",
 
   "choresDeleteDialogTitle": "Aufgabe löschen?",
-  "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deiner Liste. Wieder ansehen kannst du es noch nicht.",
+  "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deinen Listen. Der Verlauf bleibt erhalten — du findest ihn unter Einstellungen › Aufgaben-Verlauf.",
 
   "choresOccurrenceCompleteTooltip": "Erledigen",
   "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",
@@ -147,6 +147,7 @@
   "choreFormAssignmentNeedsOneError": "Wähle ein Mitglied aus",
   "choreFormAssignmentNeedsTwoError": "Wähle mindestens zwei aus",
   "choreFormAddMember": "Mitglied hinzufügen…",
+  "choreFormAssigneeRemoveTooltip": "{name} aus der Rotation entfernen",
 
   "choreFormStartDateLabel": "Startdatum",
 
@@ -224,7 +225,10 @@
   "categoryEditColorLabel": "Farbe",
 
   "categoryDeleteDialogTitle": "Kategorie löschen?",
-  "categoryDeleteDialogBody": "Damit löschst du '{categoryName}'. Aufgaben und Artikel mit dieser Kategorie verlieren sie.",
+  "categoryDeleteDialogBodyChoresZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keiner Aufgabe verwendet.",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und sind danach ohne Kategorie.}}",
+  "categoryDeleteDialogBodyShoppingZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keinem Artikel verwendet.",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und sind danach ohne Kategorie.}}",
 
   "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",
@@ -263,6 +267,8 @@
   "settingsAccountAdoptTitle": "Meinen Haushalt online stellen",
   "settingsAccountAdoptIntro": "Macht deinen Haushalt auf deinen anderen Geräten verfügbar.",
   "settingsAccountAdoptRetry": "Erneut versuchen",
+  "settingsAccountAdoptBlockedTitle": "Dieser Haushalt ist schon online",
+  "settingsAccountAdoptBlockedBody": "Er ist bereits auf dem Server, und dieses Gerät gehört nicht mehr dazu. Frag jemanden im Haushalt nach einem Einladungscode und nutze dann unten „Einem bestehenden Haushalt beitreten“.",
   "settingsAccountAdoptError": "Dein Haushalt konnte nicht online gestellt werden. Versuch es noch mal.",
   "settingsAccountLinkedSubtitle": "Synchronisiert mit {householdName}",
   "settingsAccountLastSyncedJustNow": "Zuletzt synchronisiert: gerade eben",
@@ -289,6 +295,23 @@
   "joinHouseholdImportAccept": "Mitnehmen",
   "joinHouseholdImportDecline": "Neu anfangen",
   "joinHouseholdWorkingError": "Beim Beitreten ist etwas schiefgelaufen. Versuch es noch mal.",
+  "joinHouseholdNoLongerMemberError": "Dieser Haushalt ist für dein Konto nicht mehr verfügbar. Auf diesem Gerät wurde nichts geändert. Frag jemanden im Haushalt nach einem neuen Einladungscode.",
+
+  "statsSettingsEntry": "Aufgaben-Verlauf",
+  "statsTitle": "Aufgaben-Verlauf",
+  "statsWindowLast30Days": "In den letzten 30 Tagen",
+  "statsWindowSinceStart": "Seit deinem Start am {date}",
+  "statsTotalDone": "{count, plural, one{1 Aufgabe erledigt} other{{count} Aufgaben erledigt}}",
+  "statsShareUnknownMember": "Jemand anderes",
+  "statsChoresSectionTitle": "Aufgaben",
+  "statsChoreTimesDone": "{count, plural, one{Einmal erledigt} other{{count}-mal erledigt}}",
+  "statsChoreLastDone": "zuletzt {date}",
+  "statsDeletedSectionHeader": "{count, plural, one{Gelöschte Aufgaben (1)} other{Gelöschte Aufgaben ({count})}}",
+  "statsDeletedNotice": "Diese Aufgabe wurde gelöscht. Ihr Verlauf bleibt hier erhalten.",
+  "statsHistoryTruncated": "Zeigt die {shown} neuesten von {total}",
+  "statsEmptyTitle": "Noch nichts erledigt",
+  "statsEmptyBody": "Sobald ihr Aufgaben abhakt, siehst du hier, wer was gemacht hat.",
+  "statsErrorMessage": "Der Verlauf konnte nicht geladen werden.",
 
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
@@ -302,7 +325,7 @@
   "settingsDataSectionTitle": "Daten",
   "settingsResetEntry": "App-Daten zurücksetzen",
   "settingsResetConfirm1Title": "App-Daten zurücksetzen?",
-  "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen.",
+  "settingsResetConfirm1Body": "Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.",
   "settingsResetConfirm1BodyLinked": "Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät.",
   "settingsResetConfirm1Action": "Weiter",
   "settingsResetConfirm2Title": "Wirklich alles löschen?",

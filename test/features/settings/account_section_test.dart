@@ -738,6 +738,127 @@ void main() {
     },
   );
 
+  // Finding 3 (plan `docs/plans/2026-08-14-reconnect-adopt-hardening.md`
+  // Task 6): after a revocation, `clearSyncLink()` keeps every local row --
+  // household id included -- so adopt re-sends an id the server already has,
+  // while RLS makes that household unreadable to this account. The old
+  // resume heuristic keys on "can I still read this household", which is
+  // false for exactly the one caller who can never succeed, so it produced a
+  // generic error plus "Try again" forever.
+  final revokedAdoptGateway = FakeHouseholdGateway()
+    ..createHouseholdError = const HouseholdIdTakenFailure();
+
+  testChoreApp(
+    'adopt after a revocation: the id is taken AND the household is '
+    'unreadable, so the row goes to a terminal blocked state naming the '
+    'join row as the recourse -- no retry, no tap, nothing linked',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(revokedAdoptGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('This household is already online'), findsOneWidget);
+      expect(
+        find.text(
+          'It is already on the server, and this device is no longer part '
+          'of it. Ask someone in the household for an invite code, then use '
+          '"Join an existing household" below.',
+        ),
+        findsOneWidget,
+      );
+
+      // The one thing this state exists to stop: an invitation to retry
+      // something that cannot ever succeed on this device.
+      expect(find.text('Try again'), findsNothing);
+      expect(
+        find.text("Couldn't put your household online. Please try again."),
+        findsNothing,
+      );
+
+      final adoptTile = tester.widget<ListTile>(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.account.adopt'),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(adoptTile.onTap, isNull);
+      expect(adoptTile.enabled, isFalse);
+
+      // The recourse the copy names must actually be on screen.
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
+        findsOneWidget,
+      );
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, isNull);
+      final households = await database.select(database.households).get();
+      expect(households.map((h) => h.id), [householdId]);
+
+      handle.dispose();
+    },
+  );
+
+  final resumeAdoptGateway = FakeHouseholdGateway()
+    ..createHouseholdError = const HouseholdIdTakenFailure();
+
+  testChoreApp(
+    'adopt after a Disconnect: the id is taken but the household is still '
+    'READABLE, so the resume heuristic still fires and adopt completes -- '
+    'the blocked state must not swallow this case',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(resumeAdoptGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      // Disconnect leaves the caller's user_id on the server member row, so
+      // `is_household_member` still passes and the household reads back.
+      resumeAdoptGateway.downloadSnapshotOverride = HouseholdSnapshot(
+        household: Household(
+          id: householdId,
+          name: 'My household',
+          createdAt: 't0',
+          updatedAt: 't0',
+          syncDirty: false,
+        ),
+      );
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(find.text('This household is already online'), findsNothing);
+
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.syncHouseholdId, householdId);
+
+      handle.dispose();
+    },
+  );
+
   final reconnectGateway = FakeHouseholdGateway()
     ..membership = const MyMembership(
       householdId: 'joined-hh',

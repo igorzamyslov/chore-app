@@ -55,6 +55,34 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    look at `text`, `accessibilityText` AND `hintText` (a `TextField`'s
    label/error land in `hintText`, not the other two).
 
+9. **A swipe never gets a wait — it gets an `assertVisible` on an element
+   that only exists on the destination.** The shell's tab `PageView`
+   (backlog D-1) settles with standard `PageScrollPhysics`, so the frame
+   the swipe lands on is not predictable; `assertVisible` polls, a sleep
+   does not (spec `docs/specs/testing-strategy.md` §2.5). Keep both swipe
+   endpoints well inside the screen (20%/80% is the suite's default): a
+   gesture starting at a screen edge is an iOS interactive-pop or an
+   Android system edge gesture, not your swipe — the same failure class as
+   convention 3's `hideKeyboard`. And remember that a horizontal drag
+   starting on a shopping ITEM row belongs to that row's `Dismissible`, not
+   to the page (spec `docs/specs/ui-shopping.md`), so flows that swipe on
+   the Shopping tab must do it over an empty list or over the quick-add
+   row / a category header.
+
+   **The trap that will silently poison this whole suite:
+   `PageView.allowImplicitScrolling`.** It is `false` in
+   `lib/app/app_shell.dart` and must stay `false`. Setting it true (the
+   obvious-looking "fix" for the one-frame spinner on a tab's first visit)
+   widens the viewport's cache extent so the NEIGHBOURING tab is laid out
+   inside the viewport's semantics clip — unlike a kept-alive page, which
+   is excluded. Its `Semantics(identifier: ...)` nodes then join the
+   accessibility tree while a different tab is on screen, so `assertVisible`
+   starts passing for ids that are not on screen and `assertNotVisible`
+   starts failing for ids that are correctly hidden. The failures look like
+   flakes and point nowhere near the shell. Guarded by
+   `test/app/shell_navigation_test.dart` and spec
+   `docs/specs/ui-foundation-chores.md`, "App shell navigation" item 2.
+
 ## Maestro version (pinned)
 
 CI installs Maestro PINNED via `MAESTRO_VERSION` in

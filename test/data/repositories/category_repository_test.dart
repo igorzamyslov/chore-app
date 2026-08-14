@@ -164,6 +164,98 @@ void main() {
     );
   });
 
+  group('countActiveReferences', () {
+    test('counts only active chores for a chore-kind category', () async {
+      final category = await repo.createCategory(
+        householdId,
+        kind: CategoryKind.chore,
+        name: 'Cleaning',
+        icon: 'a',
+        color: 1,
+      );
+      final choreRepo = ChoreRepository(
+        db,
+        newId: _IdGen().call,
+        nowUtc: _fixedNow,
+      );
+      await choreRepo.createChore(
+        householdId: householdId,
+        title: 'Vacuum',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        categoryId: category.id,
+      );
+      final dust = await choreRepo.createChore(
+        householdId: householdId,
+        title: 'Dust',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        categoryId: category.id,
+      );
+      await choreRepo.softDeleteChore(dust.id);
+
+      final count = await repo.countActiveReferences(
+        category.id,
+        CategoryKind.chore,
+      );
+
+      expect(count, 1);
+    });
+
+    test(
+      'counts only active shopping items for a shopping-kind category',
+      () async {
+        final category = await repo.createCategory(
+          householdId,
+          kind: CategoryKind.shopping,
+          name: 'Dairy',
+          icon: 'a',
+          color: 1,
+        );
+        final shoppingRepo = ShoppingRepository(
+          db,
+          newId: _IdGen().call,
+          nowUtc: _fixedNow,
+        );
+        await shoppingRepo.addItem(
+          householdId,
+          name: 'Milk',
+          categoryId: category.id,
+        );
+        final eggs = await shoppingRepo.addItem(
+          householdId,
+          name: 'Eggs',
+          categoryId: category.id,
+        );
+        await shoppingRepo.deleteItem(eggs.id);
+
+        final count = await repo.countActiveReferences(
+          category.id,
+          CategoryKind.shopping,
+        );
+
+        expect(count, 1);
+      },
+    );
+
+    test('returns 0 for a category nothing references', () async {
+      final category = await repo.createCategory(
+        householdId,
+        kind: CategoryKind.chore,
+        name: 'Unused',
+        icon: 'a',
+        color: 1,
+      );
+
+      final count = await repo.countActiveReferences(
+        category.id,
+        CategoryKind.chore,
+      );
+
+      expect(count, 0);
+    });
+  });
+
   group('reorderCategories', () {
     test('persists the given order as 0-based sort_order', () async {
       await repo.seedDefaults(householdId);

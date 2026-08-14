@@ -208,8 +208,9 @@ abstract class SyncTransport {
 }
 
 /// The production [SyncEngine]: LWW push/pull over a [SyncTransport], with
-/// a debounced push-on-write trigger and a realtime pull trigger (spec
-/// §8.3).
+/// a debounced push-on-write trigger, a realtime pull trigger, and a
+/// periodic foreground poll that unconditionally pulls AND retries any
+/// still-dirty push (spec §8.3, extended by B-6 -- see [_pollTick]).
 class SupabaseSyncEngine implements SyncEngine {
   /// Creates an engine for [householdId], reading/writing [db] and talking
   /// to the server through [transport]. [settings] is where the pull cursor
@@ -241,10 +242,15 @@ class SupabaseSyncEngine implements SyncEngine {
   /// before calling [pushDirty] (spec §8.3: "debounced ~2s").
   final Duration pushDebounce;
 
-  /// How often the foreground safety-net poll calls [pullSince] (spec
-  /// `docs/specs/sync-freshness.md` §2.2: 60s). Realtime is the fast path;
-  /// this only bounds worst-case staleness when realtime is degraded in a
-  /// way the re-subscribe trigger cannot see. Tests pass a shorter value.
+  /// How often the foreground safety-net poll ticks (spec
+  /// `docs/specs/sync-freshness.md` §2.2: 60s). Each tick runs [_pollTick]
+  /// (extended by B-6, `docs/backlog.md`, from a bare [pullSince] to also
+  /// retry any row a prior debounced push failed to send) -- see
+  /// [_pollTick]'s doc comment for why the pull half is unconditional even
+  /// when the push half fails. Realtime is still the fast path for pull;
+  /// this only bounds worst-case staleness, for both directions, when
+  /// realtime is degraded in a way the re-subscribe trigger cannot see.
+  /// Tests pass a shorter value.
   final Duration pollInterval;
 
   final SyncRepository _sync;
@@ -288,7 +294,12 @@ class SupabaseSyncEngine implements SyncEngine {
     // never got pushed -- e.g. a cold start while linked), which itself
     // pulls afterward on success (spec §8.3a/c): this covers "pull on
     // start" too, so a bare pullSince() call here is not enough on its
-    // own.
+    // own. _armPoll() below repeats a push-then-always-pull periodically
+    // while foregrounded (B-6, see _pollTick), so a row that fails to
+    // push here, or via the debounced write-listener, keeps getting
+    // retried instead of waiting for the next local write or resume --
+    // and the pull half of the poll keeps running even if that retry
+    // itself fails again.
     unawaited(pushDirty());
     _armPoll();
   }
@@ -319,17 +330,49 @@ class SupabaseSyncEngine implements SyncEngine {
     _armPoll();
   }
 
+  /// The poll timer's own tick (B-6, `docs/backlog.md`): pushes every
+  /// dirty row, swallowing any failure exactly like [pushDirty]'s own
+  /// try/catch (spec §8.3's failure posture), and then ALWAYS pulls --
+  /// regardless of whether the push succeeded.
+  ///
+  /// Deliberately NOT `await pushDirty(); await pullSince();`: [pushDirty]
+  /// already pulls once internally on a successful push (spec §8.3c), so
+  /// that would double-pull on every tick where nothing was wrong.
+  ///
+  /// Deliberately NOT a bare `await pushDirty()` either: [pushDirty]
+  /// returns early on failure and never reaches its own pull (see its
+  /// body) -- pointing the poll timer straight at it would make the
+  /// periodic pull conditional on the push succeeding. A single
+  /// persistently-rejected row (a `42501` from the column-restricted
+  /// `members`/`households` grants, or a row referencing something
+  /// deleted elsewhere) would then turn the 60s freshness bound
+  /// `docs/specs/sync-freshness.md` §2.2 exists to guarantee into a
+  /// total, silent pull blackout for this device -- while the other
+  /// household member's changes keep arriving unseen. This method's own
+  /// try/catch exists specifically so a push failure can never prevent
+  /// the pull that follows it.
+  Future<void> _pollTick() async {
+    try {
+      await _pushAll();
+    } on Object catch (error, stackTrace) {
+      _logFailure('pushDirty', error, stackTrace);
+    }
+    await pullSince();
+  }
+
   /// (Re)arms the foreground safety-net poll, but only while the engine is
   /// started AND the app is foregrounded -- so a resume that arrives before
   /// the engine exists, or after it was stopped, never leaves a stray timer
-  /// behind.
+  /// behind. Ticks call [_pollTick] (B-6, `docs/backlog.md`), not a bare
+  /// [pullSince]: see [_pollTick]'s own doc comment for why it must push
+  /// too, and why that push must never be allowed to block the pull.
   void _armPoll() {
     _pollTimer?.cancel();
     _pollTimer = null;
     if (!_started || !_foreground) {
       return;
     }
-    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(pullSince()));
+    _pollTimer = Timer.periodic(pollInterval, (_) => unawaited(_pollTick()));
   }
 
   void _scheduleDebouncedPush() {

@@ -1,0 +1,9 @@
+Wichtige Korrektur: Wenn du aus einem Haushalt entfernt worden warst, konnte "Neu verbinden" alles auf deinem Gerät löschen. Das bricht jetzt sicher ab, ohne deine Daten anzurühren.
+
+Neu: Einstellungen, dann Aufgaben-Verlauf, zeigt wer in den letzten 30 Tagen was erledigt hat.
+
+Wisch zwischen den Tabs, tippe einen Tab erneut für den Anfang.
+
+Erinnerungen kommen jetzt monatelang statt nur eine Woche.
+
+Beim Löschen einer Kategorie siehst du vorher, wie viele Aufgaben betroffen sind.

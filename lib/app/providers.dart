@@ -39,6 +39,7 @@ import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
+import 'package:chore_app/application/stats_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
@@ -46,6 +47,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/data/repositories/stats_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
@@ -638,6 +640,83 @@ final pausedChoresProvider = StreamProvider<List<ChoreWithDetails>>((
       );
 });
 
+/// Read-only reporting queries for the chore-history screens (spec
+/// `docs/specs/stats.md`).
+final statsRepositoryProvider = Provider<StatsRepository>((ref) {
+  return StatsRepository(ref.watch(appDatabaseProvider));
+});
+
+/// Assembles the chore-history overview (spec `docs/specs/stats.md` §2.2).
+final statsServiceProvider = Provider<StatsService>((ref) {
+  return StatsService(
+    database: ref.watch(appDatabaseProvider),
+    stats: ref.watch(statsRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  );
+});
+
+/// The chore-history overview for the bootstrap household.
+///
+/// `autoDispose` and one-shot on purpose (spec `docs/specs/stats.md` §2.3):
+/// this screen is a snapshot of the past, so a drift `.watch()` would re-run
+/// a whole-history aggregate on every unrelated occurrence write for the rest
+/// of the session. Leaving the screen drops the result; re-entering re-reads.
+// Explicitly annotated (and likewise [choreHistoryProvider] below): these
+// are the codebase's first `autoDispose` providers, and
+// `FutureProvider.autoDispose<T>` is a static-getter call rather than a
+// constructor invocation, so `specify_nonobvious_property_types` cannot
+// infer the declared type from the right-hand side.
+final AutoDisposeFutureProvider<StatsOverview> statsOverviewProvider =
+    FutureProvider.autoDispose<StatsOverview>((ref) async {
+      final householdId = await ref.watch(bootstrapProvider.future);
+      return ref.watch(statsServiceProvider).overview(householdId);
+    });
+
+/// The row cap on a single chore's completion log (spec
+/// `docs/specs/stats.md` §5) -- an honest total is shown alongside it rather
+/// than rendering a wall of entries.
+const int choreHistoryLimit = 50;
+
+/// One chore plus its capped completion log and untruncated total.
+class ChoreHistoryView {
+  /// Creates a chore-history view.
+  const ChoreHistoryView({
+    required this.chore,
+    required this.totalDone,
+    required this.recent,
+  });
+
+  /// The chore itself; may be soft-deleted (spec §5).
+  final Chore chore;
+
+  /// The chore's all-time `done` count, before [choreHistoryLimit] applies.
+  final int totalDone;
+
+  /// The most recent completions, newest first, at most [choreHistoryLimit].
+  final List<ChoreCompletion> recent;
+}
+
+/// One chore's completion log, keyed by chore id. `autoDispose` for the same
+/// reason as [statsOverviewProvider].
+final AutoDisposeFutureProviderFamily<ChoreHistoryView, String>
+choreHistoryProvider = FutureProvider.autoDispose
+    .family<ChoreHistoryView, String>((ref, choreId) async {
+      await ref.watch(bootstrapProvider.future);
+      final database = ref.watch(appDatabaseProvider);
+      final stats = ref.watch(statsRepositoryProvider);
+      final chore = await (database.select(
+        database.chores,
+      )..where((tbl) => tbl.id.equals(choreId))).getSingle();
+      return ChoreHistoryView(
+        chore: chore,
+        totalDone: await stats.doneCountForChore(choreId),
+        recent: await stats.recentCompletions(
+          choreId,
+          limit: choreHistoryLimit,
+        ),
+      );
+    });
+
 /// Every member of the bootstrap household, ordered by creation time (see
 /// `HouseholdRepository.watchMembers`).
 final membersProvider = StreamProvider<List<Member>>((ref) async* {
@@ -841,9 +920,10 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
 /// after the last relevant change, rebuilds the digest's whole scheduling
 /// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
-/// current [clockProvider] time and pushes all [digestHorizonDays] days of
-/// it to [notificationSchedulerProvider] at once — scheduling the days that
-/// have something to say and cancelling the days that don't. The horizon is
+/// current [clockProvider] time and pushes all [digestHorizonSlots] slots
+/// of it to [notificationSchedulerProvider] at once — scheduling the slots
+/// that have something to say and cancelling the ones that don't. The
+/// horizon is
 /// what makes the digest survive the app simply not being opened (spec
 /// `docs/specs/notifications.md` architecture #2): every trigger this class
 /// listens to requires a running app, so a single-slot schedule went
@@ -895,14 +975,15 @@ class DigestRescheduleController {
   /// The currently-running [_recompute] call, or `null` when idle.
   ///
   /// FIX A (review of the P0 digest-fix plan): `applyDigestPlans` awaits
-  /// SEVEN sequential platform-channel calls, one per horizon day, and
+  /// one sequential platform-channel call per horizon slot
+  /// ([digestHorizonSlots] of them), and
   /// every `await` yields the isolate. `triggerRecompute` only ever
   /// cancelled the *pending Timer* -- it had no idea whether a previous
   /// `_recompute` was still mid-flight -- so two debounce firings could run
   /// `_recompute` concurrently and interleave their writes: recompute A
   /// writes ids 1001-1003 from stale counts, yields; recompute B (newer
-  /// counts) runs to completion, writing all seven; A resumes and
-  /// overwrites 1004-1007 with its now-stale plans. The result is a
+  /// counts) runs to completion, writing the whole horizon; A resumes and
+  /// overwrites the slots after 1003 with its now-stale plans. The result is a
   /// horizon that's silently part-fresh, part-stale, with no bookkeeping
   /// that would ever notice.
   ///
@@ -1158,9 +1239,11 @@ class CatchUpController {
     }
     await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
     // Deliberately unconditional, and NOT gated on catch-up having changed
-    // something: the digest is armed only `digestHorizonDays` days ahead,
-    // so an app left open longer than that with no mutations would run off
-    // the end of its own horizon and go silent. A day passing is itself a
+    // something: the digest is armed only a bounded horizon ahead
+    // (`digestHorizonSlots` slots, reaching `digestDailyHorizonDays - 1 +
+    // digestHorizonTailStepDays * digestWeeklyHorizonSlots` days), so an
+    // app left open longer than that with no mutations would run off the
+    // end of its own horizon and go silent. A day passing is itself a
     // reason to re-arm.
     _ref.read(digestRescheduleControllerProvider).triggerRecompute();
   }

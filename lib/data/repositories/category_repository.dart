@@ -203,6 +203,32 @@ class CategoryRepository {
     });
   }
 
+  /// Counts the active chores or shopping items — whichever [kind] matches
+  /// — that currently reference category [id].
+  ///
+  /// Mirrors the exact `WHERE` clause [softDeleteCategory] uses to detach
+  /// rows from a deleted category, so this number always matches what a
+  /// delete will actually affect. Used by the delete-confirmation dialog to
+  /// state the blast radius before the irreversible tap.
+  Future<int> countActiveReferences(String id, CategoryKind kind) async {
+    switch (kind) {
+      case CategoryKind.chore:
+        final rows =
+            await (db.select(db.chores)..where(
+                  (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
+                ))
+                .get();
+        return rows.length;
+      case CategoryKind.shopping:
+        final rows =
+            await (db.select(db.shoppingItems)..where(
+                  (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
+                ))
+                .get();
+        return rows.length;
+    }
+  }
+
   /// Persists a manual sort order for [orderedCategoryIds] in a single
   /// transaction: category `orderedCategoryIds[i]` is written `sortOrder:
   /// i` (0-based).
