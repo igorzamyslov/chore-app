@@ -105,6 +105,40 @@ class MyMembership {
       'MyMembership($householdId, $memberId, $memberName, $householdName)';
 }
 
+/// [HouseholdGateway.createHousehold] was asked to create a household whose
+/// id already exists on the server.
+///
+/// `create_household`'s first statement is a plain
+/// `insert into households (id, name, created_by)`
+/// (`20260731120000_initial_schema.sql`), so a duplicate id raises
+/// `unique_violation` (SQLSTATE `23505`), which PostgREST surfaces as a
+/// `PostgrestException` with that code. `supabase/tests/002_membership_exit_test.sql`
+/// pins it.
+///
+/// Household ids are CLIENT-generated UUIDv4s, so this is not a collision
+/// with a stranger: it means *this device's own household is already on the
+/// server*. The reachable way to get there is a revocation --
+/// `SupabaseSyncEngine._pullSinceInner` calls `clearSyncLink()`, which drops
+/// the link but keeps every local row, household id included -- after which
+/// adopt tries to re-create a household the caller is no longer a member
+/// of. `HouseholdLinkService.adopt` is the consumer; see its terminal
+/// branch.
+///
+/// **Exposing this code to a non-member is a considered non-issue,** not an
+/// oversight against `remove_member`'s single-message rule: the caller
+/// already knows the id (it is their own local one), and household ids are
+/// unguessable UUIDv4s, so this cannot be used to enumerate anything.
+@immutable
+class HouseholdIdTakenFailure implements Exception {
+  /// Creates the failure.
+  const HouseholdIdTakenFailure();
+
+  @override
+  String toString() =>
+      'HouseholdIdTakenFailure: a household with this id already exists on '
+      'the server.';
+}
+
 /// The narrow seam between the app's household data and the Supabase
 /// backend (spec `docs/specs/sync-backend.md` §7.2): household/invite
 /// bootstrap RPCs, plus the two bulk data-transfer paths.
@@ -114,6 +148,11 @@ abstract class HouseholdGateway {
   /// UUIDs) and the acting member's claimed profile ([memberId],
   /// [memberName], [memberColor]); the server makes that member `admin`
   /// and links its `user_id` to the caller.
+  ///
+  /// Throws [HouseholdIdTakenFailure] when [householdId] already exists on
+  /// the server (only [SupabaseHouseholdGateway] can raise it -- see that
+  /// type's doc comment for why a client-generated UUIDv4 collision means
+  /// "this device's own household is already up there").
   Future<void> createHousehold({
     required String householdId,
     required String name,
@@ -266,16 +305,23 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
     required String memberName,
     required int memberColor,
   }) async {
-    await _client.rpc<dynamic>(
-      'create_household',
-      params: {
-        'p_household_id': householdId,
-        'p_name': name,
-        'p_member_id': memberId,
-        'p_member_name': memberName,
-        'p_color': memberColor,
-      },
-    );
+    try {
+      await _client.rpc<dynamic>(
+        'create_household',
+        params: {
+          'p_household_id': householdId,
+          'p_name': name,
+          'p_member_id': memberId,
+          'p_member_name': memberName,
+          'p_color': memberColor,
+        },
+      );
+    } on supabase.PostgrestException catch (error) {
+      if (error.code == '23505') {
+        throw const HouseholdIdTakenFailure();
+      }
+      rethrow;
+    }
   }
 
   @override
