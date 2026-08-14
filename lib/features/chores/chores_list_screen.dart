@@ -209,6 +209,19 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final completedBy =
         ref.read(actingMemberProvider)?.id ?? occurrence.assignedMember?.id;
     if (completedBy == null) {
+      // Reachable since T1.3: pinned mode with no claim resolved yet (e.g.
+      // right after adopting, before the first pull -- spec
+      // `docs/specs/members-management.md` §4.2) and no assignee to fall
+      // back on. Before T1.3, actingMemberProvider could never be null
+      // while members existed, so this was a silent no-op; now it must say
+      // something rather than let the tap vanish with no feedback.
+      if (!mounted) {
+        return;
+      }
+      showAppSnackbar(
+        context,
+        message: AppLocalizations.of(context).choresSnackbarNoActingMember,
+      );
       return;
     }
     await ref

@@ -401,6 +401,10 @@
   "@choresSnackbarPaused": {
     "description": "Undo snackbar message shown after pausing a chore (T1.5, triage.md), mirroring choresSnackbarDone/choresSnackbarSkipped's one-word tone. The UNDO action (choresSnackbarUndo) resumes the chore via ChoreService.unpauseChore."
   },
+  "choresSnackbarNoActingMember": "This device doesn't know who you are yet. Sign in again or reopen the app.",
+  "@choresSnackbarNoActingMember": {
+    "description": "Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either."
+  },
 
   "choresDoneHeader": "{count, plural, one{Done today (1)} other{Done today ({count})}}",
   "@choresDoneHeader": {

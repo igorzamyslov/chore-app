@@ -554,6 +554,12 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get choresSnackbarPaused;
 
+  /// Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either.
+  ///
+  /// In en, this message translates to:
+  /// **'This device doesn\'t know who you are yet. Sign in again or reopen the app.'**
+  String get choresSnackbarNoActingMember;
+
   /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
   ///
   /// In en, this message translates to:

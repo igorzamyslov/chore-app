@@ -109,6 +109,21 @@ class HouseholdLinkService {
     await households.setMemberRole(actingMemberId, MemberRole.admin);
     await households.setMemberUserId(actingMemberId, authUserId);
 
+    // Step 3b: also record this device's own member as the stored acting
+    // member, matching what both `HouseholdJoinService.join`/`joinFresh`
+    // already do (spec `docs/specs/members-management.md` §4.2). While
+    // pinned, `actingMemberProvider` prefers the claim
+    // (`claimedMemberProvider`) the moment it resolves -- but that claim
+    // only reaches THIS device once the sync engine's first pull applies
+    // it (`applyPulledMember`), and there is a window right after adopting
+    // (offline, or simply before that first pull) where it hasn't yet.
+    // Without this write, `settings.actingMemberId` is still null in that
+    // window and the acting member resolves to `null` rather than "this
+    // device's own member" -- a silently inert completion tap
+    // (`ChoresListScreen._complete`) for the one person who should least
+    // ever see that.
+    await settings.setActingMember(actingMemberId);
+
     // Step 4: mark this device linked -- only now that 1-2 have succeeded.
     await settings.setSyncLinked(
       householdId: householdId,

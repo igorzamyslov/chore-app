@@ -311,6 +311,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresSnackbarPaused => 'Paused';
 
   @override
+  String get choresSnackbarNoActingMember =>
+      'This device doesn\'t know who you are yet. Sign in again or reopen the app.';
+
+  @override
   String choresDoneHeader(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

@@ -155,4 +155,29 @@ void main() {
       expect(claimed.updatedAt, isNot(equals(me.updatedAt)));
     },
   );
+
+  test(
+    "adopt sets settings.actingMemberId to the caller's own member id, "
+    'matching what HouseholdJoinService.join/joinFresh already do -- '
+    'without it, actingMemberProvider has no stored id to fall back on '
+    'before the first claim-carrying pull, and can resolve to null (spec '
+    'docs/specs/members-management.md §4.2, pre-claim window)',
+    () async {
+      final household = await HouseholdRepository(db).createLocalHousehold(
+        'Me',
+      );
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+
+      await service.adopt(
+        householdId: household.id,
+        actingMemberId: me.id,
+        authUserId: 'auth-user-1',
+      );
+
+      final settings = await db.select(db.settings).getSingle();
+      expect(settings.actingMemberId, me.id);
+    },
+  );
 }

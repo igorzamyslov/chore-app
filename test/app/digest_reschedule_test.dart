@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
@@ -14,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../application/fake_digest_notification_plugin.dart';
+import '../features/settings/fake_auth_gateway.dart';
 
 /// A [FakeDigestNotificationPlugin] that pauses the FIRST [zonedSchedule]
 /// call for [pauseOnId] until [release] is called, then behaves normally
@@ -660,6 +663,83 @@ void main() {
       // The acting member resolves to the household's first/admin member —
       // not the partner — so this device's digest has nothing to say.
       expect(container.read(actingMemberProvider)!.id, isNot(partner.id));
+      expect(plugin.pending, isEmpty);
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'the digest scopes to the CLAIMED member in PINNED mode, not to the '
+    "household's first admin (FIX 5: the T2.3 scoping test above never "
+    'exercises pinned mode — this composes P0 scoping with T1.3 pinning)',
+    (tester) async {
+      final currentTime = DateTime(2026, 1, 5, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      final householdRepo = HouseholdRepository(database);
+      final household = await householdRepo.createLocalHousehold('Me');
+      // `createLocalHousehold` makes 'Me' the admin. Promote 'Anna' to
+      // admin and demote 'Me' to an ordinary member, so the OLD
+      // first-admin fallback and the NEW claim-based resolution disagree
+      // on who the recipient is -- the only way this test can tell them
+      // apart.
+      final me = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+      final anna = await householdRepo.addMember(
+        household.id,
+        name: 'Anna',
+        color: 0xFF445566,
+        role: MemberRole.admin,
+      );
+      await householdRepo.setMemberRole(me.id, MemberRole.member);
+
+      const user = AuthUser(id: 'u-1', email: 'me@example.com');
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+          authGatewayProvider.overrideWithValue(
+            FakeAuthGateway(currentUser: user),
+          ),
+        ],
+      )..read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      // Link and claim 'Me' -- mirrors what `HouseholdLinkService.adopt`
+      // now does (spec `docs/specs/household-lifecycle.md` §3.1 G-B).
+      await householdRepo.setMemberUserId(me.id, user.id);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: currentTime);
+      await tester.pump(digestRescheduleDebounce);
+
+      // Confirm the composed state this test actually exercises: pinned,
+      // and resolved via the claim to 'Me' -- the household's first ADMIN
+      // is Anna, so this assertion would fail under the old fallback.
+      expect(
+        container.read(memberIdentityModeProvider),
+        MemberIdentityMode.pinned,
+      );
+      expect(container.read(actingMemberProvider)!.id, me.id);
+
+      // Anna's fixed chore must not appear in THIS device's digest: the
+      // claimed recipient is 'Me', not Anna, even though Anna is the
+      // admin the old fallback would have picked.
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: "Anna's chore",
+            startDate: PlainDate(2026, 1, 5),
+            assignmentMode: AssignmentMode.fixed,
+            assigneeMemberIds: [anna.id],
+          );
+      await tester.pump(digestRescheduleDebounce);
+
       expect(plugin.pending, isEmpty);
 
       await _disposeAndClose(tester, container, database);
