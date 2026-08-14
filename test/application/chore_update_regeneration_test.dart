@@ -245,6 +245,54 @@ void main() {
         expect(details!.assigneeMemberIds, [m2]);
       },
     );
+
+    test(
+      'reordering a rotation (same members, new order) leaves the current '
+      "occurrence's assignee untouched, but the NEXT turn follows the new "
+      'order',
+      () async {
+        final m1 = await _insertMember(db, 'm1', householdId);
+        final m2 = await _insertMember(db, 'm2', householdId);
+        final m3 = await _insertMember(db, 'm3', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [m1, m2, m3],
+        );
+        final before = await repo.pendingOccurrenceOf(chore.id);
+        expect(before!.assignedMemberId, m1);
+
+        // Swap m2 and m3 -- m1 stays first, so the CURRENT occurrence's
+        // assignee (m1) is unaffected either way; only the order after m1
+        // changes.
+        await serviceOn(PlainDate(2026, 1, 2)).updateChore(
+          chore.id,
+          assignmentMode: AssignmentMode.rotation,
+          assigneeMemberIds: [m1, m3, m2],
+        );
+
+        // The pending occurrence is the SAME row, with the SAME assignee:
+        // a reorder is not a recurrence/startDate change, so nothing
+        // regenerates (ChoreService.updateChore doc comment, chore_service
+        // .dart:272-275).
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, before.id);
+        expect(pending.assignedMemberId, m1);
+
+        // Completing it, though, advances by the NEW order: under the
+        // original [m1, m2, m3] the member after m1 would be m2; under the
+        // reordered [m1, m3, m2] it's m3. Seeing m3 here proves the
+        // rotation reads the reordered list, not a cached original one.
+        await serviceOn(
+          PlainDate(2026, 1, 2),
+        ).completeOccurrence(pending.id, completedBy: m1);
+        final after = await repo.pendingOccurrenceOf(chore.id);
+        expect(after!.assignedMemberId, m3);
+      },
+    );
   });
 
   group('closed one-off', () {
