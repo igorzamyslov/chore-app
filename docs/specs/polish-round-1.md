@@ -103,6 +103,15 @@ of the chores list, and flows keep passing untouched.
   DST-safe: compute the next midnight from calendar components, same
   rule as `nextDigestSlot`). Also trigger a digest recompute after any
   catch-up that changed rows.
+- Amended 2026-08-08 (backlog A-2 / audit P1): on BOTH triggers the
+  controller also refreshes `todayProvider` — unconditionally, unlike the
+  digest recompute. The digest only has news when catch-up changed rows, but
+  the calendar date changes every night whether or not anything fell
+  overdue, and that common night is exactly the case the UI was getting
+  wrong. The day-change timer stays in this controller (rather than moving
+  into `todayProvider`) because this controller is activated only from
+  `main.dart`: a timer armed by a provider the widget tree watches would trip
+  `flutter_test`'s pending-timer check in every chores widget test.
 - Internals fix while there: `catchUpOverdue` reads
   `watchActiveChores().first` inside its transaction — replace with a
   new Future-based `ChoreRepository` read (`getActiveChores()`), same

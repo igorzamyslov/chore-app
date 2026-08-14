@@ -23,6 +23,17 @@ clock), and the chores feature UI. Shopping UI is a separate spec.*
   `const String.fromEnvironment('E2E_TODAY')` — when non-empty (e.g.
   `2026-07-24`), returns a fixed clock at that date's 09:00 local; otherwise
   `const Clock()`. This is the E2E clock hook from testing-strategy.md.
+- `todayProvider` (`NotifierProvider<TodayNotifier, PlainDate>`) — today's
+  local calendar date, seeded from `clockProvider` and republished by
+  `TodayNotifier.refresh()`, which `CatchUpController` calls unconditionally
+  at local midnight and on app resume. EVERY date-bucketed piece of UI reads
+  this, never `clockProvider` directly; the domain layer keeps using the
+  injected `Clock`. Never overridden in tests — it derives from
+  `clockProvider` by construction, which is what keeps `--dart-define=E2E_TODAY`
+  authoritative. Added 2026-08-08 (backlog A-2 / audit P1): `clockProvider`
+  is a plain `Provider` that never re-emits, so before this an app left open
+  overnight kept yesterday's section boundaries and yesterday's 'Done today'
+  list indefinitely.
 - Repository/service providers built from the above.
 - `bootstrapProvider` — `FutureProvider` that runs
   `ensureLocalHousehold()` + `seedDefaults()` + `catchUpOverdue()` once at
@@ -76,7 +87,8 @@ error text `semantic('app.bootstrap_error')`.
 - Sections in order, each only when non-empty, with plain header text:
   **Overdue** (due < today), **Today**, **Tomorrow**, **This week**
   (until Sunday incl.), **Later**. Sorting inside a section follows the
-  repository order.
+  repository order. "today" is `todayProvider`, so the boundaries move at
+  local midnight even if the app is never touched.
 - Occurrence tile: leading circular "complete" button (outlined circle;
   `.complete`), title, subtitle line with category chip (icon+name in
   category color) when categorized + assignee name when assigned; overdue
