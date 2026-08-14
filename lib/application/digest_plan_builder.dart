@@ -17,9 +17,9 @@ import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/digest_projection.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 
-/// The digest plan for each of the next [digestHorizonDays] slots.
+/// The digest plan for each of the next [digestHorizonSlots] slots.
 ///
-/// The returned list is ALWAYS exactly [digestHorizonDays] long: index `k`
+/// The returned list is ALWAYS exactly [digestHorizonSlots] long: index `k`
 /// is slot `k` (0 = the next slot), and a `null` entry means that day is
 /// silent and its notification id must be cancelled rather than scheduled
 /// (see `NotificationScheduler.applyDigestPlans`).

@@ -131,12 +131,12 @@ void main() {
   });
 
   group('digestSlots', () {
-    test('returns digestHorizonDays consecutive slots by default', () {
+    test('returns digestHorizonSlots consecutive slots by default', () {
       final slots = digestSlots(
         now: DateTime(2026, 7, 24, 7),
         digestMinutes: 480,
       );
-      expect(slots, hasLength(digestHorizonDays));
+      expect(slots, hasLength(digestHorizonSlots));
       expect(slots.first, DateTime(2026, 7, 24, 8));
       expect(slots.last, DateTime(2026, 7, 30, 8));
     });
@@ -178,12 +178,12 @@ void main() {
       );
     });
 
-    test('rejects a horizon below one day', () {
+    test('rejects a daily segment below one day', () {
       expect(
         () => digestSlots(
           now: DateTime(2026),
           digestMinutes: 480,
-          horizonDays: 0,
+          dailyDays: 0,
         ),
         throwsArgumentError,
       );

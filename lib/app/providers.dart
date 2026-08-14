@@ -841,7 +841,7 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
 /// after the last relevant change, rebuilds the digest's whole scheduling
 /// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
-/// current [clockProvider] time and pushes all [digestHorizonDays] days of
+/// current [clockProvider] time and pushes all [digestHorizonSlots] days of
 /// it to [notificationSchedulerProvider] at once — scheduling the days that
 /// have something to say and cancelling the days that don't. The horizon is
 /// what makes the digest survive the app simply not being opened (spec
@@ -1158,7 +1158,7 @@ class CatchUpController {
     }
     await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
     // Deliberately unconditional, and NOT gated on catch-up having changed
-    // something: the digest is armed only `digestHorizonDays` days ahead,
+    // something: the digest is armed only `digestHorizonSlots` days ahead,
     // so an app left open longer than that with no mutations would run off
     // the end of its own horizon and go silent. A day passing is itself a
     // reason to re-arm.

@@ -211,9 +211,9 @@ void main() {
       // Past the debounce window: exactly one reschedule, with the fresh
       // occurrence counted. A one-off due today is also overdue on every
       // later horizon day, so the whole horizon has something to say —
-      // one recompute now means digestHorizonDays plugin calls, not one.
+      // one recompute now means digestHorizonSlots plugin calls, not one.
       await tester.pump(const Duration(milliseconds: 450));
-      expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
+      expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
       expect(plugin.pending[digestNotificationIdBase]!.body, '1 chore today');
 
       await _disposeAndClose(tester, container, database);
@@ -271,13 +271,13 @@ void main() {
     // mutation) fully elapse.
     await tester.pump(digestRescheduleDebounce);
 
-    // One recompute call now means digestHorizonDays plugin calls (both
+    // One recompute call now means digestHorizonSlots plugin calls (both
     // one-offs are overdue on every later horizon day), not one — the
     // count still proves the burst collapsed into a single reschedule
     // rather than two (which would double it).
     expect(
       plugin.scheduledCalls,
-      hasLength(digestHorizonDays),
+      hasLength(digestHorizonSlots),
       reason: 'the burst must collapse into a single reschedule call',
     );
     expect(plugin.pending[digestNotificationIdBase]!.body, '2 chores today');
@@ -319,9 +319,9 @@ void main() {
         );
     await tester.pump(digestRescheduleDebounce);
     // A one-off due today is overdue on every later horizon day, so the
-    // whole horizon has something to say: digestHorizonDays plugin calls
+    // whole horizon has something to say: digestHorizonSlots plugin calls
     // for this one recompute, not one.
-    expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
+    expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
 
     final cancelCountBefore = plugin.cancelCallCount;
     await container
@@ -331,8 +331,8 @@ void main() {
 
     expect(plugin.cancelCallCount, greaterThan(cancelCountBefore));
     // No further schedule call after disabling.
-    expect(plugin.scheduledCalls, hasLength(digestHorizonDays));
-    // The direct proof that disabling silences all digestHorizonDays days,
+    expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
+    // The direct proof that disabling silences all digestHorizonSlots days,
     // not just that some cancels happened somewhere.
     expect(plugin.pending, isEmpty);
 
@@ -371,7 +371,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       // The whole horizon is armed up front, one id per calendar day.
-      expect(plugin.pending, hasLength(digestHorizonDays));
+      expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
         plugin.pending[digestNotificationIdBase]!.fireAt,
         DateTime(2026, 1, 5, 8),
@@ -528,11 +528,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 5));
       await tester.pump(digestRescheduleDebounce);
 
-      // Every one of the digestHorizonDays ids must show Y's count. If the
+      // Every one of the digestHorizonSlots ids must show Y's count. If the
       // two recomputes had interleaved (the bug), ids 1004-1007 would
       // still show A's stale '1 chore today' -- A resuming after B would
       // overwrite them with counts that were already out of date.
-      expect(plugin.pending, hasLength(digestHorizonDays));
+      expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
         plugin.pending.values.every((call) => call.body == '2 chores today'),
         isTrue,

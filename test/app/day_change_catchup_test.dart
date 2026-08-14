@@ -251,7 +251,7 @@ void main() {
         plugin.scheduledCalls.clear();
         // Captured right before triggerOnResume: bootstrap's own recompute
         // and the chore creation above already pushed cancelCallCount past
-        // digestHorizonDays, so asserting an absolute floor would pass
+        // digestHorizonSlots, so asserting an absolute floor would pass
         // trivially regardless of whether triggerOnResume's catch-up path
         // recomputes anything at all. The delta from here is what actually
         // proves it.
@@ -270,11 +270,11 @@ void main() {
         // the recompute correctly arms nothing...
         expect(plugin.scheduledCalls, isEmpty);
         // ...but it MUST have run: without an unconditional recompute, an
-        // app left open longer than digestHorizonDays runs off the end of
+        // app left open longer than digestHorizonSlots runs off the end of
         // its own horizon and goes silent.
         expect(
           plugin.cancelCallCount,
-          greaterThanOrEqualTo(cancelCountBefore + digestHorizonDays),
+          greaterThanOrEqualTo(cancelCountBefore + digestHorizonSlots),
         );
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate

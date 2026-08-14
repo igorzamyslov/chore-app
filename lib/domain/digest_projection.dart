@@ -9,7 +9,7 @@
 /// `docs/specs/notifications.md` architecture #1).
 ///
 /// This exists because the digest is scheduled a whole horizon ahead
-/// (`digestHorizonDays` in `lib/domain/digest_planner.dart`) and each of
+/// (`digestHorizonSlots` in `lib/domain/digest_planner.dart`) and each of
 /// those days needs its own counts *and* its own silence decision. The
 /// assumption "nothing happens in between" is exactly right for the case
 /// that matters: the app is not being opened, so nothing is completed,

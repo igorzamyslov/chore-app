@@ -53,14 +53,14 @@ void main() {
     return rows.last;
   }
 
-  test('always returns exactly digestHorizonDays entries', () async {
+  test('always returns exactly digestHorizonSlots entries', () async {
     final plans = buildDigestPlans(
       now: DateTime(2026, 1, 5, 7),
       settings: settings,
       pending: await pending(),
       recipientMemberId: null,
     );
-    expect(plans, hasLength(digestHorizonDays));
+    expect(plans, hasLength(digestHorizonSlots));
   });
 
   test('an empty household is silent on every single day', () async {

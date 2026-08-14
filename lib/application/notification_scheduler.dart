@@ -22,7 +22,7 @@ const int digestNotificationIdBase = 1001;
 /// (scheduling some, cancelling the rest), so a day that stops having
 /// anything to say can never keep a stale notification armed.
 final List<int> digestNotificationIds = List<int>.unmodifiable([
-  for (var k = 0; k < digestHorizonDays; k++) digestNotificationIdBase + k,
+  for (var k = 0; k < digestHorizonSlots; k++) digestNotificationIdBase + k,
 ]);
 
 /// The Android notification channel the digest notification is posted on.
@@ -261,14 +261,14 @@ class NotificationScheduler {
   /// Deliberately never requests the OS notification permission itself; see
   /// the class doc and spec `docs/specs/polish-round-1.md` A3.
   ///
-  /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonDays]
+  /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonSlots]
   /// long.
   Future<void> applyDigestPlans(List<DigestPlan?> plans) {
-    if (plans.length != digestHorizonDays) {
+    if (plans.length != digestHorizonSlots) {
       throw ArgumentError.value(
         plans.length,
         'plans.length',
-        'Must be exactly digestHorizonDays ($digestHorizonDays)',
+        'Must be exactly digestHorizonSlots ($digestHorizonSlots)',
       );
     }
     final waitForPrevious = _applyTail.catchError((_) {});

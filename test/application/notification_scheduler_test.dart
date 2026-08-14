@@ -67,10 +67,10 @@ void main() {
 
   group('applyDigestPlans', () {
     List<DigestPlan?> plansOf(Map<int, DigestPlan> byIndex) => [
-      for (var k = 0; k < digestHorizonDays; k++) byIndex[k],
+      for (var k = 0; k < digestHorizonSlots; k++) byIndex[k],
     ];
 
-    test('rejects a list that is not exactly digestHorizonDays long', () {
+    test('rejects a list that is not exactly digestHorizonSlots long', () {
       expect(
         () => scheduler.applyDigestPlans(const []),
         throwsArgumentError,
@@ -108,7 +108,7 @@ void main() {
           ),
         }),
       );
-      expect(plugin.cancelCallCount, digestHorizonDays - 1);
+      expect(plugin.cancelCallCount, digestHorizonSlots - 1);
       expect(plugin.pending.keys, [1001]);
     });
 
@@ -116,7 +116,7 @@ void main() {
         'no longer have anything to say', () async {
       await scheduler.applyDigestPlans(
         plansOf({
-          for (var k = 0; k < digestHorizonDays; k++)
+          for (var k = 0; k < digestHorizonSlots; k++)
             k: DigestPlan(
               fireAt: DateTime(2026, 7, 24 + k, 8),
               dueTodayCount: 1,
@@ -124,7 +124,7 @@ void main() {
             ),
         }),
       );
-      expect(plugin.pending, hasLength(digestHorizonDays));
+      expect(plugin.pending, hasLength(digestHorizonSlots));
 
       await scheduler.applyDigestPlans(plansOf({}));
       expect(plugin.pending, isEmpty);
@@ -181,7 +181,7 @@ void main() {
           dueTodayCount: 2,
           overdueCount: 1,
         ),
-        for (var k = 1; k < digestHorizonDays; k++) null,
+        for (var k = 1; k < digestHorizonSlots; k++) null,
       ]);
       expect(plugin.pending[1001]!.body, '2 Aufgaben heute · 1 überfällig');
     });
@@ -198,7 +198,7 @@ void main() {
         );
 
         List<DigestPlan?> plansWithCount(int count) => [
-          for (var k = 0; k < digestHorizonDays; k++)
+          for (var k = 0; k < digestHorizonSlots; k++)
             DigestPlan(
               fireAt: DateTime(2026, 7, 24 + k, 8),
               dueTodayCount: count,
@@ -247,11 +247,11 @@ void main() {
     );
 
     test(
-      'day 1 firing leaves days 2-7 armed, with nothing to re-arm them — '
-      'this is the whole point of the horizon (audit P0)',
+      'slot 0 firing leaves every later slot armed, with nothing to re-arm '
+      'them — this is the whole point of the horizon (audit P0)',
       () async {
         await scheduler.applyDigestPlans([
-          for (var k = 0; k < digestHorizonDays; k++)
+          for (var k = 0; k < digestHorizonSlots; k++)
             DigestPlan(
               fireAt: DateTime(2026, 7, 24 + k, 8),
               dueTodayCount: 1,
@@ -259,13 +259,16 @@ void main() {
             ),
         ]);
 
-        // The OS delivers day 1's notification a minute after it fires.
-        // Nothing re-arms it, but days 2-7 must remain untouched.
+        // The OS delivers slot 0's notification a minute after it fires.
+        // Nothing re-arms it, but every later slot must remain untouched.
         plugin.deliverDue(DateTime(2026, 7, 24, 8, 1));
 
         expect(
           plugin.pending.keys,
-          unorderedEquals([1002, 1003, 1004, 1005, 1006, 1007]),
+          unorderedEquals([
+            for (var k = 1; k < digestHorizonSlots; k++)
+              digestNotificationIdBase + k,
+          ]),
         );
       },
     );
@@ -279,13 +282,22 @@ void main() {
 
     test('cancels every id in the horizon, not just the first', () async {
       await scheduler.cancelDigest();
-      expect(plugin.cancelCallCount, digestHorizonDays);
-      expect(digestNotificationIds, [1001, 1002, 1003, 1004, 1005, 1006, 1007]);
+      expect(plugin.cancelCallCount, digestHorizonSlots);
+      // Derived from the constant rather than hard-coded, so this survives
+      // a change to the horizon's size: the ids are exactly
+      // `digestNotificationIdBase` and the `digestHorizonSlots - 1`
+      // consecutive ids after it.
+      expect(digestNotificationIds, hasLength(digestHorizonSlots));
+      expect(digestNotificationIds.first, digestNotificationIdBase);
+      expect(digestNotificationIds, [
+        for (var k = 0; k < digestHorizonSlots; k++)
+          digestNotificationIdBase + k,
+      ]);
     });
 
     test('leaves nothing armed', () async {
       await scheduler.applyDigestPlans([
-        for (var k = 0; k < digestHorizonDays; k++)
+        for (var k = 0; k < digestHorizonSlots; k++)
           DigestPlan(
             fireAt: DateTime(2026, 7, 24 + k, 8),
             dueTodayCount: 1,
