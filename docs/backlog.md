@@ -9,10 +9,12 @@ documents listed that is in fact implemented has been dropped here.*
 
 **Closed since they were written, verified in code:** the entire
 `2026-08-01-ux-audit.md` (A1–A6, B1–B3), all of `polish-round-1.md` (A1–A3,
-B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full,
-the `2026-08-07` field-feedback C1/C2/C3 and A1/B2, and every
-`next-session-plan.md` backlog bullet except `Recurrence` equality.
+B1–B2, C1–C3), app-lifecycle G1/G2/G3/G4/G5/G7/G9, triage Tier 1 in full
+(and T2.2 from Tier 2), the `2026-08-07` field-feedback C1/C2/C3 and A1/B2,
+and every `next-session-plan.md` backlog bullet except `Recurrence`
+equality.
 Also closed: **A-5 (acting-member pinning + Mark done for…, 2026-08-08)**.
+Also closed: **B-2 (category delete states its impact count, 2026-08-08)**.
 
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
@@ -135,7 +137,7 @@ section; within a wave, items are independent and can run in parallel.*
 4. **A-4** reset signs out — must precede E.
 5. **A-5** acting member — must precede G-1.
 
-**Wave 2 — trust gaps.** B-1, B-2, B-3, B-4, B-6 are mutually independent.
+**Wave 2 — trust gaps.** B-1, B-3, B-4, B-6 are mutually independent.
 B-5 waits for the shell (wave 3).
 
 **Wave 3 — conventions.** Shell (D-1/D-4/D-6) **first**, because two other
@@ -205,7 +207,6 @@ would catch by eye.*
 | ID | Title | What's wrong | Files | Effort |
 | --- | --- | --- | --- | --- |
 | **B-1** | Catch-up after a lapse is invisible (T2.1) | `catchUpOverdue` silently converts a backlog to "missed" before the list renders, with no explanation. To a returning user it reads as an accusation | `lib/application/chore_service.dart:138-178`, `lib/features/chores/` | S |
-| **B-2** | Category delete never says how much it affects (T2.2) | No "3 chores and 5 items" before an irreversible tap. Zero counting code in the dialog | `lib/features/settings/category_delete_dialog.dart` | S |
 | **B-3** | Join wizard keeps no persisted state (T2.4) | Switching to Mail to tap the magic link can drop the user back to the welcome screen mid-join; the route is not restored across process death | `lib/features/onboarding/welcome_join_page.dart` | M |
 | **B-4** | Rotation order can't be edited, only rebuilt (T2.5) | Re-tapping always re-appends; no reorder handle, while Categories next door has drag-reorder | `lib/features/chores/chore_form/assignment_fields.dart` | S |
 | **B-5** | A denied notification permission is permanent in practice (T2.6) | The only nudge is a one-shot banner; recovery lives in Settings, which the user who most needs it never opens | `lib/features/chores/digest_preprompt_banner.dart`, `lib/features/settings/digest_section.dart` | S |
