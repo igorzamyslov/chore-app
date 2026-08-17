@@ -99,7 +99,12 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(settings, settings.syncHouseholdId);
           await migrator.addColumn(settings, settings.syncLinkedAt);
         }
-        // TEMP INVERSION (a): the v7 themeMode migration, deleted.
+        if (from < 7) {
+          // v6 -> v7 (spec `docs/feedback/2026-08-01-field-feedback.md`
+          // G2): the nullable `settings.themeMode` column, defaulting to
+          // `NULL` (follow the OS theme) -- no data rewrite.
+          await migrator.addColumn(settings, settings.themeMode);
+        }
         if (from < 8) {
           // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): the
           // nullable `settings.syncLastPulledAt` pull-cursor column,
