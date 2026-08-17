@@ -17,6 +17,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle => 'We couldn\'t open your data';
+
+  @override
   String get notificationChannelDigestName => 'Daily summary';
 
   @override
@@ -1213,6 +1216,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Delete everything';
+
+  @override
+  String get settingsResetError =>
+      'Couldn\'t reset your data. Please try again.';
 
   @override
   String get exitConfirmDeleteLocalLabel => 'Also delete this phone\'s copy';

@@ -98,6 +98,24 @@ of the chores list, and flows keep passing untouched.
   `docs/feedback/2026-08-07-field-feedback.md` A1), which keeps the
   session and only unlinks the device: Reset is the clean-slate operation,
   Disconnect is the "keep working, just not with this household" one.
+- The flow lives in `confirmAndResetAppData`, a top-level function in
+  `lib/features/settings/reset_flow.dart` rather than a private method on
+  the row widget, so the startup error screen can run it too (spec
+  `docs/specs/ui-foundation-chores.md` "main.dart"; spec
+  `docs/feedback/2026-08-08-prerelease-audit.md` S2). The two dialogs
+  themselves come from the action-agnostic
+  `confirmTwoStepDestructiveAction` in
+  `lib/features/settings/destructive_confirm.dart`: any further
+  irreversible action composes a `DestructiveConfirmStep` pair instead of
+  copying a dialog builder.
+- If the wipe itself throws — the same broken connection that put a user on
+  the startup error screen is what it must write through — that surfaces as
+  the `settingsResetError` snackbar, never as an unhandled exception. That
+  catch is `on Object`, not `on Exception`, because a closed sqlite3
+  connection throws a `StateError`; likewise for the two best-effort
+  side-effects above, where a notification-plugin
+  `LateInitializationError` once escaped an `on Exception` and aborted a
+  double-confirmed wipe. **Do not narrow these catches.**
 
 ## C. Lifecycle robustness
 

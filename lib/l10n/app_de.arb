@@ -2,6 +2,7 @@
   "@@locale": "de",
   "appTitle": "Famdo",
   "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
+  "appBootstrapErrorTitle": "Deine Daten konnten nicht geöffnet werden",
 
   "notificationChannelDigestName": "Tägliche Zusammenfassung",
   "notificationChannelDigestDescription": "Die einmal täglich versendete Aufgaben-Zusammenfassung.",
@@ -333,6 +334,7 @@
   "settingsResetConfirm2Title": "Wirklich alles löschen?",
   "settingsResetConfirm2Body": "Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.",
   "settingsResetConfirm2Action": "Alles löschen",
+  "settingsResetError": "Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.",
 
   "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
   "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",

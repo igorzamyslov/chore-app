@@ -110,6 +110,12 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
+  /// Headline shown full-screen when the app fails to bootstrap, above the technical appBootstrapError detail line.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open your data'**
+  String get appBootstrapErrorTitle;
+
   /// Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned.
   ///
   /// In en, this message translates to:
@@ -1829,6 +1835,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete everything'**
   String get settingsResetConfirm2Action;
+
+  /// Snackbar shown when the reset-app-data wipe itself throws -- reachable mainly from the startup error screen's escape hatch, where the same broken database connection that caused the startup failure is also what the wipe needs to write through.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reset your data. Please try again.'**
+  String get settingsResetError;
 
   /// Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit.
   ///

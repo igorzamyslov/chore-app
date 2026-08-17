@@ -17,6 +17,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle =>
+      'Deine Daten konnten nicht geöffnet werden';
+
+  @override
   String get notificationChannelDigestName => 'Tägliche Zusammenfassung';
 
   @override
@@ -1221,6 +1225,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Alles löschen';
+
+  @override
+  String get settingsResetError =>
+      'Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.';
 
   @override
   String get exitConfirmDeleteLocalLabel =>

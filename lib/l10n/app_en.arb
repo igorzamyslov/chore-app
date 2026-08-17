@@ -14,6 +14,10 @@
       }
     }
   },
+  "appBootstrapErrorTitle": "We couldn't open your data",
+  "@appBootstrapErrorTitle": {
+    "description": "Headline shown full-screen when the app fails to bootstrap, above the technical appBootstrapError detail line."
+  },
 
   "notificationChannelDigestName": "Daily summary",
   "@notificationChannelDigestName": {
@@ -1590,6 +1594,10 @@
   "settingsResetConfirm2Action": "Delete everything",
   "@settingsResetConfirm2Action": {
     "description": "The final destructive confirm button; tapping it wipes every table and re-bootstraps the app to the fresh-install state."
+  },
+  "settingsResetError": "Couldn't reset your data. Please try again.",
+  "@settingsResetError": {
+    "description": "Snackbar shown when the reset-app-data wipe itself throws -- reachable mainly from the startup error screen's escape hatch, where the same broken database connection that caused the startup failure is also what the wipe needs to write through."
   },
 
   "exitConfirmDeleteLocalLabel": "Also delete this phone's copy",
