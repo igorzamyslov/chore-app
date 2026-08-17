@@ -223,14 +223,27 @@ void main() {
             'what makes the post-ping count below attributable to the ping',
       );
 
-      // Exactly what the background isolate sends.
-      IsolateNameServer.lookupPortByName(notificationActionPortName)!.send(
-        null,
-      );
+      // Exactly what the background isolate sends -- but inside `runAsync`,
+      // which is load-bearing and cost a CI cycle to learn. A `SendPort`
+      // message to a same-isolate `ReceivePort` is delivered by the VM's own
+      // MESSAGE loop, not by the Dart event loop `FakeAsync` controls, and
+      // `tester.pump()` only advances fake time. Sending from a plain
+      // `testWidgets` body therefore queues a message that is never delivered
+      // at all, and every assertion below then fails for a reason that has
+      // nothing to do with this controller. The real delay is generous enough
+      // to cover the debounce whether the handler's `Timer` lands in the fake
+      // zone (its `listen` was registered there) or in the real one.
+      await tester.runAsync(() async {
+        IsolateNameServer.lookupPortByName(
+          notificationActionPortName,
+        )!.send(null);
+        await Future<void>.delayed(const Duration(seconds: 2));
+      });
       // Pumped repeatedly rather than once: the recompute the handler fires
-      // directly may read pre-invalidation data, and the invalidated stream's
-      // fresh emission drives a second one behind it (see
-      // NotificationActionSignalController._onPing).
+      // directly may read pre-invalidation data -- the invalidated provider is
+      // briefly back in its loading state, which `_recompute` bails out of --
+      // so the recompute that MATTERS is the one the freshly re-emitting stream
+      // drives behind it. See NotificationActionSignalController._onPing.
       for (var i = 0; i < 6; i++) {
         await tester.pump(digestRescheduleDebounce);
       }
