@@ -70,15 +70,17 @@ Future<void> applyDoneAction({
   );
   try {
     await service.completeOccurrence(occurrenceId, completedBy: actingMemberId);
+    // Catching an Error is normally wrong, and the lint is right to say so.
+    // Justified here because this particular Error is used as a CONTROL-FLOW
+    // signal by the code we call, not as a bug report -- see the comment
+    // inside the catch block.
     // ignore: avoid_catching_errors
   } on StateError {
-    // Catching an Error is normally wrong, and the lint is right to say so.
-    // The exception is justified because this Error is being used as a
-    // CONTROL-FLOW signal by the code we call, not as a bug report:
     // `ChoreService._closeAndAdvance` THROWS (it does not silently return)
-    // when the occurrence is not pending, so this is the narrow race between
-    // the read above and the transaction below it: something else closed the
-    // row in between. Same silent no-op as finding it already closed.
+    // when the occurrence is not pending, so reaching here means the narrow
+    // race between the status read above and the transaction inside the call:
+    // something else closed the row in between. Same silent no-op as finding
+    // it already closed, and not a defect.
     //
     // `on StateError` specifically, NOT `on Object`: this is one known race,
     // not a safety net wrapped around a user-confirmed destructive action, and

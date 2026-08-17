@@ -178,11 +178,16 @@ void main() {
         var day = PlainDate(2026, 1, 1);
         for (final expectedAssignee in expectedAssignees) {
           final pending = await repo.pendingOccurrenceOf(chore.id);
+          // `completedBy` became nullable so a notification action can record
+          // an unattributed completion (backlog F-1); the `!` that used to
+          // enforce this here is now redundant, so the guarantee is asserted
+          // explicitly instead of dropped.
+          expect(pending!.assignedMemberId, isNotNull);
           await serviceOn(
             day,
           ).completeOccurrence(
-            pending!.id,
-            completedBy: pending.assignedMemberId!,
+            pending.id,
+            completedBy: pending.assignedMemberId,
           );
           final next = await repo.pendingOccurrenceOf(chore.id);
           expect(next!.assignedMemberId, expectedAssignee);
