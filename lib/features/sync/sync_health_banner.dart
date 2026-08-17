@@ -36,7 +36,7 @@ class SyncHealthBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(syncHealthStatusProvider) == SyncHealthStatus.unhealthy) {
+    if (ref.watch(syncHealthStatusProvider) == SyncHealthStatus.healthy) {
       return const SizedBox.shrink();
     }
 
