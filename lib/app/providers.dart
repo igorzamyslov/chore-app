@@ -598,7 +598,17 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
     return Completer<String>().future;
   }
   await ref.watch(categoryRepositoryProvider).seedDefaults(householdId);
-  await ref.watch(choreServiceProvider).catchUpOverdue(householdId);
+  // Whatever this run rolled forward has to be explainable on the very first
+  // frame (backlog B-1) -- this is the run nobody can see happening, since it
+  // completes before any widget builds. Safe to write another provider from
+  // here: we are past an `await`, so this is a microtask after the build, not
+  // a mutation during it.
+  final caughtUpCount = await ref
+      .watch(choreServiceProvider)
+      .catchUpOverdue(householdId);
+  if (caughtUpCount > 0) {
+    ref.read(catchUpBannerCountProvider.notifier).state += caughtUpCount;
+  }
   final cutoffUtc = ref
       .watch(clockProvider)
       .now()
@@ -1195,6 +1205,10 @@ DateTime nextLocalMidnight(DateTime now) {
 /// rolling horizon for an app that simply stays open, which no other
 /// trigger covers.
 ///
+/// When catch-up DID move something, [_runCatchUp] also adds that count to
+/// [catchUpBannerCountProvider], so the chores list can explain it rather
+/// than let chores reappear as overdue for no visible reason (backlog B-1).
+///
 /// On the same two triggers this controller ALSO refreshes [todayProvider]
 /// — unconditionally, whether or not catch-up changed anything — which is
 /// what makes every date-bucketed screen roll over at local midnight
@@ -1265,7 +1279,15 @@ class CatchUpController {
     if (householdId == null) {
       return;
     }
-    await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
+    final changedCount = await _ref
+        .read(choreServiceProvider)
+        .catchUpOverdue(householdId);
+    if (changedCount > 0) {
+      // ADDS rather than assigns: a day-change run firing while an earlier
+      // banner is still unacknowledged must not drop the earlier count (see
+      // [catchUpBannerCountProvider]).
+      _ref.read(catchUpBannerCountProvider.notifier).state += changedCount;
+    }
     // Deliberately unconditional, and NOT gated on catch-up having changed
     // something: the digest is armed only a bounded horizon ahead
     // (`digestHorizonSlots` slots, reaching `digestDailyHorizonDays - 1 +

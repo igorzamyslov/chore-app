@@ -358,6 +358,21 @@
     "description": "Digest pre-prompt banner's dismiss action: marks it shown without requesting the OS permission (the digest stays enabled but silent until permission arrives via Settings)."
   },
 
+  "catchUpBannerMessage": "{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}",
+  "@catchUpBannerMessage": {
+    "description": "Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "catchUpBannerDismissTooltip": "Dismiss",
+  "@catchUpBannerDismissTooltip": {
+    "description": "Tooltip for the catch-up banner's X dismiss button, which resets the count so the banner hides until a genuinely new catch-up run reports one."
+  },
+
   "choresSnackbarDone": "Done",
   "@choresSnackbarDone": {
     "description": "Undo snackbar message after completing a one-off occurrence (no next occurrence is created)."
