@@ -464,6 +464,7 @@ class NotificationScheduler {
   /// channel is actually gone. It runs BEFORE anything can be scheduled on
   /// [digestChannelId], because every schedule and cancel path funnels
   /// through here first, so a user never briefly holds both channels.
+  ///
   /// Passes the localized "Done" action title down for the iOS notification
   /// category (spec `docs/specs/notifications.md` N2). Resolved through
   /// [localeResolver] like every other string here, so an in-app language
