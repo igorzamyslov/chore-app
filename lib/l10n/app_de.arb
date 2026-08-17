@@ -2,7 +2,10 @@
   "@@locale": "de",
   "appTitle": "Famdo",
   "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
+  "appBootstrapErrorTitle": "Deine Daten konnten nicht geöffnet werden",
 
+  "notificationChannelDigestName": "Tägliche Zusammenfassung",
+  "notificationChannelDigestDescription": "Die einmal täglich versendete Aufgaben-Zusammenfassung.",
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
@@ -247,7 +250,7 @@
   "settingsAppearanceLight": "Hell",
   "settingsAppearanceDark": "Dunkel",
 
-  "settingsAccountIntro": "Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.",
+  "settingsAccountIntro": "Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.",
   "settingsAccountEmailLabel": "E-Mail-Adresse",
   "settingsAccountSendLink": "Anmeldelink senden",
   "settingsAccountSendAgain": "Erneut senden",
@@ -335,6 +338,7 @@
   "settingsResetConfirm2Title": "Wirklich alles löschen?",
   "settingsResetConfirm2Body": "Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.",
   "settingsResetConfirm2Action": "Alles löschen",
+  "settingsResetError": "Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.",
 
   "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
   "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",

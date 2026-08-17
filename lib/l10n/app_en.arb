@@ -14,7 +14,19 @@
       }
     }
   },
+  "appBootstrapErrorTitle": "We couldn't open your data",
+  "@appBootstrapErrorTitle": {
+    "description": "Headline shown full-screen when the app fails to bootstrap, above the technical appBootstrapError detail line."
+  },
 
+  "notificationChannelDigestName": "Daily summary",
+  "@notificationChannelDigestName": {
+    "description": "Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned."
+  },
+  "notificationChannelDigestDescription": "The once-a-day chores digest notification.",
+  "@notificationChannelDigestDescription": {
+    "description": "Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings."
+  },
   "notificationDigestDueOnly": "{count, plural, one{1 chore today} other{{count} chores today}}",
   "@notificationDigestDueOnly": {
     "description": "Daily digest notification body when there are due-today occurrences but nothing overdue.",
@@ -1149,9 +1161,9 @@
     "description": "Appearance picker option (and settingsAppearanceEntry subtitle) for the dark theme -- a stored settings.themeMode of 'dark'."
   },
 
-  "settingsAccountIntro": "Sign in to sync your household across your devices.",
+  "settingsAccountIntro": "Signing in stores your email and your household's data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.",
   "@settingsAccountIntro": {
-    "description": "Intro line shown above the email field in the Account section's signed-out state."
+    "description": "Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that)."
   },
   "settingsAccountEmailLabel": "Email address",
   "@settingsAccountEmailLabel": {
@@ -1601,6 +1613,10 @@
   "settingsResetConfirm2Action": "Delete everything",
   "@settingsResetConfirm2Action": {
     "description": "The final destructive confirm button; tapping it wipes every table and re-bootstraps the app to the fresh-install state."
+  },
+  "settingsResetError": "Couldn't reset your data. Please try again.",
+  "@settingsResetError": {
+    "description": "Snackbar shown when the reset-app-data wipe itself throws -- reachable mainly from the startup error screen's escape hatch, where the same broken database connection that caused the startup failure is also what the wipe needs to write through."
   },
 
   "exitConfirmDeleteLocalLabel": "Also delete this phone's copy",

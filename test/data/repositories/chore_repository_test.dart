@@ -192,7 +192,7 @@ void main() {
       expect(current.title, 'Renamed');
       expect(current.notes, 'initial');
       expect(current.categoryId, 'cat1');
-      expect(current.recurrence?.toJson(), Recurrence.everyNDays(2).toJson());
+      expect(current.recurrence, Recurrence.everyNDays(2));
 
       // Explicit Value(null) clears nullable fields.
       await repo.updateChore(

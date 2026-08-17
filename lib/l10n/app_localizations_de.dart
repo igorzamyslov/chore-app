@@ -17,6 +17,17 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle =>
+      'Deine Daten konnten nicht geöffnet werden';
+
+  @override
+  String get notificationChannelDigestName => 'Tägliche Zusammenfassung';
+
+  @override
+  String get notificationChannelDigestDescription =>
+      'Die einmal täglich versendete Aufgaben-Zusammenfassung.';
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -891,7 +902,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.';
+      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.';
 
   @override
   String get settingsAccountEmailLabel => 'E-Mail-Adresse';
@@ -1234,6 +1245,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Alles löschen';
+
+  @override
+  String get settingsResetError =>
+      'Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.';
 
   @override
   String get exitConfirmDeleteLocalLabel =>

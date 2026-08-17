@@ -1,3 +1,9 @@
+// `Recurrence` has only final fields and no mutating members, so it is
+// effectively immutable; we deliberately don't import `package:meta` (lib
+// code is dart:core only) to add the `@immutable` annotation the lint below
+// wants (same convention as `plain_date.dart` and `digest_planner.dart`).
+// ignore_for_file: avoid_equals_and_hash_code_on_mutable_classes
+
 /// The unit of time a [Recurrence] repeats on.
 enum RecurrenceUnit {
   /// Every N days.
@@ -318,5 +324,63 @@ class Recurrence {
       'monthly_ordinal': monthlyOrdinal,
       'monthly_weekday': monthlyWeekday,
     };
+  }
+
+  /// Value equality over all seven fields, with [weekdays] compared as an
+  /// unordered set (backlog E-4).
+  ///
+  /// Without this, a rule round-tripped through [toJson] and
+  /// [Recurrence.fromJson] -- which is what every persisted rule is --
+  /// compared unequal to the original, so any "did the recurrence change?"
+  /// check silently answered "yes, always".
+  ///
+  /// Note the knock-on effect this deliberately unlocks:
+  /// drift's generated `Chore` data class compares its `recurrence` field
+  /// with `==`, so two `Chore` rows carrying the same rule now compare
+  /// equal too, which is the correct answer and the one callers expect.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is Recurrence &&
+        other.interval == interval &&
+        other.unit == unit &&
+        other.anchor == anchor &&
+        other.monthlyMode == monthlyMode &&
+        other.monthlyOrdinal == monthlyOrdinal &&
+        other.monthlyWeekday == monthlyWeekday &&
+        _weekdaysEqual(other.weekdays, weekdays);
+  }
+
+  @override
+  int get hashCode {
+    // Sets aren't order-stable, so folding `weekdays` into `Object.hash`
+    // directly would hash `{1, 3}` and `{3, 1}` differently even though
+    // they compare equal above -- breaking the "equal objects hash equally"
+    // contract, which is exactly what a `Set<Recurrence>` or a
+    // `Map<Recurrence, ...>` relies on. XOR-folding each element's hash is
+    // order-independent, and needs no `package:collection` import (see the
+    // dart:core-only note at the top of this file).
+    final weekdaysHash = weekdays.fold<int>(
+      0,
+      (acc, day) => acc ^ day.hashCode,
+    );
+    return Object.hash(
+      interval,
+      unit,
+      anchor,
+      monthlyMode,
+      monthlyOrdinal,
+      monthlyWeekday,
+      weekdaysHash,
+    );
+  }
+
+  static bool _weekdaysEqual(Set<int> a, Set<int> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    return a.every(b.contains);
   }
 }

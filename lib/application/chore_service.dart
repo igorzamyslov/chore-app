@@ -6,8 +6,6 @@
 /// authoritative semantics.
 library;
 
-import 'dart:convert';
-
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -262,9 +260,9 @@ class ChoreService {
 
   /// Updates [choreId] via [ChoreRepository.updateChore] (same parameters,
   /// same "omit to leave unchanged" convention), then, if the edit changed
-  /// `recurrence` and/or `startDate` — compared by serialized value, since
-  /// [Recurrence] has no `==`; a bare `null` only ever equals `null` — in
-  /// the same transaction:
+  /// `recurrence` and/or `startDate` — compared by VALUE, via
+  /// [Recurrence]'s own `==` (backlog E-4); a bare `null` only ever equals
+  /// `null` — in the same transaction:
   ///
   /// - deletes the chore's current pending occurrence (if any);
   /// - if the chore is paused, stops there: a paused chore has no pending
@@ -296,9 +294,15 @@ class ChoreService {
     final today = _today;
     await database.transaction(() async {
       final before = await _requireActiveChore(choreId);
+      // Value equality, straight from `Recurrence.==` (backlog E-4).
+      // This used to compare `jsonEncode(a.toJson())` strings because
+      // `Recurrence` had only identity equality -- equivalent in result
+      // (`toJson` sorts `weekdays`, so order-independence held), but it
+      // allocated two JSON strings on every chore edit and would have
+      // silently stopped noticing a field added to `Recurrence` but not to
+      // `toJson`.
       final recurrenceChanged =
-          recurrence.present &&
-          !_sameRecurrence(recurrence.value, before.chore.recurrence);
+          recurrence.present && recurrence.value != before.chore.recurrence;
       final startDateChanged =
           startDate != null && startDate != before.chore.startDate;
 
@@ -571,18 +575,6 @@ class ChoreService {
           lastAssignedMemberId: latestClosed?.assignedMemberId,
         );
     }
-  }
-
-  /// Whether [a] and [b] are the same recurrence rule, compared by
-  /// serialized value (mirroring how a [Recurrence] is actually persisted —
-  /// see `RecurrenceConverter.toSql` in `lib/data/db/converters.dart`)
-  /// rather than identity, since [Recurrence] has no `==` override. A bare
-  /// `null` only ever equals `null`.
-  bool _sameRecurrence(Recurrence? a, Recurrence? b) {
-    if (a == null || b == null) {
-      return a == b;
-    }
-    return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
   }
 
   /// Fetches [choreId]'s details, throwing [StateError] if it doesn't exist.

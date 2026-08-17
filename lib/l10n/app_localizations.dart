@@ -110,6 +110,24 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
+  /// Headline shown full-screen when the app fails to bootstrap, above the technical appBootstrapError detail line.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open your data'**
+  String get appBootstrapErrorTitle;
+
+  /// Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get notificationChannelDigestName;
+
+  /// Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The once-a-day chores digest notification.'**
+  String get notificationChannelDigestDescription;
+
   /// Daily digest notification body when there are due-today occurrences but nothing overdue.
   ///
   /// In en, this message translates to:
@@ -1326,10 +1344,10 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsAppearanceDark;
 
-  /// Intro line shown above the email field in the Account section's signed-out state.
+  /// Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that).
   ///
   /// In en, this message translates to:
-  /// **'Sign in to sync your household across your devices.'**
+  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.'**
   String get settingsAccountIntro;
 
   /// Label of the Account section's signed-out email TextField.
@@ -1835,6 +1853,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete everything'**
   String get settingsResetConfirm2Action;
+
+  /// Snackbar shown when the reset-app-data wipe itself throws -- reachable mainly from the startup error screen's escape hatch, where the same broken database connection that caused the startup failure is also what the wipe needs to write through.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reset your data. Please try again.'**
+  String get settingsResetError;
 
   /// Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit.
   ///

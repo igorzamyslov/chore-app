@@ -225,4 +225,31 @@ void main() {
       handle.dispose();
     },
   );
+
+  testFreshChoreApp(
+    'the privacy disclosure sits above the email field here too, not only '
+    'in Settings (backlog E-3): this is the FIRST place a new user is asked '
+    'to sign in, so it is the one that most needs to say what leaves the '
+    'device -- and that nothing has to',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('welcome.join'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('welcome.join.email'), findsOneWidget);
+      expect(
+        find.text(
+          "Signing in stores your email and your household's data — chores, "
+          'shopping list, members — on the sync server, so your devices stay '
+          'in step. Without an account, everything stays on this device.',
+        ),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
 }

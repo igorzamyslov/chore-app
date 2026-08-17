@@ -481,6 +481,12 @@ final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
 final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
   return NotificationScheduler(
     plugin: ref.watch(digestNotificationPluginProvider),
+    // `read`, not `watch`, and resolved per call rather than once here: a
+    // language switch must reach the NEXT reschedule without rebuilding
+    // this provider, which would drop the scheduler's `_initialized` flag
+    // and its in-flight serialized-apply queue. See [resolveDigestLocale]
+    // for why the OS locale alone is the wrong source.
+    localeResolver: () => resolveDigestLocale(ref.read(localeOverrideProvider)),
   );
 });
 

@@ -13,6 +13,8 @@ class ScheduledCall {
     required this.title,
     required this.body,
     required this.fireAt,
+    required this.channelName,
+    required this.channelDescription,
   });
 
   /// The notification id passed to `zonedSchedule`.
@@ -27,9 +29,18 @@ class ScheduledCall {
   /// The fire time passed to `zonedSchedule`.
   final DateTime fireAt;
 
+  /// The localized Android notification channel name passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelName;
+
+  /// The localized Android notification channel description passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelDescription;
+
   @override
   String toString() =>
-      'ScheduledCall(id: $id, title: $title, body: $body, fireAt: $fireAt)';
+      'ScheduledCall(id: $id, title: $title, body: $body, fireAt: $fireAt, '
+      'channelName: $channelName, channelDescription: $channelDescription)';
 }
 
 /// A fake [DigestNotificationPlugin] that records every call instead of
@@ -47,6 +58,9 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
 
   /// How many times [cancel] was called.
   int cancelCallCount = 0;
+
+  /// How many times `deleteLegacyDigestChannel` was called.
+  int deleteLegacyDigestChannelCallCount = 0;
 
   /// Every [zonedSchedule] call, in order.
   final List<ScheduledCall> scheduledCalls = [];
@@ -86,12 +100,16 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
   }) async {
     final call = ScheduledCall(
       id: id,
       title: title,
       body: body,
       fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
     );
     scheduledCalls.add(call);
     pending[id] = call;
@@ -101,5 +119,10 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   Future<void> cancel(int id) async {
     cancelCallCount++;
     pending.remove(id);
+  }
+
+  @override
+  Future<void> deleteLegacyDigestChannel() async {
+    deleteLegacyDigestChannelCallCount++;
   }
 }

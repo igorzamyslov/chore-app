@@ -17,6 +17,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle => 'We couldn\'t open your data';
+
+  @override
+  String get notificationChannelDigestName => 'Daily summary';
+
+  @override
+  String get notificationChannelDigestDescription =>
+      'The once-a-day chores digest notification.';
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -885,7 +895,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Sign in to sync your household across your devices.';
+      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.';
 
   @override
   String get settingsAccountEmailLabel => 'Email address';
@@ -1226,6 +1236,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Delete everything';
+
+  @override
+  String get settingsResetError =>
+      'Couldn\'t reset your data. Please try again.';
 
   @override
   String get exitConfirmDeleteLocalLabel => 'Also delete this phone\'s copy';
