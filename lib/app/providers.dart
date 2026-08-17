@@ -1370,7 +1370,10 @@ class NotificationActionSignalController {
     // registry, and `registerPortWithName` fails rather than replaces. This
     // ordering is what makes a hot restart survivable.
     IsolateNameServer.removePortNameMapping(notificationActionPortName);
-    // TEMP INVERSION: registration removed.
+    IsolateNameServer.registerPortWithName(
+      _port.sendPort,
+      notificationActionPortName,
+    );
     _subscription = _port.listen((_) => _onPing());
   }
 
