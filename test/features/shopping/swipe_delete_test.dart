@@ -4,11 +4,15 @@
 /// the edit sheet's Delete button already ships (spec
 /// `docs/specs/polish-round-1.md` C3) — see `shopping_delete.dart`.
 ///
-/// The 'swiping right does nothing' case below cannot be proved by a
-/// red-before-green run alone (with no `Dismissible` at all, a right drag is
-/// trivially a no-op). It was proved instead by inverting the shipped
-/// `direction:` to `startToEnd` and observing this file go red on CI — see
-/// the report for that branch head.
+/// None of these four cases is vacuous: run 32068038199 (this branch, before
+/// the `Dismissible` existed) failed all four at the test step. The
+/// right-swipe case in particular is not a trivial no-op assertion — with no
+/// `Dismissible` in the row, a right drag was claimed by the shell's tab
+/// `PageView` and paged the app back to Chores, so both `'Milk'` and the
+/// shopping-only quick-add field went missing. That case therefore pins down
+/// the row-beats-pager arena outcome recorded as decision D-S2 in
+/// `docs/specs/ui-shopping.md` §"Behaviors & constraints", not just the
+/// `direction:` argument.
 library;
 
 import 'package:chore_app/data/repositories/shopping_repository.dart';
@@ -81,7 +85,9 @@ void main() {
   );
 
   testChoreApp(
-    'swiping right (startToEnd) does nothing — delete is left-swipe only',
+    'swiping right over a row does nothing at all — delete is left-swipe '
+    'only, and the row still beats the tab PageView so the app does not '
+    'page back to Chores either (decision D-S2)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -100,6 +106,10 @@ void main() {
 
       expect(find.text('Milk'), findsOneWidget);
       expect(find.text('Removed'), findsNothing);
+      // Still on the Shopping tab: `shopping.add.input` exists on no other
+      // page, and the shell's PageView leaves neighbouring pages out of the
+      // semantics tree (`allowImplicitScrolling` is false).
+      expect(find.bySemanticsIdentifier('shopping.add.input'), findsOneWidget);
 
       handle.dispose();
     },

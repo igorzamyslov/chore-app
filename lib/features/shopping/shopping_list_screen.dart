@@ -12,7 +12,9 @@ import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
+import 'package:chore_app/features/shopping/shopping_delete.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
+import 'package:chore_app/features/shopping/shopping_item_action_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
@@ -122,6 +124,10 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       FocusManager.instance.primaryFocus?.unfocus();
                       unawaited(showShoppingEditSheet(context, item: item));
                     },
+                    onLongPressItem: (item) => unawaited(_openMenu(item)),
+                    onSwipeDeleteItem: (id) => unawaited(
+                      deleteShoppingItemWithUndo(context, ref, itemId: id),
+                    ),
                     onClear: () => unawaited(
                       _clearChecked(
                         ref,
@@ -207,6 +213,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
   }
+
+  /// Opens the long-press action sheet for [item] and acts on the chosen
+  /// [ShoppingItemMenuAction] (backlog D-3) -- currently just Delete,
+  /// reusing the same `deleteShoppingItemWithUndo` every other delete path
+  /// calls (see `shopping_delete.dart`). Takes no explicit `context`/`ref`
+  /// params -- uses the State's own ambient values, matching
+  /// `chores_list_screen.dart`'s `_openMenu(OccurrenceWithChore occurrence)`
+  /// precedent exactly.
+  Future<void> _openMenu(ShoppingItemWithCategory item) async {
+    final action = await showShoppingItemActionSheet(context);
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case ShoppingItemMenuAction.delete:
+        await deleteShoppingItemWithUndo(context, ref, itemId: item.item.id);
+    }
+  }
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
@@ -235,6 +259,8 @@ class _Body extends StatelessWidget {
     required this.onCartExpansionChanged,
     required this.onCheckedChanged,
     required this.onTapItem,
+    required this.onLongPressItem,
+    required this.onSwipeDeleteItem,
     required this.onClear,
     required this.onUncheckAll,
   });
@@ -244,6 +270,8 @@ class _Body extends StatelessWidget {
   final ValueChanged<bool> onCartExpansionChanged;
   final void Function(String id, {required bool checked}) onCheckedChanged;
   final ValueChanged<ShoppingItemWithCategory> onTapItem;
+  final ValueChanged<ShoppingItemWithCategory> onLongPressItem;
+  final ValueChanged<String> onSwipeDeleteItem;
   final VoidCallback onClear;
   final VoidCallback onUncheckAll;
 
@@ -342,6 +370,8 @@ class _Body extends StatelessWidget {
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onTap: () => onTapItem(item),
+      onLongPress: () => onLongPressItem(item),
+      onSwipeDelete: () => onSwipeDeleteItem(item.item.id),
     );
   }
 }
