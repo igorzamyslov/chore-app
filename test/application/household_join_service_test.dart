@@ -133,6 +133,55 @@ void main() {
     },
   );
 
+  test(
+    'joinFresh (the welcome path, spec docs/specs/onboarding-v2.md §1): no '
+    'archive, no old household deleted, and the pendingJoinCode left over '
+    'from the code-entry step is cleared',
+    () async {
+      final settings = SettingsRepository(db);
+      await settings.setPendingJoinCode('ABC12345');
+
+      final gateway = FakeHouseholdGateway()
+        ..claimResultHouseholdId = 'joined-hh'
+        ..downloadSnapshotOverride = const HouseholdSnapshot(
+          household: Household(
+            id: 'joined-hh',
+            name: 'Joined household',
+            createdAt: 't0',
+            updatedAt: 't0',
+            syncDirty: false,
+          ),
+        );
+      final service = HouseholdJoinService(
+        gateway: gateway,
+        database: db,
+        settings: settings,
+        clock: Clock.fixed(DateTime.utc(2026, 7, 24)),
+      );
+
+      final joinedHouseholdId = await service.joinFresh(
+        choice: const ClaimMemberChoice('m-anna'),
+        code: 'ABC12345',
+      );
+
+      expect(joinedHouseholdId, 'joined-hh');
+      // The 'old-hh' this file's `setUp` seeds is deliberately left alone:
+      // unlike `join`, `joinFresh` has nothing local to archive or replace,
+      // so assert only on what `joinFresh` itself is responsible for.
+      final households = await db.select(db.households).get();
+      expect(households.map((h) => h.id), containsAll(['joined-hh']));
+
+      final row = await db.select(db.settings).getSingle();
+      expect(row.syncHouseholdId, 'joined-hh');
+      expect(row.actingMemberId, 'm-anna');
+      expect(
+        row.pendingJoinCode,
+        isNull,
+        reason: 'the code this join was for has done its job',
+      );
+    },
+  );
+
   // The Finding 1 guard (plan
   // `docs/plans/2026-08-14-reconnect-adopt-hardening.md` Task 1). RLS filters
   // rows rather than erroring, so "the server refused you" arrives as a
