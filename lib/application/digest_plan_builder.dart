@@ -39,6 +39,7 @@ List<DigestPlan?> buildDigestPlans({
   final occurrences = [
     for (final row in pending)
       ProjectedOccurrence(
+        id: row.occurrence.id,
         dueDate: row.occurrence.dueDate,
         startDate: row.chore.startDate,
         recurrence: row.chore.recurrence,
@@ -59,6 +60,10 @@ List<DigestPlan?> buildDigestPlans({
         enabled: settings.digestEnabled,
         dueTodayCount: counts.dueCount,
         overdueCount: counts.overdueCount,
+        // Per-slot, deliberately: each slot has its own counts and so its
+        // own actionability (spec `docs/specs/notifications.md` N2). Slot 3
+        // can carry a Done button while slot 4 does not.
+        soleOccurrenceId: counts.soleOccurrenceId,
       ),
     );
   }
