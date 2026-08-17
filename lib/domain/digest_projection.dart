@@ -189,6 +189,6 @@ DigestCounts projectDigestCounts({
   return DigestCounts(
     dueCount: dueCount,
     overdueCount: overdueCount,
-    soleOccurrenceId: dueCount + overdueCount == 1 ? lastCountedId : null,
+    soleOccurrenceId: lastCountedId, // TEMP INVERSION
   );
 }
