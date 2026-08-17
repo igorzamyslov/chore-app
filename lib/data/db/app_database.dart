@@ -141,7 +141,7 @@ class AppDatabase extends _$AppDatabase {
         // columns above, which `createTable` already covers for a v1 -> v8
         // jump) this backfill runs unconditionally whenever `from < 8`,
         // regardless of which branch above ran.
-        // TEMP INVERSION (b): households.syncDirty backfill, deleted.
+        await migrator.addColumn(households, households.syncDirty);
         await migrator.addColumn(members, members.syncDirty);
         await migrator.addColumn(categories, categories.syncDirty);
         await migrator.addColumn(chores, chores.syncDirty);

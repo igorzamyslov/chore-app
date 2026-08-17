@@ -89,6 +89,52 @@ Future<void> _dropPendingJoinCodeColumn(AppDatabase seed) async {
   );
 }
 
+/// Every `settings` column added by a migration AFTER the table itself
+/// arrived at v2 -- which is exactly the set a pre-v12 seed below has to
+/// drop and the upgrade under test has to put back.
+const _settingsColumnsAddedAfterV2 = [
+  'acting_member_id', // v3
+  'locale', // v4
+  'onboarding_name_prompt_shown_at', // v5
+  'digest_preprompt_shown_at', // v5
+  'sync_household_id', // v6
+  'sync_linked_at', // v6
+  'theme_mode', // v7
+  'sync_last_pulled_at', // v8
+  'membership_revoked', // v10
+  'pending_join_code', // v12
+];
+
+/// The names of the columns [table] actually has on disk, straight from
+/// `PRAGMA table_info`.
+///
+/// This is the EXISTENCE half of every column-addition assertion below, and
+/// it is not decoration: a bare `expect(row.someNullableColumn, isNull)` is
+/// VACUOUS. Drift maps an ABSENT nullable column to `null` on read, so such
+/// an assertion passes identically whether the migration added the column or
+/// did nothing whatsoever. That is not a theory -- deleting the `from < 7`
+/// branch left all four tests asserting `themeMode` green, including the one
+/// whose title is "adds themeMode".
+///
+/// Non-nullable columns do self-guard (drift throws rather than inventing a
+/// value -- deleting the `households.syncDirty` backfill turned the
+/// `7 -> 12` test red on the spot), but the assertions below cover both
+/// kinds anyway, so nobody reading them has to remember which column is
+/// which.
+///
+/// A SET of names, asserted with `containsAll`, rather than the per-column
+/// `hasLength(1)` count that the `9 -> 12` and `11 -> 12` tests use inline:
+/// `containsAll` says exactly what each test is about ("this upgrade
+/// produced these columns") and needs no edit when a later migration adds
+/// one more. The two shapes are equal in strength -- SQLite rejects a
+/// duplicate `ADD COLUMN` at migration time, so a name can never appear
+/// twice on disk -- so those two are left exactly as they are, since the
+/// prose around them documents the else-branch placement reasoning.
+Future<Set<String>> _columnNames(AppDatabase db, String table) async {
+  final rows = await db.customSelect("PRAGMA table_info('$table')").get();
+  return rows.map((row) => row.read<String>('name')).toSet();
+}
+
 void main() {
   test(
     'schemaVersion 1 -> 2 upgrade creates the settings table with defaults',
@@ -148,6 +194,14 @@ void main() {
       expect(row.digestMinutes, 480);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the two assertions above
+      // cannot fail on their own (see `_columnNames`). This is the
+      // v1 -> v12 path, where `createTable` is solely responsible for
+      // every column after v2: if it ever stopped building the table at
+      // full current width, the `else` branch's backfills would NOT
+      // cover for it, because this path never enters that branch.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, containsAll(_settingsColumnsAddedAfterV2));
 
       // Pre-existing v1 data survived the upgrade untouched.
       final households = await upgraded.select(upgraded.households).get();
@@ -184,6 +238,12 @@ void main() {
       final row = await db.select(db.settings).getSingle();
       expect(row.membershipRevoked, isFalse);
       expect(row.pendingJoinCode, isNull);
+      // Existence, not just default value -- `expect(row.pendingJoinCode,
+      // isNull)` above cannot fail on its own (see `_columnNames`), which
+      // would hollow out this test's entire purpose: it exists to prove a
+      // fresh install needs no `onUpgrade` to get its columns.
+      final columns = await _columnNames(db, 'settings');
+      expect(columns, containsAll(_settingsColumnsAddedAfterV2));
     },
   );
 
@@ -268,6 +328,24 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'locale',
+          'onboarding_name_prompt_shown_at',
+          'digest_preprompt_shown_at',
+          'sync_household_id',
+          'sync_linked_at',
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -361,6 +439,11 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above cannot
+      // fail on their own (see `_columnNames`). A v2 seed drops every
+      // post-v2 column, so this upgrade owes all of them.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, containsAll(_settingsColumnsAddedAfterV2));
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.digestEnabled, isTrue);
@@ -440,6 +523,21 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'sync_household_id',
+          'sync_linked_at',
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -514,6 +612,19 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -670,6 +781,13 @@ void main() {
       expect(member.name, 'Me');
       expect(member.syncDirty, isFalse);
       expect(member.deletedAt, isNull);
+      // `deletedAt` is nullable, so the assertion directly above cannot
+      // fail on its own (see `_columnNames`) -- unlike the `syncDirty` ones
+      // around it. `members` has existed since v1, so the table-age
+      // reasoning differs from `settings`, but the READ vacuity is
+      // identical: it is a property of nullability, not of the table.
+      final memberColumns = await _columnNames(upgraded, 'members');
+      expect(memberColumns, containsAll(['sync_dirty', 'deleted_at']));
 
       final category = await upgraded.select(upgraded.categories).getSingle();
       expect(category.id, 'c1');
@@ -702,6 +820,18 @@ void main() {
       final settingsRow = await upgraded.select(upgraded.settings).getSingle();
       expect(settingsRow.syncLastPulledAt, isNull);
       expect(settingsRow.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // Pre-existing settings data survived the upgrade untouched.
       expect(settingsRow.createdAt, 't0');
       expect(settingsRow.digestEnabled, isTrue);
@@ -784,9 +914,21 @@ void main() {
       expect(member.createdAt, 't0');
       // The new column defaults to NULL (active) -- no data rewrite.
       expect(member.deletedAt, isNull);
+      // ... which, `deletedAt` being nullable, is an assertion that cannot
+      // fail on its own (see `_columnNames`). This is the one that can.
+      final memberColumns = await _columnNames(upgraded, 'members');
+      expect(memberColumns, contains('deleted_at'));
 
       final settingsRow = await upgraded.select(upgraded.settings).get();
       expect(settingsRow, isEmpty);
+      // No settings ROW here, but the two settings COLUMNS this upgrade
+      // adds must exist all the same -- this test's seed dropped them, and
+      // nothing above would notice if the upgrade skipped them.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll(['membership_revoked', 'pending_join_code']),
+      );
     },
   );
 
@@ -908,6 +1050,12 @@ void main() {
           )
           .get();
       expect(rows, hasLength(1));
+
+      // This seed also rewinds past v12, so the same upgrade owes it
+      // `pending_join_code` -- and nothing else in this test would notice
+      // if it never arrived.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, contains('pending_join_code'));
     },
   );
 
