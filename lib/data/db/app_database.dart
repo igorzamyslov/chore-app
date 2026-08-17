@@ -123,18 +123,11 @@ class AppDatabase extends _$AppDatabase {
           // duplicate-column error.
           await migrator.addColumn(settings, settings.membershipRevoked);
         }
-        if (from < 12) {
-          // v11 -> v12 (spec `docs/specs/onboarding-v2.md` §1): the
-          // nullable `settings.pendingJoinCode` prefill column, defaulting
-          // to `NULL` (no join in progress) -- no data rewrite. Lives here,
-          // inside the `else` branch, for exactly the reason spelled out
-          // for `membershipRevoked` directly above: `settings` did not
-          // exist before v2, so a v1 -> v12 jump builds the table at full
-          // current width via [createTable], and a second unconditional
-          // `addColumn` for the same column would throw a duplicate-column
-          // error.
-          await migrator.addColumn(settings, settings.pendingJoinCode);
-        }
+      }
+      if (from < 12) {
+        // TEMP INVERSION: the same migration, moved OUT of the `settings`
+        // `else` branch to prove the suite catches the wrong placement.
+        await migrator.addColumn(settings, settings.pendingJoinCode);
       }
       if (from < 8) {
         // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
