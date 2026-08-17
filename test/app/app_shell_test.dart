@@ -72,7 +72,17 @@ void main() {
         final container = tester.widget<Container>(
           find.descendant(
             of: find.bySemanticsIdentifier(tabId),
-            matching: find.byType(Container),
+            // Named by its spec'd 62x30 size rather than by being the tab
+            // column's only `Container`: the B-5 attention dot is another
+            // one, and `tester.widget` throws on more than one match, so
+            // a bare `byType(Container)` would turn this pill assertion
+            // into a hostage of whatever else the tab ever draws.
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container &&
+                  widget.constraints ==
+                      const BoxConstraints.tightFor(width: 62, height: 30),
+            ),
           ),
         );
         return (container.decoration! as BoxDecoration).color;

@@ -4,12 +4,14 @@ library;
 import 'dart:async';
 
 import 'package:chore_app/app/famdo_colors.dart';
+import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/chores/chores_list_screen.dart';
 import 'package:chore_app/features/settings/settings_screen.dart';
 import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The three top-level tabs, in display order.
 enum _AppTab {
@@ -273,16 +275,45 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   }
 }
 
-class _BottomTabBar extends StatelessWidget {
+class _BottomTabBar extends ConsumerWidget {
   const _BottomTabBar({required this.selected, required this.onSelected});
 
   final _AppTab selected;
   final ValueChanged<_AppTab> onSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final famdo = famdoColors(context);
+    // Backlog B-5 / triage T2.6: a denied notification permission is
+    // permanent in practice, because the only recovery lives in Settings
+    // and the digest pre-prompt (spec `docs/specs/polish-round-1.md` A3)
+    // deliberately never comes back. So the signal has to be ambient: a
+    // live projection of current truth, carried on the tab that leads to
+    // the fix, with no dismiss action and no one-shot flag of its own --
+    // it disappears by itself the moment the permission is granted or the
+    // digest is switched off.
+    //
+    // `digestPrepromptShownAt != null` is what keeps a fresh install
+    // silent: `digestEnabled` defaults to true and an OS permission that
+    // has never been REQUESTED reads exactly like a denied one on iOS and
+    // Android 13+, so without this clause a brand-new install would open
+    // with a dot complaining about a question the app has not asked yet.
+    // Same rule the pre-prompt banner already follows (spec A3: the
+    // permission question surfaces only after an explicit user tap).
+    //
+    // `valueOrNull` rather than `value`: this bar is built on the first
+    // frame, before the settings stream has emitted, and `value` would
+    // rethrow if that stream ever errored -- taking the whole shell with
+    // it for the sake of a dot.
+    final settings = ref.watch(settingsProvider).valueOrNull;
+    final permissionGranted = ref.watch(notificationPermissionGrantedProvider);
+    final showAttentionBadge =
+        settings != null &&
+        settings.digestEnabled &&
+        !permissionGranted &&
+        settings.digestPrepromptShownAt != null;
+
     return Container(
       // A 1px top hairline (spec docs/specs/theme-v2.md §4.5) sits on this
       // outer Container so the inner Material can keep filling its bounds
@@ -332,6 +363,8 @@ class _BottomTabBar extends StatelessWidget {
                           child: _TabContent(
                             tab: tab,
                             isSelected: tab == selected,
+                            showAttentionBadge:
+                                tab == _AppTab.settings && showAttentionBadge,
                           ),
                         ),
                       ),
@@ -347,10 +380,20 @@ class _BottomTabBar extends StatelessWidget {
 }
 
 class _TabContent extends StatelessWidget {
-  const _TabContent({required this.tab, required this.isSelected});
+  const _TabContent({
+    required this.tab,
+    required this.isSelected,
+    this.showAttentionBadge = false,
+  });
 
   final _AppTab tab;
   final bool isSelected;
+
+  /// Whether to draw the small ambient dot saying the digest is switched on
+  /// but cannot currently be delivered (backlog B-5 / triage T2.6 -- see
+  /// [_BottomTabBar.build] for the rule). Only ever true for the Settings
+  /// tab, since that is where the fix lives.
+  final bool showAttentionBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -375,7 +418,49 @@ class _TabContent extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(isSelected ? tab.filled : tab.outlined, color: color),
+          child: Stack(
+            alignment: Alignment.center,
+            // The dot is placed off the icon's own 24x24 box, so the Stack
+            // must not clip -- and nothing between here and the 62x30 pill
+            // clips either, which is what keeps the offsets below inside
+            // the pill rather than bleeding into the neighbouring tab.
+            clipBehavior: Clip.none,
+            children: [
+              Icon(isSelected ? tab.filled : tab.outlined, color: color),
+              if (showAttentionBadge)
+                Positioned(
+                  top: -2,
+                  right: -6,
+                  // Label and identifier land on ONE semantics node: the
+                  // outer `semantic()` is the container, and the inner
+                  // annotation (no container of its own) merges into it.
+                  // An 8dp dot is invisible to a screen reader without a
+                  // label of its own, and it deliberately reuses the
+                  // Settings sub-line's string -- the dot and that
+                  // sub-line report the same fact, so a second wording
+                  // would only be a second thing to keep in sync.
+                  child: semantic(
+                    // Derived rather than hardcoded to the Settings tab, so
+                    // the id can never end up naming a tab other than the
+                    // one it is drawn on.
+                    'shell.tab.${tab.name}.attentionBadge',
+                    child: Semantics(
+                      label: AppLocalizations.of(
+                        context,
+                      ).settingsDigestToggleDeniedHint,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 2),
         Text(
