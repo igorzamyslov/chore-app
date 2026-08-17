@@ -86,6 +86,9 @@
   "digestPrepromptEnableAction": "Aktivieren",
   "digestPrepromptDismissAction": "Nicht jetzt",
 
+  "catchUpBannerMessage": "{count, plural, one{Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.} other{Wir haben {count} überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.}}",
+  "catchUpBannerDismissTooltip": "Schließen",
+
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
   "choresSnackbarDoneBy": "Erledigt — {name} gutgeschrieben",

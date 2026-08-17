@@ -284,6 +284,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get digestPrepromptDismissAction => 'Not now';
 
   @override
+  String catchUpBannerMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'We moved $count overdue chores forward to their most recent due dates, so nothing piled up.',
+      one:
+          'We moved 1 overdue chore forward to its most recent due date, so nothing piled up.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catchUpBannerDismissTooltip => 'Dismiss';
+
+  @override
   String get choresSnackbarDone => 'Done';
 
   @override

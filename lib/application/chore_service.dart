@@ -130,14 +130,22 @@ class ChoreService {
   /// stay overdue. Idempotent: calling this again the same day changes
   /// nothing.
   ///
-  /// Returns whether it changed anything (closed at least one chore's
-  /// occurrence as missed and reinserted it) — `CatchUpController` uses this
-  /// to decide whether a digest recompute is warranted afterward, since the
-  /// common case (nothing overdue) has nothing new for the digest to
-  /// reflect.
-  Future<bool> catchUpOverdue(String householdId) async {
+  /// Returns the number of chores it changed — i.e. how many had their
+  /// pending occurrence closed as `missed` and a fresh one reinserted (0 if
+  /// none, which is the common case).
+  ///
+  /// Nothing in the lifecycle branches on that number: the digest recompute
+  /// `CatchUpController` runs after each catch-up is deliberately
+  /// UNCONDITIONAL (see `_runCatchUp` in `lib/app/providers.dart` for why —
+  /// a day passing is itself a reason to re-arm the horizon). The UI is what
+  /// needs the count: a nonzero result is what lets `CatchUpBanner`
+  /// (`lib/features/chores/catch_up_banner.dart`) tell a returning user that
+  /// this happened, and to how many chores, instead of leaving freshly
+  /// overdue tiles to appear out of nowhere and read as an accusation
+  /// (backlog B-1 / triage T2.1).
+  Future<int> catchUpOverdue(String householdId) async {
     final today = _today;
-    var changed = false;
+    var changedCount = 0;
     await database.transaction(() async {
       final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
@@ -171,10 +179,10 @@ class ChoreService {
           dueDate: latestSlot,
           assignedMemberId: pending.assignedMemberId,
         );
-        changed = true;
+        changedCount++;
       }
     });
-    return changed;
+    return changedCount;
   }
 
   /// Pauses [choreId] and deletes its pending occurrence. History is

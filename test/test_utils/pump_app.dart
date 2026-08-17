@@ -51,12 +51,23 @@ import 'package:flutter_test/flutter_test.dart';
 /// (`test/features/chores/day_rollover_widget_test.dart`). [today] is still
 /// required: it is the date the test starts on. Pass a `Clock(() => myVar)`
 /// over a mutable variable and assign that variable to move time.
+///
+/// [seed] runs against the fresh database after the household exists but
+/// BEFORE `ChoreApp` is pumped, for the rare test whose subject is something
+/// `bootstrapProvider` does on the very first frame. Almost nothing needs it:
+/// seed from inside [body] instead, which is simpler and covers every test
+/// that only cares about the rendered result. The exception is
+/// `ChoreService.catchUpOverdue`, which `bootstrapProvider` runs to
+/// completion before any widget builds (backlog B-1's catch-up banner is
+/// driven by its count), so a chore seeded in [body] is already too late to
+/// be caught up.
 void testChoreApp(
   String description,
   Future<void> Function(WidgetTester tester, AppDatabase database) body, {
   required DateTime today,
   List<Override> overrides = const [],
   Clock? clock,
+  Future<void> Function(AppDatabase database)? seed,
 }) {
   testWidgets(description, (tester) async {
     final database = await _pumpChoreApp(
@@ -65,6 +76,7 @@ void testChoreApp(
       overrides: overrides,
       seedHousehold: true,
       clock: clock,
+      seed: seed,
     );
 
     await body(tester, database);
@@ -100,14 +112,16 @@ void testFreshChoreApp(
 
 /// Shared setup for [testChoreApp]/[testFreshChoreApp]: a fresh in-memory
 /// database (with a household + 'Me' admin member pre-seeded when
-/// [seedHousehold] is true), a tall test surface, and a pumped-and-settled
-/// [ChoreApp] against [clockProvider] fixed at [today].
+/// [seedHousehold] is true, then [seed] applied if given), a tall test
+/// surface, and a pumped-and-settled [ChoreApp] against [clockProvider]
+/// fixed at [today].
 Future<AppDatabase> _pumpChoreApp(
   WidgetTester tester, {
   required DateTime today,
   required List<Override> overrides,
   required bool seedHousehold,
   Clock? clock,
+  Future<void> Function(AppDatabase database)? seed,
 }) async {
   // Every test opens its own fresh in-memory AppDatabase, so drift's
   // "you've created this database class multiple times" warning (aimed
@@ -127,6 +141,7 @@ Future<AppDatabase> _pumpChoreApp(
   if (seedHousehold) {
     await HouseholdRepository(database).createLocalHousehold('Me');
   }
+  await seed?.call(database);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

@@ -13,6 +13,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
 import 'package:chore_app/features/chores/active_chores_presence.dart';
+import 'package:chore_app/features/chores/catch_up_banner.dart';
 import 'package:chore_app/features/chores/chore_action_sheet.dart';
 import 'package:chore_app/features/chores/chore_delete_dialog.dart';
 import 'package:chore_app/features/chores/chore_done_section.dart';
@@ -111,14 +112,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           ),
         ],
       ),
-      // The first-run banners (spec docs/specs/polish-round-1.md A2/A3)
-      // render above the list content, never blocking it: both are
-      // self-hiding (SizedBox.shrink) when their own conditions don't hold,
-      // so this Column adds nothing visible once a household is past both.
       body: Column(
         children: [
-          const OnboardingNameBanner(),
-          const DigestPrepromptBanner(),
+          const _BannerRegion(),
           // Only once occurrences have actually loaded -- avoids a
           // zero-count flash while pendingOccurrencesProvider's stream is
           // still resolving. ChoreProgressCard hides itself when M == 0.
@@ -440,6 +436,43 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       _memberFilter = null;
       _categoryFilter = null;
     });
+  }
+}
+
+/// The chores list's banner stack: everything that may appear above the list
+/// content without ever blocking it.
+///
+/// **Adding a banner?** Add it here, and only here. Every member of this
+/// region must be self-hiding — returning `SizedBox.shrink()` when its own
+/// condition doesn't hold — so the region collapses to nothing at all in the
+/// ordinary case, which is what lets them be listed unconditionally.
+///
+/// Order is by urgency to the person looking at the screen right now, not by
+/// age of the feature:
+///
+/// 1. [CatchUpBanner] — what just happened to your chores (backlog B-1).
+///    First: somebody returning after a lapse needs the explanation for the
+///    overdue tiles they are already looking at before anything evergreen.
+/// 2. [OnboardingNameBanner] — first-run name prompt (spec
+///    `docs/specs/polish-round-1.md` A2).
+/// 3. [DigestPrepromptBanner] — first-run digest prompt (spec A3, which
+///    requires it to sit below A2).
+///
+/// `MainAxisSize.min` is load-bearing: this sits inside the screen's own
+/// unbounded [Column], so a max-height nested column would overflow.
+class _BannerRegion extends StatelessWidget {
+  const _BannerRegion();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CatchUpBanner(),
+        OnboardingNameBanner(),
+        DigestPrepromptBanner(),
+      ],
+    );
   }
 }
 

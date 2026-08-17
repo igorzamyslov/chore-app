@@ -401,7 +401,10 @@ void main() {
           recurrence: Recurrence.everyNDays(1),
         );
 
-        await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId);
+        final count = await serviceOn(
+          PlainDate(2026, 1, 4),
+        ).catchUpOverdue(householdId);
+        expect(count, 1);
 
         final pending = await repo.pendingOccurrenceOf(overdueChore.id);
         expect(pending!.dueDate, PlainDate(2026, 1, 4));
@@ -416,8 +419,13 @@ void main() {
         expect(futurePending!.dueDate, PlainDate(2026, 1, 20));
         expect(await repo.latestClosedOccurrence(futureChore.id), isNull);
 
-        // Idempotent: a second call the same day changes nothing.
-        await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId);
+        // Idempotent: a second call the same day changes nothing, and says
+        // so with a zero count -- the signal the catch-up banner uses to
+        // stay hidden (backlog B-1).
+        final secondCount = await serviceOn(
+          PlainDate(2026, 1, 4),
+        ).catchUpOverdue(householdId);
+        expect(secondCount, 0);
 
         final pendingAfter = await repo.pendingOccurrenceOf(overdueChore.id);
         expect(pendingAfter!.id, pending.id);
@@ -443,7 +451,10 @@ void main() {
       );
 
       // 10 days overdue.
-      await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId);
+      final count = await serviceOn(
+        PlainDate(2026, 1, 4),
+      ).catchUpOverdue(householdId);
+      expect(count, 0);
 
       final pending = await repo.pendingOccurrenceOf(chore.id);
       expect(pending!.dueDate, PlainDate(2025, 12, 25));
@@ -464,12 +475,60 @@ void main() {
         );
         await repo.setPaused(chore.id, paused: true);
 
-        await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId);
+        final count = await serviceOn(
+          PlainDate(2026, 1, 4),
+        ).catchUpOverdue(householdId);
+        expect(count, 0);
 
         final pending = await repo.pendingOccurrenceOf(chore.id);
         expect(pending!.dueDate, PlainDate(2026, 1, 1));
         expect(pending.status, OccurrenceStatus.pending);
         expect(await repo.latestClosedOccurrence(chore.id), isNull);
+      },
+    );
+
+    test(
+      'two overdue chores in the same household both count, in one call -- '
+      'the count is chores changed, not a bare "something changed"',
+      () async {
+        final choreA = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Daily A',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        // A different interval, so this isn't two copies of one fixture:
+        // slots are 1/1, 1/3, 1/5, so the latest slot <= 1/4 is 1/3.
+        final choreB = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Daily B',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(2),
+        );
+
+        final count = await serviceOn(
+          PlainDate(2026, 1, 4),
+        ).catchUpOverdue(householdId);
+        expect(count, 2);
+
+        expect(
+          (await repo.latestClosedOccurrence(choreA.id))!.status,
+          OccurrenceStatus.missed,
+        );
+        expect(
+          (await repo.pendingOccurrenceOf(choreA.id))!.dueDate,
+          PlainDate(2026, 1, 4),
+        );
+        expect(
+          (await repo.latestClosedOccurrence(choreB.id))!.status,
+          OccurrenceStatus.missed,
+        );
+        expect(
+          (await repo.pendingOccurrenceOf(choreB.id))!.dueDate,
+          PlainDate(2026, 1, 3),
+        );
       },
     );
   });
