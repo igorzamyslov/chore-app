@@ -872,7 +872,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Sign in to sync your household across your devices.';
+      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.';
 
   @override
   String get settingsAccountEmailLabel => 'Email address';

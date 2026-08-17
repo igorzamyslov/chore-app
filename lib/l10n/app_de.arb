@@ -245,7 +245,7 @@
   "settingsAppearanceLight": "Hell",
   "settingsAppearanceDark": "Dunkel",
 
-  "settingsAccountIntro": "Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.",
+  "settingsAccountIntro": "Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.",
   "settingsAccountEmailLabel": "E-Mail-Adresse",
   "settingsAccountSendLink": "Anmeldelink senden",
   "settingsAccountSendAgain": "Erneut senden",

@@ -1320,10 +1320,10 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsAppearanceDark;
 
-  /// Intro line shown above the email field in the Account section's signed-out state.
+  /// Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that).
   ///
   /// In en, this message translates to:
-  /// **'Sign in to sync your household across your devices.'**
+  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.'**
   String get settingsAccountIntro;
 
   /// Label of the Account section's signed-out email TextField.
