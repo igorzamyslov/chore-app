@@ -329,10 +329,12 @@ class Recurrence {
   /// Value equality over all seven fields, with [weekdays] compared as an
   /// unordered set (backlog E-4).
   ///
-  /// Without this, a rule round-tripped through [toJson]/[fromJson] --
-  /// which is what every persisted rule is -- compared unequal to the
-  /// original, so any "did the recurrence change?" check silently answered
-  /// "yes, always". Note the knock-on effect this deliberately unlocks:
+  /// Without this, a rule round-tripped through [toJson] and
+  /// [Recurrence.fromJson] -- which is what every persisted rule is --
+  /// compared unequal to the original, so any "did the recurrence change?"
+  /// check silently answered "yes, always".
+  ///
+  /// Note the knock-on effect this deliberately unlocks:
   /// drift's generated `Chore` data class compares its `recurrence` field
   /// with `==`, so two `Chore` rows carrying the same rule now compare
   /// equal too, which is the correct answer and the one callers expect.
