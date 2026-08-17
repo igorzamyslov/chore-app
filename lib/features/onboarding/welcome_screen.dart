@@ -8,6 +8,8 @@
 /// ([NoopAuthGateway]).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
@@ -113,9 +115,15 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       return;
     }
     _autoJoinTriggered = true;
-    Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute(builder: (_) => const WelcomeJoinPage()));
+    // The push future completes when the subpage is popped; nothing here
+    // needs that, and the subpage reports nothing back (it either joins --
+    // at which point this whole screen is torn down -- or the user backs
+    // out to the chooser).
+    unawaited(
+      Navigator.of(
+        context,
+      ).push<void>(MaterialPageRoute(builder: (_) => const WelcomeJoinPage())),
+    );
   }
 
   void _onNameChanged() => setState(() {});
