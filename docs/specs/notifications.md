@@ -118,6 +118,43 @@ management entry point when #14 lands): 'Daily summary' toggle
 inline hint row with a button opening the system settings
 (`settings.digest.permission`). Copy per design-language tone; all l10n.
 
+### Saying so when the digest cannot be delivered (backlog B-5 / triage T2.6)
+
+A switch resting in its ON position is a claim. While the OS permission is
+denied that claim is false — nothing is scheduled and nothing will arrive —
+so two further always-current signals are binding. Both are pure
+projections of state that already exists (`digestEnabled`, the live OS
+permission state, `digestPrepromptShownAt`): no new stored flag, no
+one-shot bookkeeping, nothing to dismiss, nothing that can go stale.
+
+- **Toggle sub-line.** While the toggle is ON and the permission is denied,
+  `settings.digest.toggle` carries a short factual sub-line
+  (`settingsDigestToggleDeniedHint`, "Not delivering — notifications are
+  off"). Presentation only: it must never write back to the stored
+  `digestEnabled` (see the "Permission denied" rule below), or granting the
+  permission later would find the digest quietly switched off.
+- **Settings-tab attention dot.** An 8dp dot on the Settings tab's icon in
+  the bottom nav (`lib/app/app_shell.dart`, semantic id
+  `shell.tab.settings.attentionBadge`), shown iff `digestEnabled &&
+  !permissionGranted && digestPrepromptShownAt != null`, carrying the same
+  string as its accessibility label. Visible from every tab, because the
+  user it exists for is precisely the one who dismissed the digest
+  pre-prompt and will never open Settings on their own initiative. It
+  clears itself the instant the permission is granted or the digest is
+  switched off.
+
+  The `digestPrepromptShownAt != null` clause is load-bearing, not
+  incidental: `digestEnabled` defaults to true and an OS permission that
+  has never been *requested* is indistinguishable from a denied one on iOS
+  and Android 13+, so without it a brand-new install would launch already
+  complaining about a question the app has not asked yet. This is the rule
+  the pre-prompt banner already follows (spec
+  `docs/specs/polish-round-1.md` A3: the permission question surfaces only
+  after an explicit user tap), extended to cover the dot.
+
+Together these are the ONLY durable recovery signals: the pre-prompt banner
+is never re-armed. See `docs/specs/polish-round-1.md` A3.
+
 ## Architecture (testability first)
 
 1. **Pure planner + projection** — `lib/domain/digest_planner.dart` and
