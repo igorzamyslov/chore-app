@@ -304,6 +304,70 @@ void main() {
     );
   });
 
+  group('notification channel (backlog E-1)', () {
+    List<DigestPlan?> onlySlotZero() => [
+      DigestPlan(
+        fireAt: DateTime(2026, 7, 25, 8),
+        dueTodayCount: 3,
+        overdueCount: 0,
+      ),
+      for (var k = 1; k < digestHorizonSlots; k++) null,
+    ];
+
+    test(
+      'the channel id is versioned: Android caches a channel name at '
+      'CREATION and offers no rename, so newly-localized copy can only '
+      'reach an existing install on a NEW id',
+      () {
+        expect(digestChannelId, 'digest_v2');
+      },
+    );
+
+    test('schedules with the localized channel name and description', () async {
+      await scheduler.applyDigestPlans(onlySlotZero());
+      expect(plugin.pending[1001]!.channelName, 'Daily summary');
+      expect(
+        plugin.pending[1001]!.channelDescription,
+        'The once-a-day chores digest notification.',
+      );
+    });
+
+    test('German locale produces German channel copy', () async {
+      final germanScheduler = NotificationScheduler(
+        plugin: plugin,
+        localeResolver: () => const Locale('de'),
+      );
+      await germanScheduler.applyDigestPlans(onlySlotZero());
+      expect(plugin.pending[1001]!.channelName, 'Tägliche Zusammenfassung');
+      expect(
+        plugin.pending[1001]!.channelDescription,
+        'Die einmal täglich versendete Aufgaben-Zusammenfassung.',
+      );
+    });
+
+    test(
+      'ensureInitialized deletes the legacy (pre-l10n) channel exactly '
+      'once across repeated calls, so it stops lingering as a dead, '
+      'English-named entry in system Settings',
+      () async {
+        await scheduler.ensureInitialized();
+        await scheduler.ensureInitialized();
+        await scheduler.ensureInitialized();
+        expect(plugin.deleteLegacyDigestChannelCallCount, 1);
+      },
+    );
+
+    test(
+      'the legacy channel is deleted BEFORE anything is scheduled on the '
+      'new one, so a user never briefly holds both',
+      () async {
+        await scheduler.applyDigestPlans(onlySlotZero());
+        expect(plugin.deleteLegacyDigestChannelCallCount, 1);
+        expect(plugin.pending, hasLength(1));
+      },
+    );
+  });
+
   group('cancelDigest', () {
     test('initializes the plugin implicitly if not done already', () async {
       await scheduler.cancelDigest();
