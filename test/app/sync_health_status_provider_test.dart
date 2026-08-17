@@ -32,9 +32,9 @@ import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/sync_health.dart';
 import 'package:clock/clock.dart';
-// `isNull` here would collide with matcher's -- drift is only needed for
-// `driftRuntimeOptions`.
-import 'package:drift/drift.dart' hide isNull;
+// `isNull`/`isNotNull` here would collide with matcher's -- drift is only
+// needed for `driftRuntimeOptions`.
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,7 +124,11 @@ void main() {
       reason: 'nothing to observe on an unlinked device',
     );
 
-    await database.close();
+    // Same shutdown order as the linked tests: reading the providers above
+    // opened the `settings` drift stream (via syncEngineProvider's linked-state
+    // watch), whose internal zero-duration cleanup timer has to drain before
+    // flutter_test's pending-Timer check, i.e. before this body returns.
+    await _shutDown(tester, container, database);
   });
 
   testWidgets(
@@ -305,6 +309,17 @@ void main() {
         container.read(syncHealthStatusProvider),
         SyncHealthStatus.healthy,
         reason: 'freshly dirty -- still inside the grace period',
+      );
+
+      // That read is what first subscribes dirtySinceProvider's drift watch;
+      // its first emission arrives a frame later. Asserted explicitly so a
+      // future failure says "the dirty watch never saw the unsent row" rather
+      // than the far more confusing "still healthy after four minutes".
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        container.read(dirtySinceProvider).valueOrNull,
+        isNotNull,
+        reason: 'the unsent shopping item must register as a dirty streak',
       );
 
       currentTime = currentTime.add(const Duration(minutes: 4));
