@@ -110,6 +110,18 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
+  /// Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get notificationChannelDigestName;
+
+  /// Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The once-a-day chores digest notification.'**
+  String get notificationChannelDigestDescription;
+
   /// Daily digest notification body when there are due-today occurrences but nothing overdue.
   ///
   /// In en, this message translates to:

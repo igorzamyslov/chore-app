@@ -15,6 +15,14 @@
     }
   },
 
+  "notificationChannelDigestName": "Daily summary",
+  "@notificationChannelDigestName": {
+    "description": "Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned."
+  },
+  "notificationChannelDigestDescription": "The once-a-day chores digest notification.",
+  "@notificationChannelDigestDescription": {
+    "description": "Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings."
+  },
   "notificationDigestDueOnly": "{count, plural, one{1 chore today} other{{count} chores today}}",
   "@notificationDigestDueOnly": {
     "description": "Daily digest notification body when there are due-today occurrences but nothing overdue.",

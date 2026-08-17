@@ -173,8 +173,21 @@ inline hint row with a button opening the system settings
    `AndroidScheduleMode.inexactAllowWhileIdle` — a morning digest does
    not need second-precision, and inexact scheduling COMPLETELY avoids
    the SCHEDULE_EXACT_ALARM permission dance (deliberate; do not
-   'upgrade' to exact). Channel id 'digest', importance default (not
-   high — it's a summary, not an alarm). iOS: standard alert+badge+sound
+   'upgrade' to exact). Channel id `'digest_v2'`, importance default (not
+   high — it's a summary, not an alarm). The channel's NAME and DESCRIPTION
+   are localized like every other user-visible string — they appear in
+   system Settings → Apps → Notifications — and are passed per
+   `zonedSchedule` call, because only the caller knows the current locale.
+   **The `_v2` suffix is load-bearing, and so is the constant pair
+   `digestChannelId`/`legacyDigestChannelId`.** Android caches a channel's
+   name and description at CREATION time and has no rename operation, so
+   re-localizing the original `'digest'` id would have changed nothing on
+   any device that already had it. The fix therefore minted a new id and
+   DELETES the legacy `'digest'` channel from `ensureInitialized`; without
+   that delete an upgrading user holds two digest entries in system
+   Settings, one of them dead and English-named. Any future change to this
+   channel's copy faces the same constraint: bump the id AND delete the one
+   it replaces. iOS: standard alert+badge+sound
    authorization requested ON FIRST ENABLE (not app launch — first-run
    permission prompts are hostile), i.e. from the settings toggle or the
    bootstrap default-enabled path's first schedule attempt.

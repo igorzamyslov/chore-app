@@ -33,7 +33,33 @@ final List<int> digestNotificationIds = List<int>.unmodifiable([
 ]);
 
 /// The Android notification channel the digest notification is posted on.
-const String digestChannelId = 'digest';
+///
+/// `_v2`, rather than the original `'digest'`: Android caches a channel's
+/// name and description at CREATION time and never updates them for an
+/// existing id -- there is no rename operation. Passing newly localized
+/// copy to the same id would therefore change nothing on any device that
+/// already has the channel, which is every device the digest has ever fired
+/// on. Minting a NEW id is what makes the localized copy (backlog E-1)
+/// actually reach those installs, with no migration-state bookkeeping: the
+/// id has never existed there, so the plugin creates it fresh with today's
+/// localized name on the very next schedule.
+///
+/// Cost of the re-mint, accepted deliberately: a user who had customized
+/// the old channel's importance or sound in system Settings loses that
+/// customization once. That is the cheaper of the two prices for a
+/// cosmetic, pre-wide-install fix -- the alternative is a permanently
+/// English channel name in every non-English install.
+///
+/// See [legacyDigestChannelId] for the cleanup half of this.
+const String digestChannelId = 'digest_v2';
+
+/// The pre-l10n channel id, superseded by [digestChannelId].
+///
+/// Kept only so [NotificationScheduler.ensureInitialized] can delete it: a
+/// re-mint without a delete would leave every upgrading user with TWO
+/// digest entries in system Settings -> Notifications, one of them dead and
+/// English-named, and no way to tell which is which.
+const String legacyDigestChannelId = 'digest';
 
 /// The narrow seam between [NotificationScheduler] and the real OS-level
 /// plugin.
@@ -68,15 +94,32 @@ abstract class DigestNotificationPlugin {
   /// honour the spec's "no notification when nothing is due" rule, and
   /// would freeze its body text at whatever the counts were when it was
   /// armed.
+  ///
+  /// [channelName] and [channelDescription] are the localized copy for the
+  /// Android channel [digestChannelId], and they take effect only the FIRST
+  /// time this app ever creates that channel on the device -- see that
+  /// constant's doc comment for why a later call cannot rename it. They are
+  /// passed per-call rather than once at init because only the caller knows
+  /// the current locale, and the locale can change between launches.
   Future<void> zonedSchedule({
     required int id,
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
   });
 
   /// Cancels the notification scheduled with [id], if any.
   Future<void> cancel(int id);
+
+  /// Deletes the [legacyDigestChannelId] Android channel, if it still exists
+  /// on this device.
+  ///
+  /// A no-op on platforms with no channel concept (iOS/desktop), and safe to
+  /// call repeatedly: deleting an already-deleted or never-created channel
+  /// does nothing.
+  Future<void> deleteLegacyDigestChannel();
 }
 
 /// The production [DigestNotificationPlugin], backed by
@@ -151,6 +194,8 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
   }) async {
     // `tz.UTC` is a built-in constant that needs no `initializeTimeZones()`
     // database load. `TZDateTime.from` converts by absolute instant
@@ -175,13 +220,13 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
       // `Importance`/`Priority` default to `defaultImportance`/
       // `defaultPriority` already (a summary, not an alarm — spec
       // architecture #3), so neither is passed explicitly here.
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           digestChannelId,
-          'Daily summary',
-          channelDescription: 'The once-a-day chores digest notification.',
+          channelName,
+          channelDescription: channelDescription,
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: const DarwinNotificationDetails(),
       ),
       // Deliberate spec decision: inexact scheduling avoids the
       // SCHEDULE_EXACT_ALARM permission dance entirely — a morning digest
@@ -193,6 +238,17 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
 
   @override
   Future<void> cancel(int id) => _plugin.cancel(id: id);
+
+  @override
+  Future<void> deleteLegacyDigestChannel() async {
+    // `resolvePlatformSpecificImplementation` returns null off Android, so
+    // this is the whole cross-platform story: nowhere else has channels.
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.deleteNotificationChannel(legacyDigestChannelId);
+  }
 }
 
 /// Translates [DigestPlan]s into scheduled OS notifications on top of a
@@ -233,11 +289,19 @@ class NotificationScheduler {
 
   /// Initializes the underlying plugin. Idempotent: only the first call
   /// does anything. Safe to call on every bootstrap/resume.
+  ///
+  /// Also deletes the [legacyDigestChannelId] channel (backlog E-1), behind
+  /// the same [_initialized] flag as the plugin init above it -- once per
+  /// process is all it needs, since the delete is a no-op forever after the
+  /// channel is actually gone. It runs BEFORE anything can be scheduled on
+  /// [digestChannelId], because every schedule and cancel path funnels
+  /// through here first, so a user never briefly holds both channels.
   Future<void> ensureInitialized() async {
     if (_initialized) {
       return;
     }
     await plugin.initialize();
+    await plugin.deleteLegacyDigestChannel();
     _initialized = true;
   }
 
@@ -301,6 +365,8 @@ class NotificationScheduler {
           title: l10n.appTitle,
           body: _digestBody(l10n, plan),
           fireAt: plan.fireAt,
+          channelName: l10n.notificationChannelDigestName,
+          channelDescription: l10n.notificationChannelDigestDescription,
         );
       }
     }

@@ -35,8 +35,8 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
-    String? channelName,
-    String? channelDescription,
+    required String channelName,
+    required String channelDescription,
   }) async {
     if (!_hasPaused) {
       _hasPaused = true;

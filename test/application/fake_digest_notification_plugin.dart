@@ -13,8 +13,8 @@ class ScheduledCall {
     required this.title,
     required this.body,
     required this.fireAt,
-    this.channelName,
-    this.channelDescription,
+    required this.channelName,
+    required this.channelDescription,
   });
 
   /// The notification id passed to `zonedSchedule`.
@@ -29,14 +29,13 @@ class ScheduledCall {
   /// The fire time passed to `zonedSchedule`.
   final DateTime fireAt;
 
-  /// The (localized) Android notification channel name passed to
-  /// `zonedSchedule` (backlog E-1), or `null` while the production
-  /// interface still hardcodes English channel copy and passes none.
-  final String? channelName;
+  /// The localized Android notification channel name passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelName;
 
-  /// The (localized) Android notification channel description passed to
-  /// `zonedSchedule` (backlog E-1), or `null` -- see [channelName].
-  final String? channelDescription;
+  /// The localized Android notification channel description passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelDescription;
 
   @override
   String toString() =>
@@ -95,21 +94,14 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   @override
   Future<bool> isPermissionGranted() async => permissionGranted;
 
-  // `channelName`/`channelDescription` are deliberately OPTIONAL here even
-  // though the production interface will require them (backlog E-1): a
-  // Dart implementation may widen an override with extra optional named
-  // parameters, which lets the E-1 tests record and assert the channel copy
-  // and fail at the ASSERTION step rather than at compile time. They are
-  // tightened to `required String` in the same change that adds them to
-  // [DigestNotificationPlugin].
   @override
   Future<void> zonedSchedule({
     required int id,
     required String title,
     required String body,
     required DateTime fireAt,
-    String? channelName,
-    String? channelDescription,
+    required String channelName,
+    required String channelDescription,
   }) async {
     final call = ScheduledCall(
       id: id,
@@ -129,10 +121,7 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
     pending.remove(id);
   }
 
-  /// Records a request to delete the legacy (pre-l10n) digest channel.
-  ///
-  /// Not yet an `@override`: [DigestNotificationPlugin] gains this method in
-  /// the same change that makes the assertion below pass.
+  @override
   Future<void> deleteLegacyDigestChannel() async {
     deleteLegacyDigestChannelCallCount++;
   }

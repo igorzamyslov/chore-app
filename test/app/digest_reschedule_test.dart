@@ -52,8 +52,8 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
-    String? channelName,
-    String? channelDescription,
+    required String channelName,
+    required String channelDescription,
   }) async {
     if (id == pauseOnId && !_hasPaused) {
       _hasPaused = true;

@@ -17,6 +17,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get notificationChannelDigestName => 'Daily summary';
+
+  @override
+  String get notificationChannelDigestDescription =>
+      'The once-a-day chores digest notification.';
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
