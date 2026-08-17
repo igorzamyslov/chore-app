@@ -14,6 +14,7 @@ class DigestToggleTile extends StatelessWidget {
   const DigestToggleTile({
     required this.value,
     required this.onChanged,
+    this.permissionDenied = false,
     super.key,
   });
 
@@ -23,13 +24,29 @@ class DigestToggleTile extends StatelessWidget {
   /// Called when the switch is flipped.
   final ValueChanged<bool> onChanged;
 
+  /// Whether the OS notification permission is currently denied (backlog
+  /// B-5 / triage T2.6).
+  ///
+  /// When [value] is also true this grows a short factual sub-line, so the
+  /// switch's ON position never implies a delivery that isn't happening.
+  /// Presentation only: it never changes [value], because the stored
+  /// `digestEnabled` remains the record of what the user WANTS (spec
+  /// `docs/specs/notifications.md` — permission state must not write back
+  /// to the stored flag, or granting the permission later would leave the
+  /// digest silently off).
+  final bool permissionDenied;
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return semantic(
       'settings.digest.toggle',
       child: SettingsRow(
         icon: Icons.notifications_outlined,
-        label: AppLocalizations.of(context).settingsDigestToggleTitle,
+        label: l10n.settingsDigestToggleTitle,
+        sublabel: value && permissionDenied
+            ? l10n.settingsDigestToggleDeniedHint
+            : null,
         switchValue: value,
         onSwitchChanged: onChanged,
       ),

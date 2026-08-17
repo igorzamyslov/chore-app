@@ -133,6 +133,93 @@ void main() {
     },
   );
 
+  // Backlog B-5: the switch sitting in its ON position while nothing is
+  // being delivered is the lie this sub-line removes. Matched by its
+  // literal English copy on purpose -- `testChoreApp` pumps the app with
+  // no locale override, so the template ARB's text is what renders, and a
+  // test that read the same `AppLocalizations` getter the widget reads
+  // would pass no matter what that getter returned.
+  const deniedSubline = 'Not delivering — notifications are off';
+
+  testChoreApp(
+    'toggle grows a "not delivering" sub-line when enabled but the OS '
+    'permission is denied',
+    today: today,
+    overrides: [
+      notificationPermissionGrantedProvider.overrideWith((ref) => false),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.digest.toggle'),
+          matching: find.text(deniedSubline),
+        ),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'toggle sub-line stays hidden while the permission is granted',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.digest.toggle'),
+          matching: find.text(deniedSubline),
+        ),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'toggle sub-line stays hidden when the digest itself is off, even with '
+    'the permission denied',
+    today: today,
+    overrides: [
+      notificationPermissionGrantedProvider.overrideWith((ref) => false),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      // Guard against this assertion passing for the wrong reason: the
+      // sub-line has to be there BEFORE the toggle is flipped, or
+      // `findsNothing` below proves nothing about the digest-off case.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.digest.toggle'),
+          matching: find.text(deniedSubline),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.bySemanticsIdentifier('settings.digest.toggle'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.digest.toggle'),
+          matching: find.text(deniedSubline),
+        ),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
   testChoreApp(
     'time picker round trip: picking a new time updates the row and '
     'persists it',

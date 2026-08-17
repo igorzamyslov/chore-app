@@ -177,6 +177,7 @@
 
   "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleTitle": "Tägliche Zusammenfassung",
+  "settingsDigestToggleDeniedHint": "Wird nicht zugestellt — Benachrichtigungen sind aus",
   "settingsDigestTimeLabel": "Benachrichtigungszeit",
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",

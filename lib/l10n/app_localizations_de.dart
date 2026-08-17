@@ -670,6 +670,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDigestToggleTitle => 'Tägliche Zusammenfassung';
 
   @override
+  String get settingsDigestToggleDeniedHint =>
+      'Wird nicht zugestellt — Benachrichtigungen sind aus';
+
+  @override
   String get settingsDigestTimeLabel => 'Benachrichtigungszeit';
 
   @override

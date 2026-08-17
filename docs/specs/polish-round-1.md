@@ -60,6 +60,17 @@ of the chores list, and flows keep passing untouched.
   `digest.preprompt.dismiss`): mark flag only — the digest stays enabled
   but silent until permission arrives via Settings (existing hint row is
   the recovery path). Banner id `digest.preprompt`.
+- **This banner is never re-armed or re-shown** after either action, on any
+  trigger — not on a cooldown, not on a symptom. Its job is to explain the
+  feature before the one-shot OS dialog, and that job is finished the first
+  time it is answered; bringing the same question back to someone who
+  already answered it is the nagging `DESIGN.md` §2 forbids. The durable
+  recovery path for a user who never returns to Settings is instead the
+  Settings tab's ambient attention dot plus the digest toggle's sub-line
+  (backlog B-5 / triage T2.6) — see the "Saying so when the digest cannot
+  be delivered" section of `docs/specs/notifications.md`. That dot is
+  gated on `digestPrepromptShownAt != null`, i.e. it takes over exactly
+  where this banner leaves off, so the two are never on screen together.
 
 ## B. Settings data operations (G8 + G9)
 
