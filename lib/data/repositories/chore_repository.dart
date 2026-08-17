@@ -392,6 +392,23 @@ class ChoreRepository {
     );
   }
 
+  /// Returns the occurrence with [occurrenceId], whichever chore owns it, or
+  /// `null` if there is none.
+  ///
+  /// The one occurrence lookup here that is NOT chore-scoped, deliberately:
+  /// the digest notification's "Done" action names a bare occurrence id in its
+  /// payload (spec `docs/specs/notifications.md` N2), and the background
+  /// isolate handling it has no chore id and no reason to guess one.
+  ///
+  /// Returns the row whatever its status; the caller decides what a
+  /// non-pending row means. For the notification action it means "someone
+  /// already handled this" and is a silent no-op.
+  Future<ChoreOccurrence?> getOccurrence(String occurrenceId) {
+    return (db.select(
+      db.choreOccurrences,
+    )..where((tbl) => tbl.id.equals(occurrenceId))).getSingleOrNull();
+  }
+
   /// Returns the pending occurrence of [choreId], or `null` if none.
   Future<ChoreOccurrence?> pendingOccurrenceOf(String choreId) {
     return (db.select(db.choreOccurrences)..where(
@@ -472,45 +489,84 @@ class ChoreRepository {
   Stream<List<OccurrenceWithChore>> watchPendingOccurrences(
     String householdId,
   ) {
-    final query =
-        db.select(db.choreOccurrences).join([
-            innerJoin(
-              db.chores,
-              db.chores.id.equalsExp(db.choreOccurrences.choreId),
-            ),
-            leftOuterJoin(
-              db.categories,
-              db.categories.id.equalsExp(db.chores.categoryId),
-            ),
-            leftOuterJoin(
-              db.members,
-              db.members.id.equalsExp(db.choreOccurrences.assignedMemberId),
-            ),
-          ])
-          ..where(
-            db.chores.householdId.equals(householdId) &
-                db.chores.deletedAt.isNull() &
-                db.chores.pausedAt.isNull() &
-                db.choreOccurrences.status.equalsValue(
-                  OccurrenceStatus.pending,
-                ),
-          )
-          ..orderBy([
-            OrderingTerm(expression: db.choreOccurrences.dueDate),
-            OrderingTerm(expression: db.chores.title),
-          ]);
+    return _pendingOccurrencesQuery(
+      householdId,
+    ).watch().map(_occurrencesWithChoreFromRows);
+  }
 
-    return query.watch().map((rows) {
-      return [
-        for (final row in rows)
-          OccurrenceWithChore(
-            occurrence: row.readTable(db.choreOccurrences),
-            chore: row.readTable(db.chores),
-            category: row.readTableOrNull(db.categories),
-            assignedMember: row.readTableOrNull(db.members),
-          ),
-      ];
-    });
+  /// The one-shot twin of [watchPendingOccurrences]: exactly the same rows,
+  /// filters and ordering, read once instead of watched.
+  ///
+  /// Exists because the notification-action background isolate (spec
+  /// `docs/specs/notifications.md` N2) has no Riverpod container to hold a
+  /// stream subscription open, and awaiting a drift stream is a deadlock this
+  /// project has already been bitten by. Same
+  /// [getActiveChores]/[watchActiveChores] pattern.
+  ///
+  /// The query builder and the row mapping are BOTH shared with the stream --
+  /// see [_pendingOccurrencesQuery] and [_occurrencesWithChoreFromRows] -- so
+  /// the two cannot drift. A divergence would make the isolate's horizon
+  /// disagree with the app's for reasons no test would explain.
+  Future<List<OccurrenceWithChore>> getPendingOccurrences(
+    String householdId,
+  ) async {
+    return _occurrencesWithChoreFromRows(
+      await _pendingOccurrencesQuery(householdId).get(),
+    );
+  }
+
+  /// The shared pending-occurrences query behind [watchPendingOccurrences] and
+  /// [getPendingOccurrences].
+  ///
+  /// Shared rather than duplicated (which is what [getActiveChores] does with
+  /// its own builder) because these two feed two different isolates' notions
+  /// of the same horizon, and a copied `WHERE` that drifted would be silent.
+  JoinedSelectStatement<HasResultSet, dynamic> _pendingOccurrencesQuery(
+    String householdId,
+  ) {
+    return db.select(db.choreOccurrences).join([
+        innerJoin(
+          db.chores,
+          db.chores.id.equalsExp(db.choreOccurrences.choreId),
+        ),
+        leftOuterJoin(
+          db.categories,
+          db.categories.id.equalsExp(db.chores.categoryId),
+        ),
+        leftOuterJoin(
+          db.members,
+          db.members.id.equalsExp(db.choreOccurrences.assignedMemberId),
+        ),
+      ])
+      ..where(
+        db.chores.householdId.equals(householdId) &
+            db.chores.deletedAt.isNull() &
+            db.chores.pausedAt.isNull() &
+            db.choreOccurrences.status.equalsValue(OccurrenceStatus.pending),
+      )
+      ..orderBy([
+        OrderingTerm(expression: db.choreOccurrences.dueDate),
+        OrderingTerm(expression: db.chores.title),
+      ]);
+  }
+
+  /// Maps joined occurrence/chore/category/member rows to
+  /// [OccurrenceWithChore].
+  ///
+  /// Synchronous, unlike [_choreDetailsFromRows], because this needs no
+  /// per-row follow-up query.
+  List<OccurrenceWithChore> _occurrencesWithChoreFromRows(
+    List<TypedResult> rows,
+  ) {
+    return [
+      for (final row in rows)
+        OccurrenceWithChore(
+          occurrence: row.readTable(db.choreOccurrences),
+          chore: row.readTable(db.chores),
+          category: row.readTableOrNull(db.categories),
+          assignedMember: row.readTableOrNull(db.members),
+        ),
+    ];
   }
 
   /// Watches occurrences of active chores in [householdId] closed (done or

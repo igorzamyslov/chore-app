@@ -596,13 +596,15 @@ class ChoreService {
     return details;
   }
 
-  /// Looks up an occurrence by id directly, since [ChoreRepository] only
-  /// exposes chore-scoped occurrence lookups.
-  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) {
-    return (database.select(
-      database.choreOccurrences,
-    )..where((tbl) => tbl.id.equals(occurrenceId))).getSingleOrNull();
-  }
+  /// Looks up an occurrence by id, whichever chore owns it.
+  ///
+  /// Delegates to [ChoreRepository.getOccurrence] rather than re-issuing the
+  /// query. This was a private copy of that query only because the repository
+  /// exposed nothing but chore-scoped occurrence lookups; the digest
+  /// notification action (spec `docs/specs/notifications.md` N2) needed a
+  /// public one, and two copies of a query is how a third appears.
+  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) =>
+      chores.getOccurrence(occurrenceId);
 
   /// [choreId]'s occurrences closed (done/skipped/missed) with
   /// `closedOn == today`, ordered newest-first by due date then

@@ -38,6 +38,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/member_service.dart';
+import 'package:chore_app/application/notification_action_handler.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/application/stats_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
@@ -207,16 +208,14 @@ final settingsProvider = StreamProvider<DeviceSettings>((ref) {
 /// itself is in an `AsyncError` state (e.g. a broken database connection),
 /// which would otherwise crash the loading/error screens this locale also
 /// applies to.
+/// The stored-value mapping is [localeFromStoredSetting], shared with the
+/// notification-action isolate's `readDigestLocale` (which has no container to
+/// read this provider from) so the two cannot disagree about what a stored
+/// `settings.locale` means.
 final localeOverrideProvider = Provider<Locale?>((ref) {
-  final stored = ref.watch(settingsProvider).valueOrNull?.locale;
-  switch (stored) {
-    case 'en':
-      return const Locale('en');
-    case 'de':
-      return const Locale('de');
-    default:
-      return null;
-  }
+  return localeFromStoredSetting(
+    ref.watch(settingsProvider).valueOrNull?.locale,
+  );
 });
 
 /// The manual theme override chosen via Settings (spec
@@ -473,7 +472,15 @@ final currentHouseholdProvider = StreamProvider<Household>((ref) async* {
 final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
   ref,
 ) {
-  return FlutterLocalNotificationsAdapter();
+  // `handleNotificationAction` is the top-level `@pragma('vm:entry-point')`
+  // handler the OS runs in a FRESH background isolate when a notification
+  // action is tapped (spec `docs/specs/notifications.md` N2). It shares nothing
+  // with this container -- it opens its own database connection -- and is
+  // passed here only so the plugin can record its callback handle at
+  // `initialize` time.
+  return FlutterLocalNotificationsAdapter(
+    onBackgroundResponse: handleNotificationAction,
+  );
 });
 
 /// The digest notification scheduler, built on
@@ -1142,13 +1149,20 @@ class DigestRescheduleController {
       return;
     }
 
+    final actingMemberId = _ref.read(actingMemberProvider)?.id;
     await scheduler.applyDigestPlans(
       buildDigestPlans(
         now: _ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
-        recipientMemberId: _ref.read(actingMemberProvider)?.id,
+        recipientMemberId: actingMemberId,
       ),
+      // Carried into each actionable slot's payload so the background isolate
+      // never has to re-derive it -- it could not do so correctly (no auth
+      // session) and a simplified guess would re-introduce the A-5
+      // misattribution for every linked household. See
+      // `DigestActionPayload.actingMemberId`.
+      actingMemberId: actingMemberId,
     );
   }
 }

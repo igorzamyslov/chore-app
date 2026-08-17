@@ -616,4 +616,29 @@ class NotificationScheduler {
 ui.Locale resolveDigestLocale(ui.Locale? inAppOverride) =>
     inAppOverride ?? _defaultLocale();
 
+/// Maps a `settings.locale` column value to a [ui.Locale], or `null` for "no
+/// override stored".
+///
+/// **Shared on purpose** between `localeOverrideProvider`
+/// (`lib/app/providers.dart`, which drives `MaterialApp.locale`) and
+/// `readDigestLocale` (`lib/application/notification_action_processor.dart`,
+/// the notification-action isolate, which has no Riverpod container to read a
+/// provider from). Those two must agree, and duplicating a switch statement in
+/// two isolates is exactly how they would stop agreeing.
+///
+/// An unrecognized value — future-proofing against a value this build does not
+/// know — maps to `null` rather than throwing, and nothing is written back:
+/// the same read-time self-heal `actingMemberProvider` applies to a stale
+/// stored id. A foreign value therefore degrades to the OS locale.
+ui.Locale? localeFromStoredSetting(String? stored) {
+  switch (stored) {
+    case 'en':
+      return const ui.Locale('en');
+    case 'de':
+      return const ui.Locale('de');
+    default:
+      return null;
+  }
+}
+
 ui.Locale _defaultLocale() => ui.PlatformDispatcher.instance.locale;

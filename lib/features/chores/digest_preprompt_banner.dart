@@ -120,13 +120,18 @@ class DigestPrepromptBanner extends ConsumerWidget {
       return;
     }
 
+    final actingMemberId = ref.read(actingMemberProvider)?.id;
     await scheduler.applyDigestPlans(
       buildDigestPlans(
         now: ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
-        recipientMemberId: ref.read(actingMemberProvider)?.id,
+        recipientMemberId: actingMemberId,
       ),
+      // See `DigestRescheduleController._recompute`: the acting member is
+      // resolved HERE and carried in each actionable slot's payload, never
+      // re-derived by the background isolate.
+      actingMemberId: actingMemberId,
     );
   }
 }
