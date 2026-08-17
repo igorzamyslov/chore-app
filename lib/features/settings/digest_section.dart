@@ -44,7 +44,7 @@ class DigestToggleTile extends StatelessWidget {
       child: SettingsRow(
         icon: Icons.notifications_outlined,
         label: l10n.settingsDigestToggleTitle,
-        sublabel: value || permissionDenied
+        sublabel: value && permissionDenied
             ? l10n.settingsDigestToggleDeniedHint
             : null,
         switchValue: value,
