@@ -95,9 +95,31 @@ occurrence per chore, at its most recent missed slot. Completion-anchored
 and one-off chores are never auto-missed — they just stay overdue.
 Idempotent: a second call the same day changes nothing.
 
-Returns whether it changed anything (closed at least one chore's
-occurrence as missed and reinserted it) — `CatchUpController` uses this to
-decide whether a digest recompute is warranted afterward.
+Returns the **number of chores it changed** (0 if none — the common case).
+The digest recompute `CatchUpController` runs after every catch-up is
+deliberately UNCONDITIONAL and does not consult this number (a day passing
+is itself a reason to re-arm a bounded horizon); the count exists for the
+UI.
+
+**Catch-up must be visible (backlog B-1 / triage T2.1).** Rolling a
+backlog forward before the first frame is silent by construction: the only
+trace left is a reinserted pending occurrence, indistinguishable from one
+that was always overdue, so to a returning user the list reads as an
+unexplained accusation. Every catch-up run therefore ADDS its nonzero
+count to an in-memory counter (`catchUpBannerCountProvider`,
+`lib/app/providers.dart`), which the chores list renders as a dismissible
+banner (`catchup.banner`, dismiss `catchup.banner.dismiss`) above the
+first-run banners, explaining the mechanism in one sentence without using
+the word "missed". Requirements:
+
+- Zero count ⇒ nothing shown. A cold start with nothing overdue must be
+  indistinguishable from before.
+- Accumulating, not overwriting: a second run firing before the user has
+  acknowledged the first never drops the earlier count.
+- NOT persisted, unlike the once-ever `settings` flags behind the
+  first-run banners: catch-up is a recurring background event, so a later
+  run must be able to explain itself again. Dismissing resets the counter
+  to 0.
 
 ### pauseChore(String choreId)
 `setPaused(true)` + delete pending occurrences. History untouched.
@@ -225,6 +247,12 @@ ids. Cover at minimum:
    today, one new `missed` row, assignee preserved; future-due pending
    untouched; completion-anchored chore 10 days overdue untouched; paused
    chore untouched; second call same day is a no-op (assert row counts).
+   The returned count is asserted on every one of those calls (1, 0, 0,
+   0 respectively) plus a two-overdue-chores run returning 2, so it is
+   provably per-chore rather than a saturating flag. Banner side: the
+   cold-start (`bootstrapProvider`) and resume/day-change
+   (`CatchUpController`) paths each set `catchUpBannerCountProvider` to the
+   real count, and the banner itself renders/hides/dismisses off it.
 6. pause/unpause round-trip per anchor mode incl. rotation continuity
    (A done → paused → unpaused → next assignee is B); done/skip today →
    paused → unpaused (same day) never resurrects a pending occurrence at
