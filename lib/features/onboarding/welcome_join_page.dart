@@ -70,6 +70,38 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
     _emailController.addListener(_onFieldChanged);
     _codeController.addListener(_onFieldChanged);
     _nameController.addListener(_onFieldChanged);
+    unawaited(_prefillPendingCode());
+  }
+
+  /// Seeds [_codeController] from `Settings.pendingJoinCode` -- the code
+  /// most recently accepted by the server on the code-entry step, which a
+  /// process kill would otherwise force the user to retype (spec
+  /// `docs/specs/onboarding-v2.md` §1). Purely a prefill: the step this page
+  /// shows is still derived entirely from provider state (see the library
+  /// doc comment), so a stale code only ever lands in a field the user can
+  /// overwrite.
+  ///
+  /// Reads the row through the repository rather than
+  /// `ref.read(settingsProvider).valueOrNull`: `settingsProvider` is a
+  /// stream whose first state is always `AsyncLoading`, so a synchronous
+  /// read here would silently prefill nothing whenever this page mounts
+  /// before that stream's first emission -- exactly the cold-start ordering
+  /// the auto-resume in `WelcomeScreen` produces.
+  ///
+  /// No-op if the field already holds text (nothing races this in practice,
+  /// but it must never clobber something the user typed) or if no code was
+  /// persisted. Assigning to the controller notifies [_onFieldChanged],
+  /// which rebuilds -- and the `await` above guarantees that happens after
+  /// this widget's first build rather than during it.
+  Future<void> _prefillPendingCode() async {
+    final settings = await ref
+        .read(settingsRepositoryProvider)
+        .ensureSettings();
+    final pendingCode = settings.pendingJoinCode;
+    if (!mounted || pendingCode == null || _codeController.text.isNotEmpty) {
+      return;
+    }
+    _codeController.text = pendingCode;
   }
 
   @override
@@ -276,6 +308,17 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       final members = await ref
           .read(householdGatewayProvider)
           .listClaimableMembers(code);
+      if (!mounted) {
+        return;
+      }
+      // Persisted the moment the SERVER has accepted the code, before the
+      // chooser renders (spec `docs/specs/onboarding-v2.md` §1): a kill from
+      // here on can then resume with it prefilled, so this is never worse
+      // than "the user retypes a code that turned out to be right". A kill
+      // AFTER the claim/join RPC has actually reached the server self-heals
+      // through the P2d reconnect offer instead (`myMembershipProvider`'s
+      // probe finds the membership) -- this covers the window before that.
+      await ref.read(settingsRepositoryProvider).setPendingJoinCode(code);
       if (!mounted) {
         return;
       }

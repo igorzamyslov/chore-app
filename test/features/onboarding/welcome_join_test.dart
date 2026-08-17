@@ -196,9 +196,12 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
 
-      await tester.tap(find.bySemanticsIdentifier('welcome.join'));
-      await tester.pumpAndSettle();
-
+      // No tap on the `welcome.join` card: signed in with no household,
+      // `WelcomeScreen` has already auto-resumed onto this subpage (spec
+      // §1 -- see `welcome_screen_test.dart`'s cold-start test), so the
+      // card is behind the pushed route and unreachable. The tap-the-card
+      // route into this page is still covered by the happy-path test
+      // above, which starts out signed OUT.
       expect(
         find.bySemanticsIdentifier('welcome.join.reconnect'),
         findsOneWidget,

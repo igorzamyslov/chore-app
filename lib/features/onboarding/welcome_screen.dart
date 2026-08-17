@@ -38,18 +38,84 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   bool _saving = false;
   String? _error;
 
+  /// Guards [_maybeAutoResumeJoin] against firing more than once per screen
+  /// instance -- see that method's doc comment.
+  bool _autoJoinTriggered = false;
+
+  late final ProviderSubscription<AsyncValue<AuthUser?>> _authSubscription;
+
   @override
   void initState() {
     super.initState();
     _nameController.addListener(_onNameChanged);
+    // Spec `docs/specs/onboarding-v2.md` §1, the "point of maximum anxiety"
+    // (`docs/research/triage.md` T2.4): a process kill while the user is
+    // away in Mail tapping the magic link wipes this screen's Navigator
+    // stack, so a relaunch always starts back here. The Supabase session
+    // survives that kill even though nothing else does, and nothing OTHER
+    // than the join flow ever signs this device in while no household
+    // exists -- so a signed-in user on this screen can only mean an
+    // interrupted join. Push the join subpage back open rather than
+    // stranding them on the two-card chooser with no sign anything was in
+    // progress; the subpage then re-derives its own step from live provider
+    // state (see its library doc comment).
+    //
+    // Two entry points cover both timings. The post-frame read catches
+    // "already signed in when this screen mounted"; [_authSubscription]
+    // catches the far more common cold-start case, where
+    // `currentAuthUserProvider` is a stream whose first state is always
+    // `AsyncLoading` and whose real value only arrives an event-loop turn
+    // later.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeAutoResumeJoin(ref.read(currentAuthUserProvider));
+    });
+    _authSubscription = ref.listenManual<AsyncValue<AuthUser?>>(
+      currentAuthUserProvider,
+      (previous, next) => _maybeAutoResumeJoin(next),
+    );
   }
 
   @override
   void dispose() {
+    _authSubscription.close();
     _nameController
       ..removeListener(_onNameChanged)
       ..dispose();
     super.dispose();
+  }
+
+  /// Pushes [WelcomeJoinPage] the first time a signed-in user is observed
+  /// while no household exists yet -- see [initState]'s doc comment.
+  ///
+  /// Fires at most once per state instance ([_autoJoinTriggered]): once
+  /// pushed, popping back here is the user explicitly backing out to
+  /// reconsider, and re-pushing immediately would make the back button
+  /// useless.
+  ///
+  /// Skips while this screen's route is not the topmost one: the user is
+  /// then already ON the join subpage (they tapped the card and are signing
+  /// in without ever having left the app), and pushing a SECOND copy over it
+  /// would hide the code they just typed and, worse, survive the
+  /// post-join pop -- leaving them staring at a stale join page instead of
+  /// their new household.
+  ///
+  /// Skips while [_creatingHousehold] too: the two flows are mutually
+  /// exclusive in practice, but a half-typed "start fresh" name must never
+  /// be shoved aside by this.
+  void _maybeAutoResumeJoin(AsyncValue<AuthUser?> authState) {
+    if (_autoJoinTriggered || _creatingHousehold || !mounted) {
+      return;
+    }
+    if (authState.valueOrNull == null) {
+      return;
+    }
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    _autoJoinTriggered = true;
+    Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute(builder: (_) => const WelcomeJoinPage()));
   }
 
   void _onNameChanged() => setState(() {});
