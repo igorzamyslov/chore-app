@@ -10,12 +10,12 @@ library;
 import 'dart:ui' as ui;
 
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
-import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:clock/clock.dart';
 
 /// Completes the occurrence named by a digest action payload, if it is still
@@ -70,7 +70,11 @@ Future<void> applyDoneAction({
   );
   try {
     await service.completeOccurrence(occurrenceId, completedBy: actingMemberId);
+    // ignore: avoid_catching_errors
   } on StateError {
+    // Catching an Error is normally wrong, and the lint is right to say so.
+    // The exception is justified because this Error is being used as a
+    // CONTROL-FLOW signal by the code we call, not as a bug report:
     // `ChoreService._closeAndAdvance` THROWS (it does not silently return)
     // when the occurrence is not pending, so this is the narrow race between
     // the read above and the transaction below it: something else closed the

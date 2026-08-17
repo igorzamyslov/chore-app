@@ -376,6 +376,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
                     // is what routes the tap to the background isolate
                     // instead of launching the app. See the verification note
                     // at the `initialize` call above.
+                    // ignore: avoid_redundant_argument_values
                     showsUserInterface: false,
                   ),
                 ]

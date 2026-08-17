@@ -1139,7 +1139,7 @@ void main() {
       final slotZero = plugin.pending[digestNotificationIdBase]!;
       expect(slotZero.body, '2 chores today');
       expect(slotZero.actionable, isFalse);
-      expect(slotZero.payload, isNull);
+      expect(slotZero.payload, null);
 
       await _disposeAndClose(tester, container, database);
     },
@@ -1229,7 +1229,7 @@ void main() {
             'actionability is per slot: the same recompute must be able to '
             'produce different answers for different slots',
       );
-      expect(laterSlot.payload, isNull);
+      expect(laterSlot.payload, null);
 
       await _disposeAndClose(tester, container, database);
     },

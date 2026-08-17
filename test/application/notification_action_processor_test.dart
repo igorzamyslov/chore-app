@@ -5,7 +5,7 @@
 /// [AppDatabase], real repositories, the real [ChoreService], a fixed clock,
 /// and only the bottom-most OS-facing plugin faked. Nothing here touches
 /// Riverpod -- that is the point of the split, and it is why these need no
-/// [ProviderContainer] and no widget pump.
+/// `ProviderContainer` and no widget pump.
 ///
 /// **What these tests CANNOT cover, stated so a green run is not mistaken for
 /// a working feature:** everything about the real background isolate. Whether
@@ -26,13 +26,12 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
-import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart' show Locale;
+import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_digest_notification_plugin.dart';
 
@@ -291,7 +290,7 @@ void main() {
       );
     });
 
-    test('scopes to actingMemberId: a partner\'s pending chore is '
+    test("scopes to actingMemberId: a partner's pending chore is "
         'ignored', () async {
       final me = await _insertMember(db, 'me', householdId);
       await _insertMember(db, 'partner', householdId);

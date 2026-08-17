@@ -48,7 +48,7 @@
 library;
 
 import 'dart:async';
-import 'dart:isolate';
+// `IsolateNameServer` lives in `dart:ui`, not `dart:isolate`.
 import 'dart:ui' as ui;
 
 import 'package:chore_app/application/digest_action_payload.dart';
@@ -129,12 +129,14 @@ Future<void> _run(DigestActionPayload payload) async {
     // Best-effort by design. A null lookup means the main isolate is not
     // alive, which is the common case for a notification action and is
     // completely fine -- step 3 is what covers it.
-    IsolateNameServer.lookupPortByName(notificationActionPortName)?.send(null);
+    ui.IsolateNameServer.lookupPortByName(
+      notificationActionPortName,
+    )?.send(null);
 
     // The isolate must produce the SAME copy as the main isolate, so the
     // locale comes from the persisted settings row rather than the scheduler's
     // bare OS-locale default -- see `readDigestLocale`.
-    final ui.Locale locale = await readDigestLocale(database);
+    final locale = await readDigestLocale(database);
     await rewriteDigestHorizon(
       database: database,
       scheduler: NotificationScheduler(
