@@ -127,6 +127,47 @@ void main() {
           ),
         ),
       );
+      expect(
+        base,
+        isNot(
+          DigestPlan(
+            fireAt: DateTime(2026, 7, 24, 8),
+            dueTodayCount: 1,
+            overdueCount: 2,
+            soleOccurrenceId: 'occ-1',
+          ),
+        ),
+      );
+    });
+
+    test('soleOccurrenceId enters BOTH == and hashCode', () {
+      // Asserted separately from the case above because forgetting the
+      // field in `Object.hash` while remembering it in `==` leaves the
+      // hashCode half passing by luck. Two plans differing only in this
+      // field must differ in both.
+      final withId = DigestPlan(
+        fireAt: DateTime(2026, 7, 24, 8),
+        dueTodayCount: 1,
+        overdueCount: 0,
+        soleOccurrenceId: 'occ-1',
+      );
+      final withOtherId = DigestPlan(
+        fireAt: DateTime(2026, 7, 24, 8),
+        dueTodayCount: 1,
+        overdueCount: 0,
+        soleOccurrenceId: 'occ-2',
+      );
+      expect(withId, isNot(withOtherId));
+      expect(withId.hashCode, isNot(withOtherId.hashCode));
+
+      final sameId = DigestPlan(
+        fireAt: DateTime(2026, 7, 24, 8),
+        dueTodayCount: 1,
+        overdueCount: 0,
+        soleOccurrenceId: 'occ-1',
+      );
+      expect(withId, sameId);
+      expect(withId.hashCode, sameId.hashCode);
     });
   });
 
@@ -329,6 +370,43 @@ void main() {
       expect(plan!.fireAt, fireAt);
       expect(plan.dueTodayCount, 2);
       expect(plan.overdueCount, 1);
+    });
+
+    test('carries a provided soleOccurrenceId through unchanged', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 1,
+        overdueCount: 0,
+        soleOccurrenceId: 'occ-42',
+      );
+      expect(plan!.soleOccurrenceId, 'occ-42');
+    });
+
+    test('soleOccurrenceId is null when the parameter is omitted', () {
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 1,
+        overdueCount: 0,
+      );
+      expect(plan!.soleOccurrenceId, isNull);
+    });
+
+    test('does NOT decide the sole occurrence itself: it carries whatever '
+        'the caller determined, even for a two-occurrence slot', () {
+      // `planDigestSlot` stays pure and enforces no invariant of its own --
+      // `projectDigestCounts` owns the `dueTodayCount + overdueCount == 1`
+      // gate (spec docs/specs/notifications.md N2). Pinning that here so
+      // nobody "helpfully" adds a null-out rule in two places.
+      final plan = planDigestSlot(
+        fireAt: fireAt,
+        enabled: true,
+        dueTodayCount: 2,
+        overdueCount: 0,
+        soleOccurrenceId: 'occ-42',
+      );
+      expect(plan!.soleOccurrenceId, 'occ-42');
     });
   });
 }

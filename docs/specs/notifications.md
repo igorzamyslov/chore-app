@@ -277,6 +277,12 @@ here, without reading any plan.*
   `digestHorizonSlots <= 32`. A future horizon raise trips that guard rather
   than silently eating the reminder budget, and changing the guard means
   renegotiating this split — not quietly editing a number.
+- **Notification ACTIONS spend nothing.** N2's digest "Done" action (see
+  "N2: digest notification actions" below) attaches to notifications that
+  already exist, so it consumes no id at all and leaves the 40 intact. The
+  corollary is a constraint on anyone extending it: an action must never be
+  answered with a *new* notification (a confirmation, an "undone" toast), as
+  that would spend G-6's budget.
 
 ## Testing
 
@@ -330,8 +336,183 @@ here, without reading any plan.*
   integration test via `pendingNotificationRequests()` in a dedicated
   `integration_test/` target instead.
 
+## N2: digest notification actions
+
+Adds a single "Done" action to the digest notification (`docs/backlog.md`
+F-1) — NOT the per-chore reminders/evening-re-reminder parts of N2, which
+remain unbuilt (G-6). Spends **zero** notification ids: actions attach to the
+existing horizon, so G-6's reserved 40 are untouched.
+
+**Gate, evaluated PER SLOT.** The action is attached to a slot IF AND ONLY IF
+that slot's own projected counts sum to exactly one occurrence
+(`dueTodayCount + overdueCount == 1`) — the only case where "the chore" the
+action names is unambiguous. Every other case (silent, or two-or-more) gets
+no action; tapping the notification body still opens the app on the chores
+tab, unchanged from N1. Slots are judged independently, so actionability is
+NOT monotone along the horizon even though the silence decision is — counts
+only grow, so a one-occurrence slot is often followed by two-occurrence ones.
+The gate is deliberately NOT restricted to the daily segment: a pending
+slot's payload is exactly as fresh as the last recompute whether it is slot 0
+or slot 23, and the projection's accuracy is binary and slot-independent.
+
+**What "Done" means.** Complete the specific occurrence ROW named in the
+payload, if it is still pending; otherwise do nothing. Deliberately NOT
+"complete whatever is due on the date this notification describes" — that is
+what makes the answer independent of which slot fired and of how long the
+notification sat unread. A row that is no longer pending (completed
+elsewhere, or replaced by `catchUpOverdue` after an app open) is a silent
+no-op. For a schedule-anchored overdue occurrence this records `done` where
+in-app catch-up would have recorded `missed`; that divergence is accepted —
+the user is asserting they did it, and `missed` is what catch-up infers from
+the absence of any such assertion.
+
+**Not shipped in N2 as scoped here:** "Snooze to tomorrow" — its own ticket
+(decision closed in `docs/backlog.md` F-1).
+
+**Payload.** Notification ids are SLOT-RELATIVE (`digestNotificationIdBase +
+k`, k = offset from the next slot), so an id names neither a chore nor a date
+and cannot be used to address anything; `NotificationResponse.id` is
+additionally unreliable on the background path. The payload is therefore the
+only channel, and carries JSON
+`{"v":1,"occ":"<occurrenceId>","by":"<memberId>"|null}`:
+
+- `occ` — the sole pending occurrence's id.
+- `by` — the acting member the slot was computed and scoped for, resolved in
+  the MAIN isolate. The background isolate must NOT re-derive this: the real
+  chain needs `memberIdentityModeProvider`/`currentAuthUserProvider` (a live
+  auth session), and in **pinned** mode with no resolvable claim it returns
+  `null` rather than guessing — guessing is the misattribution A-5 closed. A
+  `null` `by` becomes an unattributed completion.
+
+Action id is namespaced **`digest.done`**; a future per-chore reminder (G-6)
+mints its own rather than reusing it, because the background callback is
+process-global.
+
+**Handling:** `flutter_local_notifications`'
+`onDidReceiveBackgroundNotificationResponse`, a SEPARATE background isolate
+with no Riverpod container, no open `AppDatabase`, no `BuildContext`, and no
+Supabase session. The top-level entrypoint
+(`lib/application/notification_action_handler.dart`) opens its own
+`AppDatabase(openConnection())` and, **in this order** (the callback is a
+synchronous `void` typedef and the hosting context is time-boxed, so the
+work must degrade gracefully if cut short):
+
+1. calls the existing `ChoreService.completeOccurrence(occ, completedBy: by)`
+   — the user's intent, must never be lost;
+2. pings the main isolate via `IsolateNameServer` (best-effort; a `null`
+   lookup means the app isn't running, which is fine);
+3. rewrites the WHOLE horizon from the now-updated database via
+   `buildDigestPlans` + `applyDigestPlans`, so a device whose app is never
+   re-opened is not re-nagged about the chore it was just told is done. This
+   is the only correct option: leaving the remaining slots armed means
+   knowingly wrong counts, and cancelling them all means up to 83 days of
+   silence, at identical cost.
+
+then closes the connection in a `finally`. It never calls `cancel` on a
+specific id: `AndroidNotificationAction.cancelNotification` defaults to
+`true`, so the tapped notification is dismissed by the platform, and it has
+already fired so nothing is pending on its id.
+
+**Locale in the isolate.** The isolate's own `NotificationScheduler` resolves
+copy through the SAME path the main isolate uses: `resolveDigestLocale` over
+the persisted `settings.locale` (backlog E-1), read from the isolate's own
+database connection by `readDigestLocale`. It must NOT fall back to
+`NotificationScheduler`'s bare `PlatformDispatcher.instance.locale` default,
+which would give a user who chose German on an English phone an English
+"Done" button under a German app — exactly the defect E-1 closed for the
+title and body, and more glaring on a button than in body text. The
+stored-value → `Locale` mapping is shared with `localeOverrideProvider` via
+`localeFromStoredSetting` so the two cannot drift apart.
+
+**Known, bounded hazard:** `applyDigestPlans`' `_applyTail` serialization is
+per-instance and does NOT cross isolates, so the background isolate and the
+main isolate can interleave writes to the same 24 ids. Self-correcting
+whenever it can occur — it requires the app to be alive, and an alive app
+receives the ping after the isolate's write, so the main isolate's last apply
+always runs on post-completion data. Do not attempt a cross-isolate lock.
+Relatedly, `cancelDigest()` remains unserialized against `applyDigestPlans`;
+with a second process-level writer that is now reachable in principle (a wipe
+racing an action) and is tracked rather than fixed here.
+
+**Cross-isolate UI refresh:** the main isolate registers a well-known
+`IsolateNameServer` port at bootstrap. On a ping, it invalidates
+`pendingOccurrencesProvider`/`closedTodayOccurrencesProvider` (so any open
+screen re-reads the file fresh — a write through a second connection is
+invisible to the first connection's stream-invalidation bus) and re-runs the
+same recompute/push calls the existing app-resume observer already makes. The
+invalidate is what guarantees correctness: the recompute fired in the same
+handler may read pre-invalidation data, and `DigestRescheduleController`'s
+existing `ref.listen` on the invalidated stream is what delivers the correct
+second recompute. See `NotificationActionSignalController` in
+`lib/app/providers.dart`.
+
+**Platform setup:**
+- Android: `AndroidNotificationAction('digest.done', <localized 'Done'>,
+  showsUserInterface: false)` in `AndroidNotificationDetails.actions`,
+  attached per-notification (so it always uses the current locale) only for
+  slots carrying a sole occurrence id. New manifest receiver
+  `com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver` (no new
+  permission, and **no new channel id** — actions are per-notification, and
+  the channel id is E-1's `digest_v2`).
+- iOS: `DarwinNotificationCategory('digestActions', actions:
+  [DarwinNotificationAction.plain('digest.done', <localized 'Done'>)])`
+  registered once at `initialize()` via
+  `DarwinInitializationSettings.notificationCategories`, and referenced
+  per-notification through `DarwinNotificationDetails.categoryIdentifier`.
+  Category action titles are fixed at registration, not per-notification — a
+  known, accepted staleness window across a locale change until the next
+  full app relaunch. `ios/Runner/AppDelegate.swift` needs
+  `UNUserNotificationCenter.current().delegate = self` plus
+  `FlutterLocalNotificationsPlugin.setPluginRegistrantCallback` wired inside
+  `didInitializeImplicitFlutterEngine`, before the existing
+  `GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)`
+  call — without it the background engine's other plugins (path_provider and
+  sqlite3, which drift needs) never register and the isolate can't touch the
+  database.
+
+**Testing.** The completion/attribution/rewrite logic
+(`notification_action_processor.dart`) is fully unit-testable against an
+in-memory `AppDatabase`, including the horizon rewrite that silences the stale
+slots, and both are covered. The ping receiver is testable to the extent that
+`IsolateNameServer` is same-process: `test/app/notification_action_signal_test.dart`
+covers port registration/release and that a ping causes a recompute in a window
+it first proves quiet. It does NOT reproduce the cross-connection invisibility
+the invalidates exist for — that needs a second `AppDatabase` over a real file,
+and on-disk drift inside `testWidgets`' fake-async zone hangs the suite. That
+half is GATE-verified by hand (below), not by any automated test here.
+
+**What no test in this repo covers, stated so nobody mistakes green CI for a
+working feature.** The real background-isolate spawn, the manifest receiver,
+the AppDelegate change, and whether `openConnection()`'s `path_provider`
+channel lookup succeeds inside a background engine are all
+platform-integration facts — the same carve-out N1 already accepts for
+fire-time verification. `e2e.yml` cannot reach them either: it drives a
+Maestro flow on an Android emulator, which can neither wait for a scheduled
+digest nor tap a notification action. So the following are ASSUMED, and are
+verified once per platform by hand against
+`docs/plans/2026-08-08-notification-actions.md` Task 10, whose three **GATE**
+items name each assumption and its fallback:
+
+1. a background isolate can open the drift database at all (fallback: hand
+   the isolate an explicit file path instead of a `path_provider` channel
+   lookup — `AppDatabase` takes a plain `QueryExecutor`, so it is a change of
+   executor, not of the class);
+2. an action tap while the app is in the FOREGROUND still routes to the
+   background callback (fallback: also handle
+   `onDidReceiveNotificationResponse` in the main isolate, where a live
+   Riverpod container makes it simpler, and keep the background path for the
+   app-dead case);
+3. the isolate lives long enough to finish the horizon rewrite (fallback:
+   accept the truncation and document it — NOT a switch to `cancelDigest()`,
+   which trades one wrong notification for up to 83 days of silence).
+
 ## Out of scope for N1 (explicitly)
 
 Per-chore reminders, actions on the notification, quiet hours beyond the
 single digest time, per-member settings (meaningless until accounts),
 badge counts, and anything requiring background execution.
+
+**Forward pointer:** "actions on the notification" is out of scope for *N1*
+and is now specified above, under "N2: digest notification actions" — but
+only the single "Done" action on the digest. Per-chore reminders, the evening
+re-reminder, and "Snooze to tomorrow" all remain unbuilt.

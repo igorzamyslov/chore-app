@@ -95,10 +95,30 @@ class ChoreService {
   /// recurring chore) inserts the next pending occurrence with the rotation
   /// advanced.
   ///
+  /// [completedBy] is nullable — an UNATTRIBUTED completion — and stays
+  /// `required` so no caller can omit it by accident. Two callers, two
+  /// different right answers, and the asymmetry is deliberate:
+  ///
+  /// - **In-app** (`chores_list_screen.dart`) a null identity is REFUSED: the
+  ///   tap is abandoned and a snackbar asks the user who they are (T1.3). That
+  ///   is right there, because there is a user looking at a screen who can
+  ///   answer.
+  /// - **From a digest notification action** (spec
+  ///   `docs/specs/notifications.md` N2) a null identity is ACCEPTED and
+  ///   recorded as null. There is no UI to ask in, and the alternatives are
+  ///   both worse: dropping the tap silently discards the user's explicit "I
+  ///   did this", and guessing at a member is the misattribution backlog A-5
+  ///   closed.
+  ///
+  /// Nothing else changes: the `completed_by` column has always been nullable
+  /// ([skipOccurrence] already writes null through the same
+  /// `_closeAndAdvance`), and rotation advances on `assigned_member_id`, never
+  /// on `completed_by`.
+  ///
   /// Throws [StateError] if the occurrence is not currently pending.
   Future<void> completeOccurrence(
     String occurrenceId, {
-    required String completedBy,
+    required String? completedBy,
   }) {
     return _closeAndAdvance(
       occurrenceId,
@@ -596,13 +616,15 @@ class ChoreService {
     return details;
   }
 
-  /// Looks up an occurrence by id directly, since [ChoreRepository] only
-  /// exposes chore-scoped occurrence lookups.
-  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) {
-    return (database.select(
-      database.choreOccurrences,
-    )..where((tbl) => tbl.id.equals(occurrenceId))).getSingleOrNull();
-  }
+  /// Looks up an occurrence by id, whichever chore owns it.
+  ///
+  /// Delegates to [ChoreRepository.getOccurrence] rather than re-issuing the
+  /// query. This was a private copy of that query only because the repository
+  /// exposed nothing but chore-scoped occurrence lookups; the digest
+  /// notification action (spec `docs/specs/notifications.md` N2) needed a
+  /// public one, and two copies of a query is how a third appears.
+  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) =>
+      chores.getOccurrence(occurrenceId);
 
   /// [choreId]'s occurrences closed (done/skipped/missed) with
   /// `closedOn == today`, ordered newest-first by due date then

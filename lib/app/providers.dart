@@ -35,6 +35,10 @@
 library;
 
 import 'dart:async';
+import 'dart:isolate';
+// `IsolateNameServer` lives in `dart:ui`, not `dart:isolate`; `ReceivePort`
+// lives in `dart:isolate`.
+import 'dart:ui' show IsolateNameServer;
 
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
@@ -45,6 +49,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/member_service.dart';
+import 'package:chore_app/application/notification_action_handler.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/application/stats_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
@@ -216,16 +221,14 @@ final settingsProvider = StreamProvider<DeviceSettings>((ref) {
 /// itself is in an `AsyncError` state (e.g. a broken database connection),
 /// which would otherwise crash the loading/error screens this locale also
 /// applies to.
+/// The stored-value mapping is [localeFromStoredSetting], shared with the
+/// notification-action isolate's `readDigestLocale` (which has no container to
+/// read this provider from) so the two cannot disagree about what a stored
+/// `settings.locale` means.
 final localeOverrideProvider = Provider<Locale?>((ref) {
-  final stored = ref.watch(settingsProvider).valueOrNull?.locale;
-  switch (stored) {
-    case 'en':
-      return const Locale('en');
-    case 'de':
-      return const Locale('de');
-    default:
-      return null;
-  }
+  return localeFromStoredSetting(
+    ref.watch(settingsProvider).valueOrNull?.locale,
+  );
 });
 
 /// The manual theme override chosen via Settings (spec
@@ -582,7 +585,15 @@ final currentHouseholdProvider = StreamProvider<Household>((ref) async* {
 final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
   ref,
 ) {
-  return FlutterLocalNotificationsAdapter();
+  // `handleNotificationAction` is the top-level `@pragma('vm:entry-point')`
+  // handler the OS runs in a FRESH background isolate when a notification
+  // action is tapped (spec `docs/specs/notifications.md` N2). It shares nothing
+  // with this container -- it opens its own database connection -- and is
+  // passed here only so the plugin can record its callback handle at
+  // `initialize` time.
+  return FlutterLocalNotificationsAdapter(
+    onBackgroundResponse: handleNotificationAction,
+  );
 });
 
 /// The digest notification scheduler, built on
@@ -1251,13 +1262,20 @@ class DigestRescheduleController {
       return;
     }
 
+    final actingMemberId = _ref.read(actingMemberProvider)?.id;
     await scheduler.applyDigestPlans(
       buildDigestPlans(
         now: _ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
-        recipientMemberId: _ref.read(actingMemberProvider)?.id,
+        recipientMemberId: actingMemberId,
       ),
+      // Carried into each actionable slot's payload so the background isolate
+      // never has to re-derive it -- it could not do so correctly (no auth
+      // session) and a simplified guess would re-introduce the A-5
+      // misattribution for every linked household. See
+      // `DigestActionPayload.actingMemberId`.
+      actingMemberId: actingMemberId,
     );
   }
 }
@@ -1424,6 +1442,99 @@ final catchUpControllerProvider = Provider<CatchUpController>((ref) {
   ref.onDispose(controller.dispose);
   return controller;
 });
+
+/// Receives the background notification-action isolate's ping and refreshes
+/// the app from disk (spec `docs/specs/notifications.md` N2, backlog F-1).
+///
+/// Same shape and same discipline as [DigestRescheduleController] /
+/// [CatchUpController] / [SyncEngineController]: constructed exactly once,
+/// from `main.dart`, before `runApp`, and NEVER read from inside the
+/// `lib/app`/`lib/features` widget tree — see [DigestRescheduleController]'s
+/// doc comment for the reasoning (every widget test builds `ChoreApp`
+/// directly, never through `main()`).
+///
+/// It has no on-resume behaviour of its own and so is absent from
+/// `_AppResumeObserver`; it only has to exist, so that its `ReceivePort` is
+/// registered for the process's lifetime.
+///
+/// ## Why a ping is needed at all
+///
+/// The "Done" action is handled in a SEPARATE background isolate which opens
+/// its own [AppDatabase] connection (see
+/// `lib/application/notification_action_handler.dart`). Drift's reactive
+/// `.watch()` streams only re-emit for writes made through the SAME
+/// `QueryExecutor`, and two isolates in one process do not share that
+/// stream-invalidation bus — so a completion written over there is invisible to
+/// every stream over here, indefinitely. Verified from the plugin's own Android
+/// source (see `FlutterLocalNotificationsAdapter.initialize`): an action with
+/// `showsUserInterface: false` routes to the background isolate even when the
+/// app is in the FOREGROUND, so the existing app-resume observer is not a
+/// substitute — a user who pulls down the shade over the open app would
+/// otherwise see nothing change.
+class NotificationActionSignalController {
+  /// Registers the well-known port and starts listening immediately.
+  NotificationActionSignalController(this._ref) {
+    // Remove BEFORE registering: a hot restart tears down the container
+    // without running `dispose`, leaving the old mapping in the VM-wide
+    // registry, and `registerPortWithName` fails rather than replaces. This
+    // ordering is what makes a hot restart survivable.
+    IsolateNameServer.removePortNameMapping(notificationActionPortName);
+    IsolateNameServer.registerPortWithName(
+      _port.sendPort,
+      notificationActionPortName,
+    );
+    _subscription = _port.listen((_) => _onPing());
+  }
+
+  final Ref _ref;
+  final ReceivePort _port = ReceivePort();
+  late final StreamSubscription<dynamic> _subscription;
+
+  /// Stops listening, closes the port and releases the name. Wired via
+  /// `ref.onDispose`.
+  void dispose() {
+    unawaited(_subscription.cancel());
+    _port.close();
+    IsolateNameServer.removePortNameMapping(notificationActionPortName);
+  }
+
+  void _onPing() {
+    // **The invalidates are the part that guarantees correctness**, and the
+    // triggers below are only a latency optimisation. The write came through a
+    // different `AppDatabase` connection, so drift's stream-invalidation bus
+    // never saw it and these two streams would otherwise keep serving
+    // pre-completion rows to whatever screen is open.
+    _ref
+      ..invalidate(pendingOccurrencesProvider)
+      ..invalidate(closedTodayOccurrencesProvider);
+    // `invalidate` does not synchronously deliver a fresh value, so THIS
+    // recompute may well read pre-invalidation data. That is fine and is not a
+    // race worth fixing: `DigestRescheduleController` already
+    // `ref.listen`s `pendingOccurrencesProvider`, so the invalidated stream's
+    // fresh emission drives a second, correct recompute right behind this one.
+    // What this call buys is that the common case is fast, not that it is
+    // right.
+    _ref.read(digestRescheduleControllerProvider).triggerRecompute();
+    // The same two calls `main.dart`'s `_AppResumeObserver` makes.
+    // `completeOccurrence` marked the row `syncDirty` regardless of which
+    // connection wrote it (a column write, not a stream side effect), so the
+    // existing push path needs no new code. `triggerOnResume` returns void and
+    // wraps its own fire-and-forget push, so no `unawaited` here — mirroring
+    // that observer's own call site.
+    _ref.read(syncEngineControllerProvider).triggerOnResume();
+  }
+}
+
+/// Activates [NotificationActionSignalController] the moment it's first read.
+///
+/// Read exactly once, from `main.dart`, before `runApp` — see the controller's
+/// own doc comment for why it must never be read from inside the widget tree.
+final notificationActionSignalControllerProvider =
+    Provider<NotificationActionSignalController>((ref) {
+      final controller = NotificationActionSignalController(ref);
+      ref.onDispose(controller.dispose);
+      return controller;
+    });
 
 /// Owns the P3 sync engine's app-resume trigger (spec
 /// `docs/specs/sync-backend.md` §8.3: "pull on ... app resume") --

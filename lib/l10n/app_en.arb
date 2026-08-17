@@ -61,6 +61,10 @@
       }
     }
   },
+  "notificationActionDone": "Done",
+  "@notificationActionDone": {
+    "description": "Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows."
+  },
 
   "commonCancel": "Cancel",
   "@commonCancel": {

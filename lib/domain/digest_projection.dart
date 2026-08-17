@@ -41,11 +41,22 @@ import 'package:chore_app/domain/recurrence/recurrence_engine.dart';
 class ProjectedOccurrence {
   /// Creates a projection input.
   const ProjectedOccurrence({
+    required this.id,
     required this.dueDate,
     required this.startDate,
     required this.recurrence,
     required this.assignedMemberId,
   });
+
+  /// The occurrence row's id.
+  ///
+  /// Carried so [projectDigestCounts] can report [DigestCounts
+  /// .soleOccurrenceId] — the notification-action payload's `occ` (spec
+  /// `docs/specs/notifications.md` N2). **Required, not optional:** an
+  /// optional id would let a future caller silently produce a
+  /// never-actionable digest by forgetting it, and there are only two
+  /// construction sites in the tree.
+  final String id;
 
   /// The occurrence's current due date.
   final PlainDate dueDate;
@@ -63,7 +74,11 @@ class ProjectedOccurrence {
 /// The due/overdue split for a single digest slot's calendar date.
 class DigestCounts {
   /// Creates a counts pair.
-  const DigestCounts({required this.dueCount, required this.overdueCount});
+  const DigestCounts({
+    required this.dueCount,
+    required this.overdueCount,
+    this.soleOccurrenceId,
+  });
 
   /// Occurrences whose projected due date is exactly the queried date.
   final int dueCount;
@@ -71,6 +86,19 @@ class DigestCounts {
   /// Occurrences whose projected due date is strictly before the queried
   /// date.
   final int overdueCount;
+
+  /// The [ProjectedOccurrence.id] of the single occurrence this slot counted,
+  /// or `null` when it counted anything other than exactly one.
+  ///
+  /// Non-null exactly when `dueCount + overdueCount == 1`, which is the only
+  /// case where a notification ACTION can name an unambiguous chore (spec
+  /// `docs/specs/notifications.md` N2). Deciding it HERE, rather than in the
+  /// planner or the plan builder, is what guarantees it obeys precisely the
+  /// same recipient scoping and the same projected-due-date comparison as
+  /// the counts beside it: any other home would be a second copy of both
+  /// rules, and a scoping copy that drifted would make the "Done" button
+  /// vanish in every two-person household.
+  final String? soleOccurrenceId;
 
   /// Whether there is nothing at all to say — the spec's "silence is a
   /// feature" condition, evaluated per day.
@@ -80,14 +108,16 @@ class DigestCounts {
   bool operator ==(Object other) =>
       other is DigestCounts &&
       other.dueCount == dueCount &&
-      other.overdueCount == overdueCount;
+      other.overdueCount == overdueCount &&
+      other.soleOccurrenceId == soleOccurrenceId;
 
   @override
-  int get hashCode => Object.hash(dueCount, overdueCount);
+  int get hashCode => Object.hash(dueCount, overdueCount, soleOccurrenceId);
 
   @override
   String toString() =>
-      'DigestCounts(dueCount: $dueCount, overdueCount: $overdueCount)';
+      'DigestCounts(dueCount: $dueCount, overdueCount: $overdueCount, '
+      'soleOccurrenceId: $soleOccurrenceId)';
 }
 
 /// The due date [occurrence] would carry on [date], if the app is never
@@ -124,6 +154,9 @@ PlainDate projectedDueDateOn(ProjectedOccurrence occurrence, PlainDate date) {
 ///
 /// Scoping is applied BEFORE projection, so a partner's chore never
 /// influences this recipient's counts no matter how it rolls forward.
+///
+/// Also reports [DigestCounts.soleOccurrenceId] when exactly one occurrence
+/// was counted — see that field for why this is its only correct home.
 DigestCounts projectDigestCounts({
   required Iterable<ProjectedOccurrence> occurrences,
   required PlainDate date,
@@ -131,6 +164,7 @@ DigestCounts projectDigestCounts({
 }) {
   var dueCount = 0;
   var overdueCount = 0;
+  String? lastCountedId;
   for (final occurrence in occurrences) {
     final assignee = occurrence.assignedMemberId;
     if (recipientMemberId != null &&
@@ -141,9 +175,20 @@ DigestCounts projectDigestCounts({
     final projected = projectedDueDateOn(occurrence, date);
     if (projected == date) {
       dueCount++;
+      lastCountedId = occurrence.id;
     } else if (projected.isBefore(date)) {
       overdueCount++;
+      lastCountedId = occurrence.id;
     }
   }
-  return DigestCounts(dueCount: dueCount, overdueCount: overdueCount);
+  // Remembering the last counted id and discarding it unless the total is
+  // exactly 1 needs no separate match counter: the total IS the counter, and
+  // checking it after the loop makes the invariant hold regardless of
+  // iteration order. An occurrence due strictly after [date] is counted by
+  // neither branch, so it can never become the sole id either.
+  return DigestCounts(
+    dueCount: dueCount,
+    overdueCount: overdueCount,
+    soleOccurrenceId: dueCount + overdueCount == 1 ? lastCountedId : null,
+  );
 }

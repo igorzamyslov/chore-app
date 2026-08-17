@@ -146,6 +146,12 @@ abstract class AppLocalizations {
   /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
   String notificationDigestBoth(int dueCount, int overdueCount);
 
+  /// Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get notificationActionDone;
+
   /// Generic 'cancel' action, used by the chore delete confirmation dialog.
   ///
   /// In en, this message translates to:

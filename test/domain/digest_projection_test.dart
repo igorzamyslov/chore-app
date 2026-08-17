@@ -5,11 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 ProjectedOccurrence _occurrence({
   required PlainDate dueDate,
+  String id = 'occ',
   PlainDate? startDate,
   Recurrence? recurrence,
   String? assignedMemberId,
 }) {
   return ProjectedOccurrence(
+    id: id,
     dueDate: dueDate,
     startDate: startDate ?? dueDate,
     recurrence: recurrence,
@@ -137,6 +139,132 @@ void main() {
         recipientMemberId: 'me',
       );
       expect(counts.isSilent, isTrue);
+    });
+  });
+
+  group('soleOccurrenceId (spec docs/specs/notifications.md N2)', () {
+    test('exactly one occurrence due on the queried date names that '
+        'occurrence', () {
+      final counts = projectDigestCounts(
+        occurrences: [_occurrence(id: 'only', dueDate: PlainDate(2026, 1, 6))],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: null,
+      );
+      expect(counts.dueCount, 1);
+      expect(counts.soleOccurrenceId, 'only');
+    });
+
+    test('exactly one OVERDUE occurrence and nothing due still names it: an '
+        'overdue-only slot is actionable too', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(id: 'rotten', dueDate: PlainDate(2026, 1, 2)),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: null,
+      );
+      expect(counts.dueCount, 0);
+      expect(counts.overdueCount, 1);
+      expect(counts.soleOccurrenceId, 'rotten');
+    });
+
+    test('two occurrences name nothing: "the chore" is ambiguous', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(id: 'a', dueDate: PlainDate(2026, 1, 6)),
+          _occurrence(id: 'b', dueDate: PlainDate(2026, 1, 2)),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: null,
+      );
+      expect(counts.dueCount + counts.overdueCount, 2);
+      expect(counts.soleOccurrenceId, isNull);
+    });
+
+    test('zero occurrences name nothing', () {
+      final counts = projectDigestCounts(
+        occurrences: const [],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: null,
+      );
+      expect(counts.isSilent, isTrue);
+      expect(counts.soleOccurrenceId, isNull);
+    });
+
+    test('an occurrence due AFTER the queried day is not the sole one -- it '
+        'does not count at all', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(id: 'today', dueDate: PlainDate(2026, 1, 6)),
+          _occurrence(id: 'later', dueDate: PlainDate(2026, 1, 20)),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: null,
+      );
+      expect(counts.dueCount, 1);
+      expect(counts.soleOccurrenceId, 'today');
+    });
+
+    test('SCOPING is respected: two occurrences of which one is my '
+        "partner's names MINE, not null", () {
+      // The case that catches deciding the sole id BEFORE scoping instead
+      // of after, which would silently make the Done action vanish in every
+      // two-person household. Mirrors 'scoping is applied before
+      // projection, not after' above.
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(
+            id: 'mine',
+            dueDate: PlainDate(2026, 1, 6),
+            assignedMemberId: 'me',
+          ),
+          _occurrence(
+            id: 'theirs',
+            dueDate: PlainDate(2026, 1, 6),
+            assignedMemberId: 'partner',
+          ),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: 'me',
+      );
+      expect(counts.dueCount, 1);
+      expect(counts.soleOccurrenceId, 'mine');
+    });
+
+    test("a partner's occurrence is never named, even when it is the only "
+        'one there is', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(
+            id: 'theirs',
+            dueDate: PlainDate(2026, 1, 6),
+            assignedMemberId: 'partner',
+          ),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: 'me',
+      );
+      expect(counts.isSilent, isTrue);
+      expect(counts.soleOccurrenceId, isNull);
+    });
+
+    test('PROJECTION is respected: a schedule-anchored occurrence that '
+        'rolls forward is still the sole id at that date', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(
+            id: 'daily',
+            dueDate: PlainDate(2026, 1, 5),
+            recurrence: Recurrence.everyNDays(1),
+          ),
+        ],
+        date: PlainDate(2026, 1, 9),
+        recipientMemberId: null,
+      );
+      // It rolled forward onto the queried date, so it is DUE, not overdue.
+      expect(counts.dueCount, 1);
+      expect(counts.overdueCount, 0);
+      expect(counts.soleOccurrenceId, 'daily');
     });
   });
 
