@@ -320,4 +320,92 @@ void main() {
       expect(json['anchor'], 'schedule');
     });
   });
+
+  group('equality (backlog E-4)', () {
+    test('two rules built with identical fields are equal', () {
+      final a = Recurrence.everyNDays(3);
+      final b = Recurrence.everyNDays(3);
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('weekdays equality is order-independent', () {
+      final a = Recurrence.weekly(weekdays: {1, 3, 5});
+      final b = Recurrence.weekly(weekdays: {5, 3, 1});
+      expect(a, b);
+      expect(
+        a.hashCode,
+        b.hashCode,
+        reason:
+            'a Set is not order-stable, so hashCode must fold the weekdays '
+            'order-independently or it breaks the equal-objects-hash-equally '
+            'contract this equality now promises',
+      );
+    });
+
+    test('differing interval makes rules unequal', () {
+      expect(Recurrence.everyNDays(3), isNot(Recurrence.everyNDays(4)));
+    });
+
+    test('differing unit makes rules unequal', () {
+      expect(Recurrence.everyNDays(1), isNot(Recurrence.weekly()));
+    });
+
+    test('differing anchor makes rules unequal', () {
+      expect(
+        Recurrence.everyNDays(3),
+        isNot(Recurrence.everyNDays(3, anchor: RecurrenceAnchor.completion)),
+      );
+    });
+
+    test('differing weekdays makes rules unequal', () {
+      expect(
+        Recurrence.weekly(weekdays: {1, 3}),
+        isNot(Recurrence.weekly(weekdays: {1, 4})),
+      );
+      expect(
+        Recurrence.weekly(weekdays: {1, 3}),
+        isNot(Recurrence.weekly(weekdays: {1})),
+      );
+    });
+
+    test('differing monthlyMode makes rules unequal', () {
+      expect(
+        Recurrence.monthlyOnDay(),
+        isNot(Recurrence.monthlyOnNthWeekday(1, 6)),
+      );
+    });
+
+    test('differing monthly ordinal/weekday makes rules unequal', () {
+      expect(
+        Recurrence.monthlyOnNthWeekday(1, 6),
+        isNot(Recurrence.monthlyOnNthWeekday(2, 6)),
+      );
+      expect(
+        Recurrence.monthlyOnNthWeekday(1, 6),
+        isNot(Recurrence.monthlyOnNthWeekday(1, 7)),
+      );
+    });
+
+    test('is not equal to an unrelated object', () {
+      // ignore: unrelated_type_equality_checks
+      expect(Recurrence.everyNDays(3) == 'not a recurrence', isFalse);
+    });
+
+    test('a rule round-tripped through JSON equals the original', () {
+      // The reason E-4 exists at all: this is the comparison every caller
+      // reaches for, and identity equality made it silently false.
+      final rule = Recurrence.weekly(interval: 2, weekdays: {5, 1, 3});
+      expect(Recurrence.fromJson(rule.toJson()), rule);
+    });
+
+    test('equal rules collapse in a Set', () {
+      final rules = {
+        Recurrence.weekly(weekdays: {1, 3}),
+        Recurrence.weekly(weekdays: {3, 1}),
+        Recurrence.weekly(weekdays: {1, 4}),
+      };
+      expect(rules, hasLength(2));
+    });
+  });
 }
