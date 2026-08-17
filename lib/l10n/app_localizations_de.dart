@@ -954,6 +954,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.';
 
   @override
+  String get syncHealthBannerMessage =>
+      'Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Abmelden hat nicht geklappt. Versuch es noch mal.';
 

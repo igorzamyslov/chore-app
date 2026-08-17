@@ -28,10 +28,13 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/sync_health.dart';
 import 'package:clock/clock.dart';
-import 'package:drift/drift.dart';
+// `isNull` here would collide with matcher's -- drift is only needed for
+// `driftRuntimeOptions`.
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

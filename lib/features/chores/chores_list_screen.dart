@@ -26,6 +26,7 @@ import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -450,12 +451,21 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 /// Order is by urgency to the person looking at the screen right now, not by
 /// age of the feature:
 ///
-/// 1. [CatchUpBanner] — what just happened to your chores (backlog B-1).
-///    First: somebody returning after a lapse needs the explanation for the
-///    overdue tiles they are already looking at before anything evergreen.
-/// 2. [OnboardingNameBanner] — first-run name prompt (spec
+/// 1. [SyncHealthBanner] — this device hasn't reached the household in a
+///    while (backlog D-5, spec `docs/specs/sync-freshness.md` §2.5). First
+///    because it is the only member that QUALIFIES everything else on the
+///    screen: if sync is not getting through, the list may be missing other
+///    members' changes and this person's own completions may not have
+///    arrived, so reading it changes how you read the tiles — and it is the
+///    only member naming an action the user can take right now. The other
+///    three are, in their different ways, retrospective or evergreen.
+/// 2. [CatchUpBanner] — what just happened to your chores (backlog B-1).
+///    Somebody returning after a lapse needs the explanation for the overdue
+///    tiles they are already looking at before anything evergreen, but that
+///    explanation is retrospective and needs no action.
+/// 3. [OnboardingNameBanner] — first-run name prompt (spec
 ///    `docs/specs/polish-round-1.md` A2).
-/// 3. [DigestPrepromptBanner] — first-run digest prompt (spec A3, which
+/// 4. [DigestPrepromptBanner] — first-run digest prompt (spec A3, which
 ///    requires it to sit below A2).
 ///
 /// `MainAxisSize.min` is load-bearing: this sits inside the screen's own
@@ -468,6 +478,7 @@ class _BannerRegion extends StatelessWidget {
     return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        SyncHealthBanner(),
         CatchUpBanner(),
         OnboardingNameBanner(),
         DigestPrepromptBanner(),

@@ -25,6 +25,13 @@
 /// [syncEngineProvider]'s own linked-state branching against a fake
 /// transport, bypassing the compile-time [supabaseConfigured] gate that a
 /// test binary can't otherwise flip; see its own doc comment.
+/// [syncHealthStatusProvider] (spec `docs/specs/sync-freshness.md` §2.5) is
+/// a seventh, used only by the two D-5 banner widget tests
+/// (`test/features/chores/sync_health_banner_test.dart`,
+/// `test/features/shopping/sync_health_banner_test.dart`) to check that
+/// banner's own render/hide wiring without reconstructing a real unhealthy
+/// condition -- every other test, including
+/// `test/app/sync_health_status_provider_test.dart`, computes it for real.
 library;
 
 import 'dart:async';
@@ -48,8 +55,10 @@ import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/data/repositories/stats_repository.dart';
+import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/domain/sync_health.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart' show Locale;
@@ -452,6 +461,106 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   )..start();
   ref.onDispose(engine.stop);
   return engine;
+});
+
+/// The moment this device most recently had a genuine chance to reach its
+/// household at all -- `null` while not linked+signed in (spec
+/// `docs/specs/sync-freshness.md` §2.5).
+///
+/// Rebuilt (and so re-stamped from [clockProvider]) exactly twice: when
+/// [syncEngineProvider] swaps identity -- a fresh linked engine session --
+/// and when [SyncEngineController.triggerOnResume] invalidates it on app
+/// resume. It deliberately does NOT depend on anything a pull writes, so a
+/// running session's stamp stays put.
+///
+/// [computeSyncHealth] uses it as a FLOOR under the pull-staleness
+/// reference point. Without it, `syncLastPulledAt` is genuinely hours old
+/// in the moment the engine comes back -- so the banner would appear for
+/// the second or two until the session's first pull lands, on every cold
+/// start or resume after more than five minutes away, i.e. on most
+/// launches. That flash is the exact cry-wolf failure §2.5's thresholds
+/// exist to avoid; with the floor each foreground session gets the same
+/// five-missed-cycles grace it would get mid-session.
+final syncObservingSinceProvider = Provider<DateTime?>((ref) {
+  if (ref.watch(syncEngineProvider) is NoopSyncEngine) {
+    return null;
+  }
+  return ref.watch(clockProvider).now();
+});
+
+/// The wall-clock moment this device's synced tables most recently
+/// transitioned from "nothing dirty" to "something dirty" (spec
+/// `docs/specs/sync-freshness.md` §2.5), `null` while clean. In-memory
+/// only, derived live from [SyncRepository.watchAnyDirty] -- an app restart
+/// giving the benefit of the doubt is fine: if the underlying row really is
+/// still stuck dirty, the clock simply starts again from the restart rather
+/// than the signal being lost entirely.
+///
+/// Deliberately built by calling [SyncRepository.watchAnyDirty] directly
+/// inside this provider's own stream, NOT by composing a separate
+/// `StreamProvider` via its `.stream` modifier -- that modifier is
+/// `@Deprecated` in this project's pinned riverpod version (2.6.1) and
+/// would trip `flutter analyze --fatal-infos`.
+///
+/// Only ever watched from [syncHealthStatusProvider]'s linked branch, so an
+/// unlinked app (every widget test, every E2E run) never opens this drift
+/// stream at all.
+final dirtySinceProvider = StreamProvider<DateTime?>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final clock = ref.watch(clockProvider);
+  return dirtySinceStream(SyncRepository(db).watchAnyDirty(), clock.now);
+});
+
+/// The D-5 indicator's source of truth (spec
+/// `docs/specs/sync-freshness.md` §2.5): [SyncHealthStatus.healthy]
+/// whenever the device isn't linked+signed-in at all -- the same gate
+/// [syncEngineProvider] itself applies, so "not linked" and "linked, signed
+/// out" (which has its own honest treatment in Settings → Account) never
+/// show anything here, exactly like the pull-to-refresh indicator.
+/// Otherwise inferred by [computeSyncHealth] from the persisted cursor/link
+/// timestamps ([settingsProvider]), [syncObservingSinceProvider], and the
+/// live [dirtySinceProvider] watch. Never reads `SyncEngine`'s own
+/// swallowed errors (spec `docs/specs/sync-backend.md` §8.3, deliberately
+/// untouched by this indicator -- see §2.5 for why).
+///
+/// **The one-shot [Timer] below is load-bearing, not a convenience.** A
+/// purely reactive version of this provider would never fire in the case it
+/// exists for: a device that cannot reach the server persists nothing (a
+/// failed `pullSince` writes no cursor), and [dirtySinceStream] pins its
+/// timestamp to when the dirty streak STARTED, so a second local write
+/// re-emits an equal `AsyncData` that Riverpod correctly treats as no
+/// change. With nothing in the graph moving, no threshold could ever be
+/// observed as crossed. The timer is armed ONLY on this linked branch --
+/// after the early return above -- so it never exists in a widget test or
+/// E2E run (both are permanently unlinked), exactly like the engine's own
+/// poll timer, and carries none of this project's "a Timer is still
+/// pending" test hazard. See [syncHealthRecheckInterval].
+final syncHealthStatusProvider = Provider<SyncHealthStatus>((ref) {
+  final observingSince = ref.watch(syncObservingSinceProvider);
+  if (observingSince == null) {
+    return SyncHealthStatus.healthy;
+  }
+  final settings = ref.watch(settingsProvider).valueOrNull;
+  final linkedAtRaw = settings?.syncLinkedAt;
+  if (linkedAtRaw == null) {
+    // Momentarily true right after linking, before this provider's settings
+    // watch has seen the post-link write land -- treat as healthy rather
+    // than guessing.
+    return SyncHealthStatus.healthy;
+  }
+  final timer = Timer(syncHealthRecheckInterval, ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+
+  final lastPulledAtRaw = settings?.syncLastPulledAt;
+  return computeSyncHealth(
+    now: ref.watch(clockProvider).now(),
+    lastPulledAt: lastPulledAtRaw == null
+        ? null
+        : DateTime.parse(lastPulledAtRaw),
+    linkedAt: DateTime.parse(linkedAtRaw),
+    observingSince: observingSince,
+    dirtySince: ref.watch(dirtySinceProvider).valueOrNull,
+  );
 });
 
 /// The bootstrap household's own row (currently just its `name`), kept in
@@ -1359,6 +1468,14 @@ class SyncEngineController {
   /// (the OS can suspend/kill the debounce `Timer`), so resume must also
   /// recover it, not only fetch what changed remotely.
   void triggerOnResume() {
+    // Re-arms the D-5 indicator's grace period (spec
+    // `docs/specs/sync-freshness.md` §2.5): the pull cursor is legitimately
+    // as old as the time spent backgrounded, and the push/pull this method
+    // kicks off is the device's first chance in that whole span to prove
+    // otherwise. Without this the banner would flash on every resume after
+    // more than five minutes away. Invalidated BEFORE the push, so the
+    // stamp can never land after a pull the push triggers.
+    _ref.invalidate(syncObservingSinceProvider);
     unawaited(_ref.read(syncEngineProvider).pushDirty());
   }
 
