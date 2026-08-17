@@ -958,6 +958,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t reach the household. Your changes are saved here and will sync later.';
 
   @override
+  String get syncHealthBannerMessage =>
+      'This device hasn\'t reached the rest of the household in a while. Your changes are saved — try pulling down to refresh.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Couldn\'t sign out. Please try again.';
 

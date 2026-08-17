@@ -15,6 +15,7 @@ import 'package:chore_app/features/shopping/shopping_checked_section.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
+import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,6 +62,22 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       ),
       body: Column(
         children: [
+          // This screen's only banner (backlog D-5, spec
+          // `docs/specs/sync-freshness.md` §2.5), self-hiding to
+          // `SizedBox.shrink()` whenever sync looks healthy — which is
+          // always, for an unlinked household.
+          //
+          // ABOVE the quick-add row, not below it: the warning is about
+          // whether what you are here to type will reach the person you are
+          // shopping for, so it has to be readable BEFORE the field, not
+          // after it. Deliberately not lifted into a `_BannerRegion` like
+          // the chores list's (`lib/features/chores/chores_list_screen.dart`)
+          // — one member does not need a region. If a second banner ever
+          // lands on this screen, lift both into one, follow that region's
+          // documented contract (every member self-hides; order by urgency
+          // to the person on screen right now), and keep this one above the
+          // quick-add row for the reason above.
+          const SyncHealthBanner(),
           const ShoppingQuickAddRow(),
           Expanded(
             // Bug 3 (field feedback round 2,

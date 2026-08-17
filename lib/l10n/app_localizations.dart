@@ -1446,6 +1446,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t reach the household. Your changes are saved here and will sync later.'**
   String get syncRefreshError;
 
+  /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
+  ///
+  /// In en, this message translates to:
+  /// **'This device hasn\'t reached the rest of the household in a while. Your changes are saved — try pulling down to refresh.'**
+  String get syncHealthBannerMessage;
+
   /// Snackbar shown when signing out fails.
   ///
   /// In en, this message translates to:
