@@ -928,6 +928,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t reach the household. Your changes are saved here and will sync later.';
 
   @override
+  String get syncRefreshErrorRevoked =>
+      'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Couldn\'t sign out. Please try again.';
 

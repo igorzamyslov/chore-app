@@ -17,10 +17,7 @@ enum _AppTab {
   chores(filled: Icons.checklist, outlined: Icons.checklist_outlined),
 
   /// The shopping list.
-  shopping(
-    filled: Icons.shopping_cart,
-    outlined: Icons.shopping_cart_outlined,
-  ),
+  shopping(filled: Icons.shopping_cart, outlined: Icons.shopping_cart_outlined),
 
   /// Household settings.
   settings(filled: Icons.settings, outlined: Icons.settings_outlined);

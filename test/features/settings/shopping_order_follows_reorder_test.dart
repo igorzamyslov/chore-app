@@ -26,10 +26,7 @@ void main() {
       );
       final produce = categories.firstWhere((c) => c.name == 'Produce');
       final dairy = categories.firstWhere((c) => c.name == 'Dairy');
-      expect(
-        categories.indexOf(produce),
-        lessThan(categories.indexOf(dairy)),
-      );
+      expect(categories.indexOf(produce), lessThan(categories.indexOf(dairy)));
 
       // One item per category, so the shopping list's category-run order
       // reflects the categories' own sort order.

@@ -139,131 +139,119 @@ void main() {
       expect(row.syncDirty, isFalse);
     });
 
-    test(
-      'pulled vs local-dirty: pull keeps the local row untouched',
-      () async {
-        final category = await categories.createCategory(
-          household.id,
-          kind: CategoryKind.chore,
-          name: 'Old name',
-          icon: 'a',
-          color: 1,
+    test('pulled vs local-dirty: pull keeps the local row untouched', () async {
+      final category = await categories.createCategory(
+        household.id,
+        kind: CategoryKind.chore,
+        name: 'Old name',
+        icon: 'a',
+        color: 1,
+      );
+      // Deliberately left dirty (not cleared) -- simulates an unsynced
+      // local edit racing the pull.
+
+      transport.serverRows['categories']!.add({
+        'id': category.id,
+        'household_id': household.id,
+        'kind': 'chore',
+        'name': 'New name from server',
+        'icon': 'b',
+        'color': 2,
+        'sort_order': 0,
+        'created_at': category.createdAt,
+        'updated_at': DateTime.utc(2026, 6).toIso8601String(),
+        'deleted_at': null,
+      });
+
+      await engine.pullSince();
+
+      final row = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.equals(category.id))).getSingle();
+      expect(row.name, 'Old name');
+      expect(row.syncDirty, isTrue);
+    });
+
+    test('tombstone pull: a soft-deleted server row replicates deletedAt '
+        'locally', () async {
+      final category = await categories.createCategory(
+        household.id,
+        kind: CategoryKind.chore,
+        name: 'Old name',
+        icon: 'a',
+        color: 1,
+      );
+      await clearCategoryDirty(category.id);
+
+      transport.serverRows['categories']!.add({
+        'id': category.id,
+        'household_id': household.id,
+        'kind': 'chore',
+        'name': 'Old name',
+        'icon': 'a',
+        'color': 1,
+        'sort_order': 0,
+        'created_at': category.createdAt,
+        'updated_at': DateTime.utc(2026, 6).toIso8601String(),
+        'deleted_at': DateTime.utc(2026, 6).toIso8601String(),
+      });
+
+      await engine.pullSince();
+
+      final row = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.equals(category.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+      expect(row.syncDirty, isFalse);
+    });
+
+    test('dirty tombstone push: a locally soft-deleted row pushes its '
+        'deletedAt to the server and clears the flag', () async {
+      final category = await categories.createCategory(
+        household.id,
+        kind: CategoryKind.chore,
+        name: 'Old name',
+        icon: 'a',
+        color: 1,
+      );
+      await categories.softDeleteCategory(category.id);
+
+      await engine.pushDirty();
+
+      final serverRow = transport.serverRows['categories']!.singleWhere(
+        (row) => row['id'] == category.id,
+      );
+      expect(serverRow['deleted_at'], isNotNull);
+      final localRow = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.equals(category.id))).getSingle();
+      expect(localRow.syncDirty, isFalse);
+    });
+
+    test('mid-push re-dirty stays dirty: a local edit arriving during the '
+        'network round trip keeps its dirty flag set', () async {
+      final category = await categories.createCategory(
+        household.id,
+        kind: CategoryKind.chore,
+        name: 'Milk aisle',
+        icon: 'a',
+        color: 1,
+      );
+      transport.beforeUpsert = () async {
+        await categories.updateCategory(
+          category.id,
+          name: 'Renamed mid-flight',
         );
-        // Deliberately left dirty (not cleared) -- simulates an unsynced
-        // local edit racing the pull.
+      };
 
-        transport.serverRows['categories']!.add({
-          'id': category.id,
-          'household_id': household.id,
-          'kind': 'chore',
-          'name': 'New name from server',
-          'icon': 'b',
-          'color': 2,
-          'sort_order': 0,
-          'created_at': category.createdAt,
-          'updated_at': DateTime.utc(2026, 6).toIso8601String(),
-          'deleted_at': null,
-        });
+      await engine.pushDirty();
 
-        await engine.pullSince();
-
-        final row = await (db.select(
-          db.categories,
-        )..where((tbl) => tbl.id.equals(category.id))).getSingle();
-        expect(row.name, 'Old name');
-        expect(row.syncDirty, isTrue);
-      },
-    );
-
-    test(
-      'tombstone pull: a soft-deleted server row replicates deletedAt '
-      'locally',
-      () async {
-        final category = await categories.createCategory(
-          household.id,
-          kind: CategoryKind.chore,
-          name: 'Old name',
-          icon: 'a',
-          color: 1,
-        );
-        await clearCategoryDirty(category.id);
-
-        transport.serverRows['categories']!.add({
-          'id': category.id,
-          'household_id': household.id,
-          'kind': 'chore',
-          'name': 'Old name',
-          'icon': 'a',
-          'color': 1,
-          'sort_order': 0,
-          'created_at': category.createdAt,
-          'updated_at': DateTime.utc(2026, 6).toIso8601String(),
-          'deleted_at': DateTime.utc(2026, 6).toIso8601String(),
-        });
-
-        await engine.pullSince();
-
-        final row = await (db.select(
-          db.categories,
-        )..where((tbl) => tbl.id.equals(category.id))).getSingle();
-        expect(row.deletedAt, isNotNull);
-        expect(row.syncDirty, isFalse);
-      },
-    );
-
-    test(
-      'dirty tombstone push: a locally soft-deleted row pushes its '
-      'deletedAt to the server and clears the flag',
-      () async {
-        final category = await categories.createCategory(
-          household.id,
-          kind: CategoryKind.chore,
-          name: 'Old name',
-          icon: 'a',
-          color: 1,
-        );
-        await categories.softDeleteCategory(category.id);
-
-        await engine.pushDirty();
-
-        final serverRow = transport.serverRows['categories']!.singleWhere(
-          (row) => row['id'] == category.id,
-        );
-        expect(serverRow['deleted_at'], isNotNull);
-        final localRow = await (db.select(
-          db.categories,
-        )..where((tbl) => tbl.id.equals(category.id))).getSingle();
-        expect(localRow.syncDirty, isFalse);
-      },
-    );
-
-    test(
-      'mid-push re-dirty stays dirty: a local edit arriving during the '
-      'network round trip keeps its dirty flag set',
-      () async {
-        final category = await categories.createCategory(
-          household.id,
-          kind: CategoryKind.chore,
-          name: 'Milk aisle',
-          icon: 'a',
-          color: 1,
-        );
-        transport.beforeUpsert = () async {
-          await categories.updateCategory(
-            category.id,
-            name: 'Renamed mid-flight',
-          );
-        };
-
-        await engine.pushDirty();
-
-        final row = await (db.select(
-          db.categories,
-        )..where((tbl) => tbl.id.equals(category.id))).getSingle();
-        expect(row.syncDirty, isTrue);
-        expect(row.name, 'Renamed mid-flight');
-      },
-    );
+      final row = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.equals(category.id))).getSingle();
+      expect(row.syncDirty, isTrue);
+      expect(row.name, 'Renamed mid-flight');
+    });
 
     test(
       'cursor advances to the fetched server now() after a successful pull',
@@ -280,73 +268,64 @@ void main() {
       },
     );
 
-    test(
-      'cursor stays unchanged if the pull fails partway through (only '
-      'advances on a committed pull)',
-      () async {
-        final throwingEngine = SupabaseSyncEngine(
-          db: db,
-          transport: _ThrowingPullTransport('chores'),
-          settings: SettingsRepository(db),
-          householdId: household.id,
-        );
-        addTearDown(throwingEngine.stop);
+    test('cursor stays unchanged if the pull fails partway through (only '
+        'advances on a committed pull)', () async {
+      final throwingEngine = SupabaseSyncEngine(
+        db: db,
+        transport: _ThrowingPullTransport('chores'),
+        settings: SettingsRepository(db),
+        householdId: household.id,
+      );
+      addTearDown(throwingEngine.stop);
 
-        await throwingEngine.pullSince();
+      await throwingEngine.pullSince();
 
-        final settingsRow = await SettingsRepository(db).ensureSettings();
-        expect(settingsRow.syncLastPulledAt, isNull);
-      },
-    );
+      final settingsRow = await SettingsRepository(db).ensureSettings();
+      expect(settingsRow.syncLastPulledAt, isNull);
+    });
 
-    test(
-      'a pull whose membership probe comes back false clears the sync link '
-      'and records the revocation for the notice (spec '
-      'docs/specs/household-lifecycle.md §3.5)',
-      () async {
-        await settings.setSyncLinked(
-          householdId: household.id,
-          linkedAt: DateTime.utc(2026),
-        );
-        transport.membershipPresent = false;
+    test('a pull whose membership probe comes back false clears the sync link '
+        'and records the revocation for the notice (spec '
+        'docs/specs/household-lifecycle.md §3.5)', () async {
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026),
+      );
+      transport.membershipPresent = false;
 
-        await engine.pullSince();
+      await engine.pullSince();
 
-        final row = await settings.ensureSettings();
-        expect(row.syncHouseholdId, isNull);
-        expect(row.membershipRevoked, isTrue);
-        // The probe short-circuits BEFORE any table fetch or cursor
-        // advance -- not merely "ends up in the right state" via some
-        // later step undoing a fetch that already happened.
-        expect(transport.serverNowCalls, 0);
-      },
-    );
+      final row = await settings.ensureSettings();
+      expect(row.syncHouseholdId, isNull);
+      expect(row.membershipRevoked, isTrue);
+      // The probe short-circuits BEFORE any table fetch or cursor
+      // advance -- not merely "ends up in the right state" via some
+      // later step undoing a fetch that already happened.
+      expect(transport.serverNowCalls, 0);
+    });
 
-    test(
-      'a pull whose membership probe THROWS (transient network failure) '
-      'leaves the device linked and unflagged -- retryable, not silently '
-      'unlinked (spec docs/specs/household-lifecycle.md §3.5: only an '
-      'empty result is a revocation signal, an error is not)',
-      () async {
-        await settings.setSyncLinked(
-          householdId: household.id,
-          linkedAt: DateTime.utc(2026),
-        );
-        final throwingEngine = SupabaseSyncEngine(
-          db: db,
-          transport: _RevocationProbeFailsTransport(),
-          settings: settings,
-          householdId: household.id,
-        );
-        addTearDown(throwingEngine.stop);
+    test('a pull whose membership probe THROWS (transient network failure) '
+        'leaves the device linked and unflagged -- retryable, not silently '
+        'unlinked (spec docs/specs/household-lifecycle.md §3.5: only an '
+        'empty result is a revocation signal, an error is not)', () async {
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026),
+      );
+      final throwingEngine = SupabaseSyncEngine(
+        db: db,
+        transport: _RevocationProbeFailsTransport(),
+        settings: settings,
+        householdId: household.id,
+      );
+      addTearDown(throwingEngine.stop);
 
-        await throwingEngine.pullSince();
+      await throwingEngine.pullSince();
 
-        final row = await settings.ensureSettings();
-        expect(row.syncHouseholdId, household.id);
-        expect(row.membershipRevoked, isFalse);
-      },
-    );
+      final row = await settings.ensureSettings();
+      expect(row.syncHouseholdId, household.id);
+      expect(row.membershipRevoked, isFalse);
+    });
 
     test(
       'a pull whose membership probe succeeds leaves the link alone',
@@ -365,43 +344,37 @@ void main() {
       },
     );
 
-    test(
-      'refreshNow reports false when its own pull discovers revocation '
-      '(smaller fix 4): a deliberate pull-to-refresh must not answer '
-      '"yes, working" at the exact moment the device is cut off, right '
-      'before the refresh affordance disappears because it is gated on '
-      'linked state',
-      () async {
-        await settings.setSyncLinked(
-          householdId: household.id,
-          linkedAt: DateTime.utc(2026),
-        );
-        transport.membershipPresent = false;
+    test('refreshNow reports false when its own pull discovers revocation '
+        '(smaller fix 4): a deliberate pull-to-refresh must not answer '
+        '"yes, working" at the exact moment the device is cut off, right '
+        'before the refresh affordance disappears because it is gated on '
+        'linked state', () async {
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026),
+      );
+      transport.membershipPresent = false;
 
-        final result = await engine.refreshNow();
+      final result = await engine.refreshNow();
 
-        expect(result, isFalse);
-        final row = await settings.ensureSettings();
-        expect(row.syncHouseholdId, isNull);
-        expect(row.membershipRevoked, isTrue);
-      },
-    );
+      expect(result, isFalse);
+      final row = await settings.ensureSettings();
+      expect(row.syncHouseholdId, isNull);
+      expect(row.membershipRevoked, isTrue);
+    });
 
-    test(
-      'refreshNow still reports true for an ordinary successful refresh '
-      '(membership present)',
-      () async {
-        await settings.setSyncLinked(
-          householdId: household.id,
-          linkedAt: DateTime.utc(2026),
-        );
-        transport.membershipPresent = true;
+    test('refreshNow still reports true for an ordinary successful refresh '
+        '(membership present)', () async {
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026),
+      );
+      transport.membershipPresent = true;
 
-        final result = await engine.refreshNow();
+      final result = await engine.refreshNow();
 
-        expect(result, isTrue);
-      },
-    );
+      expect(result, isTrue);
+    });
   });
 
   group('SupabaseSyncEngine push mechanics', () {
@@ -429,46 +402,40 @@ void main() {
       await db.close();
     });
 
-    test(
-      'members push: insert-with-ignore for a new row, then a '
-      'granted-columns update propagates a later name change',
-      () async {
-        await engine.pushDirty();
-        final memberId = (await db.select(db.members).getSingle()).id;
-        expect(transport.serverRows['members']!.single['name'], 'Me');
+    test('members push: insert-with-ignore for a new row, then a '
+        'granted-columns update propagates a later name change', () async {
+      await engine.pushDirty();
+      final memberId = (await db.select(db.members).getSingle()).id;
+      expect(transport.serverRows['members']!.single['name'], 'Me');
 
-        await households.renameMember(memberId, 'Renamed');
-        await engine.pushDirty();
+      await households.renameMember(memberId, 'Renamed');
+      await engine.pushDirty();
 
-        expect(transport.serverRows['members']!.single['name'], 'Renamed');
-      },
-    );
+      expect(transport.serverRows['members']!.single['name'], 'Renamed');
+    });
 
-    test(
-      'members push: a soft-deleted member (MemberService.deleteMember, '
-      'spec docs/feedback/2026-08-01-ux-audit.md A1) propagates '
-      'deleted_at via the granted-columns update',
-      () async {
-        final second = await households.addMember(
-          household.id,
-          name: 'Jo',
-          color: 1,
-        );
-        await engine.pushDirty();
-        expect(transport.serverRows['members'], hasLength(2));
+    test('members push: a soft-deleted member (MemberService.deleteMember, '
+        'spec docs/feedback/2026-08-01-ux-audit.md A1) propagates '
+        'deleted_at via the granted-columns update', () async {
+      final second = await households.addMember(
+        household.id,
+        name: 'Jo',
+        color: 1,
+      );
+      await engine.pushDirty();
+      expect(transport.serverRows['members'], hasLength(2));
 
-        await MemberService(
-          database: db,
-          chores: ChoreRepository(db),
-        ).deleteMember(second.id);
-        await engine.pushDirty();
+      await MemberService(
+        database: db,
+        chores: ChoreRepository(db),
+      ).deleteMember(second.id);
+      await engine.pushDirty();
 
-        final serverRow = transport.serverRows['members']!.singleWhere(
-          (row) => row['id'] == second.id,
-        );
-        expect(serverRow['deleted_at'], isNotNull);
-      },
-    );
+      final serverRow = transport.serverRows['members']!.singleWhere(
+        (row) => row['id'] == second.id,
+      );
+      expect(serverRow['deleted_at'], isNotNull);
+    });
 
     test(
       'households push: a plain UPDATE per dirty row (never an upsert)',
@@ -505,32 +472,29 @@ void main() {
       },
     );
 
-    test(
-      "chore_assignees push denormalizes household_id off the assignee's "
-      'chore',
-      () async {
-        final member = await households.addMember(
-          household.id,
-          name: 'Jo',
-          color: 1,
-        );
-        final chores = ChoreRepository(db);
-        final chore = await chores.createChore(
-          householdId: household.id,
-          title: 'Dishes',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.fixed,
-          assigneeMemberIds: [member.id],
-        );
+    test("chore_assignees push denormalizes household_id off the assignee's "
+        'chore', () async {
+      final member = await households.addMember(
+        household.id,
+        name: 'Jo',
+        color: 1,
+      );
+      final chores = ChoreRepository(db);
+      final chore = await chores.createChore(
+        householdId: household.id,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [member.id],
+      );
 
-        await engine.pushDirty();
+      await engine.pushDirty();
 
-        final assigneeRow = transport.serverRows['chore_assignees']!.single;
-        expect(assigneeRow['household_id'], household.id);
-        expect(assigneeRow['chore_id'], chore.id);
-        expect(assigneeRow['member_id'], member.id);
-      },
-    );
+      final assigneeRow = transport.serverRows['chore_assignees']!.single;
+      expect(assigneeRow['household_id'], household.id);
+      expect(assigneeRow['chore_id'], chore.id);
+      expect(assigneeRow['member_id'], member.id);
+    });
 
     test('pushDirty pushes every dirty table in FK order', () async {
       final member = await households.addMember(
@@ -608,59 +572,53 @@ void main() {
         ..stop();
     });
 
-    test(
-      'start() schedules a debounced push after a local write to a synced '
-      'table',
-      () async {
-        engine.start();
-        // Let the initial start()-triggered pull settle before clearing
-        // what it touched, so only the write below is under test.
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        transport.pushedTables.clear();
+    test('start() schedules a debounced push after a local write to a synced '
+        'table', () async {
+      engine.start();
+      // Let the initial start()-triggered pull settle before clearing
+      // what it touched, so only the write below is under test.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      transport.pushedTables.clear();
 
-        final shopping = ShoppingRepository(db);
-        await shopping.addItem(household.id, name: 'Milk');
+      final shopping = ShoppingRepository(db);
+      await shopping.addItem(household.id, name: 'Milk');
 
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-        expect(transport.pushedTables, contains('shopping_items'));
-      },
-    );
+      expect(transport.pushedTables, contains('shopping_items'));
+    });
 
-    test(
-      'start() schedules a pull when the transport reports a household '
-      'change (payload ignored; data comes from the pull path)',
-      () async {
-        engine.start();
-        await Future<void>.delayed(const Duration(milliseconds: 10));
+    test('start() schedules a pull when the transport reports a household '
+        'change (payload ignored; data comes from the pull path)', () async {
+      engine.start();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
 
-        // The initial start()-triggered pull already advanced the cursor
-        // to `transport.now`; the server clock must move on so this new
-        // row's `updated_at` is strictly after that cursor (spec §8.3:
-        // "rows with updated_at > syncLastPulledAt").
-        transport.now = transport.now.add(const Duration(minutes: 1));
-        transport.serverRows['categories']!.add({
-          'id': 'server-category',
-          'household_id': household.id,
-          'kind': 'chore',
-          'name': 'From realtime',
-          'icon': 'a',
-          'color': 1,
-          'sort_order': 0,
-          'created_at': transport.now.toIso8601String(),
-          'updated_at': transport.now.toIso8601String(),
-          'deleted_at': null,
-        });
-        transport.emitChange();
+      // The initial start()-triggered pull already advanced the cursor
+      // to `transport.now`; the server clock must move on so this new
+      // row's `updated_at` is strictly after that cursor (spec §8.3:
+      // "rows with updated_at > syncLastPulledAt").
+      transport.now = transport.now.add(const Duration(minutes: 1));
+      transport.serverRows['categories']!.add({
+        'id': 'server-category',
+        'household_id': household.id,
+        'kind': 'chore',
+        'name': 'From realtime',
+        'icon': 'a',
+        'color': 1,
+        'sort_order': 0,
+        'created_at': transport.now.toIso8601String(),
+        'updated_at': transport.now.toIso8601String(),
+        'deleted_at': null,
+      });
+      transport.emitChange();
 
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-        final row = await (db.select(
-          db.categories,
-        )..where((tbl) => tbl.id.equals('server-category'))).getSingleOrNull();
-        expect(row, isNotNull);
-      },
-    );
+      final row = await (db.select(
+        db.categories,
+      )..where((tbl) => tbl.id.equals('server-category'))).getSingleOrNull();
+      expect(row, isNotNull);
+    });
   });
 
   // Spec `docs/specs/sync-freshness.md` §2.2: the foreground safety-net
@@ -756,116 +714,110 @@ void main() {
       expect(await pullsDuring(const Duration(milliseconds: 100)), 0);
     });
 
-    test(
-      'foreground poll retries a push that failed earlier, without '
-      'waiting for another local write or app resume (B-6, '
-      'docs/backlog.md)',
-      () async {
-        var upsertAttempts = 0;
-        transport.beforeUpsert = () async {
-          upsertAttempts++;
-          if (upsertAttempts == 1) {
-            // Simulates the exact B-6 scenario: connectivity drops during
-            // the debounced push that follows a local write.
-            throw Exception('simulated connectivity drop');
-          }
-        };
+    test('foreground poll retries a push that failed earlier, without '
+        'waiting for another local write or app resume (B-6, '
+        'docs/backlog.md)', () async {
+      var upsertAttempts = 0;
+      transport.beforeUpsert = () async {
+        upsertAttempts++;
+        if (upsertAttempts == 1) {
+          // Simulates the exact B-6 scenario: connectivity drops during
+          // the debounced push that follows a local write.
+          throw Exception('simulated connectivity drop');
+        }
+      };
 
-        // This test needs to observe the window BETWEEN the failed
-        // debounced push and the first retry, so it drives its own engine
-        // through the same constructor seam the group's setUp uses, with
-        // the poll spaced far enough from the 20ms debounce that the
-        // pre-retry state is genuinely observable. At the group's 30ms
-        // interval the first tick lands before any such check could run,
-        // which would leave the test asserting the absence of the very
-        // retry it exists to prove.
-        final retryEngine = SupabaseSyncEngine(
-          db: db,
-          transport: transport,
-          settings: SettingsRepository(db),
-          householdId: household.id,
-          pushDebounce: const Duration(milliseconds: 20),
-          pollInterval: const Duration(milliseconds: 200),
-        );
-        addTearDown(retryEngine.stop);
+      // This test needs to observe the window BETWEEN the failed
+      // debounced push and the first retry, so it drives its own engine
+      // through the same constructor seam the group's setUp uses, with
+      // the poll spaced far enough from the 20ms debounce that the
+      // pre-retry state is genuinely observable. At the group's 30ms
+      // interval the first tick lands before any such check could run,
+      // which would leave the test asserting the absence of the very
+      // retry it exists to prove.
+      final retryEngine = SupabaseSyncEngine(
+        db: db,
+        transport: transport,
+        settings: SettingsRepository(db),
+        householdId: household.id,
+        pushDebounce: const Duration(milliseconds: 20),
+        pollInterval: const Duration(milliseconds: 200),
+      );
+      addTearDown(retryEngine.stop);
 
-        retryEngine.start();
-        await Future<void>.delayed(const Duration(milliseconds: 5));
-        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+      retryEngine.start();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await ShoppingRepository(db).addItem(household.id, name: 'Milk');
 
-        // Let the 20ms debounced push fire and fail against the simulated
-        // drop -- the row must still be dirty afterward, and nothing must
-        // have reached the fake server. This is B-6's premise: without the
-        // retry, a write made as connectivity drops just sits here.
-        await Future<void>.delayed(const Duration(milliseconds: 60));
-        expect(
-          transport.serverRows['shopping_items'],
-          isEmpty,
-          reason: 'the first push attempt was made to fail on purpose',
-        );
-        final stillDirty = await (db.select(
-          db.shoppingItems,
-        )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
-        expect(stillDirty.syncDirty, isTrue);
+      // Let the 20ms debounced push fire and fail against the simulated
+      // drop -- the row must still be dirty afterward, and nothing must
+      // have reached the fake server. This is B-6's premise: without the
+      // retry, a write made as connectivity drops just sits here.
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(
+        transport.serverRows['shopping_items'],
+        isEmpty,
+        reason: 'the first push attempt was made to fail on purpose',
+      );
+      final stillDirty = await (db.select(
+        db.shoppingItems,
+      )..where((tbl) => tbl.name.equals('Milk'))).getSingle();
+      expect(stillDirty.syncDirty, isTrue);
 
-        // The 200ms foreground poll must now retry it on its own -- no
-        // further local write, no resume.
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-        expect(
-          upsertAttempts,
-          greaterThanOrEqualTo(2),
-          reason:
-              'the first attempt was failed on purpose, so a second one can '
-              'only have come from the poll. It also proves the row was '
-              'still dirty when that tick ran: FakeSyncTransport.upsertRows '
-              'returns before calling beforeUpsert when there is nothing '
-              'to push, so the hook is unreachable with a clean table',
-        );
-        expect(
-          transport.serverRows['shopping_items']!.any(
-            (row) => row['name'] == 'Milk',
-          ),
-          isTrue,
-          reason:
-              'the foreground safety-net poll must retry a dirty row left '
-              'over from an earlier failed push (B-6) -- before this fix '
-              'only pull was retried on a timer',
-        );
-      },
-    );
+      // The 200ms foreground poll must now retry it on its own -- no
+      // further local write, no resume.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        upsertAttempts,
+        greaterThanOrEqualTo(2),
+        reason:
+            'the first attempt was failed on purpose, so a second one can '
+            'only have come from the poll. It also proves the row was '
+            'still dirty when that tick ran: FakeSyncTransport.upsertRows '
+            'returns before calling beforeUpsert when there is nothing '
+            'to push, so the hook is unreachable with a clean table',
+      );
+      expect(
+        transport.serverRows['shopping_items']!.any(
+          (row) => row['name'] == 'Milk',
+        ),
+        isTrue,
+        reason:
+            'the foreground safety-net poll must retry a dirty row left '
+            'over from an earlier failed push (B-6) -- before this fix '
+            'only pull was retried on a timer',
+      );
+    });
 
-    test(
-      'foreground poll still pulls even when the push half keeps '
-      'failing forever -- a permanently-stuck dirty row must not '
-      'silence pull too (B-6, docs/backlog.md)',
-      () async {
-        transport.beforeUpsert = () async {
-          throw Exception('simulated permanent rejection, e.g. a 42501');
-        };
+    test('foreground poll still pulls even when the push half keeps '
+        'failing forever -- a permanently-stuck dirty row must not '
+        'silence pull too (B-6, docs/backlog.md)', () async {
+      transport.beforeUpsert = () async {
+        throw Exception('simulated permanent rejection, e.g. a 42501');
+      };
 
-        engine.start();
-        await Future<void>.delayed(const Duration(milliseconds: 5));
-        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+      engine.start();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await ShoppingRepository(db).addItem(household.id, name: 'Milk');
 
-        // Let the debounced push fail (and keep failing -- beforeUpsert
-        // always throws), then measure whether pulls keep happening on
-        // the poll's own cadence regardless.
-        await Future<void>.delayed(const Duration(milliseconds: 40));
-        final before = transport.serverNowCalls;
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+      // Let the debounced push fail (and keep failing -- beforeUpsert
+      // always throws), then measure whether pulls keep happening on
+      // the poll's own cadence regardless.
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      final before = transport.serverNowCalls;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-        expect(
-          transport.serverNowCalls,
-          greaterThan(before),
-          reason:
-              'a poll tick must ALWAYS pull, whether or not the push '
-              'half succeeded -- pointing the poll timer straight at '
-              'pushDirty() would make the pull conditional on push '
-              'success and turn one stuck row into a total pull '
-              'blackout, exactly what sync-freshness.md §2.2 exists to '
-              'prevent',
-        );
-      },
-    );
+      expect(
+        transport.serverNowCalls,
+        greaterThan(before),
+        reason:
+            'a poll tick must ALWAYS pull, whether or not the push '
+            'half succeeded -- pointing the poll timer straight at '
+            'pushDirty() would make the pull conditional on push '
+            'success and turn one stuck row into a total pull '
+            'blackout, exactly what sync-freshness.md §2.2 exists to '
+            'prevent',
+      );
+    });
   });
 }

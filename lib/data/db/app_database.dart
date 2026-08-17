@@ -139,10 +139,7 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(categories, categories.syncDirty);
         await migrator.addColumn(chores, chores.syncDirty);
         await migrator.addColumn(choreAssignees, choreAssignees.syncDirty);
-        await migrator.addColumn(
-          choreOccurrences,
-          choreOccurrences.syncDirty,
-        );
+        await migrator.addColumn(choreOccurrences, choreOccurrences.syncDirty);
         await migrator.addColumn(shoppingItems, shoppingItems.syncDirty);
       }
       if (from < 9) {

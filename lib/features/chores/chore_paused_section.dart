@@ -50,10 +50,7 @@ class ChorePausedSection extends StatelessWidget {
         children: [
           for (var i = 0; i < chores.length; i++) ...[
             if (i > 0) const Divider(height: 1, thickness: 1),
-            _PausedRow(
-              details: chores[i],
-              onResume: () => onResume(chores[i]),
-            ),
+            _PausedRow(details: chores[i], onResume: () => onResume(chores[i])),
           ],
         ],
       ),

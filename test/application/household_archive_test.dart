@@ -44,33 +44,28 @@ void main() {
   });
 
   group('writeHouseholdArchive', () {
-    test(
-      'writes the export document as JSON to a famdo-archive-<date>.json '
-      'file inside the given directory, and returns that File',
-      () async {
-        final clock = Clock.fixed(DateTime.utc(2026, 8, 1, 12));
+    test('writes the export document as JSON to a famdo-archive-<date>.json '
+        'file inside the given directory, and returns that File', () async {
+      final clock = Clock.fixed(DateTime.utc(2026, 8, 1, 12));
 
-        final file = await writeHouseholdArchive(
-          database: db,
-          clock: clock,
-          directory: tempDir,
-        );
+      final file = await writeHouseholdArchive(
+        database: db,
+        clock: clock,
+        directory: tempDir,
+      );
 
-        expect(file.path, '${tempDir.path}/famdo-archive-2026-08-01.json');
-        expect(file.existsSync(), isTrue);
+      expect(file.path, '${tempDir.path}/famdo-archive-2026-08-01.json');
+      expect(file.existsSync(), isTrue);
 
-        final decoded =
-            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-        expect(decoded['format'], 1);
-        final tables = decoded['tables']! as Map<String, dynamic>;
-        final households = tables['households']! as List<dynamic>;
-        expect(
-          households.any(
-            (row) => (row as Map<String, dynamic>)['id'] == 'h1',
-          ),
-          isTrue,
-        );
-      },
-    );
+      final decoded =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      expect(decoded['format'], 1);
+      final tables = decoded['tables']! as Map<String, dynamic>;
+      final households = tables['households']! as List<dynamic>;
+      expect(
+        households.any((row) => (row as Map<String, dynamic>)['id'] == 'h1'),
+        isTrue,
+      );
+    });
   });
 }

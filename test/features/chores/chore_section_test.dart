@@ -22,10 +22,7 @@ void main() {
     });
 
     test('today is today', () {
-      expect(
-        sectionFor(today: today, dueDate: today),
-        ChoreSection.today,
-      );
+      expect(sectionFor(today: today, dueDate: today), ChoreSection.today);
     });
 
     test('today + 1 is tomorrow', () {

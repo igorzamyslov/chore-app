@@ -151,9 +151,7 @@ class CategoryRepository {
     int? color,
     int? sortOrder,
   }) async {
-    await (db.update(
-      db.categories,
-    )..where((tbl) => tbl.id.equals(id))).write(
+    await (db.update(db.categories)..where((tbl) => tbl.id.equals(id))).write(
       CategoriesCompanion(
         name: name != null ? Value(name) : const Value.absent(),
         icon: icon != null ? Value(icon) : const Value.absent(),
@@ -171,18 +169,16 @@ class CategoryRepository {
   Future<void> softDeleteCategory(String id) async {
     final now = _isoNow();
     await db.transaction(() async {
-      await (db.update(
-        db.categories,
-      )..where((tbl) => tbl.id.equals(id))).write(
+      await (db.update(db.categories)..where((tbl) => tbl.id.equals(id))).write(
         CategoriesCompanion(
           deletedAt: Value(now),
           updatedAt: Value(now),
           syncDirty: syncDirtyOnWrite,
         ),
       );
-      await (db.update(db.chores)..where(
-            (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
-          ))
+      await (db.update(
+            db.chores,
+          )..where((tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull()))
           .write(
             ChoresCompanion(
               categoryId: const Value(null),
@@ -190,9 +186,9 @@ class CategoryRepository {
               syncDirty: syncDirtyOnWrite,
             ),
           );
-      await (db.update(db.shoppingItems)..where(
-            (tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull(),
-          ))
+      await (db.update(
+            db.shoppingItems,
+          )..where((tbl) => tbl.categoryId.equals(id) & tbl.deletedAt.isNull()))
           .write(
             ShoppingItemsCompanion(
               categoryId: const Value(null),

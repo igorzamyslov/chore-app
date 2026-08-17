@@ -59,9 +59,7 @@ void main() {
     "Noop gateway: shows the disabled 'coming soon' row, no interactive "
     'account UI',
     today: today,
-    overrides: [
-      authGatewayProvider.overrideWithValue(const NoopAuthGateway()),
-    ],
+    overrides: [authGatewayProvider.overrideWithValue(const NoopAuthGateway())],
     (tester, database) async {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
@@ -144,9 +142,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'Check your email at me@example.com for your sign-in link.',
-        ),
+        find.text('Check your email at me@example.com for your sign-in link.'),
         findsOneWidget,
       );
       expect(find.text('Send again'), findsOneWidget);
@@ -282,10 +278,7 @@ void main() {
         find.bySemanticsIdentifier('settings.account.adopt'),
         findsNothing,
       );
-      expect(
-        find.bySemanticsIdentifier('settings.account.join'),
-        findsNothing,
-      );
+      expect(find.bySemanticsIdentifier('settings.account.join'), findsNothing);
       expect(
         find.bySemanticsIdentifier('settings.account.email'),
         findsOneWidget,
@@ -408,10 +401,9 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
-      await SettingsRepository(database).setSyncLinked(
-        householdId: householdId,
-        linkedAt: DateTime.utc(2026),
-      );
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
       await SettingsRepository(
         database,
       ).setSyncLastPulledAt(DateTime.utc(2026, 2));
@@ -580,10 +572,7 @@ void main() {
         find.bySemanticsIdentifier('settings.account.adopt'),
         findsNothing,
       );
-      expect(
-        find.bySemanticsIdentifier('settings.account.join'),
-        findsNothing,
-      );
+      expect(find.bySemanticsIdentifier('settings.account.join'), findsNothing);
       // The reconnect row only ever renders from AccountSectionBody's
       // UNLINKED branch -- once linked, myMembershipProvider's resolved
       // value (if it settles at all before this device's settled linked

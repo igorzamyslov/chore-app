@@ -69,9 +69,7 @@ void main() {
       final tables = document['tables']! as Map<String, dynamic>;
       final chores = tables['chores']! as List<dynamic>;
       expect(
-        chores.any(
-          (row) => (row as Map<String, dynamic>)['title'] == 'Vacuum',
-        ),
+        chores.any((row) => (row as Map<String, dynamic>)['title'] == 'Vacuum'),
         isTrue,
       );
 

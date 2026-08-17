@@ -209,10 +209,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('My chore'), findsOneWidget);
-      expect(
-        find.bySemanticsIdentifier('chores.empty.filtered'),
-        findsNothing,
-      );
+      expect(find.bySemanticsIdentifier('chores.empty.filtered'), findsNothing);
       // Both filter icons are back to their unbadged state.
       expect(find.byType(Badge), findsNothing);
 
@@ -242,10 +239,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('chores.empty.fresh'), findsOneWidget);
-      expect(
-        find.bySemanticsIdentifier('chores.empty.filtered'),
-        findsNothing,
-      );
+      expect(find.bySemanticsIdentifier('chores.empty.filtered'), findsNothing);
 
       handle.dispose();
     },

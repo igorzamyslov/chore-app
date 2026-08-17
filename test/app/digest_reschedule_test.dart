@@ -144,9 +144,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(
-          Clock.fixed(DateTime(2026, 7, 24, 7)),
-        ),
+        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 7))),
         digestNotificationPluginProvider.overrideWithValue(plugin),
       ],
     );
@@ -193,9 +191,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
       plugin.scheduledCalls.clear();
 
-      final today = PlainDate.fromDateTime(
-        container.read(clockProvider).now(),
-      );
+      final today = PlainDate.fromDateTime(container.read(clockProvider).now());
       await container
           .read(choreServiceProvider)
           .createChore(
@@ -229,9 +225,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(
-          Clock.fixed(DateTime(2026, 7, 24, 7)),
-        ),
+        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 7))),
         digestNotificationPluginProvider.overrideWithValue(plugin),
       ],
     );
@@ -447,9 +441,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(
-          Clock.fixed(DateTime(2026, 7, 24, 7)),
-        ),
+        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 7))),
         digestNotificationPluginProvider.overrideWithValue(plugin),
       ],
     );
@@ -653,55 +645,54 @@ void main() {
     },
   );
 
-  testWidgets(
-    'completing the last chore silences the entire horizon',
-    (tester) async {
-      final currentTime = DateTime(2026, 1, 5, 7);
-      final database = AppDatabase(NativeDatabase.memory());
-      await HouseholdRepository(database).createLocalHousehold('Me');
-      final plugin = FakeDigestNotificationPlugin();
-      final container = ProviderContainer(
-        overrides: [
-          appDatabaseProvider.overrideWithValue(database),
-          clockProvider.overrideWithValue(Clock(() => currentTime)),
-          digestNotificationPluginProvider.overrideWithValue(plugin),
-        ],
-      )..read(digestRescheduleControllerProvider);
-      final householdId = await _awaitBootstrap(tester, container);
-      await tester.pump(digestRescheduleDebounce);
+  testWidgets('completing the last chore silences the entire horizon', (
+    tester,
+  ) async {
+    final currentTime = DateTime(2026, 1, 5, 7);
+    final database = AppDatabase(NativeDatabase.memory());
+    await HouseholdRepository(database).createLocalHousehold('Me');
+    final plugin = FakeDigestNotificationPlugin();
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(database),
+        clockProvider.overrideWithValue(Clock(() => currentTime)),
+        digestNotificationPluginProvider.overrideWithValue(plugin),
+      ],
+    )..read(digestRescheduleControllerProvider);
+    final householdId = await _awaitBootstrap(tester, container);
+    await tester.pump(digestRescheduleDebounce);
 
-      final service = container.read(choreServiceProvider);
-      final chore = await service.createChore(
-        householdId: householdId,
-        title: 'Call the plumber',
-        startDate: PlainDate(2026, 1, 5),
-        assignmentMode: AssignmentMode.anyone,
-      );
-      await tester.pump(digestRescheduleDebounce);
-      expect(plugin.pending, isNotEmpty);
+    final service = container.read(choreServiceProvider);
+    final chore = await service.createChore(
+      householdId: householdId,
+      title: 'Call the plumber',
+      startDate: PlainDate(2026, 1, 5),
+      assignmentMode: AssignmentMode.anyone,
+    );
+    await tester.pump(digestRescheduleDebounce);
+    expect(plugin.pending, isNotEmpty);
 
-      final pendingOccurrence = await container
-          .read(choreRepositoryProvider)
-          .pendingOccurrenceOf(chore.id);
-      // `completedBy` is a FK to `members`, so it must be a real member id
-      // (nullable in the schema, but not in this method's signature) —
-      // the household's admin member, same as `actingMemberProvider`
-      // resolves to.
-      await service.completeOccurrence(
-        pendingOccurrence!.id,
-        completedBy: container.read(actingMemberProvider)!.id,
-      );
-      await tester.pump(digestRescheduleDebounce);
+    final pendingOccurrence = await container
+        .read(choreRepositoryProvider)
+        .pendingOccurrenceOf(chore.id);
+    // `completedBy` is a FK to `members`, so it must be a real member id
+    // (nullable in the schema, but not in this method's signature) —
+    // the household's admin member, same as `actingMemberProvider`
+    // resolves to.
+    await service.completeOccurrence(
+      pendingOccurrence!.id,
+      completedBy: container.read(actingMemberProvider)!.id,
+    );
+    await tester.pump(digestRescheduleDebounce);
 
-      expect(
-        plugin.pending,
-        isEmpty,
-        reason: 'a one-off has no successor, so every day is now silent',
-      );
+    expect(
+      plugin.pending,
+      isEmpty,
+      reason: 'a one-off has no successor, so every day is now silent',
+    );
 
-      await _disposeAndClose(tester, container, database);
-    },
-  );
+    await _disposeAndClose(tester, container, database);
+  });
 
   testWidgets(
     'FIX A: a recompute paused mid-horizon does not interleave with a '

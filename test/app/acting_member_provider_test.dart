@@ -22,10 +22,7 @@ import '../features/settings/fake_auth_gateway.dart';
 /// container.read(x.future)` deadlocks under `flutter test`'s fake clock,
 /// so progress is nudged forward with repeated nonzero-duration
 /// `tester.pump()` calls instead.
-Future<void> _pumpUntil(
-  WidgetTester tester,
-  bool Function() condition,
-) async {
+Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
   for (var i = 0; i < 400; i++) {
     if (condition()) {
       return;
@@ -134,52 +131,46 @@ void main() {
     await database.close();
   });
 
-  testWidgets(
-    'falls back to the first admin when actingMemberId is dangling',
-    (tester) async {
-      final database = AppDatabase(NativeDatabase.memory());
-      // bootstrapProvider no longer creates a household (spec
-      // docs/specs/onboarding-v2.md §2) -- seed one directly on the
-      // database BEFORE the container exists.
-      await HouseholdRepository(database).createLocalHousehold('Me');
-      final container = ProviderContainer(
-        overrides: [
-          appDatabaseProvider.overrideWithValue(database),
-          clockProvider.overrideWithValue(
-            Clock.fixed(DateTime(2026, 7, 24, 9)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+  testWidgets('falls back to the first admin when actingMemberId is dangling', (
+    tester,
+  ) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly on the
+    // database BEFORE the container exists.
+    await HouseholdRepository(database).createLocalHousehold('Me');
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(database),
+        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 9))),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      // Poll instead of bare-awaiting bootstrap — see the first test.
-      await _pumpUntil(
-        tester,
-        () => container.read(bootstrapProvider).hasValue,
-      );
-      await _pumpUntil(
-        tester,
-        () =>
-            container.read(membersProvider).hasValue &&
-            container.read(settingsProvider).hasValue,
-      );
+    // Poll instead of bare-awaiting bootstrap — see the first test.
+    await _pumpUntil(tester, () => container.read(bootstrapProvider).hasValue);
+    await _pumpUntil(
+      tester,
+      () =>
+          container.read(membersProvider).hasValue &&
+          container.read(settingsProvider).hasValue,
+    );
 
-      // No member with this id exists in the household at all.
-      await container
-          .read(settingsRepositoryProvider)
-          .setActingMember('does-not-exist');
-      await _pumpUntil(
-        tester,
-        () =>
-            container.read(settingsProvider).value?.actingMemberId ==
-            'does-not-exist',
-      );
+    // No member with this id exists in the household at all.
+    await container
+        .read(settingsRepositoryProvider)
+        .setActingMember('does-not-exist');
+    await _pumpUntil(
+      tester,
+      () =>
+          container.read(settingsProvider).value?.actingMemberId ==
+          'does-not-exist',
+    );
 
-      expect(container.read(actingMemberProvider)?.name, 'Me');
+    expect(container.read(actingMemberProvider)?.name, 'Me');
 
-      await database.close();
-    },
-  );
+    await database.close();
+  });
 
   testWidgets(
     'a linked, signed-in device pins to the CLAIMED member, ignoring a '
@@ -221,11 +212,9 @@ void main() {
       // The device-scoped leftover this ticket exists to defeat: this phone
       // still thinks it is Anna.
       await container.read(settingsRepositoryProvider).setActingMember(anna.id);
-      await (database.update(
-        database.members,
-      )..where((tbl) => tbl.id.equals(me.id))).write(
-        const MembersCompanion(userId: Value('u-1')),
-      );
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u-1')));
       await SettingsRepository(database).setSyncLinked(
         householdId: householdId,
         linkedAt: DateTime.utc(2026, 7, 24),

@@ -163,10 +163,7 @@ class SettingsRow extends StatelessWidget {
         ),
       );
     } else if (switchChanged != null) {
-      trailing = Switch(
-        value: switchValue ?? false,
-        onChanged: switchChanged,
-      );
+      trailing = Switch(value: switchValue ?? false, onChanged: switchChanged);
     } else if (showChevron) {
       trailing = Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant);
     }

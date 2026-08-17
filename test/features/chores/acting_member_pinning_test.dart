@@ -78,11 +78,9 @@ void main() {
         database.members,
       )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();
 
-      await (database.update(
-        database.members,
-      )..where((tbl) => tbl.id.equals(me.id))).write(
-        const MembersCompanion(userId: Value('u-1')),
-      );
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u-1')));
       await SettingsRepository(
         database,
       ).setSyncLinked(householdId: householdId, linkedAt: today);

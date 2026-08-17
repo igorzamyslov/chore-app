@@ -24,10 +24,7 @@ void main() {
     final today = PlainDate(2026, 7, 22);
 
     test('today reads "Today"', () {
-      expect(
-        futureDueText(en, 'en', today: today, dueDate: today),
-        'Today',
-      );
+      expect(futureDueText(en, 'en', today: today, dueDate: today), 'Today');
     });
 
     test('tomorrow reads "Tomorrow"', () {
@@ -51,17 +48,14 @@ void main() {
       );
     });
 
-    test(
-      'the 8-day boundary switches to the locale-formatted date, not '
-      '"In 8 days"',
-      () {
-        final dueDate = today.addDays(8); // 2026-07-30, a Thursday.
-        expect(
-          futureDueText(en, 'en', today: today, dueDate: dueDate),
-          'Thu, Jul 30',
-        );
-      },
-    );
+    test('the 8-day boundary switches to the locale-formatted date, not '
+        '"In 8 days"', () {
+      final dueDate = today.addDays(8); // 2026-07-30, a Thursday.
+      expect(
+        futureDueText(en, 'en', today: today, dueDate: dueDate),
+        'Thu, Jul 30',
+      );
+    });
 
     test('a date far beyond a week uses the locale-formatted weekday+date', () {
       // 2026-07-31 is a Friday: matches the spec's own example verbatim.

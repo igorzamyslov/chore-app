@@ -67,9 +67,7 @@ class FakeSyncTransport implements SyncTransport {
       for (final row in serverRows[table]!)
         if (row[scopeColumn] == householdId &&
             (since == null ||
-                DateTime.parse(
-                  row['updated_at']! as String,
-                ).isAfter(since)))
+                DateTime.parse(row['updated_at']! as String).isAfter(since)))
           Map<String, Object?>.from(row),
     ];
   }

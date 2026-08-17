@@ -69,38 +69,35 @@ void main() {
 
   tearDown(() => db.close());
 
-  test(
-    'watchActiveItems orders unchecked-first, then category sort_order, '
-    'then name',
-    () async {
-      final catLow = await createCategory(
-        id: 'cat-low',
-        name: 'Produce',
-        sortOrder: 0,
-      );
-      final catHigh = await createCategory(
-        id: 'cat-high',
-        name: 'Dairy',
-        sortOrder: 1,
-      );
+  test('watchActiveItems orders unchecked-first, then category sort_order, '
+      'then name', () async {
+    final catLow = await createCategory(
+      id: 'cat-low',
+      name: 'Produce',
+      sortOrder: 0,
+    );
+    final catHigh = await createCategory(
+      id: 'cat-high',
+      name: 'Dairy',
+      sortOrder: 1,
+    );
 
-      await repo.addItem(householdId, name: 'Zucchini', categoryId: catLow.id);
-      await repo.addItem(householdId, name: 'Apples', categoryId: catLow.id);
-      final checkedItem = await repo.addItem(
-        householdId,
-        name: 'Bananas',
-        categoryId: catLow.id,
-      );
-      await repo.setChecked(checkedItem.id, checked: true);
-      await repo.addItem(householdId, name: 'Milk', categoryId: catHigh.id);
+    await repo.addItem(householdId, name: 'Zucchini', categoryId: catLow.id);
+    await repo.addItem(householdId, name: 'Apples', categoryId: catLow.id);
+    final checkedItem = await repo.addItem(
+      householdId,
+      name: 'Bananas',
+      categoryId: catLow.id,
+    );
+    await repo.setChecked(checkedItem.id, checked: true);
+    await repo.addItem(householdId, name: 'Milk', categoryId: catHigh.id);
 
-      final items = await repo.watchActiveItems(householdId).first;
-      expect(
-        [for (final i in items) i.item.name],
-        ['Apples', 'Zucchini', 'Milk', 'Bananas'],
-      );
-    },
-  );
+    final items = await repo.watchActiveItems(householdId).first;
+    expect(
+      [for (final i in items) i.item.name],
+      ['Apples', 'Zucchini', 'Milk', 'Bananas'],
+    );
+  });
 
   test('setChecked toggles checked_at', () async {
     final item = await repo.addItem(householdId, name: 'Bread');
@@ -124,34 +121,28 @@ void main() {
     expect((await row(uncheckedItem.id)).deletedAt, isNull);
 
     final active = await repo.watchActiveItems(householdId).first;
-    expect(
-      active.map((i) => i.item.id),
-      isNot(contains(checkedItem.id)),
-    );
+    expect(active.map((i) => i.item.id), isNot(contains(checkedItem.id)));
     expect(active.map((i) => i.item.id), contains(uncheckedItem.id));
   });
 
-  test(
-    'restoreItems (T1.4 undo) restores exactly the given ids, not every '
-    'soft-deleted item',
-    () async {
-      final a = await repo.addItem(householdId, name: 'A');
-      final b = await repo.addItem(householdId, name: 'B');
-      final unrelated = await repo.addItem(householdId, name: 'C');
-      await repo.setChecked(a.id, checked: true);
-      await repo.setChecked(b.id, checked: true);
-      await repo.clearChecked(householdId);
-      // Deleted independently of the clear -- restoreItems must never
-      // touch this one even though it's also soft-deleted right now.
-      await repo.deleteItem(unrelated.id);
+  test('restoreItems (T1.4 undo) restores exactly the given ids, not every '
+      'soft-deleted item', () async {
+    final a = await repo.addItem(householdId, name: 'A');
+    final b = await repo.addItem(householdId, name: 'B');
+    final unrelated = await repo.addItem(householdId, name: 'C');
+    await repo.setChecked(a.id, checked: true);
+    await repo.setChecked(b.id, checked: true);
+    await repo.clearChecked(householdId);
+    // Deleted independently of the clear -- restoreItems must never
+    // touch this one even though it's also soft-deleted right now.
+    await repo.deleteItem(unrelated.id);
 
-      await repo.restoreItems([a.id, b.id]);
+    await repo.restoreItems([a.id, b.id]);
 
-      expect((await row(a.id)).deletedAt, isNull);
-      expect((await row(b.id)).deletedAt, isNull);
-      expect((await row(unrelated.id)).deletedAt, isNotNull);
-    },
-  );
+    expect((await row(a.id)).deletedAt, isNull);
+    expect((await row(b.id)).deletedAt, isNull);
+    expect((await row(unrelated.id)).deletedAt, isNotNull);
+  });
 
   test('restoreItems is a no-op for an empty id list', () async {
     final item = await repo.addItem(householdId, name: 'A');
@@ -164,11 +155,7 @@ void main() {
   });
 
   test('updateItem supports the Value-wrapped nullable fields', () async {
-    final item = await repo.addItem(
-      householdId,
-      name: 'A',
-      quantityNote: 'x2',
-    );
+    final item = await repo.addItem(householdId, name: 'A', quantityNote: 'x2');
 
     await repo.updateItem(item.id, name: 'A renamed');
     expect((await row(item.id)).quantityNote, 'x2');
@@ -200,63 +187,49 @@ void main() {
   });
 
   group('clearCheckedOlderThan', () {
-    test(
-      'soft-deletes an active checked item whose checked_at is older than '
-      'the cutoff (checked 25h ago, 24h cutoff)',
-      () async {
-        final item = await repo.addItem(householdId, name: 'Milk');
-        await repo.setChecked(item.id, checked: true);
-        await (db.update(db.shoppingItems)..where(
-              (tbl) => tbl.id.equals(item.id),
-            ))
-            .write(
-              ShoppingItemsCompanion(
-                checkedAt: Value(
-                  clock
-                      .call()
-                      .subtract(const Duration(hours: 25))
-                      .toIso8601String(),
-                ),
-              ),
-            );
+    test('soft-deletes an active checked item whose checked_at is older than '
+        'the cutoff (checked 25h ago, 24h cutoff)', () async {
+      final item = await repo.addItem(householdId, name: 'Milk');
+      await repo.setChecked(item.id, checked: true);
+      await (db.update(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(item.id))).write(
+        ShoppingItemsCompanion(
+          checkedAt: Value(
+            clock.call().subtract(const Duration(hours: 25)).toIso8601String(),
+          ),
+        ),
+      );
 
-        await repo.clearCheckedOlderThan(
-          householdId,
-          cutoffUtc: clock.call().subtract(const Duration(hours: 24)),
-        );
+      await repo.clearCheckedOlderThan(
+        householdId,
+        cutoffUtc: clock.call().subtract(const Duration(hours: 24)),
+      );
 
-        expect((await row(item.id)).deletedAt, isNotNull);
-      },
-    );
+      expect((await row(item.id)).deletedAt, isNotNull);
+    });
 
-    test(
-      'keeps an active checked item whose checked_at is within the cutoff '
-      'window (checked 23h ago, 24h cutoff)',
-      () async {
-        final item = await repo.addItem(householdId, name: 'Milk');
-        await repo.setChecked(item.id, checked: true);
-        await (db.update(db.shoppingItems)..where(
-              (tbl) => tbl.id.equals(item.id),
-            ))
-            .write(
-              ShoppingItemsCompanion(
-                checkedAt: Value(
-                  clock
-                      .call()
-                      .subtract(const Duration(hours: 23))
-                      .toIso8601String(),
-                ),
-              ),
-            );
+    test('keeps an active checked item whose checked_at is within the cutoff '
+        'window (checked 23h ago, 24h cutoff)', () async {
+      final item = await repo.addItem(householdId, name: 'Milk');
+      await repo.setChecked(item.id, checked: true);
+      await (db.update(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(item.id))).write(
+        ShoppingItemsCompanion(
+          checkedAt: Value(
+            clock.call().subtract(const Duration(hours: 23)).toIso8601String(),
+          ),
+        ),
+      );
 
-        await repo.clearCheckedOlderThan(
-          householdId,
-          cutoffUtc: clock.call().subtract(const Duration(hours: 24)),
-        );
+      await repo.clearCheckedOlderThan(
+        householdId,
+        cutoffUtc: clock.call().subtract(const Duration(hours: 24)),
+      );
 
-        expect((await row(item.id)).deletedAt, isNull);
-      },
-    );
+      expect((await row(item.id)).deletedAt, isNull);
+    });
 
     test('leaves unchecked items alone regardless of cutoff', () async {
       final item = await repo.addItem(householdId, name: 'Bread');
@@ -294,22 +267,19 @@ void main() {
   });
 
   group('suggestions', () {
-    test(
-      'ranks by frequency first, then recency, deduplicating by '
-      'normalized name',
-      () async {
-        // "Milk" added twice (frequency 2), "Milkshake" once (frequency 1)
-        // but most recent overall — frequency must still win.
-        await repo.addItem(householdId, name: 'Milk');
-        clock.advance(const Duration(minutes: 1));
-        await repo.addItem(householdId, name: 'milk');
-        clock.advance(const Duration(minutes: 1));
-        await repo.addItem(householdId, name: 'Milkshake');
+    test('ranks by frequency first, then recency, deduplicating by '
+        'normalized name', () async {
+      // "Milk" added twice (frequency 2), "Milkshake" once (frequency 1)
+      // but most recent overall — frequency must still win.
+      await repo.addItem(householdId, name: 'Milk');
+      clock.advance(const Duration(minutes: 1));
+      await repo.addItem(householdId, name: 'milk');
+      clock.advance(const Duration(minutes: 1));
+      await repo.addItem(householdId, name: 'Milkshake');
 
-        final results = await repo.suggestions(householdId, 'mil');
-        expect(results.map((s) => s.name), ['milk', 'Milkshake']);
-      },
-    );
+      final results = await repo.suggestions(householdId, 'mil');
+      expect(results.map((s) => s.name), ['milk', 'Milkshake']);
+    });
 
     test(
       'among equal frequency, ranks the more recently-created name first',
@@ -334,26 +304,23 @@ void main() {
       },
     );
 
-    test(
-      'resolves the most recent non-null category, even if a later row '
-      'had none',
-      () async {
-        final dairy = await createCategory(
-          id: 'dairy',
-          name: 'Dairy',
-          sortOrder: 0,
-        );
-        await repo.addItem(householdId, name: 'Milk', categoryId: dairy.id);
-        clock.advance(const Duration(minutes: 1));
-        // Most recent row for "milk" has no category; the earlier one does.
-        await repo.addItem(householdId, name: 'Milk');
+    test('resolves the most recent non-null category, even if a later row '
+        'had none', () async {
+      final dairy = await createCategory(
+        id: 'dairy',
+        name: 'Dairy',
+        sortOrder: 0,
+      );
+      await repo.addItem(householdId, name: 'Milk', categoryId: dairy.id);
+      clock.advance(const Duration(minutes: 1));
+      // Most recent row for "milk" has no category; the earlier one does.
+      await repo.addItem(householdId, name: 'Milk');
 
-        final results = await repo.suggestions(householdId, 'milk');
-        expect(results, hasLength(1));
-        expect(results.single.categoryId, dairy.id);
-        expect(results.single.category?.name, 'Dairy');
-      },
-    );
+      final results = await repo.suggestions(householdId, 'milk');
+      expect(results, hasLength(1));
+      expect(results.single.categoryId, dairy.id);
+      expect(results.single.category?.name, 'Dairy');
+    });
 
     test('matches only names starting with the (normalized) prefix', () async {
       await repo.addItem(householdId, name: 'Milk');
@@ -379,100 +346,88 @@ void main() {
     });
   });
 
-  group(
-    'suggestions — empty-prefix (focus) deleted-vs-cleared rule '
-    '(field feedback round 2, bug 1)',
-    () {
-      test(
-        'excludes a name whose most recent row was deleted while still '
-        'unchecked — explicitly removed without ever being bought',
-        () async {
-          final item = await repo.addItem(householdId, name: 'Milk');
-          await repo.deleteItem(item.id); // never checked first
+  group('suggestions — empty-prefix (focus) deleted-vs-cleared rule '
+      '(field feedback round 2, bug 1)', () {
+    test('excludes a name whose most recent row was deleted while still '
+        'unchecked — explicitly removed without ever being bought', () async {
+      final item = await repo.addItem(householdId, name: 'Milk');
+      await repo.deleteItem(item.id); // never checked first
 
-          final results = await repo.suggestions(householdId, '');
-          expect(results.map((s) => s.name), isNot(contains('Milk')));
-        },
-      );
+      final results = await repo.suggestions(householdId, '');
+      expect(results.map((s) => s.name), isNot(contains('Milk')));
+    });
 
-      test(
-        'still proposes a name whose most recent row was checked THEN '
-        'deleted — cleared after shopping via clearChecked',
-        () async {
-          final item = await repo.addItem(householdId, name: 'Milk');
-          await repo.setChecked(item.id, checked: true);
-          await repo.deleteItem(item.id);
+    test('still proposes a name whose most recent row was checked THEN '
+        'deleted — cleared after shopping via clearChecked', () async {
+      final item = await repo.addItem(householdId, name: 'Milk');
+      await repo.setChecked(item.id, checked: true);
+      await repo.deleteItem(item.id);
 
-          final results = await repo.suggestions(householdId, '');
-          expect(results.map((s) => s.name), contains('Milk'));
-        },
-      );
+      final results = await repo.suggestions(householdId, '');
+      expect(results.map((s) => s.name), contains('Milk'));
+    });
 
-      test(
-        're-adding a name after it was deleted-while-unchecked makes it '
-        'eligible again, since only the MOST RECENT row is looked at',
-        () async {
-          final first = await repo.addItem(householdId, name: 'Milk');
-          await repo.deleteItem(first.id); // explicit removal, excluded
-          clock.advance(const Duration(minutes: 1));
+    test(
+      're-adding a name after it was deleted-while-unchecked makes it '
+      'eligible again, since only the MOST RECENT row is looked at',
+      () async {
+        final first = await repo.addItem(householdId, name: 'Milk');
+        await repo.deleteItem(first.id); // explicit removal, excluded
+        clock.advance(const Duration(minutes: 1));
 
-          expect(
-            (await repo.suggestions(householdId, '')).map((s) => s.name),
-            isNot(contains('Milk')),
-          );
+        expect(
+          (await repo.suggestions(householdId, '')).map((s) => s.name),
+          isNot(contains('Milk')),
+        );
 
-          // Re-added, then bought and cleared: the newest row is now
-          // checked-then-deleted, which stays eligible — the earlier
-          // explicit deletion no longer matters.
-          final second = await repo.addItem(householdId, name: 'Milk');
-          await repo.setChecked(second.id, checked: true);
-          await repo.deleteItem(second.id);
+        // Re-added, then bought and cleared: the newest row is now
+        // checked-then-deleted, which stays eligible — the earlier
+        // explicit deletion no longer matters.
+        final second = await repo.addItem(householdId, name: 'Milk');
+        await repo.setChecked(second.id, checked: true);
+        await repo.deleteItem(second.id);
 
-          expect(
-            (await repo.suggestions(householdId, '')).map((s) => s.name),
-            contains('Milk'),
-          );
-        },
-      );
+        expect(
+          (await repo.suggestions(householdId, '')).map((s) => s.name),
+          contains('Milk'),
+        );
+      },
+    );
 
-      test(
-        'a name with an older ACTIVE row is never proposed, even when its '
-        'most recent row was cleared after shopping — "already on the '
-        'list" is checked against every row, not just the newest one',
-        () async {
-          // B3 duplicate prevention (a UI-level guard) normally makes this
-          // shape unreachable; the repository must not depend on that.
-          final active = await repo.addItem(householdId, name: 'Milk');
-          clock.advance(const Duration(minutes: 1));
-          final newer = await repo.addItem(householdId, name: 'Milk');
-          await repo.setChecked(newer.id, checked: true);
-          await repo.deleteItem(newer.id);
+    test(
+      'a name with an older ACTIVE row is never proposed, even when its '
+      'most recent row was cleared after shopping — "already on the '
+      'list" is checked against every row, not just the newest one',
+      () async {
+        // B3 duplicate prevention (a UI-level guard) normally makes this
+        // shape unreachable; the repository must not depend on that.
+        final active = await repo.addItem(householdId, name: 'Milk');
+        clock.advance(const Duration(minutes: 1));
+        final newer = await repo.addItem(householdId, name: 'Milk');
+        await repo.setChecked(newer.id, checked: true);
+        await repo.deleteItem(newer.id);
 
-          expect(active.deletedAt, isNull, reason: 'still on the list');
-          expect(
-            (await repo.suggestions(householdId, '')).map((s) => s.name),
-            isNot(contains('Milk')),
-          );
-        },
-      );
+        expect(active.deletedAt, isNull, reason: 'still on the list');
+        expect(
+          (await repo.suggestions(householdId, '')).map((s) => s.name),
+          isNot(contains('Milk')),
+        );
+      },
+    );
 
-      test(
-        'the deleted-while-unchecked exclusion does not apply on the '
-        'type-ahead (non-empty prefix) path',
-        () async {
-          final removed = await repo.addItem(householdId, name: 'Milk');
-          await repo.deleteItem(removed.id); // never checked
-          clock.advance(const Duration(minutes: 1));
-          final cleared = await repo.addItem(householdId, name: 'Mint');
-          await repo.setChecked(cleared.id, checked: true);
-          await repo.deleteItem(cleared.id);
+    test('the deleted-while-unchecked exclusion does not apply on the '
+        'type-ahead (non-empty prefix) path', () async {
+      final removed = await repo.addItem(householdId, name: 'Milk');
+      await repo.deleteItem(removed.id); // never checked
+      clock.advance(const Duration(minutes: 1));
+      final cleared = await repo.addItem(householdId, name: 'Mint');
+      await repo.setChecked(cleared.id, checked: true);
+      await repo.deleteItem(cleared.id);
 
-          final results = await repo.suggestions(householdId, 'mi');
-          expect(results.map((s) => s.name), containsAll(['Milk', 'Mint']));
-        },
-      );
-    },
-  );
+      final results = await repo.suggestions(householdId, 'mi');
+      expect(results.map((s) => s.name), containsAll(['Milk', 'Mint']));
+    });
+  });
 
   group('findActiveByNormalizedName', () {
     test('matches active items regardless of case/whitespace', () async {
@@ -499,10 +454,7 @@ void main() {
       final item = await repo.addItem(householdId, name: 'Milk');
       await repo.setChecked(item.id, checked: true);
 
-      final found = await repo.findActiveByNormalizedName(
-        householdId,
-        'milk',
-      );
+      final found = await repo.findActiveByNormalizedName(householdId, 'milk');
       expect(found?.item.id, item.id);
       expect(found?.item.checkedAt, isNotNull);
     });
@@ -537,28 +489,22 @@ void main() {
       );
     });
 
-    test(
-      'falls back to an earlier non-null category when the most recent '
-      'row has none',
-      () async {
-        final dairy = await createCategory(
-          id: 'dairy',
-          name: 'Dairy',
-          sortOrder: 0,
-        );
-        await repo.addItem(householdId, name: 'Milk', categoryId: dairy.id);
-        clock.advance(const Duration(minutes: 1));
-        await repo.addItem(householdId, name: 'Milk');
+    test('falls back to an earlier non-null category when the most recent '
+        'row has none', () async {
+      final dairy = await createCategory(
+        id: 'dairy',
+        name: 'Dairy',
+        sortOrder: 0,
+      );
+      await repo.addItem(householdId, name: 'Milk', categoryId: dairy.id);
+      clock.advance(const Duration(minutes: 1));
+      await repo.addItem(householdId, name: 'Milk');
 
-        expect(
-          await repo.mostRecentCategoryIdForNormalizedName(
-            householdId,
-            'milk',
-          ),
-          dairy.id,
-        );
-      },
-    );
+      expect(
+        await repo.mostRecentCategoryIdForNormalizedName(householdId, 'milk'),
+        dairy.id,
+      );
+    });
 
     test('includes soft-deleted rows from history', () async {
       final dairy = await createCategory(

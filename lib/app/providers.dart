@@ -590,9 +590,7 @@ final pendingOccurrencesProvider = StreamProvider<List<OccurrenceWithChore>>((
   final householdId = await ref.watch(bootstrapProvider.future);
   yield* ref
       .watch(choreRepositoryProvider)
-      .watchPendingOccurrences(
-        householdId,
-      );
+      .watchPendingOccurrences(householdId);
 });
 
 /// Occurrences of the bootstrap household closed (done or skipped) today,

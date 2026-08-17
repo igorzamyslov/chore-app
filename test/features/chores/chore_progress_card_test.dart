@@ -261,10 +261,7 @@ void main() {
 
       // No filter yet: no filter-active line.
       expect(find.text('0 of 1 done today'), findsOneWidget);
-      expect(
-        find.text('Filtered — not the whole household'),
-        findsNothing,
-      );
+      expect(find.text('Filtered — not the whole household'), findsNothing);
 
       // Filter to Me: the occurrence still matches, so the sentence is
       // unchanged, but the card now discloses that a filter is active.
@@ -273,20 +270,14 @@ void main() {
       await tapMenuEntry(tester, 'Me');
 
       expect(find.text('0 of 1 done today'), findsOneWidget);
-      expect(
-        find.text('Filtered — not the whole household'),
-        findsOneWidget,
-      );
+      expect(find.text('Filtered — not the whole household'), findsOneWidget);
 
       // Reset: the line disappears again.
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
       await tapMenuEntry(tester, 'All members');
 
-      expect(
-        find.text('Filtered — not the whole household'),
-        findsNothing,
-      );
+      expect(find.text('Filtered — not the whole household'), findsNothing);
 
       handle.dispose();
     },

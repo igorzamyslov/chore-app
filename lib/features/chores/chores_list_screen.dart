@@ -871,11 +871,7 @@ class _EmptyStateIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: famdoColors(context).primaryOutline),
       ),
-      child: Icon(
-        icon,
-        size: 36,
-        color: theme.colorScheme.onPrimaryContainer,
-      ),
+      child: Icon(icon, size: 36, color: theme.colorScheme.onPrimaryContainer),
     );
   }
 }

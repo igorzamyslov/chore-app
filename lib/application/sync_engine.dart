@@ -616,14 +616,10 @@ class SupabaseSyncEngine implements SyncEngine {
     final choreHouseholdIds = {
       for (final chore in chores) chore.id: chore.householdId,
     };
-    await transport.upsertRows(
-      'chore_assignees',
-      [
-        for (final assignee in dirty)
-          choreAssigneeRow(assignee, choreHouseholdIds),
-      ],
-      onConflict: 'chore_id,member_id',
-    );
+    await transport.upsertRows('chore_assignees', [
+      for (final assignee in dirty)
+        choreAssigneeRow(assignee, choreHouseholdIds),
+    ], onConflict: 'chore_id,member_id');
     for (final assignee in dirty) {
       await _sync.clearChoreAssigneeDirty(
         assignee.choreId,

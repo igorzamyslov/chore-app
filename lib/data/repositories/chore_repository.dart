@@ -447,10 +447,8 @@ class ChoreRepository {
                 tbl.status.equalsValue(OccurrenceStatus.pending).not(),
           )
           ..orderBy([
-            (tbl) => OrderingTerm(
-              expression: tbl.closedOn,
-              mode: OrderingMode.desc,
-            ),
+            (tbl) =>
+                OrderingTerm(expression: tbl.closedOn, mode: OrderingMode.desc),
             (tbl) =>
                 OrderingTerm(expression: tbl.dueDate, mode: OrderingMode.desc),
           ])
@@ -552,9 +550,7 @@ class ChoreRepository {
             db.chores.householdId.equals(householdId) &
                 db.chores.deletedAt.isNull() &
                 db.choreOccurrences.closedOn.equalsValue(date) &
-                (db.choreOccurrences.status.equalsValue(
-                      OccurrenceStatus.done,
-                    ) |
+                (db.choreOccurrences.status.equalsValue(OccurrenceStatus.done) |
                     db.choreOccurrences.status.equalsValue(
                       OccurrenceStatus.skipped,
                     )),

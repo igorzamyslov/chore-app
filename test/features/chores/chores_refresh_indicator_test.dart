@@ -16,6 +16,7 @@ library;
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../application/fake_sync_transport.dart';
@@ -45,6 +46,21 @@ Future<void> _pumpUntilRefreshIndicator(
   throw StateError(
     'chores.refresh never became ${expectPresent ? 'present' : 'absent'}',
   );
+}
+
+/// Fires `_refresh` through the `RefreshIndicator`'s own callback rather
+/// than a drag gesture -- the same widget `chores.refresh` already wraps, so
+/// this exercises the production code path without depending on fling
+/// physics.
+Future<void> _triggerRefresh(WidgetTester tester) async {
+  final indicator = tester.widget<RefreshIndicator>(
+    find.descendant(
+      of: find.bySemanticsIdentifier('chores.refresh'),
+      matching: find.byType(RefreshIndicator),
+    ),
+  );
+  await indicator.onRefresh();
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -87,6 +103,38 @@ void main() {
 
       await _pumpUntilRefreshIndicator(tester, expectPresent: true);
       expect(find.bySemanticsIdentifier('chores.refresh'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a pull-to-refresh that discovers revocation shows the revoked-specific '
+    "string, not syncRefreshError's now-inaccurate \"will sync later\" "
+    '(carried finding, docs/handover-2026-08-14-planning.md §4)',
+    today: today,
+    overrides: [
+      syncTransportProvider.overrideWithValue(
+        FakeSyncTransport()..membershipPresent = false,
+      ),
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.now());
+      await _pumpUntilRefreshIndicator(tester, expectPresent: true);
+
+      await _triggerRefresh(tester);
+
+      expect(find.textContaining('so nothing will sync'), findsOneWidget);
+      expect(find.textContaining('will sync later'), findsNothing);
 
       handle.dispose();
     },

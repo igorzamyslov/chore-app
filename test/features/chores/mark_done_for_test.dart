@@ -28,11 +28,9 @@ Future<void> _linkAndClaim(
   required String memberId,
   required DateTime now,
 }) async {
-  await (database.update(
-    database.members,
-  )..where((tbl) => tbl.id.equals(memberId))).write(
-    const MembersCompanion(userId: Value('u-1')),
-  );
+  await (database.update(database.members)
+        ..where((tbl) => tbl.id.equals(memberId)))
+      .write(const MembersCompanion(userId: Value('u-1')));
   await SettingsRepository(
     database,
   ).setSyncLinked(householdId: householdId, linkedAt: now);
@@ -139,9 +137,8 @@ void main() {
         findsNothing,
       );
       final closed =
-          await (database.select(
-                database.choreOccurrences,
-              )..where((tbl) => tbl.status.equalsValue(OccurrenceStatus.done)))
+          await (database.select(database.choreOccurrences)
+                ..where((tbl) => tbl.status.equalsValue(OccurrenceStatus.done)))
               .getSingle();
       expect(closed.completedBy, me.id);
 
@@ -240,9 +237,8 @@ void main() {
 
       // Credited to Anna...
       final closed =
-          await (database.select(
-                database.choreOccurrences,
-              )..where((tbl) => tbl.status.equalsValue(OccurrenceStatus.done)))
+          await (database.select(database.choreOccurrences)
+                ..where((tbl) => tbl.status.equalsValue(OccurrenceStatus.done)))
               .getSingle();
       expect(closed.completedBy, anna.id);
       expect(find.text('Done — credited to Anna'), findsOneWidget);

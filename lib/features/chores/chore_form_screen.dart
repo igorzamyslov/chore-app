@@ -235,10 +235,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     // clears `categoryId` on every chore referencing it in the same
     // transaction; this covers the in-memory, not-yet-saved case that
     // cascade can't reach.
-    ref.listen<AsyncValue<List<Category>>>(choreCategoriesProvider, (
-      _,
-      next,
-    ) {
+    ref.listen<AsyncValue<List<Category>>>(choreCategoriesProvider, (_, next) {
       final active = next.value;
       if (active == null) {
         return;

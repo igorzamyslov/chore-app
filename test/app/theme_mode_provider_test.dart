@@ -110,10 +110,7 @@ void main() {
         tester,
         () => container.read(bootstrapProvider).hasValue,
       );
-      await _pumpUntil(
-        tester,
-        () => container.read(settingsProvider).hasValue,
-      );
+      await _pumpUntil(tester, () => container.read(settingsProvider).hasValue);
       // Confirms the NULL branch specifically, not just "not loaded yet".
       expect(container.read(settingsProvider).value?.themeMode, isNull);
 
@@ -123,38 +120,30 @@ void main() {
     },
   );
 
-  testWidgets(
-    "an unknown stored value ('sepia') maps to ThemeMode.system "
-    '(future-proofing)',
-    (tester) async {
-      final database = AppDatabase(NativeDatabase.memory());
-      // bootstrapProvider no longer creates a household (spec
-      // docs/specs/onboarding-v2.md §2) -- seed one directly on the
-      // database BEFORE the container exists.
-      await HouseholdRepository(database).createLocalHousehold('Me');
-      final container = ProviderContainer(
-        overrides: [
-          appDatabaseProvider.overrideWithValue(database),
-          clockProvider.overrideWithValue(
-            Clock.fixed(DateTime(2026, 7, 24, 9)),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+  testWidgets("an unknown stored value ('sepia') maps to ThemeMode.system "
+      '(future-proofing)', (tester) async {
+    final database = AppDatabase(NativeDatabase.memory());
+    // bootstrapProvider no longer creates a household (spec
+    // docs/specs/onboarding-v2.md §2) -- seed one directly on the
+    // database BEFORE the container exists.
+    await HouseholdRepository(database).createLocalHousehold('Me');
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(database),
+        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 9))),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await _pumpUntil(
-        tester,
-        () => container.read(bootstrapProvider).hasValue,
-      );
-      await container.read(settingsRepositoryProvider).setThemeMode('sepia');
-      await _pumpUntil(
-        tester,
-        () => container.read(settingsProvider).value?.themeMode == 'sepia',
-      );
+    await _pumpUntil(tester, () => container.read(bootstrapProvider).hasValue);
+    await container.read(settingsRepositoryProvider).setThemeMode('sepia');
+    await _pumpUntil(
+      tester,
+      () => container.read(settingsProvider).value?.themeMode == 'sepia',
+    );
 
-      expect(container.read(themeModeProvider), ThemeMode.system);
+    expect(container.read(themeModeProvider), ThemeMode.system);
 
-      await database.close();
-    },
-  );
+    await database.close();
+  });
 }

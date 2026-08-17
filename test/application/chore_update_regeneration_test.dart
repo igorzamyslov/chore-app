@@ -85,58 +85,50 @@ void main() {
   }
 
   group('changed recurrence', () {
-    test(
-      "regenerates the pending occurrence at the new rule's due date, "
-      'deleting (not closing) the old one',
-      () async {
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Weekly-ish',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-          recurrence: Recurrence.everyNDays(7),
-        );
-        final before = await repo.pendingOccurrenceOf(chore.id);
-        expect(before!.dueDate, PlainDate(2026, 1, 1));
+    test("regenerates the pending occurrence at the new rule's due date, "
+        'deleting (not closing) the old one', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Weekly-ish',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(7),
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
+      expect(before!.dueDate, PlainDate(2026, 1, 1));
 
-        await serviceOn(PlainDate(2026, 1, 3)).updateChore(
-          chore.id,
-          recurrence: Value(Recurrence.everyNDays(3)),
-        );
+      await serviceOn(
+        PlainDate(2026, 1, 3),
+      ).updateChore(chore.id, recurrence: Value(Recurrence.everyNDays(3)));
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.id, isNot(before.id));
-        // Every-3-days series from 2026-01-01: 01-01, 01-04, 01-07... The
-        // first slot >= today (01-03, since nothing was ever closed) is
-        // 01-04.
-        expect(pending.dueDate, PlainDate(2026, 1, 4));
-        // Deleted, not closed: no missed/done/skipped history was created.
-        expect(await repo.latestClosedOccurrence(chore.id), isNull);
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, isNot(before.id));
+      // Every-3-days series from 2026-01-01: 01-01, 01-04, 01-07... The
+      // first slot >= today (01-03, since nothing was ever closed) is
+      // 01-04.
+      expect(pending.dueDate, PlainDate(2026, 1, 4));
+      // Deleted, not closed: no missed/done/skipped history was created.
+      expect(await repo.latestClosedOccurrence(chore.id), isNull);
+    });
 
-    test(
-      'converting a one-off into a recurring chore inserts a fresh '
-      'occurrence per the new rule',
-      () async {
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'One-off turned weekly',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-        );
+    test('converting a one-off into a recurring chore inserts a fresh '
+        'occurrence per the new rule', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off turned weekly',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
 
-        await serviceOn(PlainDate(2026, 1, 2)).updateChore(
-          chore.id,
-          recurrence: Value(Recurrence.everyNDays(5)),
-        );
+      await serviceOn(
+        PlainDate(2026, 1, 2),
+      ).updateChore(chore.id, recurrence: Value(Recurrence.everyNDays(5)));
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        // Every-5-days series from 2026-01-01: 01-01, 01-06, 01-11... The
-        // first slot >= today (01-02) is 01-06.
-        expect(pending!.dueDate, PlainDate(2026, 1, 6));
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      // Every-5-days series from 2026-01-01: 01-01, 01-06, 01-11... The
+      // first slot >= today (01-02) is 01-06.
+      expect(pending!.dueDate, PlainDate(2026, 1, 6));
+    });
   });
 
   group('changed start date', () {
@@ -162,168 +154,153 @@ void main() {
       },
     );
 
-    test(
-      'a new start date already in the past regenerates due today, not '
-      'the past date',
-      () async {
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Future one-off',
-          startDate: PlainDate(2026, 1, 10),
-          assignmentMode: AssignmentMode.anyone,
-        );
+    test('a new start date already in the past regenerates due today, not '
+        'the past date', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Future one-off',
+        startDate: PlainDate(2026, 1, 10),
+        assignmentMode: AssignmentMode.anyone,
+      );
 
-        await serviceOn(
-          PlainDate(2026, 1, 15),
-        ).updateChore(chore.id, startDate: PlainDate(2026, 1, 5));
+      await serviceOn(
+        PlainDate(2026, 1, 15),
+      ).updateChore(chore.id, startDate: PlainDate(2026, 1, 5));
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.dueDate, PlainDate(2026, 1, 15));
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.dueDate, PlainDate(2026, 1, 15));
+    });
   });
 
   group('unchanged edit', () {
-    test(
-      'an edit touching neither recurrence nor startDate leaves the '
-      'pending occurrence and its assignee untouched',
-      () async {
-        final m1 = await _insertMember(db, 'm1', householdId);
-        final m2 = await _insertMember(db, 'm2', householdId);
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Rotation',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.rotation,
-          recurrence: Recurrence.everyNDays(1),
-          assigneeMemberIds: [m1, m2],
-        );
-        final before = await repo.pendingOccurrenceOf(chore.id);
+    test('an edit touching neither recurrence nor startDate leaves the '
+        'pending occurrence and its assignee untouched', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Rotation',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.rotation,
+        recurrence: Recurrence.everyNDays(1),
+        assigneeMemberIds: [m1, m2],
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
 
-        await serviceOn(
-          PlainDate(2026, 1, 5),
-        ).updateChore(chore.id, title: 'Rotation (renamed)');
+      await serviceOn(
+        PlainDate(2026, 1, 5),
+      ).updateChore(chore.id, title: 'Rotation (renamed)');
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.id, before!.id);
-        expect(pending.dueDate, before.dueDate);
-        expect(pending.assignedMemberId, before.assignedMemberId);
-        final details = await repo.getChore(chore.id);
-        expect(details!.chore.title, 'Rotation (renamed)');
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, before!.id);
+      expect(pending.dueDate, before.dueDate);
+      expect(pending.assignedMemberId, before.assignedMemberId);
+      final details = await repo.getChore(chore.id);
+      expect(details!.chore.title, 'Rotation (renamed)');
+    });
 
-    test(
-      'changing assignmentMode/assignees alone (no recurrence/startDate '
-      'change) still leaves the pending occurrence untouched',
-      () async {
-        final m1 = await _insertMember(db, 'm1', householdId);
-        final m2 = await _insertMember(db, 'm2', householdId);
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Fixed',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.fixed,
-          recurrence: Recurrence.everyNDays(1),
-          assigneeMemberIds: [m1],
-        );
-        final before = await repo.pendingOccurrenceOf(chore.id);
-        expect(before!.assignedMemberId, m1);
+    test('changing assignmentMode/assignees alone (no recurrence/startDate '
+        'change) still leaves the pending occurrence untouched', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Fixed',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.fixed,
+        recurrence: Recurrence.everyNDays(1),
+        assigneeMemberIds: [m1],
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
+      expect(before!.assignedMemberId, m1);
 
-        await serviceOn(PlainDate(2026, 1, 5)).updateChore(
-          chore.id,
-          assignmentMode: AssignmentMode.fixed,
-          assigneeMemberIds: [m2],
-        );
+      await serviceOn(PlainDate(2026, 1, 5)).updateChore(
+        chore.id,
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [m2],
+      );
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.id, before.id);
-        // The occurrence itself is untouched even though the chore's
-        // assignee list changed underneath it.
-        expect(pending.assignedMemberId, m1);
-        final details = await repo.getChore(chore.id);
-        expect(details!.assigneeMemberIds, [m2]);
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, before.id);
+      // The occurrence itself is untouched even though the chore's
+      // assignee list changed underneath it.
+      expect(pending.assignedMemberId, m1);
+      final details = await repo.getChore(chore.id);
+      expect(details!.assigneeMemberIds, [m2]);
+    });
 
-    test(
-      'reordering a rotation (same members, new order) leaves the current '
-      "occurrence's assignee untouched, but the NEXT turn follows the new "
-      'order',
-      () async {
-        final m1 = await _insertMember(db, 'm1', householdId);
-        final m2 = await _insertMember(db, 'm2', householdId);
-        final m3 = await _insertMember(db, 'm3', householdId);
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Dishes',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.rotation,
-          recurrence: Recurrence.everyNDays(1),
-          assigneeMemberIds: [m1, m2, m3],
-        );
-        final before = await repo.pendingOccurrenceOf(chore.id);
-        expect(before!.assignedMemberId, m1);
+    test('reordering a rotation (same members, new order) leaves the current '
+        "occurrence's assignee untouched, but the NEXT turn follows the new "
+        'order', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final m3 = await _insertMember(db, 'm3', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.rotation,
+        recurrence: Recurrence.everyNDays(1),
+        assigneeMemberIds: [m1, m2, m3],
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
+      expect(before!.assignedMemberId, m1);
 
-        // Swap m2 and m3 -- m1 stays first, so the CURRENT occurrence's
-        // assignee (m1) is unaffected either way; only the order after m1
-        // changes.
-        await serviceOn(PlainDate(2026, 1, 2)).updateChore(
-          chore.id,
-          assignmentMode: AssignmentMode.rotation,
-          assigneeMemberIds: [m1, m3, m2],
-        );
+      // Swap m2 and m3 -- m1 stays first, so the CURRENT occurrence's
+      // assignee (m1) is unaffected either way; only the order after m1
+      // changes.
+      await serviceOn(PlainDate(2026, 1, 2)).updateChore(
+        chore.id,
+        assignmentMode: AssignmentMode.rotation,
+        assigneeMemberIds: [m1, m3, m2],
+      );
 
-        // The pending occurrence is the SAME row, with the SAME assignee:
-        // a reorder is not a recurrence/startDate change, so nothing
-        // regenerates (ChoreService.updateChore doc comment, chore_service
-        // .dart:272-275).
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        expect(pending!.id, before.id);
-        expect(pending.assignedMemberId, m1);
+      // The pending occurrence is the SAME row, with the SAME assignee:
+      // a reorder is not a recurrence/startDate change, so nothing
+      // regenerates (ChoreService.updateChore doc comment, chore_service
+      // .dart:272-275).
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, before.id);
+      expect(pending.assignedMemberId, m1);
 
-        // Completing it, though, advances by the NEW order: under the
-        // original [m1, m2, m3] the member after m1 would be m2; under the
-        // reordered [m1, m3, m2] it's m3. Seeing m3 here proves the
-        // rotation reads the reordered list, not a cached original one.
-        await serviceOn(
-          PlainDate(2026, 1, 2),
-        ).completeOccurrence(pending.id, completedBy: m1);
-        final after = await repo.pendingOccurrenceOf(chore.id);
-        expect(after!.assignedMemberId, m3);
-      },
-    );
+      // Completing it, though, advances by the NEW order: under the
+      // original [m1, m2, m3] the member after m1 would be m2; under the
+      // reordered [m1, m3, m2] it's m3. Seeing m3 here proves the
+      // rotation reads the reordered list, not a cached original one.
+      await serviceOn(
+        PlainDate(2026, 1, 2),
+      ).completeOccurrence(pending.id, completedBy: m1);
+      final after = await repo.pendingOccurrenceOf(chore.id);
+      expect(after!.assignedMemberId, m3);
+    });
   });
 
   group('closed one-off', () {
-    test(
-      "editing a completed one-off's start date updates the row but "
-      'inserts no occurrence',
-      () async {
-        final m1 = await _insertMember(db, 'm1', householdId);
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'One-off',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-        );
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        await serviceOn(
-          PlainDate(2026, 1, 1),
-        ).completeOccurrence(pending!.id, completedBy: m1);
+    test("editing a completed one-off's start date updates the row but "
+        'inserts no occurrence', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      await serviceOn(
+        PlainDate(2026, 1, 1),
+      ).completeOccurrence(pending!.id, completedBy: m1);
 
-        await serviceOn(
-          PlainDate(2026, 1, 10),
-        ).updateChore(chore.id, startDate: PlainDate(2026, 1, 15));
+      await serviceOn(
+        PlainDate(2026, 1, 10),
+      ).updateChore(chore.id, startDate: PlainDate(2026, 1, 15));
 
-        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
-        final details = await repo.getChore(chore.id);
-        expect(details!.chore.startDate, PlainDate(2026, 1, 15));
-        final closed = await repo.latestClosedOccurrence(chore.id);
-        expect(closed!.id, pending.id);
-        expect(closed.status, OccurrenceStatus.done);
-      },
-    );
+      expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+      final details = await repo.getChore(chore.id);
+      expect(details!.chore.startDate, PlainDate(2026, 1, 15));
+      final closed = await repo.latestClosedOccurrence(chore.id);
+      expect(closed!.id, pending.id);
+      expect(closed.status, OccurrenceStatus.done);
+    });
   });
 
   group('completion anchor', () {
@@ -368,105 +345,93 @@ void main() {
   });
 
   group('weekday-pinned', () {
-    test(
-      'changing the pinned weekday recalculates the due date against the '
-      'new pin',
-      () async {
-        // 2026-01-01 is a Thursday.
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Weekly, pinned Monday',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-          recurrence: Recurrence.weekly(weekdays: {DateTime.monday}),
-        );
-        final before = await repo.pendingOccurrenceOf(chore.id);
-        expect(before!.dueDate, PlainDate(2026, 1, 5)); // first Monday.
+    test('changing the pinned weekday recalculates the due date against the '
+        'new pin', () async {
+      // 2026-01-01 is a Thursday.
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Weekly, pinned Monday',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.weekly(weekdays: {DateTime.monday}),
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
+      expect(before!.dueDate, PlainDate(2026, 1, 5)); // first Monday.
 
-        await serviceOn(PlainDate(2026, 1, 2)).updateChore(
-          chore.id,
-          recurrence: Value(
-            Recurrence.weekly(weekdays: {DateTime.wednesday}),
-          ),
-        );
+      await serviceOn(PlainDate(2026, 1, 2)).updateChore(
+        chore.id,
+        recurrence: Value(Recurrence.weekly(weekdays: {DateTime.wednesday})),
+      );
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        // First Wednesday on/after 2026-01-02 is 2026-01-07.
-        expect(pending!.dueDate, PlainDate(2026, 1, 7));
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      // First Wednesday on/after 2026-01-02 is 2026-01-07.
+      expect(pending!.dueDate, PlainDate(2026, 1, 7));
+    });
   });
 
   group('assignee re-resolution mirrors unpause', () {
-    test(
-      "rotation continues from the latest closed occurrence's assignee, "
-      'even against a freshly-changed assignee list',
-      () async {
-        final memberA = await _insertMember(db, 'a', householdId);
-        final memberB = await _insertMember(db, 'b', householdId);
-        final memberC = await _insertMember(db, 'c', householdId);
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Rotation',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.rotation,
-          recurrence: Recurrence.everyNDays(1),
-          assigneeMemberIds: [memberA, memberB],
-        );
-        final first = await repo.pendingOccurrenceOf(chore.id);
-        expect(first!.assignedMemberId, memberA);
-        // A completes -> pending advances to B.
-        await serviceOn(
-          PlainDate(2026, 1, 1),
-        ).completeOccurrence(first.id, completedBy: memberA);
+    test("rotation continues from the latest closed occurrence's assignee, "
+        'even against a freshly-changed assignee list', () async {
+      final memberA = await _insertMember(db, 'a', householdId);
+      final memberB = await _insertMember(db, 'b', householdId);
+      final memberC = await _insertMember(db, 'c', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Rotation',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.rotation,
+        recurrence: Recurrence.everyNDays(1),
+        assigneeMemberIds: [memberA, memberB],
+      );
+      final first = await repo.pendingOccurrenceOf(chore.id);
+      expect(first!.assignedMemberId, memberA);
+      // A completes -> pending advances to B.
+      await serviceOn(
+        PlainDate(2026, 1, 1),
+      ).completeOccurrence(first.id, completedBy: memberA);
 
-        // Edit the recurrence and the assignee list (adding C) in the same
-        // call.
-        await serviceOn(PlainDate(2026, 1, 2)).updateChore(
-          chore.id,
-          recurrence: Value(Recurrence.everyNDays(2)),
-          assigneeMemberIds: [memberA, memberB, memberC],
-        );
+      // Edit the recurrence and the assignee list (adding C) in the same
+      // call.
+      await serviceOn(PlainDate(2026, 1, 2)).updateChore(
+        chore.id,
+        recurrence: Value(Recurrence.everyNDays(2)),
+        assigneeMemberIds: [memberA, memberB, memberC],
+      );
 
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        // Continues from history (A was last done) against the new order
-        // -> B.
-        expect(pending!.assignedMemberId, memberB);
-      },
-    );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      // Continues from history (A was last done) against the new order
+      // -> B.
+      expect(pending!.assignedMemberId, memberB);
+    });
   });
 
   group('paused chore', () {
-    test(
-      "editing a paused chore's recurrence updates the row but inserts no "
-      'occurrence; unpausing afterward uses the updated rule',
-      () async {
-        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
-          householdId: householdId,
-          title: 'Weekly-ish',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-          recurrence: Recurrence.everyNDays(7),
-        );
-        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(chore.id);
-        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+    test("editing a paused chore's recurrence updates the row but inserts no "
+        'occurrence; unpausing afterward uses the updated rule', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Weekly-ish',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(7),
+      );
+      await serviceOn(PlainDate(2026, 1, 2)).pauseChore(chore.id);
+      expect(await repo.pendingOccurrenceOf(chore.id), isNull);
 
-        await serviceOn(PlainDate(2026, 1, 3)).updateChore(
-          chore.id,
-          recurrence: Value(Recurrence.everyNDays(3)),
-        );
+      await serviceOn(
+        PlainDate(2026, 1, 3),
+      ).updateChore(chore.id, recurrence: Value(Recurrence.everyNDays(3)));
 
-        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
-        final details = await repo.getChore(chore.id);
-        expect(details!.chore.pausedAt, isNotNull);
+      expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+      final details = await repo.getChore(chore.id);
+      expect(details!.chore.pausedAt, isNotNull);
 
-        await serviceOn(PlainDate(2026, 1, 10)).unpauseChore(chore.id);
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        // every-3-days series from 2026-01-01: ...01-01, 01-04, 01-07,
-        // 01-10... first slot >= today (01-10) is 01-10.
-        expect(pending!.dueDate, PlainDate(2026, 1, 10));
-      },
-    );
+      await serviceOn(PlainDate(2026, 1, 10)).unpauseChore(chore.id);
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      // every-3-days series from 2026-01-01: ...01-01, 01-04, 01-07,
+      // 01-10... first slot >= today (01-10) is 01-10.
+      expect(pending!.dueDate, PlainDate(2026, 1, 10));
+    });
   });
 
   group('errors', () {

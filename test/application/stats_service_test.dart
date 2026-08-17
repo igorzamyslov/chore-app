@@ -149,83 +149,71 @@ void main() {
     },
   );
 
-  test(
-    'shares are in roster order, keep zero-count members, append a departed '
-    'contributor, and put the unattributed bucket last',
-    () async {
-      await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
-      // Roster (creation) order is anna, ben, cara, dan. The counts below
-      // are chosen so that roster order and count-descending order DISAGREE
-      // on every position: by count the list would read ben(5), cara(2),
-      // anna(1), <unattributed>(1), dan(0). If anyone ever "improves" this
-      // into a leaderboard, the order assertion has to fail -- equal counts
-      // would let a count sort masquerade as roster order (spec §0 rule 2).
-      await _member(db, 'anna', 'hh', createdAt: '2026-01-01T10:00:00.000Z');
-      await _member(db, 'ben', 'hh', createdAt: '2026-01-02T10:00:00.000Z');
-      await _member(
+  test('shares are in roster order, keep zero-count members, append a departed '
+      'contributor, and put the unattributed bucket last', () async {
+    await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+    // Roster (creation) order is anna, ben, cara, dan. The counts below
+    // are chosen so that roster order and count-descending order DISAGREE
+    // on every position: by count the list would read ben(5), cara(2),
+    // anna(1), <unattributed>(1), dan(0). If anyone ever "improves" this
+    // into a leaderboard, the order assertion has to fail -- equal counts
+    // would let a count sort masquerade as roster order (spec §0 rule 2).
+    await _member(db, 'anna', 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+    await _member(db, 'ben', 'hh', createdAt: '2026-01-02T10:00:00.000Z');
+    await _member(
+      db,
+      'cara',
+      'hh',
+      createdAt: '2026-01-03T10:00:00.000Z',
+      deletedAt: '2026-08-01T10:00:00.000Z',
+    );
+    await _member(db, 'dan', 'hh', createdAt: '2026-01-04T10:00:00.000Z');
+    await _chore(db, 'c1', 'hh', title: 'Bathroom');
+
+    await _done(db, 'o1', 'c1', closedOn: '2026-08-01', completedBy: 'anna');
+    for (var i = 0; i < 5; i++) {
+      await _done(
         db,
-        'cara',
-        'hh',
-        createdAt: '2026-01-03T10:00:00.000Z',
-        deletedAt: '2026-08-01T10:00:00.000Z',
+        'ben-$i',
+        'c1',
+        closedOn: '2026-08-02',
+        completedBy: 'ben',
       );
-      await _member(db, 'dan', 'hh', createdAt: '2026-01-04T10:00:00.000Z');
-      await _chore(db, 'c1', 'hh', title: 'Bathroom');
+    }
+    await _done(db, 'o2', 'c1', closedOn: '2026-08-02', completedBy: 'cara');
+    await _done(db, 'o3', 'c1', closedOn: '2026-08-03', completedBy: 'cara');
+    await _done(db, 'o4', 'c1', closedOn: '2026-08-03');
 
-      await _done(db, 'o1', 'c1', closedOn: '2026-08-01', completedBy: 'anna');
-      for (var i = 0; i < 5; i++) {
-        await _done(
-          db,
-          'ben-$i',
-          'c1',
-          closedOn: '2026-08-02',
-          completedBy: 'ben',
-        );
-      }
-      await _done(db, 'o2', 'c1', closedOn: '2026-08-02', completedBy: 'cara');
-      await _done(db, 'o3', 'c1', closedOn: '2026-08-03', completedBy: 'cara');
-      await _done(db, 'o4', 'c1', closedOn: '2026-08-03');
+    final overview = await serviceAt(DateTime(2026, 8, 11, 9)).overview('hh');
 
-      final overview = await serviceAt(DateTime(2026, 8, 11, 9)).overview('hh');
+    expect(overview.shares.map((s) => s.member?.id).toList(), [
+      'anna',
+      'ben',
+      'cara',
+      'dan',
+      null,
+    ]);
+    expect(overview.shares.map((s) => s.doneCount).toList(), [1, 5, 2, 0, 1]);
+    expect(overview.totalDone, 9);
+  });
 
-      expect(overview.shares.map((s) => s.member?.id).toList(), [
-        'anna',
-        'ben',
-        'cara',
-        'dan',
-        null,
-      ]);
-      expect(overview.shares.map((s) => s.doneCount).toList(), [
-        1,
-        5,
-        2,
-        0,
-        1,
-      ]);
-      expect(overview.totalDone, 9);
-    },
-  );
+  test('a departed member with no contributions in the window is dropped, '
+      'while a current member with none is kept', () async {
+    await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+    await _member(db, 'anna', 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+    await _member(
+      db,
+      'ghost',
+      'hh',
+      createdAt: '2026-01-02T10:00:00.000Z',
+      deletedAt: '2026-08-01T10:00:00.000Z',
+    );
 
-  test(
-    'a departed member with no contributions in the window is dropped, '
-    'while a current member with none is kept',
-    () async {
-      await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
-      await _member(db, 'anna', 'hh', createdAt: '2026-01-01T10:00:00.000Z');
-      await _member(
-        db,
-        'ghost',
-        'hh',
-        createdAt: '2026-01-02T10:00:00.000Z',
-        deletedAt: '2026-08-01T10:00:00.000Z',
-      );
+    final overview = await serviceAt(DateTime(2026, 8, 11, 9)).overview('hh');
 
-      final overview = await serviceAt(DateTime(2026, 8, 11, 9)).overview('hh');
-
-      expect(overview.shares.map((s) => s.member?.id).toList(), ['anna']);
-      expect(overview.totalDone, 0);
-    },
-  );
+    expect(overview.shares.map((s) => s.member?.id).toList(), ['anna']);
+    expect(overview.totalDone, 0);
+  });
 
   test('chores split into active and deleted, each alphabetical', () async {
     await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');

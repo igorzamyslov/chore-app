@@ -75,10 +75,7 @@ class RepeatControls extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        IntervalField(
-          controller: intervalController,
-          errorText: intervalError,
-        ),
+        IntervalField(controller: intervalController, errorText: intervalError),
         const SizedBox(height: 8),
         UnitRow(value: unit, interval: interval, onChanged: onUnitChanged),
         const SizedBox(height: 8),

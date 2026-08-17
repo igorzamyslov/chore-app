@@ -156,10 +156,7 @@ Widget _entryLabel(String text, {required bool isSelected}) {
   return Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(
-        isSelected ? Icons.check : null,
-        size: 18,
-      ),
+      Icon(isSelected ? Icons.check : null, size: 18),
       const SizedBox(width: 8),
       Text(text),
     ],

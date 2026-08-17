@@ -35,20 +35,19 @@ void main() {
     },
   );
 
-  testChoreApp(
-    'quick add: empty submit adds nothing',
-    today: today,
-    (tester, database) async {
-      final handle = tester.ensureSemantics();
-      await openShoppingTab(tester);
+  testChoreApp('quick add: empty submit adds nothing', today: today, (
+    tester,
+    database,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await openShoppingTab(tester);
 
-      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+    await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('shopping.empty'), findsOneWidget);
-      expect(find.text('UNCATEGORIZED'), findsNothing);
+    expect(find.bySemanticsIdentifier('shopping.empty'), findsOneWidget);
+    expect(find.text('UNCATEGORIZED'), findsNothing);
 
-      handle.dispose();
-    },
-  );
+    handle.dispose();
+  });
 }

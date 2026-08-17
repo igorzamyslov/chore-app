@@ -134,11 +134,9 @@ void main() {
     expect(container.read(claimedMemberProvider), isNull);
 
     // The claim arrives (pull, join snapshot, or adopt's G-B mirror).
-    await (database.update(
-      database.members,
-    )..where((tbl) => tbl.id.equals(setUpResult.me.id))).write(
-      const MembersCompanion(userId: Value('u-1')),
-    );
+    await (database.update(database.members)
+          ..where((tbl) => tbl.id.equals(setUpResult.me.id)))
+        .write(const MembersCompanion(userId: Value('u-1')));
     await _pumpUntil(
       tester,
       () => container.read(claimedMemberProvider)?.id == setUpResult.me.id,
@@ -164,11 +162,9 @@ void main() {
     );
     final container = setUpResult.container;
 
-    await (database.update(
-      database.members,
-    )..where((tbl) => tbl.id.equals(setUpResult.me.id))).write(
-      const MembersCompanion(userId: Value('someone-else')),
-    );
+    await (database.update(database.members)
+          ..where((tbl) => tbl.id.equals(setUpResult.me.id)))
+        .write(const MembersCompanion(userId: Value('someone-else')));
     await SettingsRepository(database).setSyncLinked(
       householdId: setUpResult.householdId,
       linkedAt: DateTime.utc(2026, 7, 24),

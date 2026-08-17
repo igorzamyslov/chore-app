@@ -316,10 +316,7 @@ class NotificationScheduler {
 
   String _digestBody(AppLocalizations l10n, DigestPlan plan) {
     if (plan.dueTodayCount > 0 && plan.overdueCount > 0) {
-      return l10n.notificationDigestBoth(
-        plan.dueTodayCount,
-        plan.overdueCount,
-      );
+      return l10n.notificationDigestBoth(plan.dueTodayCount, plan.overdueCount);
     }
     if (plan.overdueCount > 0) {
       return l10n.notificationDigestOverdueOnly(plan.overdueCount);

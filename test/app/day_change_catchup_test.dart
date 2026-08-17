@@ -123,23 +123,20 @@ void main() {
       expect(nextLocalMidnight(now), DateTime(2027, 1, 1, 0, 0, 1));
     });
 
-    test(
-      'built from calendar components, not a fixed 24h duration: the '
-      'result is always 00:00:01 on the next calendar day, regardless of '
-      'how far into today [now] already is',
-      () {
-        final justAfterMidnight = DateTime(2026, 3, 28, 0, 0, 5);
-        final justBeforeMidnight = DateTime(2026, 3, 28, 23, 59, 59);
-        expect(
-          nextLocalMidnight(justAfterMidnight),
-          DateTime(2026, 3, 29, 0, 0, 1),
-        );
-        expect(
-          nextLocalMidnight(justBeforeMidnight),
-          DateTime(2026, 3, 29, 0, 0, 1),
-        );
-      },
-    );
+    test('built from calendar components, not a fixed 24h duration: the '
+        'result is always 00:00:01 on the next calendar day, regardless of '
+        'how far into today [now] already is', () {
+      final justAfterMidnight = DateTime(2026, 3, 28, 0, 0, 5);
+      final justBeforeMidnight = DateTime(2026, 3, 28, 23, 59, 59);
+      expect(
+        nextLocalMidnight(justAfterMidnight),
+        DateTime(2026, 3, 29, 0, 0, 1),
+      );
+      expect(
+        nextLocalMidnight(justBeforeMidnight),
+        DateTime(2026, 3, 29, 0, 0, 1),
+      );
+    });
   });
 
   group('CatchUpController.triggerOnResume', () {
@@ -474,61 +471,58 @@ void main() {
   });
 
   group('closedTodayOccurrencesProvider', () {
-    testWidgets(
-      'empties when the calendar day rolls over: a completion made '
-      'yesterday is no longer "closed today"',
-      (tester) async {
-        var currentTime = DateTime(2026, 1, 5, 9);
-        final database = AppDatabase(NativeDatabase.memory());
-        // Seed the household BEFORE the container exists — see the
-        // identical comment on the first test in this file.
-        await HouseholdRepository(database).createLocalHousehold('Me');
-        final container = ProviderContainer(
-          overrides: [
-            appDatabaseProvider.overrideWithValue(database),
-            clockProvider.overrideWithValue(Clock(() => currentTime)),
-          ],
-        );
-        final householdId = await _awaitBootstrap(tester, container);
-        final me = await database.select(database.members).getSingle();
+    testWidgets('empties when the calendar day rolls over: a completion made '
+        'yesterday is no longer "closed today"', (tester) async {
+      var currentTime = DateTime(2026, 1, 5, 9);
+      final database = AppDatabase(NativeDatabase.memory());
+      // Seed the household BEFORE the container exists — see the
+      // identical comment on the first test in this file.
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+        ],
+      );
+      final householdId = await _awaitBootstrap(tester, container);
+      final me = await database.select(database.members).getSingle();
 
-        final service = container.read(choreServiceProvider);
-        final chore = await service.createChore(
-          householdId: householdId,
-          title: 'Dishes',
-          startDate: PlainDate(2026, 1, 5),
-          assignmentMode: AssignmentMode.anyone,
-        );
-        final repo = container.read(choreRepositoryProvider);
-        final pending = await repo.pendingOccurrenceOf(chore.id);
-        await service.completeOccurrence(pending!.id, completedBy: me.id);
+      final service = container.read(choreServiceProvider);
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final repo = container.read(choreRepositoryProvider);
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      await service.completeOccurrence(pending!.id, completedBy: me.id);
 
-        // A StreamProvider only runs while something listens to it.
-        container.listen(closedTodayOccurrencesProvider, (_, _) {});
-        await _pumpUntil(
-          tester,
-          () async =>
-              container.read(closedTodayOccurrencesProvider).value?.length == 1,
-        );
+      // A StreamProvider only runs while something listens to it.
+      container.listen(closedTodayOccurrencesProvider, (_, _) {});
+      await _pumpUntil(
+        tester,
+        () async =>
+            container.read(closedTodayOccurrencesProvider).value?.length == 1,
+      );
 
-        // Midnight passes. Nothing else changes in the database at all.
-        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
-        container.read(todayProvider.notifier).refresh();
+      // Midnight passes. Nothing else changes in the database at all.
+      currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+      container.read(todayProvider.notifier).refresh();
 
-        // The provider re-subscribes against the new date; until its new
-        // stream emits, Riverpod keeps serving the previous value, which is
-        // exactly what _pumpUntil is for.
-        await _pumpUntil(
-          tester,
-          () async =>
-              container.read(closedTodayOccurrencesProvider).value?.isEmpty ??
-              false,
-        );
+      // The provider re-subscribes against the new date; until its new
+      // stream emits, Riverpod keeps serving the previous value, which is
+      // exactly what _pumpUntil is for.
+      await _pumpUntil(
+        tester,
+        () async =>
+            container.read(closedTodayOccurrencesProvider).value?.isEmpty ??
+            false,
+      );
 
-        // See [_disposeAndClose]'s doc comment for why a pump must separate
-        // `dispose()` from `close()`.
-        await _disposeAndClose(tester, container, database);
-      },
-    );
+      // See [_disposeAndClose]'s doc comment for why a pump must separate
+      // `dispose()` from `close()`.
+      await _disposeAndClose(tester, container, database);
+    });
   });
 }

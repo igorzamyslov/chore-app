@@ -110,10 +110,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(
-          of: rowAfterRestart,
-          matching: find.text('Deutsch'),
-        ),
+        find.descendant(of: rowAfterRestart, matching: find.text('Deutsch')),
         findsOneWidget,
       );
 
@@ -132,10 +129,7 @@ void main() {
       final row = find.bySemanticsIdentifier('settings.about.version');
       expect(row, findsOneWidget);
       expect(
-        find.descendant(
-          of: row,
-          matching: find.textContaining('9.9.9'),
-        ),
+        find.descendant(of: row, matching: find.textContaining('9.9.9')),
         findsOneWidget,
       );
       expect(

@@ -1410,6 +1410,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t reach the household. Your changes are saved here and will sync later.'**
   String get syncRefreshError;
 
+  /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED pull-to-refresh is what discovered that this device's membership was revoked (spec docs/specs/household-lifecycle.md 3.5). SupabaseSyncEngine.refreshNow() has already cleared the sync link by the time it returns false for this case, so syncRefreshError's 'will sync later' would be a promise the app cannot keep.
+  ///
+  /// In en, this message translates to:
+  /// **'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.'**
+  String get syncRefreshErrorRevoked;
+
   /// Snackbar shown when signing out fails.
   ///
   /// In en, this message translates to:

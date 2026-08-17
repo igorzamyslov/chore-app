@@ -13,25 +13,22 @@ void main() {
 
     tearDown(() => db.close());
 
-    test(
-      'inserting an occurrence for a nonexistent chore throws',
-      () async {
-        await expectLater(
-          db
-              .into(db.choreOccurrences)
-              .insert(
-                ChoreOccurrencesCompanion.insert(
-                  id: 'o1',
-                  choreId: 'does-not-exist',
-                  dueDate: PlainDate(2026, 1, 1),
-                  createdAt: 't0',
-                  updatedAt: 't0',
-                ),
+    test('inserting an occurrence for a nonexistent chore throws', () async {
+      await expectLater(
+        db
+            .into(db.choreOccurrences)
+            .insert(
+              ChoreOccurrencesCompanion.insert(
+                id: 'o1',
+                choreId: 'does-not-exist',
+                dueDate: PlainDate(2026, 1, 1),
+                createdAt: 't0',
+                updatedAt: 't0',
               ),
-          throwsException,
-        );
-      },
-    );
+            ),
+        throwsException,
+      );
+    });
 
     test('inserting a member for a nonexistent household throws', () async {
       await expectLater(

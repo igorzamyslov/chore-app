@@ -251,42 +251,39 @@ void main() {
       expect(await _categoryDirty(db, b.id), isTrue);
     });
 
-    test(
-      'softDeleteCategory marks the category AND every chore/shopping '
-      'item that referenced it dirty',
-      () async {
-        final category = await repo.createCategory(
-          householdId,
-          kind: CategoryKind.chore,
-          name: 'Cleaning',
-          icon: 'cleaning_services',
-          color: 0xFF123456,
-        );
-        final chores = ChoreRepository(db, newId: _IdGen().call);
-        final chore = await chores.createChore(
-          householdId: householdId,
-          title: 'Dishes',
-          startDate: PlainDate(2026, 1, 1),
-          assignmentMode: AssignmentMode.anyone,
-          categoryId: category.id,
-        );
-        final shopping = ShoppingRepository(db, newId: _IdGen().call);
-        final item = await shopping.addItem(
-          householdId,
-          name: 'Milk',
-          categoryId: category.id,
-        );
-        await _clearCategoryDirty(db, category.id);
-        await _clearChoreDirty(db, chore.id);
-        await _clearShoppingItemDirty(db, item.id);
+    test('softDeleteCategory marks the category AND every chore/shopping '
+        'item that referenced it dirty', () async {
+      final category = await repo.createCategory(
+        householdId,
+        kind: CategoryKind.chore,
+        name: 'Cleaning',
+        icon: 'cleaning_services',
+        color: 0xFF123456,
+      );
+      final chores = ChoreRepository(db, newId: _IdGen().call);
+      final chore = await chores.createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        categoryId: category.id,
+      );
+      final shopping = ShoppingRepository(db, newId: _IdGen().call);
+      final item = await shopping.addItem(
+        householdId,
+        name: 'Milk',
+        categoryId: category.id,
+      );
+      await _clearCategoryDirty(db, category.id);
+      await _clearChoreDirty(db, chore.id);
+      await _clearShoppingItemDirty(db, item.id);
 
-        await repo.softDeleteCategory(category.id);
+      await repo.softDeleteCategory(category.id);
 
-        expect(await _categoryDirty(db, category.id), isTrue);
-        expect(await _choreDirty(db, chore.id), isTrue);
-        expect(await _shoppingItemDirty(db, item.id), isTrue);
-      },
-    );
+      expect(await _categoryDirty(db, category.id), isTrue);
+      expect(await _choreDirty(db, chore.id), isTrue);
+      expect(await _shoppingItemDirty(db, item.id), isTrue);
+    });
   });
 
   group('ChoreRepository', () {
@@ -512,31 +509,28 @@ void main() {
       );
     });
 
-    test(
-      'completeOccurrence marks the closed occurrence AND its freshly '
-      'inserted successor dirty (spec §8.1 widget-test-proof)',
-      () async {
-        final chore = await service.createChore(
-          householdId: householdId,
-          title: 'Weekly bins',
-          startDate: PlainDate(2026, 1, 8),
-          assignmentMode: AssignmentMode.anyone,
-          recurrence: Recurrence.everyNDays(7),
-        );
-        final pending = (await chores.pendingOccurrenceOf(chore.id))!;
-        await _clearOccurrenceDirty(db, pending.id);
-        expect(await _occurrenceDirty(db, pending.id), isFalse);
+    test('completeOccurrence marks the closed occurrence AND its freshly '
+        'inserted successor dirty (spec §8.1 widget-test-proof)', () async {
+      final chore = await service.createChore(
+        householdId: householdId,
+        title: 'Weekly bins',
+        startDate: PlainDate(2026, 1, 8),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(7),
+      );
+      final pending = (await chores.pendingOccurrenceOf(chore.id))!;
+      await _clearOccurrenceDirty(db, pending.id);
+      expect(await _occurrenceDirty(db, pending.id), isFalse);
 
-        await service.completeOccurrence(pending.id, completedBy: memberId);
+      await service.completeOccurrence(pending.id, completedBy: memberId);
 
-        // The just-closed occurrence became dirty...
-        expect(await _occurrenceDirty(db, pending.id), isTrue);
-        // ...and so did its freshly-inserted successor.
-        final successor = (await chores.pendingOccurrenceOf(chore.id))!;
-        expect(successor.id, isNot(pending.id));
-        expect(await _occurrenceDirty(db, successor.id), isTrue);
-      },
-    );
+      // The just-closed occurrence became dirty...
+      expect(await _occurrenceDirty(db, pending.id), isTrue);
+      // ...and so did its freshly-inserted successor.
+      final successor = (await chores.pendingOccurrenceOf(chore.id))!;
+      expect(successor.id, isNot(pending.id));
+      expect(await _occurrenceDirty(db, successor.id), isTrue);
+    });
 
     test('reopenOccurrence (a direct database write bypassing '
         'ChoreRepository) marks the occurrence dirty', () async {

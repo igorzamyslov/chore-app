@@ -13,82 +13,80 @@ void main() {
   // 2026-07-22 is a Wednesday.
   final today = DateTime(2026, 7, 22, 9);
 
-  testChoreApp(
-    'skip creates the next occurrence',
-    today: today,
-    (tester, database) async {
-      final handle = tester.ensureSemantics();
-      final householdId = await currentHouseholdId(database);
-      final service = ChoreService(
-        database: database,
-        chores: ChoreRepository(database),
-        clock: Clock.fixed(today),
-      );
-      final chore = await service.createChore(
-        householdId: householdId,
-        title: 'Weekly chore',
-        startDate: PlainDate(2026, 7, 22),
-        assignmentMode: AssignmentMode.anyone,
-        recurrence: Recurrence.weekly(),
-      );
-      await tester.pumpAndSettle();
-      // The "TODAY" section header, plus the tile's own due text (A1: due
-      // text on every tile) — two matches.
-      // Refined A1: tiles under Today show no due text, so 'TODAY' appears
-      // exactly once — as the section header. Section headers render
-      // uppercase (theme-v2.md §2/§4.1 item 2).
-      expect(find.text('TODAY'), findsOneWidget);
+  testChoreApp('skip creates the next occurrence', today: today, (
+    tester,
+    database,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final householdId = await currentHouseholdId(database);
+    final service = ChoreService(
+      database: database,
+      chores: ChoreRepository(database),
+      clock: Clock.fixed(today),
+    );
+    final chore = await service.createChore(
+      householdId: householdId,
+      title: 'Weekly chore',
+      startDate: PlainDate(2026, 7, 22),
+      assignmentMode: AssignmentMode.anyone,
+      recurrence: Recurrence.weekly(),
+    );
+    await tester.pumpAndSettle();
+    // The "TODAY" section header, plus the tile's own due text (A1: due
+    // text on every tile) — two matches.
+    // Refined A1: tiles under Today show no due text, so 'TODAY' appears
+    // exactly once — as the section header. Section headers render
+    // uppercase (theme-v2.md §2/§4.1 item 2).
+    expect(find.text('TODAY'), findsOneWidget);
 
-      await tester.tap(
-        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chores.menu.skip'));
-      await tester.pumpAndSettle();
+    await tester.tap(
+      find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsIdentifier('chores.menu.skip'));
+    await tester.pumpAndSettle();
 
-      // Skipping today's occurrence inserts the next weekly slot, 7 days
-      // out (2026-07-29) — still in July, so "THIS MONTH", not "TODAY".
-      expect(find.text('TODAY'), findsNothing);
-      expect(find.text('THIS MONTH'), findsOneWidget);
-      expect(find.text('Weekly chore'), findsOneWidget);
+    // Skipping today's occurrence inserts the next weekly slot, 7 days
+    // out (2026-07-29) — still in July, so "THIS MONTH", not "TODAY".
+    expect(find.text('TODAY'), findsNothing);
+    expect(find.text('THIS MONTH'), findsOneWidget);
+    expect(find.text('Weekly chore'), findsOneWidget);
 
-      handle.dispose();
-    },
-  );
+    handle.dispose();
+  });
 
-  testChoreApp(
-    'pause removes the tile',
-    today: today,
-    (tester, database) async {
-      final handle = tester.ensureSemantics();
-      final householdId = await currentHouseholdId(database);
-      final service = ChoreService(
-        database: database,
-        chores: ChoreRepository(database),
-        clock: Clock.fixed(today),
-      );
-      final chore = await service.createChore(
-        householdId: householdId,
-        title: 'One-off chore',
-        startDate: PlainDate(2026, 7, 22),
-        assignmentMode: AssignmentMode.anyone,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('One-off chore'), findsOneWidget);
+  testChoreApp('pause removes the tile', today: today, (
+    tester,
+    database,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final householdId = await currentHouseholdId(database);
+    final service = ChoreService(
+      database: database,
+      chores: ChoreRepository(database),
+      clock: Clock.fixed(today),
+    );
+    final chore = await service.createChore(
+      householdId: householdId,
+      title: 'One-off chore',
+      startDate: PlainDate(2026, 7, 22),
+      assignmentMode: AssignmentMode.anyone,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('One-off chore'), findsOneWidget);
 
-      await tester.tap(
-        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
-      await tester.pumpAndSettle();
+    await tester.tap(
+      find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('One-off chore'), findsNothing);
-      expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
+    expect(find.text('One-off chore'), findsNothing);
+    expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
 
-      handle.dispose();
-    },
-  );
+    handle.dispose();
+  });
 
   testChoreApp(
     'pausing shows a "Paused" snackbar whose Undo action resumes the chore '

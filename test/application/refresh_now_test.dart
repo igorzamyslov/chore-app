@@ -85,18 +85,15 @@ void main() {
     expect(await engineWith(_PushFailsTransport()).refreshNow(), isFalse);
   });
 
-  test(
-    'pushDirty and pullSince still swallow failures (background contract, '
-    'spec sync-backend.md §8.3) -- only refreshNow reports',
-    () async {
-      final engine = engineWith(_OfflineTransport());
+  test('pushDirty and pullSince still swallow failures (background contract, '
+      'spec sync-backend.md §8.3) -- only refreshNow reports', () async {
+    final engine = engineWith(_OfflineTransport());
 
-      // Neither throws, which is exactly why neither can drive a
-      // user-facing error.
-      await engine.pushDirty();
-      await engine.pullSince();
-    },
-  );
+    // Neither throws, which is exactly why neither can drive a
+    // user-facing error.
+    await engine.pushDirty();
+    await engine.pullSince();
+  });
 
   test('NoopSyncEngine.refreshNow reports success', () async {
     expect(await const NoopSyncEngine().refreshNow(), isTrue);

@@ -49,10 +49,7 @@ class AccountSectionBody extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
-      children: [
-        const MembershipRevokedNotice(),
-        _body(context, ref),
-      ],
+      children: [const MembershipRevokedNotice(), _body(context, ref)],
     );
   }
 

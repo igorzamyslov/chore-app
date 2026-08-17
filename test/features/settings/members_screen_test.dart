@@ -250,33 +250,27 @@ void main() {
     },
   );
 
-  testChoreApp(
-    'invite row hidden while unlinked',
-    today: today,
-    (tester, database) async {
-      final handle = tester.ensureSemantics();
-      await openManageMembers(tester);
+  testChoreApp('invite row hidden while unlinked', today: today, (
+    tester,
+    database,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await openManageMembers(tester);
 
-      expect(
-        find.bySemanticsIdentifier('settings.members.invite'),
-        findsNothing,
-      );
-      // The household-name row and the bootstrap-only member row are still
-      // the only ones.
-      expect(find.byType(ListTile), findsNWidgets(2));
+    expect(find.bySemanticsIdentifier('settings.members.invite'), findsNothing);
+    // The household-name row and the bootstrap-only member row are still
+    // the only ones.
+    expect(find.byType(ListTile), findsNWidgets(2));
 
-      handle.dispose();
-    },
-  );
+    handle.dispose();
+  });
 
   final inviteGateway = FakeHouseholdGateway();
   testChoreApp(
     'invite row visible once linked; tap revokes any previous invite THEN '
     "creates a new one (spec A3), and shows the sheet with the fake's code",
     today: today,
-    overrides: [
-      householdGatewayProvider.overrideWithValue(inviteGateway),
-    ],
+    overrides: [householdGatewayProvider.overrideWithValue(inviteGateway)],
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
@@ -415,11 +409,9 @@ void main() {
       // Claim 'Me' directly (no local claim flow exists offline) so the
       // "claimed members are undeletable" guard is exercised even though
       // two members now exist.
-      await (database.update(
-        database.members,
-      )..where((tbl) => tbl.id.equals(me.id))).write(
-        const MembersCompanion(userId: Value('u1')),
-      );
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u1')));
       await tester.pumpAndSettle();
 
       await openManageMembers(tester);
@@ -457,21 +449,16 @@ void main() {
       ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
       // Claim 'Me' so a claimed member exists in the household, but edit
       // ANNA (unclaimed, and not the last member since 'Me' also exists).
-      await (database.update(
-        database.members,
-      )..where((tbl) => tbl.id.equals(me.id))).write(
-        const MembersCompanion(userId: Value('u1')),
-      );
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u1')));
       await tester.pumpAndSettle();
 
       await openManageMembers(tester);
       await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.bySemanticsIdentifier('members.edit.delete'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
         findsNothing,

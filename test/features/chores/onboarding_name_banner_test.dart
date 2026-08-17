@@ -26,10 +26,7 @@ void main() {
       final handle = tester.ensureSemantics();
 
       expect(find.bySemanticsIdentifier('onboarding.name'), findsOneWidget);
-      expect(
-        find.bySemanticsIdentifier('onboarding.name.set'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsIdentifier('onboarding.name.set'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('onboarding.name.dismiss'),
         findsOneWidget,

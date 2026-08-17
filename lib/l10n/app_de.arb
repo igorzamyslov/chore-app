@@ -260,6 +260,7 @@
   "settingsAccountSignOutConfirmBody": "Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet.",
   "settingsAccountSignOutConfirmAction": "Abmelden",
   "syncRefreshError": "Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.",
+  "syncRefreshErrorRevoked": "Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.",
   "settingsAccountSignOutError": "Abmelden hat nicht geklappt. Versuch es noch mal.",
   "settingsAccountComingSoonTitle": "Synchronisierung — bald verfügbar",
   "settingsAccountReconnectTitle": "Mit {householdName} neu verbinden",

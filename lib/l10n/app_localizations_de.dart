@@ -934,6 +934,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.';
 
   @override
+  String get syncRefreshErrorRevoked =>
+      'Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.';
+
+  @override
   String get settingsAccountSignOutError =>
       'Abmelden hat nicht geklappt. Versuch es noch mal.';
 

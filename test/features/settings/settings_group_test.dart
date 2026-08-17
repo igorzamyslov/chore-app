@@ -54,9 +54,7 @@ void main() {
       },
     );
 
-    testWidgets('a single-row group shows no hairline at all', (
-      tester,
-    ) async {
+    testWidgets('a single-row group shows no hairline at all', (tester) async {
       await pumpGroup(
         tester,
         const SettingsGroup(label: 'Group', children: [Text('Only row')]),
@@ -140,39 +138,36 @@ void main() {
       },
     );
 
-    test(
-      'never shows two trailing elements at once -- constructing one trips '
-      'an assertion',
-      () {
-        expect(
-          () => SettingsRow(
-            icon: Icons.language_outlined,
-            label: 'Language',
-            value: 'English',
-            showChevron: true,
-          ),
-          throwsAssertionError,
-        );
-        expect(
-          () => SettingsRow(
-            icon: Icons.language_outlined,
-            label: 'Language',
-            value: 'English',
-            onSwitchChanged: (_) {},
-          ),
-          throwsAssertionError,
-        );
-        expect(
-          () => SettingsRow(
-            icon: Icons.language_outlined,
-            label: 'Language',
-            onSwitchChanged: (_) {},
-            showChevron: true,
-          ),
-          throwsAssertionError,
-        );
-      },
-    );
+    test('never shows two trailing elements at once -- constructing one trips '
+        'an assertion', () {
+      expect(
+        () => SettingsRow(
+          icon: Icons.language_outlined,
+          label: 'Language',
+          value: 'English',
+          showChevron: true,
+        ),
+        throwsAssertionError,
+      );
+      expect(
+        () => SettingsRow(
+          icon: Icons.language_outlined,
+          label: 'Language',
+          value: 'English',
+          onSwitchChanged: (_) {},
+        ),
+        throwsAssertionError,
+      );
+      expect(
+        () => SettingsRow(
+          icon: Icons.language_outlined,
+          label: 'Language',
+          onSwitchChanged: (_) {},
+          showChevron: true,
+        ),
+        throwsAssertionError,
+      );
+    });
 
     testWidgets('destructive draws the leading icon and the label in '
         'error', (tester) async {
