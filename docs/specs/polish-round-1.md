@@ -146,7 +146,8 @@ of the chores list, and flows keep passing untouched.
 ### C2. Editing recurrence/start date regenerates the pending occurrence
 - Documented v1 simplification (chore_form_screen.dart) becomes real
   behavior: when an EDIT changes `recurrence` and/or `startDate`
-  (compare by serialized value), the service must, in the same
+  (compare by value — `Recurrence` has a real `==` since backlog E-4; this
+  used to be a `jsonEncode` projection), the service must, in the same
   transaction: delete the chore's pending occurrences and insert a fresh
   one using THE SAME two-floors rule as `unpauseChore` (never before
   today; never at/before the latest closed slot; closed one-off →

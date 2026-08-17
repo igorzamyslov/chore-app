@@ -142,10 +142,10 @@ unchanged" convention; `notes`/`categoryId`/`recurrence` need drift's
 `Value` wrapper to distinguish "unchanged" from "set to null").
 
 Updates the chore via the repository, then, if the edit changed
-`recurrence` and/or `startDate` — compared by serialized value (two
-`Recurrence`s are equal iff their JSON encodings match; a bare `null` only
-ever equals `null`) — regenerates the chore's pending occurrence, in the
-same transaction:
+`recurrence` and/or `startDate` — compared by VALUE, via `Recurrence`'s own
+`==` (all seven fields, `weekdays` compared as an unordered set; a bare
+`null` only ever equals `null`) — regenerates the chore's pending
+occurrence, in the same transaction:
 
 - delete the chore's current pending occurrence (if any);
 - if the chore is paused, stop there — a paused chore has no pending
