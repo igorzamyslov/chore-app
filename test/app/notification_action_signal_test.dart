@@ -22,7 +22,6 @@
 /// invalidate happens.
 library;
 
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
