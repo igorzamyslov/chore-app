@@ -29,12 +29,13 @@ import 'dart:ui';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/notification_action_handler.dart';
 import 'package:chore_app/application/notification_action_processor.dart';
+import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,9 +99,7 @@ void main() {
         ),
         authGatewayProvider.overrideWithValue(FakeAuthGateway()),
       ],
-    );
-    container.read(notificationActionSignalControllerProvider);
-
+    )..read(notificationActionSignalControllerProvider);
     expect(
       IsolateNameServer.lookupPortByName(notificationActionPortName),
       isNotNull,
@@ -269,8 +268,7 @@ void main() {
         ),
         authGatewayProvider.overrideWithValue(FakeAuthGateway()),
       ],
-    );
-    container.read(notificationActionSignalControllerProvider);
+    )..read(notificationActionSignalControllerProvider);
     await _disposeAndClose(tester, container, database);
 
     // This is precisely what the handler does, and the `?.` is the whole
