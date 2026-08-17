@@ -4418,6 +4418,17 @@ class $SettingsTable extends Settings
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _pendingJoinCodeMeta = const VerificationMeta(
+    'pendingJoinCode',
+  );
+  @override
+  late final GeneratedColumn<String> pendingJoinCode = GeneratedColumn<String>(
+    'pending_join_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4454,6 +4465,7 @@ class $SettingsTable extends Settings
     themeMode,
     syncLastPulledAt,
     membershipRevoked,
+    pendingJoinCode,
     createdAt,
     updatedAt,
   ];
@@ -4567,6 +4579,15 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('pending_join_code')) {
+      context.handle(
+        _pendingJoinCodeMeta,
+        pendingJoinCode.isAcceptableOrUnknown(
+          data['pending_join_code']!,
+          _pendingJoinCodeMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4640,6 +4661,10 @@ class $SettingsTable extends Settings
         DriftSqlType.bool,
         data['${effectivePrefix}membership_revoked'],
       )!,
+      pendingJoinCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pending_join_code'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -4737,6 +4762,24 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// `AppDatabase.migration`.
   final bool membershipRevoked;
 
+  /// The invite code most recently submitted -- and accepted by the
+  /// server -- on the welcome-join subpage's code-entry step (spec
+  /// `docs/specs/onboarding-v2.md` §1, `docs/research/triage.md` T2.4), or
+  /// `NULL`. Prefills the code field again after a process kill mid-join
+  /// (`WelcomeJoinPage._prefillPendingCode`), so the user is not forced to
+  /// retype an 8-character code they may never have written down.
+  ///
+  /// Deliberately ADVISORY, never authoritative: nothing routes on it --
+  /// which step the join subpage shows is re-derived on every build from
+  /// `currentAuthUserProvider`/`myMembershipProvider` alone (see
+  /// `WelcomeScreen`/`WelcomeJoinPage`'s own doc comments). A stale value
+  /// can therefore only ever sit in a text field the user is free to
+  /// overwrite; it can never trap anyone. Cleared by
+  /// `HouseholdJoinService.joinFresh` on a successful join and by
+  /// `HouseholdCreateService.create` (a join abandoned for a fresh
+  /// household). Added in schemaVersion 12; see `AppDatabase.migration`.
+  final String? pendingJoinCode;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4755,6 +4798,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.themeMode,
     this.syncLastPulledAt,
     required this.membershipRevoked,
+    this.pendingJoinCode,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4793,6 +4837,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       map['sync_last_pulled_at'] = Variable<String>(syncLastPulledAt);
     }
     map['membership_revoked'] = Variable<bool>(membershipRevoked);
+    if (!nullToAbsent || pendingJoinCode != null) {
+      map['pending_join_code'] = Variable<String>(pendingJoinCode);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4829,6 +4876,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ? const Value.absent()
           : Value(syncLastPulledAt),
       membershipRevoked: Value(membershipRevoked),
+      pendingJoinCode: pendingJoinCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingJoinCode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4856,6 +4906,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       themeMode: serializer.fromJson<String?>(json['themeMode']),
       syncLastPulledAt: serializer.fromJson<String?>(json['syncLastPulledAt']),
       membershipRevoked: serializer.fromJson<bool>(json['membershipRevoked']),
+      pendingJoinCode: serializer.fromJson<String?>(json['pendingJoinCode']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4880,6 +4931,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'themeMode': serializer.toJson<String?>(themeMode),
       'syncLastPulledAt': serializer.toJson<String?>(syncLastPulledAt),
       'membershipRevoked': serializer.toJson<bool>(membershipRevoked),
+      'pendingJoinCode': serializer.toJson<String?>(pendingJoinCode),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4898,6 +4950,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> themeMode = const Value.absent(),
     Value<String?> syncLastPulledAt = const Value.absent(),
     bool? membershipRevoked,
+    Value<String?> pendingJoinCode = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4923,6 +4976,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         ? syncLastPulledAt.value
         : this.syncLastPulledAt,
     membershipRevoked: membershipRevoked ?? this.membershipRevoked,
+    pendingJoinCode: pendingJoinCode.present
+        ? pendingJoinCode.value
+        : this.pendingJoinCode,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -4958,6 +5014,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       membershipRevoked: data.membershipRevoked.present
           ? data.membershipRevoked.value
           : this.membershipRevoked,
+      pendingJoinCode: data.pendingJoinCode.present
+          ? data.pendingJoinCode.value
+          : this.pendingJoinCode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4978,6 +5037,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('themeMode: $themeMode, ')
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('membershipRevoked: $membershipRevoked, ')
+          ..write('pendingJoinCode: $pendingJoinCode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4998,6 +5058,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     themeMode,
     syncLastPulledAt,
     membershipRevoked,
+    pendingJoinCode,
     createdAt,
     updatedAt,
   );
@@ -5018,6 +5079,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.themeMode == this.themeMode &&
           other.syncLastPulledAt == this.syncLastPulledAt &&
           other.membershipRevoked == this.membershipRevoked &&
+          other.pendingJoinCode == this.pendingJoinCode &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -5035,6 +5097,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> themeMode;
   final Value<String?> syncLastPulledAt;
   final Value<bool> membershipRevoked;
+  final Value<String?> pendingJoinCode;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -5051,6 +5114,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.themeMode = const Value.absent(),
     this.syncLastPulledAt = const Value.absent(),
     this.membershipRevoked = const Value.absent(),
+    this.pendingJoinCode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5068,6 +5132,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.themeMode = const Value.absent(),
     this.syncLastPulledAt = const Value.absent(),
     this.membershipRevoked = const Value.absent(),
+    this.pendingJoinCode = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -5087,6 +5152,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? themeMode,
     Expression<String>? syncLastPulledAt,
     Expression<bool>? membershipRevoked,
+    Expression<String>? pendingJoinCode,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -5106,6 +5172,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (themeMode != null) 'theme_mode': themeMode,
       if (syncLastPulledAt != null) 'sync_last_pulled_at': syncLastPulledAt,
       if (membershipRevoked != null) 'membership_revoked': membershipRevoked,
+      if (pendingJoinCode != null) 'pending_join_code': pendingJoinCode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5125,6 +5192,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? themeMode,
     Value<String?>? syncLastPulledAt,
     Value<bool>? membershipRevoked,
+    Value<String?>? pendingJoinCode,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -5144,6 +5212,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       themeMode: themeMode ?? this.themeMode,
       syncLastPulledAt: syncLastPulledAt ?? this.syncLastPulledAt,
       membershipRevoked: membershipRevoked ?? this.membershipRevoked,
+      pendingJoinCode: pendingJoinCode ?? this.pendingJoinCode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5193,6 +5262,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (membershipRevoked.present) {
       map['membership_revoked'] = Variable<bool>(membershipRevoked.value);
     }
+    if (pendingJoinCode.present) {
+      map['pending_join_code'] = Variable<String>(pendingJoinCode.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -5220,6 +5292,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('themeMode: $themeMode, ')
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('membershipRevoked: $membershipRevoked, ')
+          ..write('pendingJoinCode: $pendingJoinCode, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -9701,6 +9774,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> themeMode,
       Value<String?> syncLastPulledAt,
       Value<bool> membershipRevoked,
+      Value<String?> pendingJoinCode,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -9719,6 +9793,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> themeMode,
       Value<String?> syncLastPulledAt,
       Value<bool> membershipRevoked,
+      Value<String?> pendingJoinCode,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -9790,6 +9865,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get membershipRevoked => $composableBuilder(
     column: $table.membershipRevoked,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pendingJoinCode => $composableBuilder(
+    column: $table.pendingJoinCode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9873,6 +9953,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pendingJoinCode => $composableBuilder(
+    column: $table.pendingJoinCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9947,6 +10032,11 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get pendingJoinCode => $composableBuilder(
+    column: $table.pendingJoinCode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -9998,6 +10088,7 @@ class $$SettingsTableTableManager
                 Value<String?> themeMode = const Value.absent(),
                 Value<String?> syncLastPulledAt = const Value.absent(),
                 Value<bool> membershipRevoked = const Value.absent(),
+                Value<String?> pendingJoinCode = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -10014,6 +10105,7 @@ class $$SettingsTableTableManager
                 themeMode: themeMode,
                 syncLastPulledAt: syncLastPulledAt,
                 membershipRevoked: membershipRevoked,
+                pendingJoinCode: pendingJoinCode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -10033,6 +10125,7 @@ class $$SettingsTableTableManager
                 Value<String?> themeMode = const Value.absent(),
                 Value<String?> syncLastPulledAt = const Value.absent(),
                 Value<bool> membershipRevoked = const Value.absent(),
+                Value<String?> pendingJoinCode = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -10049,6 +10142,7 @@ class $$SettingsTableTableManager
                 themeMode: themeMode,
                 syncLastPulledAt: syncLastPulledAt,
                 membershipRevoked: membershipRevoked,
+                pendingJoinCode: pendingJoinCode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

@@ -239,6 +239,30 @@ class SettingsRepository {
     );
   }
 
+  /// Records [code] as the invite code most recently submitted -- and
+  /// accepted by the server -- on the welcome-join subpage's code-entry step
+  /// (spec `docs/specs/onboarding-v2.md` §1), or clears it when [code] is
+  /// `null`.
+  ///
+  /// `null` means "clear it", never "leave it unchanged", so [Value] wraps
+  /// [code] unconditionally. The stored value is read only as a prefill for
+  /// that code field (`WelcomeJoinPage._prefillPendingCode`) and never
+  /// drives routing -- see [DeviceSettings.pendingJoinCode]'s own doc
+  /// comment. Cleared by `HouseholdJoinService.joinFresh` on a successful
+  /// join and by `HouseholdCreateService.create` when the user starts a new
+  /// household instead of finishing a join.
+  Future<void> setPendingJoinCode(String? code) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        pendingJoinCode: Value(code),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   /// Disconnects this device from its currently linked household (spec
   /// `docs/feedback/2026-08-07-field-feedback.md` A1.2 -- the exit this app
   /// never had): clears `syncHouseholdId` and `syncLinkedAt` TOGETHER (spec

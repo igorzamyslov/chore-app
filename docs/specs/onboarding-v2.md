@@ -59,10 +59,30 @@ Full-screen, no tab shell. Content:
 If Supabase is unconfigured (offline/F-Droid builds, tests), the join
 card is hidden entirely and only "set up new" shows.
 
-Kill-the-app-mid-welcome resumes at the welcome screen (state is simply
-"no household yet"). Sign-in completed but join not finished → welcome
-join subpage restores to the signed-in step (auth state persists via
-supabase session; the gate checks it on build).
+Kill-the-app-mid-welcome, BEFORE any sign-in, resumes at the plain welcome
+screen (state is simply "no household yet"). Once sign-in has completed, a
+kill-and-relaunch instead resumes DIRECTLY on the join subpage, skipping the
+two-card chooser: `WelcomeScreen` auto-pushes `WelcomeJoinPage` the first
+time it observes a signed-in `currentAuthUserProvider` with no household yet
+(at most once per screen instance, and never while its own route is not the
+topmost one, so backing out of the subpage neither loops nor stacks a second
+copy over a subpage the user is already on). That subpage's own build-time
+derivation (above) takes it from there — to the P2d reconnect offer if
+`myMembershipProvider` already resolves one, otherwise to code entry. The
+invite code most recently accepted by the server also survives
+(`settings.pendingJoinCode`, cleared on a successful join and on starting a
+new household instead) and prefills the code field, so a kill after code
+entry but before the claim/join RPC completes does not force retyping an
+8-character code the joiner may never have written down.
+
+Neither mechanism is authoritative: the step shown is always re-derived from
+live `currentAuthUserProvider`/`myMembershipProvider` state, never from a
+cached "where was I" flag, and `pendingJoinCode` only ever seeds a text field
+the user can overwrite. A half-succeeded claim/join RPC self-heals through
+the same reconnect-offer path a returning device uses (spec
+`docs/specs/sync-backend.md` §7.6) — by the time that RPC returns, the
+account is already a claimed member server-side, whether or not the local
+device finished applying it.
 
 ## 2. App-spine changes
 
