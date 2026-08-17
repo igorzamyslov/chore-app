@@ -12,11 +12,6 @@ import 'shopping_test_utils.dart';
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
-  Future<void> expandCartSection(WidgetTester tester, String label) async {
-    await tester.tap(find.text(label));
-    await tester.pumpAndSettle();
-  }
-
   testChoreApp(
     'unchecking one of several checked items leaves the cart section open',
     today: today,
