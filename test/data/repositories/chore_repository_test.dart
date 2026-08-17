@@ -504,6 +504,206 @@ void main() {
     );
   });
 
+  group('getPendingOccurrences (the one-shot twin, backlog F-1)', () {
+    test(
+      "returns the same rows in the same order as the stream's first "
+      'emission, and excludes paused and soft-deleted chores',
+      () async {
+        // Three chores whose due-date order is deliberately the REVERSE of
+        // their alphabetical order, so a wrong or missing orderBy actually
+        // fails instead of holding trivially on a one-row fixture.
+        final lateChore = await repo.createChore(
+          householdId: householdId,
+          title: 'A late',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: lateChore.id,
+          dueDate: PlainDate(2026, 1, 20),
+        );
+        final midChore = await repo.createChore(
+          householdId: householdId,
+          title: 'B mid',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: midChore.id,
+          dueDate: PlainDate(2026, 1, 10),
+        );
+        final earlyChore = await repo.createChore(
+          householdId: householdId,
+          title: 'C early',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: earlyChore.id,
+          dueDate: PlainDate(2026, 1, 2),
+        );
+
+        final pausedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Paused',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: pausedChore.id,
+          dueDate: PlainDate(2026, 1, 3),
+        );
+        await repo.setPaused(pausedChore.id, paused: true);
+
+        final deletedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Deleted',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: deletedChore.id,
+          dueDate: PlainDate(2026, 1, 4),
+        );
+        await repo.softDeleteChore(deletedChore.id);
+
+        final closedChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Closed',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final closed = await repo.insertOccurrence(
+          choreId: closedChore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await repo.closeOccurrence(
+          closed.id,
+          status: OccurrenceStatus.done,
+          closedOn: PlainDate(2026, 1, 5),
+        );
+
+        final oneShot = await repo.getPendingOccurrences(householdId);
+        expect(
+          [for (final r in oneShot) r.chore.title],
+          [
+            'C early',
+            'B mid',
+            'A late',
+          ],
+        );
+
+        // The two must not drift: the background isolate builds its horizon
+        // from this one-shot read and the app builds its from the stream, so
+        // a divergence would make them disagree for reasons no other test
+        // would explain.
+        final fromStream = await repo
+            .watchPendingOccurrences(householdId)
+            .first;
+        expect(
+          [for (final r in fromStream) r.occurrence.id],
+          [
+            for (final r in oneShot) r.occurrence.id,
+          ],
+        );
+      },
+    );
+
+    test('excludes another household entirely', () async {
+      final otherHousehold = await _insertHousehold(db, 'h2');
+      final mine = await repo.createChore(
+        householdId: householdId,
+        title: 'Mine',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await repo.insertOccurrence(
+        choreId: mine.id,
+        dueDate: PlainDate(2026, 1, 2),
+      );
+      final theirs = await repo.createChore(
+        householdId: otherHousehold,
+        title: 'Theirs',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await repo.insertOccurrence(
+        choreId: theirs.id,
+        dueDate: PlainDate(2026, 1, 2),
+      );
+
+      final rows = await repo.getPendingOccurrences(householdId);
+      expect([for (final r in rows) r.chore.title], ['Mine']);
+    });
+
+    test('joins the assigned member, exactly as the stream does', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'Assigned',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [m1],
+      );
+      await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 2),
+        assignedMemberId: m1,
+      );
+
+      final rows = await repo.getPendingOccurrences(householdId);
+      expect(rows.single.assignedMember?.id, m1);
+      expect(rows.single.occurrence.assignedMemberId, m1);
+    });
+  });
+
+  group('getOccurrence (chore-agnostic lookup, backlog F-1)', () {
+    test('returns a seeded occurrence regardless of which chore owns '
+        'it', () async {
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final occurrence = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 10),
+      );
+
+      final found = await repo.getOccurrence(occurrence.id);
+      expect(found?.id, occurrence.id);
+      expect(found?.choreId, chore.id);
+      expect(found?.status, OccurrenceStatus.pending);
+    });
+
+    test('returns a CLOSED occurrence too: the caller decides what to do '
+        'with a non-pending row', () async {
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final occurrence = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 10),
+      );
+      await repo.closeOccurrence(
+        occurrence.id,
+        status: OccurrenceStatus.done,
+        closedOn: PlainDate(2026, 1, 10),
+      );
+
+      final found = await repo.getOccurrence(occurrence.id);
+      expect(found?.status, OccurrenceStatus.done);
+    });
+
+    test('returns null for an unknown id', () async {
+      expect(await repo.getOccurrence('nope'), isNull);
+    });
+  });
+
   group('watchClosedOnDate', () {
     test(
       'includes done/skipped closed on the given date; excludes missed, '

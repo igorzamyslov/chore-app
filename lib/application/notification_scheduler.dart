@@ -6,6 +6,7 @@ library;
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -85,6 +86,26 @@ const String digestChannelId = 'digest_v2';
 /// English-named, and no way to tell which is which.
 const String legacyDigestChannelId = 'digest';
 
+/// The iOS `UNNotificationCategory` identifier carrying the digest's "Done"
+/// action (spec `docs/specs/notifications.md` N2).
+///
+/// iOS actions are registered once per category at `initialize()` time and
+/// referenced per-notification via
+/// [DarwinNotificationDetails.categoryIdentifier]; Android has no equivalent
+/// and attaches its actions per-notification instead.
+const String digestActionsCategoryId = 'digestActions';
+
+/// The `actionId` of the digest's "Done" action.
+///
+/// **Namespaced deliberately.** `actionId` is the routing discriminator in a
+/// callback that is PROCESS-GLOBAL: the background handler receives responses
+/// for every notification this app will ever schedule, including the 40 ids
+/// reserved for the unbuilt per-chore reminders (backlog G-6 / F16). A bare
+/// `'done'` here is precisely the name G-6 would plausibly reuse for its own
+/// per-chore Done button, and the two would then be indistinguishable. G-6
+/// mints its own id; it does not reuse this one.
+const String digestDoneActionId = 'digest.done';
+
 /// The narrow seam between [NotificationScheduler] and the real OS-level
 /// plugin.
 ///
@@ -96,7 +117,15 @@ const String legacyDigestChannelId = 'digest';
 abstract class DigestNotificationPlugin {
   /// Initializes the underlying plugin. Called once per process (guarded by
   /// [NotificationScheduler]'s own idempotency) before any other method.
-  Future<void> initialize();
+  ///
+  /// [doneActionTitle] is the localized label for the digest's "Done" action
+  /// (spec `docs/specs/notifications.md` N2). It is used ONLY for the iOS
+  /// notification category [digestActionsCategoryId], because
+  /// `UNNotificationCategory` fixes its action titles at registration and
+  /// offers no per-notification override. Android's action title is passed
+  /// per notification in [zonedSchedule] instead, so it always follows the
+  /// current locale.
+  Future<void> initialize({required String doneActionTitle});
 
   /// Requests the OS notification permission (alert/badge/sound on iOS;
   /// `POST_NOTIFICATIONS` on Android 13+).
@@ -125,6 +154,19 @@ abstract class DigestNotificationPlugin {
   /// constant's doc comment for why a later call cannot rename it. They are
   /// passed per-call rather than once at init because only the caller knows
   /// the current locale, and the locale can change between launches.
+  ///
+  /// [payload] is the JSON action payload (see
+  /// `lib/application/digest_action_payload.dart`) delivered back to the app
+  /// when the user interacts with this notification. [actionable] attaches the
+  /// localized "Done" action — Android per-notification, iOS by pointing the
+  /// notification at the [digestActionsCategoryId] category registered in
+  /// [initialize].
+  ///
+  /// Today the digest passes them together: [payload] is non-null exactly
+  /// when [actionable] is true. They are still two parameters rather than one
+  /// nullable payload because they are two distinct platform concepts — a
+  /// payload also comes back on a plain body tap, with no action involved —
+  /// and no invariant tying them is asserted here.
   Future<void> zonedSchedule({
     required int id,
     required String title,
@@ -132,6 +174,8 @@ abstract class DigestNotificationPlugin {
     required DateTime fireAt,
     required String channelName,
     required String channelDescription,
+    String? payload,
+    bool actionable = false,
   });
 
   /// Cancels the notification scheduled with [id], if any.
@@ -150,13 +194,43 @@ abstract class DigestNotificationPlugin {
 /// `flutter_local_notifications`.
 class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
   /// Creates an adapter around a fresh plugin instance.
-  FlutterLocalNotificationsAdapter()
+  ///
+  /// [onBackgroundResponse] is the top-level `@pragma('vm:entry-point')`
+  /// handler the OS invokes, in a fresh background isolate, when the user taps
+  /// a notification ACTION — in production
+  /// `handleNotificationAction` from
+  /// `lib/application/notification_action_handler.dart`.
+  ///
+  /// **Required rather than defaulted, deliberately, for two reasons.** It
+  /// keeps this file free of any data-layer import: the handler opens its own
+  /// `AppDatabase`, so a default value here would make every importer of the
+  /// scheduler (including widget tests) depend transitively on drift, and
+  /// would create an import cycle between the two libraries. And because it is
+  /// required, the compiler names every construction site that would otherwise
+  /// have shipped a "Done" button that silently does nothing — a failure mode
+  /// indistinguishable from a working app until a user taps it.
+  FlutterLocalNotificationsAdapter({required this.onBackgroundResponse})
     : _plugin = FlutterLocalNotificationsPlugin();
+
+  /// The background notification-action handler; see the constructor.
+  final DidReceiveBackgroundNotificationResponseCallback onBackgroundResponse;
 
   final FlutterLocalNotificationsPlugin _plugin;
 
+  /// The localized "Done" action title, captured at [initialize] and reused
+  /// for every Android per-notification action.
+  ///
+  /// Android's action title IS per notification, so re-resolving it per apply
+  /// would honour a mid-session language switch — but every caller resolves
+  /// its copy once per apply and this adapter is only ever driven by
+  /// [NotificationScheduler], which passes the same locale's strings to
+  /// [initialize] and [zonedSchedule] alike. Caching keeps the interface from
+  /// carrying the same string twice per call.
+  String _doneActionTitle = '';
+
   @override
-  Future<void> initialize() async {
+  Future<void> initialize({required String doneActionTitle}) async {
+    _doneActionTitle = doneActionTitle;
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     // `request*Permission: false`: the iOS authorization prompt is
     // deliberately deferred to [requestPermission], which
@@ -164,16 +238,50 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
     // attempt (spec: "on first enable", not app launch). Passing `true`
     // here would make the plugin request it immediately on `initialize`,
     // i.e. at bootstrap.
-    const iosInit = DarwinInitializationSettings(
+    //
+    // `notificationCategories` registers the digest's "Done" action for iOS
+    // (spec `docs/specs/notifications.md` N2). Unlike Android, iOS fixes a
+    // category's action titles at registration time -- `UNNotificationCategory`
+    // has no per-notification override -- and `ensureInitialized` runs once
+    // per process, so the iOS label is frozen at whichever locale was active
+    // on this process's first init. A language switch reaches it on the next
+    // full relaunch. Documented, not solved: the same class of lag the
+    // Android channel NAME already accepts (see [digestChannelId]), and
+    // normal on both platforms.
+    final iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
+      notificationCategories: [
+        DarwinNotificationCategory(
+          digestActionsCategoryId,
+          actions: [
+            DarwinNotificationAction.plain(
+              digestDoneActionId,
+              doneActionTitle,
+            ),
+          ],
+        ),
+      ],
     );
     await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: androidInit,
-        iOS: iosInit,
-      ),
+      settings: InitializationSettings(android: androidInit, iOS: iosInit),
+      // VERIFIED against flutter_local_notifications 22.1.0's own Android
+      // source, because the plan that specified this treated it as an
+      // unverified fork: an action built with `showsUserInterface: false`
+      // gets a `PendingIntent.getBroadcast` to `ActionBroadcastReceiver`
+      // (`FlutterLocalNotificationsPlugin.java`), and that receiver ALWAYS
+      // runs the Dart callback dispatcher in a headless engine of its own --
+      // it has no reference to the app's main engine and never forwards to
+      // it. `didReceiveNotificationResponse` is only ever invoked for the
+      // `SELECT_NOTIFICATION`/`SELECT_FOREGROUND_NOTIFICATION_ACTION` intent
+      // actions, which are set exclusively on ACTIVITY launch intents. So a
+      // `showsUserInterface: false` action tap reaches this background
+      // callback even when the app is in the FOREGROUND, and there is no code
+      // path by which it could reach the foreground one. That is why the
+      // background handler pings the main isolate rather than relying on the
+      // app-resume observer -- see `notification_action_handler.dart`.
+      onDidReceiveBackgroundNotificationResponse: onBackgroundResponse,
     );
   }
 
@@ -220,6 +328,8 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
     required DateTime fireAt,
     required String channelName,
     required String channelDescription,
+    String? payload,
+    bool actionable = false,
   }) async {
     // `tz.UTC` is a built-in constant that needs no `initializeTimeZones()`
     // database load. `TZDateTime.from` converts by absolute instant
@@ -249,9 +359,36 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
           digestChannelId,
           channelName,
           channelDescription: channelDescription,
+          // Attached per notification, which is what lets the label follow
+          // the current locale (spec `docs/specs/notifications.md` N2), and
+          // only for slots that name a single occurrence. Action buttons
+          // render fine at this channel's existing default importance, so no
+          // channel change is needed -- and none may be made: E-1 has just
+          // minted `digest_v2` and re-minting would discard the localized
+          // name and any importance/sound the user customized.
+          actions: actionable
+              ? [
+                  AndroidNotificationAction(
+                    digestDoneActionId,
+                    _doneActionTitle,
+                    // Already the default, but passed explicitly because it
+                    // is the load-bearing decision, not an accident: `false`
+                    // is what routes the tap to the background isolate
+                    // instead of launching the app. See the verification note
+                    // at the `initialize` call above.
+                    showsUserInterface: false,
+                  ),
+                ]
+              : null,
         ),
-        iOS: const DarwinNotificationDetails(),
+        // `categoryIdentifier` is how iOS finds the actions, which were
+        // registered on the category in `initialize` (iOS has no
+        // per-notification action list).
+        iOS: DarwinNotificationDetails(
+          categoryIdentifier: actionable ? digestActionsCategoryId : null,
+        ),
       ),
+      payload: payload,
       // Deliberate spec decision: inexact scheduling avoids the
       // SCHEDULE_EXACT_ALARM permission dance entirely — a morning digest
       // doesn't need second-precision. Do NOT "upgrade" this to an exact
@@ -326,11 +463,17 @@ class NotificationScheduler {
   /// channel is actually gone. It runs BEFORE anything can be scheduled on
   /// [digestChannelId], because every schedule and cancel path funnels
   /// through here first, so a user never briefly holds both channels.
+  /// Passes the localized "Done" action title down for the iOS notification
+  /// category (spec `docs/specs/notifications.md` N2). Resolved through
+  /// [localeResolver] like every other string here, so an in-app language
+  /// override reaches it -- but only once per process, since this is
+  /// idempotent; see [DigestNotificationPlugin.initialize].
   Future<void> ensureInitialized() async {
     if (_initialized) {
       return;
     }
-    await plugin.initialize();
+    final l10n = lookupAppLocalizations(localeResolver());
+    await plugin.initialize(doneActionTitle: l10n.notificationActionDone);
     await plugin.deleteLegacyDigestChannel();
     _initialized = true;
   }
@@ -365,9 +508,21 @@ class NotificationScheduler {
   /// Deliberately never requests the OS notification permission itself; see
   /// the class doc and spec `docs/specs/polish-round-1.md` A3.
   ///
+  /// [actingMemberId] is the member the whole recompute was scoped to, and is
+  /// what a "Done" tap on any of these slots will be attributed to. It is a
+  /// parameter here rather than a [DigestPlan] field because it is a property
+  /// of the recompute, not of one slot: it would be identical on all
+  /// [digestHorizonSlots] entries and would push an application-layer identity
+  /// into a pure-domain value. `null` (identity unresolvable — see
+  /// `actingMemberProvider`) yields a payload with `by: null`, i.e. an
+  /// unattributed completion, which is the honest answer rather than a guess.
+  ///
   /// Throws [ArgumentError] if [plans] is not exactly [digestHorizonSlots]
   /// long.
-  Future<void> applyDigestPlans(List<DigestPlan?> plans) {
+  Future<void> applyDigestPlans(
+    List<DigestPlan?> plans, {
+    String? actingMemberId,
+  }) {
     if (plans.length != digestHorizonSlots) {
       throw ArgumentError.value(
         plans.length,
@@ -376,12 +531,17 @@ class NotificationScheduler {
       );
     }
     final waitForPrevious = _applyTail.catchError((_) {});
-    final thisApply = waitForPrevious.then((_) => _applyDigestPlansNow(plans));
+    final thisApply = waitForPrevious.then(
+      (_) => _applyDigestPlansNow(plans, actingMemberId),
+    );
     _applyTail = thisApply.catchError((_) {});
     return thisApply;
   }
 
-  Future<void> _applyDigestPlansNow(List<DigestPlan?> plans) async {
+  Future<void> _applyDigestPlansNow(
+    List<DigestPlan?> plans,
+    String? actingMemberId,
+  ) async {
     await ensureInitialized();
     final l10n = lookupAppLocalizations(localeResolver());
     for (var k = 0; k < plans.length; k++) {
@@ -390,6 +550,10 @@ class NotificationScheduler {
       if (plan == null) {
         await plugin.cancel(id);
       } else {
+        // Per slot, deliberately: each slot carries its own counts, so slot 0
+        // can be actionable while slot 5 is not (spec
+        // `docs/specs/notifications.md` N2).
+        final soleOccurrenceId = plan.soleOccurrenceId;
         await plugin.zonedSchedule(
           id: id,
           title: l10n.appTitle,
@@ -397,6 +561,13 @@ class NotificationScheduler {
           fireAt: plan.fireAt,
           channelName: l10n.notificationChannelDigestName,
           channelDescription: l10n.notificationChannelDigestDescription,
+          payload: soleOccurrenceId == null
+              ? null
+              : encodeDigestActionPayload(
+                  occurrenceId: soleOccurrenceId,
+                  actingMemberId: actingMemberId,
+                ),
+          actionable: soleOccurrenceId != null,
         );
       }
     }
