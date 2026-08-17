@@ -313,6 +313,29 @@ void main() {
     );
   });
 
+  group('resolveDigestLocale', () {
+    test('an in-app language override wins over the OS locale', () {
+      // The whole point: the UI honours the override, so the notification
+      // copy must too -- reading only the OS locale gave a user who picked
+      // German on an English phone English notifications behind a German
+      // app.
+      expect(resolveDigestLocale(const Locale('de')), const Locale('de'));
+      expect(resolveDigestLocale(const Locale('en')), const Locale('en'));
+    });
+
+    test('no override falls back to the OS locale', () {
+      expect(
+        resolveDigestLocale(null),
+        PlatformDispatcher.instance.locale,
+        reason:
+            'null means "nothing stored", which is also what an '
+            "unrecognized stored value maps to via localeOverrideProvider's "
+            'read-time self-heal -- it must degrade to the OS locale, not '
+            'throw',
+      );
+    });
+  });
+
   group('notification channel (backlog E-1)', () {
     List<DigestPlan?> onlySlotZero() => [
       DigestPlan(

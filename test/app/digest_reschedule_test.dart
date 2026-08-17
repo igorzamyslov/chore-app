@@ -992,4 +992,54 @@ void main() {
       await _disposeAndClose(tester, container, database);
     },
   );
+
+  testWidgets(
+    'the digest copy follows the IN-APP language override, not the OS '
+    'locale: a user who picked German on an English-language phone was '
+    'getting English notifications behind a German app',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      // Deliberately NOT overriding the OS locale: the test binary's own
+      // locale is English, which is exactly the situation being fixed --
+      // the override must beat it.
+      await container.read(settingsRepositoryProvider).setLocale('de');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(
+        container.read(clockProvider).now(),
+      );
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Blumen gießen',
+            startDate: today,
+            assignmentMode: AssignmentMode.anyone,
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      final armed = plugin.pending[digestNotificationIdBase]!;
+      expect(armed.body, '1 Aufgabe heute');
+      expect(armed.channelName, 'Tägliche Zusammenfassung');
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
 }

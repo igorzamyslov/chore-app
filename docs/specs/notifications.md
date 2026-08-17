@@ -187,13 +187,33 @@ inline hint row with a button opening the system settings
    that delete an upgrading user holds two digest entries in system
    Settings, one of them dead and English-named. Any future change to this
    channel's copy faces the same constraint: bump the id AND delete the one
-   it replaces. iOS: standard alert+badge+sound
+   it replaces. **Recorded decision — a LANGUAGE SWITCH does not update the
+   channel name, and that is accepted.** The same caching freezes the name
+   at whatever locale was active when the channel was first created, so a
+   user who later switches language keeps the old label in system Settings
+   forever. Minting a per-language id instead would accumulate one dead
+   channel row per language the user ever tried AND discard their own
+   importance/sound customization each time, since channel identity carries
+   it — a worse trade than one stale label. The copy the user actually reads
+   is unaffected: title and body are re-resolved on every reschedule.
+   iOS: standard alert+badge+sound
    authorization requested ON FIRST ENABLE (not app launch — first-run
    permission prompts are hostile), i.e. from the settings toggle or the
    bootstrap default-enabled path's first schedule attempt.
    Each notification stays a genuine one-shot `zonedSchedule`; the repeat
    comes from the `digestHorizonSlots`-id horizon, never from
    `matchDateTimeComponents` (see N1 behavior for why).
+4. **Which locale the copy is rendered in**: `resolveDigestLocale` — the
+   in-app language override (`localeOverrideProvider`, backed by the
+   persisted `settings.locale`) when the user has chosen one, else the OS
+   locale. **The OS locale ALONE is wrong and was a real defect**: the UI
+   honours the override, so a user who picked German on an English-language
+   phone got English digest notifications behind a German app. It is
+   resolved afresh on every apply — never cached in a field — so a language
+   switch reaches the next reschedule; `notificationSchedulerProvider`
+   therefore `read`s the override inside the resolver rather than `watch`ing
+   it, since rebuilding the scheduler would drop its `_initialized` flag and
+   its in-flight serialized-apply queue.
 - Permission denied → digest stays 'enabled' in settings but the
   settings screen shows the inline hint (the OS state is the source of
   truth, re-checked on app resume via the plugin's API).

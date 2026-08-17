@@ -50,6 +50,30 @@ final List<int> digestNotificationIds = List<int>.unmodifiable([
 /// cosmetic, pre-wide-install fix -- the alternative is a permanently
 /// English channel name in every non-English install.
 ///
+/// ## What a LANGUAGE SWITCH does to this name -- decided, not overlooked
+///
+/// The same caching means the channel's name is frozen at whatever locale
+/// was active the first time this app created it. A user who later switches
+/// language in Settings keeps the OLD language's channel name in system
+/// Settings -> Notifications, permanently, because there is no rename.
+///
+/// **That is ACCEPTED, and deliberately not "fixed".** The alternative --
+/// minting a per-language id, or re-minting on every language change --
+/// would leave one dead channel row behind for every language the user ever
+/// tried, and would silently discard their own importance/sound
+/// customization each time (channel identity is what carries it). A stale
+/// name on one row inside system Settings is a smaller harm than a growing
+/// list of near-identical rows plus repeatedly-reset preferences.
+///
+/// What the user actually reads is unaffected: the notification's own title
+/// and body are re-resolved from [NotificationScheduler.localeResolver] on
+/// EVERY reschedule (see [resolveDigestLocale]), so a language switch takes
+/// effect on the next apply. Only the system-Settings label lags.
+///
+/// If that label ever does need to change, the mechanism is the one this
+/// constant already documents: bump the id AND delete its predecessor. Do
+/// not attempt a rename; there isn't one.
+///
 /// See [legacyDigestChannelId] for the cleanup half of this.
 const String digestChannelId = 'digest_v2';
 
@@ -270,7 +294,13 @@ class NotificationScheduler {
   /// The underlying OS-level plugin (or fake).
   final DigestNotificationPlugin plugin;
 
-  /// Resolves the locale used to format the notification's title/body.
+  /// Resolves the locale used to format the notification's title, body and
+  /// channel copy.
+  ///
+  /// Production wiring passes [resolveDigestLocale] over the in-app language
+  /// override, NOT the bare OS locale -- see that function. It is called
+  /// afresh on every apply, so a language switch reaches the next
+  /// reschedule; do not hoist its result into a field.
   final ui.Locale Function() localeResolver;
 
   bool _initialized = false;
@@ -393,5 +423,26 @@ class NotificationScheduler {
     return l10n.notificationDigestDueOnly(plan.dueTodayCount);
   }
 }
+
+/// The locale the digest's copy is rendered in: the in-app language
+/// override ([inAppOverride], `localeOverrideProvider`'s value, backed by
+/// the persisted `settings.locale` column) when the user has chosen one,
+/// otherwise the OS locale.
+///
+/// This exists because the OS locale ALONE is the wrong source. The UI
+/// honours the in-app override, so reading only
+/// `PlatformDispatcher.instance.locale` gave a user who picked German on an
+/// English-language phone English digest notifications while every screen
+/// around them was German. That is the same class of defect as backlog
+/// E-1's hardcoded channel copy -- a user-visible notification string not
+/// resolved the way the rest of the app resolves its strings -- so it is
+/// fixed here rather than filed.
+///
+/// `null` means "no override stored", which is also what an unrecognized
+/// stored value maps to (`localeOverrideProvider`'s read-time self-heal:
+/// nothing is written back), so a foreign value degrades to the OS locale
+/// instead of throwing.
+ui.Locale resolveDigestLocale(ui.Locale? inAppOverride) =>
+    inAppOverride ?? _defaultLocale();
 
 ui.Locale _defaultLocale() => ui.PlatformDispatcher.instance.locale;
