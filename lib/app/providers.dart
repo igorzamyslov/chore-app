@@ -498,6 +498,34 @@ final notificationPermissionGrantedProvider = StateProvider<bool>(
   (ref) => true,
 );
 
+/// How many chores [ChoreService.catchUpOverdue] has rolled forward without
+/// the user having acknowledged it yet — `0` meaning "there is nothing to
+/// explain", which is the overwhelmingly common case.
+///
+/// Backlog B-1 / triage T2.1: catch-up is silent by construction. It runs
+/// before the first frame ([bootstrapProvider]) or in the background
+/// ([CatchUpController]), and the only trace it leaves is a reinserted
+/// pending occurrence that renders as an ordinary overdue tile — so to
+/// somebody coming back after a lapse, the list reads as an unexplained
+/// accusation. Both call sites ADD their nonzero count here, and
+/// `CatchUpBanner` (`lib/features/chores/catch_up_banner.dart`) is the only
+/// reader; dismissing it resets this to `0`.
+///
+/// Adding rather than overwriting is deliberate: a day-change run firing
+/// while an earlier banner is still unacknowledged must not drop the
+/// earlier count on the floor.
+///
+/// Deliberately NOT persisted, unlike the once-ever `settings` flags behind
+/// the first-run banners (`onboardingNamePromptShownAt`,
+/// `digestPrepromptShownAt`): catch-up is a recurring background event, not
+/// an onboarding step, so a genuinely new lapse has to be able to explain
+/// itself again even though an earlier one was dismissed. A plain
+/// [StateProvider] for the same reason as
+/// [notificationPermissionGrantedProvider]: widget tests can override it
+/// directly to exercise the banner's own visible/hidden/copy states without
+/// standing up a real overdue backlog first.
+final catchUpBannerCountProvider = StateProvider<int>((ref) => 0);
+
 /// The chore lifecycle service, built on [appDatabaseProvider],
 /// [choreRepositoryProvider], and [clockProvider].
 final choreServiceProvider = Provider<ChoreService>((ref) {
