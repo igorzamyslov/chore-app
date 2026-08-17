@@ -104,6 +104,17 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   /// Skips while [_creatingHousehold] too: the two flows are mutually
   /// exclusive in practice, but a half-typed "start fresh" name must never
   /// be shoved aside by this.
+  ///
+  /// One non-join way to reach "signed in, no household" is known and
+  /// accepted: "reset app data" signs out BEFORE it wipes, but that sign-out
+  /// is deliberately best-effort (`ResetDataTile._signOut` -- the wipe must
+  /// never be blocked by a network hiccup), so a failed sign-out lands the
+  /// user here still signed in and gets the subpage auto-opened. That is
+  /// recoverable with one back tap, and the subpage is not even a bad
+  /// destination -- their server membership is still live, so it offers the
+  /// reconnect card. Not worth gating on `pendingJoinCode`, which is null in
+  /// the very scenario this exists for (killed right after tapping the magic
+  /// link, before any code was entered).
   void _maybeAutoResumeJoin(AsyncValue<AuthUser?> authState) {
     if (_autoJoinTriggered || _creatingHousehold || !mounted) {
       return;
