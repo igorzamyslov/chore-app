@@ -308,11 +308,7 @@ class _BottomTabBar extends ConsumerWidget {
     // it for the sake of a dot.
     final settings = ref.watch(settingsProvider).valueOrNull;
     final permissionGranted = ref.watch(notificationPermissionGrantedProvider);
-    final showAttentionBadge =
-        settings != null &&
-        settings.digestEnabled &&
-        !permissionGranted &&
-        settings.digestPrepromptShownAt != null;
+    final showAttentionBadge = settings != null || permissionGranted;
 
     return Container(
       // A 1px top hairline (spec docs/specs/theme-v2.md §4.5) sits on this
