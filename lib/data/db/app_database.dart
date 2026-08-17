@@ -124,11 +124,6 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(settings, settings.membershipRevoked);
         }
       }
-      if (from < 12) {
-        // TEMP INVERSION: the same migration, moved OUT of the `settings`
-        // `else` branch to prove the suite catches the wrong placement.
-        await migrator.addColumn(settings, settings.pendingJoinCode);
-      }
       if (from < 8) {
         // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
         // table -- households, members, categories, chores,
