@@ -482,4 +482,103 @@ void main() {
       handle.dispose();
     },
   );
+
+  // The two gestures added by backlog D-2/D-3 are 'working the list' in
+  // exactly the sense bug 3 means, so they owe the same unfocus the check
+  // control and a scroll drag already do -- otherwise the suggestion list
+  // sits open above a list the user is actively editing, which is the
+  // reported bug.
+  testChoreApp(
+    'swiping an item away hides the suggestions (bug 3, field feedback '
+    'round 2)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      var nextId = 0;
+      final repo = ShoppingRepository(
+        database,
+        newId: () => 'item-${nextId++}',
+      );
+      final milk = await repo.addItem(householdId, name: 'Milk');
+      final bread = await repo.addItem(householdId, name: 'Bread');
+      await repo.setChecked(bread.id, checked: true);
+      await repo.deleteItem(bread.id); // an eligible focus-suggestion
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
+          matching: find.text('Bread'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.drag(
+        find.bySemanticsIdentifier('shopping.item.${milk.id}'),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'long-pressing an item hides the suggestions (bug 3, field feedback '
+    'round 2)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      var nextId = 0;
+      final repo = ShoppingRepository(
+        database,
+        newId: () => 'item-${nextId++}',
+      );
+      final milk = await repo.addItem(householdId, name: 'Milk');
+      final bread = await repo.addItem(householdId, name: 'Bread');
+      await repo.setChecked(bread.id, checked: true);
+      await repo.deleteItem(bread.id); // an eligible focus-suggestion
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
+          matching: find.text('Bread'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.longPress(
+        find.bySemanticsIdentifier('shopping.item.${milk.id}'),
+      );
+      await tester.pumpAndSettle();
+      // Asserted after backing out of the menu, so the assertion can't be
+      // confused by whether a modal route hides the routes below it from
+      // the semantics tree. The unfocus happened at long-press time either
+      // way, and nothing refocuses the field on the way back.
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
+      expect(find.text('Milk'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
 }
