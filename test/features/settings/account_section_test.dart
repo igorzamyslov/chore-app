@@ -110,8 +110,14 @@ void main() {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
 
+      // Backlog E-3: the line above the email field must say WHAT is
+      // stored and WHERE, and that not signing in keeps everything local.
       expect(
-        find.text('Sign in to sync your household across your devices.'),
+        find.text(
+          "Signing in stores your email and your household's data — chores, "
+          'shopping list, members — on the sync server, so your devices stay '
+          'in step. Without an account, everything stays on this device.',
+        ),
         findsOneWidget,
       );
 
