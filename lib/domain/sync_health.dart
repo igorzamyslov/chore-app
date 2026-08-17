@@ -94,9 +94,7 @@ SyncHealthStatus computeSyncHealth({
   Duration dirtyStaleAfter = defaultDirtyStaleAfter,
 }) {
   final cursor = lastPulledAt ?? linkedAt;
-  final pullReference = cursor.isAfter(observingSince)
-      ? cursor
-      : observingSince;
+  final pullReference = cursor;
   if (now.difference(pullReference) > pullStaleAfter) {
     return SyncHealthStatus.unhealthy;
   }
