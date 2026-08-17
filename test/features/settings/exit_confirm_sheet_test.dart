@@ -80,4 +80,65 @@ void main() {
     expect(result!.confirmed, isFalse);
     expect(result.alsoDeleteLocalData, isFalse);
   });
+
+  testWidgets(
+    'a long body at a large text scale on a small phone does not overflow '
+    '(regression: the sheet had no scroll view, and D-L5/D-L6 add copy '
+    'longer than either of the two strings live before slice 4)',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      // The longest real string this cluster adds -- the German of
+      // accountDeleteFinalBodyDeletePhone, German running longer again than
+      // the English. Literal text rather than the l10n getter on purpose:
+      // that key does not exist until slice 6, and this regression guard
+      // must not depend on task order.
+      const longBody =
+          'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, '
+          'und die Kopie auf diesem Gerät — Mitglieder, Aufgaben und '
+          'Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. '
+          'Beides lässt sich nicht rückgängig machen. Wenn du vorher eine '
+          'Kopie deiner Daten willst, nutze „Exportieren“ unter '
+          'Einstellungen → Daten.';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () => showExitConfirmSheet(
+                  context,
+                  title: 'Delete your account?',
+                  body: longBody,
+                  actionLabel: 'Delete account',
+                  semanticPrefix: 'settings.account.deleteAccount',
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      // The action must be reachable, not merely un-crashed: scrolling to it
+      // is what makes the overflow fix a fix rather than a clip.
+      await tester.scrollUntilVisible(find.text('Delete account'), 100);
+      expect(find.text('Delete account'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
