@@ -9,6 +9,7 @@
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
+  "notificationActionDone": "Erledigt",
 
   "commonCancel": "Abbrechen",
   "commonDelete": "Löschen",

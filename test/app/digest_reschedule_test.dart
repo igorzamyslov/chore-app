@@ -54,6 +54,8 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
     required DateTime fireAt,
     required String channelName,
     required String channelDescription,
+    String? payload,
+    bool actionable = false,
   }) async {
     if (id == pauseOnId && !_hasPaused) {
       _hasPaused = true;
@@ -66,6 +68,8 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
       fireAt: fireAt,
       channelName: channelName,
       channelDescription: channelDescription,
+      payload: payload,
+      actionable: actionable,
     );
   }
 }

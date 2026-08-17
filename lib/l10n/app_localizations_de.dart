@@ -67,6 +67,9 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get notificationActionDone => 'Erledigt';
+
+  @override
   String get commonCancel => 'Abbrechen';
 
   @override
