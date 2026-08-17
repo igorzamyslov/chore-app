@@ -30,8 +30,6 @@ import 'package:chore_app/application/notification_action_handler.dart';
 import 'package:chore_app/application/notification_action_processor.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/repositories/chore_repository.dart';
-import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
