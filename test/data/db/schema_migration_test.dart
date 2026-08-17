@@ -975,11 +975,18 @@ void main() {
       expect(row.digestEnabled, isTrue);
       expect(row.digestMinutes, 480);
 
-      // Exactly one `pending_join_code` column on `settings` -- same
-      // reasoning as the 9 -> 12 test's identical assertion above: it pins
-      // the shape of THIS upgrade path, and would NOT by itself catch the
-      // flat/unconditional `addColumn` placement that duplicate-adds on a
-      // 1 -> 12 jump.
+      // Exactly one `pending_join_code` column on `settings`. This, NOT
+      // the `isNull` assertion above, is what proves the migration ran:
+      // drift maps an ABSENT nullable column to `null` on read, so
+      // `expect(row.pendingJoinCode, isNull)` passes just as happily when
+      // nothing added the column at all (verified by deleting the
+      // migration branch: only this assertion went red). Any future
+      // nullable-column migration test needs the same guard.
+      //
+      // What it does NOT catch is the flat/unconditional `addColumn`
+      // placement -- that still adds the column exactly once on a 11 -> 12
+      // upgrade, and duplicate-adds only on a 1 -> 12 jump, where the
+      // `1 -> 2` test above is the one that fails.
       final columns = await upgraded
           .customSelect("PRAGMA table_info('settings')")
           .get();
