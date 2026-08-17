@@ -388,6 +388,9 @@ void main() {
     });
 
     test('is not equal to an unrelated object', () {
+      // Comparing against a deliberately unrelated type is the point of
+      // this test: the `other is Recurrence` guard must reject it rather
+      // than throw.
       // ignore: unrelated_type_equality_checks
       expect(Recurrence.everyNDays(3) == 'not a recurrence', isFalse);
     });

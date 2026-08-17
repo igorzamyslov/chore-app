@@ -35,12 +35,21 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    String? channelName,
+    String? channelDescription,
   }) async {
     if (!_hasPaused) {
       _hasPaused = true;
       await _gate.future;
     }
-    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+    await super.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
+    );
   }
 }
 
