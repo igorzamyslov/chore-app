@@ -486,6 +486,7 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
     // this provider, which would drop the scheduler's `_initialized` flag
     // and its in-flight serialized-apply queue. See [resolveDigestLocale]
     // for why the OS locale alone is the wrong source.
+    localeResolver: () => resolveDigestLocale(ref.read(localeOverrideProvider)),
   );
 });
 
