@@ -984,6 +984,12 @@ abstract class AppLocalizations {
   /// **'Daily summary'**
   String get settingsDigestToggleTitle;
 
+  /// Sub-line shown under the settings screen's digest toggle when the toggle is on but the OS notification permission is denied, so the switch's ON position doesn't look like it is working. Also the accessibility label of the Settings tab's ambient attention dot (lib/app/app_shell.dart), which appears in exactly the same situation.
+  ///
+  /// In en, this message translates to:
+  /// **'Not delivering — notifications are off'**
+  String get settingsDigestToggleDeniedHint;
+
   /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
   ///
   /// In en, this message translates to:

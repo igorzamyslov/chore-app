@@ -666,6 +666,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDigestToggleTitle => 'Daily summary';
 
   @override
+  String get settingsDigestToggleDeniedHint =>
+      'Not delivering — notifications are off';
+
+  @override
   String get settingsDigestTimeLabel => 'Notification time';
 
   @override
