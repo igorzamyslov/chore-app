@@ -77,60 +77,83 @@ class _ExitConfirmSheetState extends State<_ExitConfirmSheet> {
     final theme = Theme.of(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
 
+    // Two axes, two problems, both reachable with real copy on a small
+    // phone at a large text scale -- see this file's test for the fixture
+    // that reproduced them.
+    //
+    // VERTICAL: `showModalBottomSheet` is called with
+    // `isScrollControlled: true`, which lets the sheet grow to the full
+    // screen height and then stops. The cascade warning (D-L5) and the
+    // delete-account copy (D-L6) are taller than that in German, so without
+    // a scroll view the Column overflows and the action buttons become
+    // unreachable. `mainAxisSize: MainAxisSize.min` is exactly what
+    // `SingleChildScrollView` wants from its child, so nothing else in the
+    // tree changes shape while the content still fits.
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Text(widget.body, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 16),
-          semantic(
-            '${widget.semanticPrefix}.deleteLocal',
-            child: CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: _alsoDeleteLocalData,
-              title: Text(l10n.exitConfirmDeleteLocalLabel),
-              subtitle: Text(l10n.exitConfirmDeleteLocalExplanation),
-              onChanged: (value) =>
-                  setState(() => _alsoDeleteLocalData = value ?? false),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Text(widget.body, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 16),
+            semantic(
+              '${widget.semanticPrefix}.deleteLocal',
+              child: CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _alsoDeleteLocalData,
+                title: Text(l10n.exitConfirmDeleteLocalLabel),
+                subtitle: Text(l10n.exitConfirmDeleteLocalExplanation),
+                onChanged: (value) =>
+                    setState(() => _alsoDeleteLocalData = value ?? false),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              semantic(
-                '${widget.semanticPrefix}.cancel',
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(
-                    const ExitConfirmResult(
-                      confirmed: false,
-                      alsoDeleteLocalData: false,
+            const SizedBox(height: 8),
+            // HORIZONTAL: Cancel plus an action label as long as "Konto
+            // löschen" does not fit 288 logical pixels at a 2x text scale,
+            // and a plain `Row` reports that as a RenderFlex overflow rather
+            // than wrapping. `OverflowBar` is what `AlertDialog.actions`
+            // uses, so every confirmation in this app already stacks its
+            // buttons this way when they stop fitting -- this makes the
+            // sheet behave like the dialogs instead of clipping.
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              overflowAlignment: OverflowBarAlignment.end,
+              spacing: 8,
+              overflowSpacing: 8,
+              children: [
+                semantic(
+                  '${widget.semanticPrefix}.cancel',
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(
+                      const ExitConfirmResult(
+                        confirmed: false,
+                        alsoDeleteLocalData: false,
+                      ),
                     ),
+                    child: Text(l10n.exitConfirmCancel),
                   ),
-                  child: Text(l10n.exitConfirmCancel),
                 ),
-              ),
-              const SizedBox(width: 8),
-              semantic(
-                '${widget.semanticPrefix}.confirm',
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(
-                    ExitConfirmResult(
-                      confirmed: true,
-                      alsoDeleteLocalData: _alsoDeleteLocalData,
+                semantic(
+                  '${widget.semanticPrefix}.confirm',
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(
+                      ExitConfirmResult(
+                        confirmed: true,
+                        alsoDeleteLocalData: _alsoDeleteLocalData,
+                      ),
                     ),
+                    child: Text(widget.actionLabel),
                   ),
-                  child: Text(widget.actionLabel),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

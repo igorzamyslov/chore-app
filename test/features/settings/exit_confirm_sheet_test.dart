@@ -106,6 +106,7 @@ void main() {
           'Kopie deiner Daten willst, nutze „Exportieren“ unter '
           'Einstellungen → Daten.';
 
+      ExitConfirmResult? result;
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [
@@ -117,13 +118,18 @@ void main() {
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
-                onPressed: () => showExitConfirmSheet(
-                  context,
-                  title: 'Delete your account?',
-                  body: longBody,
-                  actionLabel: 'Delete account',
-                  semanticPrefix: 'settings.account.deleteAccount',
-                ),
+                onPressed: () async {
+                  result = await showExitConfirmSheet(
+                    context,
+                    title: 'Delete your account?',
+                    body: longBody,
+                    // As long as the real German 'Konto löschen', which is
+                    // what overflows the button row horizontally next to
+                    // Cancel at this scale.
+                    actionLabel: 'Konto löschen',
+                    semanticPrefix: 'settings.account.deleteAccount',
+                  );
+                },
                 child: const Text('open'),
               ),
             ),
@@ -133,11 +139,24 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      // The action must be reachable, not merely un-crashed: scrolling to it
-      // is what makes the overflow fix a fix rather than a clip.
-      await tester.scrollUntilVisible(find.text('Delete account'), 100);
-      expect(find.text('Delete account'), findsOneWidget);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'both axes must survive: the Column needs a scroll view, and the '
+            'button row needs to stack rather than overflow horizontally',
+      );
+
+      // Not merely un-crashed -- the action has to be REACHABLE. ensureVisible
+      // fails outright if nothing in the sheet scrolls, and tap fails if the
+      // button is not hit-testable where it ended up, so the two together
+      // are what distinguish a real fix from a clip.
+      await tester.ensureVisible(find.text('Konto löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Konto löschen'));
+      await tester.pumpAndSettle();
+
+      expect(result?.confirmed, isTrue);
       expect(tester.takeException(), isNull);
     },
   );
