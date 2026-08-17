@@ -247,7 +247,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >()
-        ?.deleteNotificationChannel(legacyDigestChannelId);
+        ?.deleteNotificationChannel(channelId: legacyDigestChannelId);
   }
 }
 
