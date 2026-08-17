@@ -471,9 +471,15 @@ second recompute. See `NotificationActionSignalController` in
   database.
 
 **Testing.** The completion/attribution/rewrite logic
-(`NotificationActionProcessor`) is fully unit-testable against an in-memory
-`AppDatabase`, and the ping receiver is testable because `IsolateNameServer`
-is same-process; both are covered.
+(`notification_action_processor.dart`) is fully unit-testable against an
+in-memory `AppDatabase`, including the horizon rewrite that silences the stale
+slots, and both are covered. The ping receiver is testable to the extent that
+`IsolateNameServer` is same-process: `test/app/notification_action_signal_test.dart`
+covers port registration/release and that a ping causes a recompute in a window
+it first proves quiet. It does NOT reproduce the cross-connection invisibility
+the invalidates exist for — that needs a second `AppDatabase` over a real file,
+and on-disk drift inside `testWidgets`' fake-async zone hangs the suite. That
+half is GATE-verified by hand (below), not by any automated test here.
 
 **What no test in this repo covers, stated so nobody mistakes green CI for a
 working feature.** The real background-isolate spawn, the manifest receiver,
