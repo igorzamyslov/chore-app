@@ -124,10 +124,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       FocusManager.instance.primaryFocus?.unfocus();
                       unawaited(showShoppingEditSheet(context, item: item));
                     },
-                    onLongPressItem: (item) => unawaited(_openMenu(item)),
-                    onSwipeDeleteItem: (id) => unawaited(
-                      deleteShoppingItemWithUndo(context, ref, itemId: id),
-                    ),
+                    // Both new gestures (D-2/D-3) unfocus for the same Bug 3
+                    // reason as the two callbacks above: swiping a row away
+                    // and long-pressing one are 'working the list', so the
+                    // suggestion list must not stay open over a list being
+                    // edited. The swipe's unfocus lands when the dismiss
+                    // animation finishes rather than when the drag starts,
+                    // which folds it into the same reflow as the row
+                    // disappearing instead of causing a second one.
+                    onLongPressItem: (item) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(_openMenu(item));
+                    },
+                    onSwipeDeleteItem: (id) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(
+                        deleteShoppingItemWithUndo(context, ref, itemId: id),
+                      );
+                    },
                     onClear: () => unawaited(
                       _clearChecked(
                         ref,
