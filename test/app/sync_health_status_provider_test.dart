@@ -323,8 +323,9 @@ void main() {
       // what the following pull's `serverNow()` returns, so it must be
       // brought up to `currentTime` first. Otherwise the pull below would
       // set `syncLastPulledAt` to the fake's stale default.
-      transport.now = currentTime;
-      transport.beforeUpsert = null;
+      transport
+        ..now = currentTime
+        ..beforeUpsert = null;
       await container.read(syncEngineProvider).pushDirty();
       await tester.pump(const Duration(milliseconds: 50));
       container.invalidate(syncHealthStatusProvider);

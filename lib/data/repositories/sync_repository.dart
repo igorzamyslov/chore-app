@@ -38,14 +38,14 @@ class SyncRepository {
   Stream<bool> watchAnyDirty() {
     return db
         .customSelect(
-          'SELECT EXISTS('
+          'SELECT EXISTS( '
           'SELECT 1 FROM households WHERE sync_dirty = 1 '
           'UNION ALL SELECT 1 FROM members WHERE sync_dirty = 1 '
           'UNION ALL SELECT 1 FROM categories WHERE sync_dirty = 1 '
           'UNION ALL SELECT 1 FROM chores WHERE sync_dirty = 1 '
           'UNION ALL SELECT 1 FROM chore_assignees WHERE sync_dirty = 1 '
           'UNION ALL SELECT 1 FROM chore_occurrences WHERE sync_dirty = 1 '
-          'UNION ALL SELECT 1 FROM shopping_items WHERE sync_dirty = 1'
+          'UNION ALL SELECT 1 FROM shopping_items WHERE sync_dirty = 1 '
           ') AS any_dirty',
           readsFrom: {
             db.households,
