@@ -110,6 +110,24 @@ abstract class AppLocalizations {
   /// **'Something went wrong starting up: {error}'**
   String appBootstrapError(Object error);
 
+  /// Headline shown full-screen when the app fails to bootstrap, above the technical appBootstrapError detail line.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t open your data'**
+  String get appBootstrapErrorTitle;
+
+  /// Android notification channel name for the daily digest, shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why digestChannelId is versioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get notificationChannelDigestName;
+
+  /// Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'The once-a-day chores digest notification.'**
+  String get notificationChannelDigestDescription;
+
   /// Daily digest notification body when there are due-today occurrences but nothing overdue.
   ///
   /// In en, this message translates to:
@@ -127,6 +145,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
   String notificationDigestBoth(int dueCount, int overdueCount);
+
+  /// Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get notificationActionDone;
 
   /// Generic 'cancel' action, used by the chore delete confirmation dialog.
   ///
@@ -511,6 +535,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not now'**
   String get digestPrepromptDismissAction;
+
+  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}'**
+  String catchUpBannerMessage(int count);
+
+  /// Tooltip for the catch-up banner's X dismiss button, which resets the count so the banner hides until a genuinely new catch-up run reports one.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get catchUpBannerDismissTooltip;
 
   /// Undo snackbar message after completing a one-off occurrence (no next occurrence is created).
   ///
@@ -984,6 +1020,12 @@ abstract class AppLocalizations {
   /// **'Daily summary'**
   String get settingsDigestToggleTitle;
 
+  /// Sub-line shown under the settings screen's digest toggle when the toggle is on but the OS notification permission is denied, so the switch's ON position doesn't look like it is working. Also the accessibility label of the Settings tab's ambient attention dot (lib/app/app_shell.dart), which appears in exactly the same situation.
+  ///
+  /// In en, this message translates to:
+  /// **'Not delivering — notifications are off'**
+  String get settingsDigestToggleDeniedHint;
+
   /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
   ///
   /// In en, this message translates to:
@@ -1308,10 +1350,10 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsAppearanceDark;
 
-  /// Intro line shown above the email field in the Account section's signed-out state.
+  /// Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that).
   ///
   /// In en, this message translates to:
-  /// **'Sign in to sync your household across your devices.'**
+  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.'**
   String get settingsAccountIntro;
 
   /// Label of the Account section's signed-out email TextField.
@@ -1415,6 +1457,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.'**
   String get syncRefreshErrorRevoked;
+
+  /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
+  ///
+  /// In en, this message translates to:
+  /// **'This device hasn\'t reached the rest of the household in a while. Your changes are saved — try pulling down to refresh.'**
+  String get syncHealthBannerMessage;
 
   /// Snackbar shown when signing out fails.
   ///
@@ -1823,6 +1871,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete everything'**
   String get settingsResetConfirm2Action;
+
+  /// Snackbar shown when the reset-app-data wipe itself throws -- reachable mainly from the startup error screen's escape hatch, where the same broken database connection that caused the startup failure is also what the wipe needs to write through.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reset your data. Please try again.'**
+  String get settingsResetError;
 
   /// Checkbox label in the shared exit-confirmation sheet (spec docs/specs/household-lifecycle.md §3.3). Unchecked by default in every exit.
   ///

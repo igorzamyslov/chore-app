@@ -17,6 +17,18 @@ import 'package:flutter/material.dart';
 /// never the only signal for the checked state, per
 /// `docs/specs/design-language.md`).
 ///
+/// Two more gestures (backlog D-2/D-3, conventions audit C2/C5): swiping
+/// left ([DismissDirection.endToStart] only, never both directions) fires
+/// [onSwipeDelete]; long-pressing anywhere on the row fires [onLongPress].
+/// Both ultimately call the SAME `deleteShoppingItemWithUndo` the edit
+/// sheet's own Delete button uses (`shopping_delete.dart`) -- there is
+/// exactly one delete-with-undo behavior in the app, reached three ways.
+/// The row wins the horizontal gesture arena against the shell's tab
+/// `PageView` because it is deeper in the tree, which is a deliberate,
+/// documented trade-off -- see `docs/specs/ui-shopping.md`
+/// §"Behaviors & constraints" for the accepted cost and the escape hatch,
+/// and do NOT try to hand the pager priority back.
+///
 /// This widget is deliberately bare (no card of its own): callers group rows
 /// from the same category into one shared card (see `ShoppingListScreen`'s
 /// aisle cards and `ShoppingCheckedSection`'s cart card), hairline-separated,
@@ -27,6 +39,8 @@ class ShoppingItemTile extends StatelessWidget {
     required this.item,
     required this.onCheckedChanged,
     required this.onTap,
+    required this.onLongPress,
+    required this.onSwipeDelete,
     super.key,
   });
 
@@ -40,6 +54,18 @@ class ShoppingItemTile extends StatelessWidget {
   /// Called when the row is tapped anywhere but the check control.
   final VoidCallback onTap;
 
+  /// Called when the row is long-pressed, to open the delete action sheet
+  /// (backlog D-3) -- the tap-reachable equivalent of [onSwipeDelete] for
+  /// anyone who can't perform a calibrated horizontal drag.
+  final VoidCallback onLongPress;
+
+  /// Called once the swipe-to-delete gesture's own dismiss animation
+  /// completes (backlog D-2). The caller does the actual delete + undo
+  /// snackbar (`deleteShoppingItemWithUndo`) -- this widget only reports
+  /// that the gesture happened, matching how [onTap]/[onLongPress] report
+  /// gestures without owning their side effects.
+  final VoidCallback onSwipeDelete;
+
   @override
   Widget build(BuildContext context) {
     final shoppingItem = item.item;
@@ -48,57 +74,96 @@ class ShoppingItemTile extends StatelessWidget {
     final quantityNote = shoppingItem.quantityNote;
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
-    return semantic(
-      'shopping.item.${shoppingItem.id}',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                _CheckRing(
-                  identifier: 'shopping.item.${shoppingItem.id}.check',
-                  checked: checked,
-                  onChanged: onCheckedChanged,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          shoppingItem.name,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            decoration: checked
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: checked ? mutedColor : null,
-                          ),
-                        ),
-                        if (quantityNote != null && quantityNote.isNotEmpty)
+    return Dismissible(
+      key: ValueKey('shopping.item.${shoppingItem.id}.dismissible'),
+      // Single direction (OD-1, docs/plans/2026-08-08-shopping-gestures.md):
+      // delete-only, swipe left -- never both directions, so this never
+      // duplicates the dedicated 48dp check-ring control and keeps the
+      // smallest possible collision surface against the shell's tab
+      // `PageView` (backlog D-1, `lib/app/app_shell.dart`).
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onSwipeDelete(),
+      background: const _SwipeDeleteBackground(),
+      child: semantic(
+        'shopping.item.${shoppingItem.id}',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  _CheckRing(
+                    identifier: 'shopping.item.${shoppingItem.id}.check',
+                    checked: checked,
+                    onChanged: onCheckedChanged,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            quantityNote,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: mutedColor,
+                            shoppingItem.name,
+                            style: theme.textTheme.titleSmall?.copyWith(
                               decoration: checked
                                   ? TextDecoration.lineThrough
                                   : null,
+                              color: checked ? mutedColor : null,
                             ),
                           ),
-                      ],
+                          if (quantityNote != null && quantityNote.isNotEmpty)
+                            Text(
+                              quantityNote,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: mutedColor,
+                                decoration: checked
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The swipe-to-delete background: an `errorContainer` ground with a
+/// trailing delete glyph in `error`, revealed as the row is dragged left --
+/// the same error-container/error pairing the overdue chore tile already
+/// uses (`lib/features/chores/chore_occurrence_tile.dart`), so this doesn't
+/// introduce a new color pairing. Purely a transient drag-in-progress
+/// affordance, not a persistent status color, so it doesn't conflict with
+/// design-language.md's "category color is an accent, not a background"
+/// rule (a different subject: persistent per-item state, not a one-off
+/// gesture reveal).
+class _SwipeDeleteBackground extends StatelessWidget {
+  const _SwipeDeleteBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      color: colorScheme.errorContainer,
+      // Directional, not `centerRight`: the glyph must sit at the END of the
+      // row, which is where an `endToStart` drag reveals it in either text
+      // direction.
+      alignment: AlignmentDirectional.centerEnd,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Icon(Icons.delete_outline, color: colorScheme.error),
     );
   }
 }

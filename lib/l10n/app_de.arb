@@ -2,10 +2,14 @@
   "@@locale": "de",
   "appTitle": "Famdo",
   "appBootstrapError": "Beim Start ist etwas schiefgelaufen: {error}",
+  "appBootstrapErrorTitle": "Deine Daten konnten nicht geöffnet werden",
 
+  "notificationChannelDigestName": "Tägliche Zusammenfassung",
+  "notificationChannelDigestDescription": "Die einmal täglich versendete Aufgaben-Zusammenfassung.",
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
+  "notificationActionDone": "Erledigt",
 
   "commonCancel": "Abbrechen",
   "commonDelete": "Löschen",
@@ -85,6 +89,9 @@
   "digestPrepromptMessage": "Möchtest du eine tägliche Zusammenfassung deiner fälligen Aufgaben?",
   "digestPrepromptEnableAction": "Aktivieren",
   "digestPrepromptDismissAction": "Nicht jetzt",
+
+  "catchUpBannerMessage": "{count, plural, one{Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.} other{Wir haben {count} überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.}}",
+  "catchUpBannerDismissTooltip": "Schließen",
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
@@ -177,6 +184,7 @@
 
   "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleTitle": "Tägliche Zusammenfassung",
+  "settingsDigestToggleDeniedHint": "Wird nicht zugestellt — Benachrichtigungen sind aus",
   "settingsDigestTimeLabel": "Benachrichtigungszeit",
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
@@ -243,7 +251,7 @@
   "settingsAppearanceLight": "Hell",
   "settingsAppearanceDark": "Dunkel",
 
-  "settingsAccountIntro": "Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.",
+  "settingsAccountIntro": "Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.",
   "settingsAccountEmailLabel": "E-Mail-Adresse",
   "settingsAccountSendLink": "Anmeldelink senden",
   "settingsAccountSendAgain": "Erneut senden",
@@ -261,6 +269,7 @@
   "settingsAccountSignOutConfirmAction": "Abmelden",
   "syncRefreshError": "Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.",
   "syncRefreshErrorRevoked": "Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.",
+  "syncHealthBannerMessage": "Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.",
   "settingsAccountSignOutError": "Abmelden hat nicht geklappt. Versuch es noch mal.",
   "settingsAccountComingSoonTitle": "Synchronisierung — bald verfügbar",
   "settingsAccountReconnectTitle": "Mit {householdName} neu verbinden",
@@ -332,6 +341,7 @@
   "settingsResetConfirm2Title": "Wirklich alles löschen?",
   "settingsResetConfirm2Body": "Das ist der letzte Schritt. Sobald du bestätigst, ist sofort alles weg.",
   "settingsResetConfirm2Action": "Alles löschen",
+  "settingsResetError": "Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.",
 
   "exitConfirmDeleteLocalLabel": "Kopie auf diesem Gerät auch löschen",
   "exitConfirmDeleteLocalExplanation": "Aus: Der Haushalt bleibt als deine eigene lokale Kopie auf diesem Gerät. An: Mitglieder, Aufgaben und Einkaufsliste auf diesem Gerät werden gelöscht und die App startet neu.",

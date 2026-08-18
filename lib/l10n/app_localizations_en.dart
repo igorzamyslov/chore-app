@@ -17,6 +17,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle => 'We couldn\'t open your data';
+
+  @override
+  String get notificationChannelDigestName => 'Daily summary';
+
+  @override
+  String get notificationChannelDigestDescription =>
+      'The once-a-day chores digest notification.';
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -54,6 +64,9 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0 · $_temp1';
   }
+
+  @override
+  String get notificationActionDone => 'Done';
 
   @override
   String get commonCancel => 'Cancel';
@@ -282,6 +295,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get digestPrepromptDismissAction => 'Not now';
+
+  @override
+  String catchUpBannerMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'We moved $count overdue chores forward to their most recent due dates, so nothing piled up.',
+      one:
+          'We moved 1 overdue chore forward to its most recent due date, so nothing piled up.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catchUpBannerDismissTooltip => 'Dismiss';
 
   @override
   String get choresSnackbarDone => 'Done';
@@ -666,6 +695,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDigestToggleTitle => 'Daily summary';
 
   @override
+  String get settingsDigestToggleDeniedHint =>
+      'Not delivering — notifications are off';
+
+  @override
   String get settingsDigestTimeLabel => 'Notification time';
 
   @override
@@ -865,7 +898,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Sign in to sync your household across your devices.';
+      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.';
 
   @override
   String get settingsAccountEmailLabel => 'Email address';
@@ -930,6 +963,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get syncRefreshErrorRevoked =>
       'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.';
+
+  @override
+  String get syncHealthBannerMessage =>
+      'This device hasn\'t reached the rest of the household in a while. Your changes are saved — try pulling down to refresh.';
 
   @override
   String get settingsAccountSignOutError =>
@@ -1210,6 +1247,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Delete everything';
+
+  @override
+  String get settingsResetError =>
+      'Couldn\'t reset your data. Please try again.';
 
   @override
   String get exitConfirmDeleteLocalLabel => 'Also delete this phone\'s copy';

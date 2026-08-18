@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:chore_app/application/notification_scheduler.dart';
@@ -35,12 +36,25 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
+    String? payload,
+    bool actionable = false,
   }) async {
     if (!_hasPaused) {
       _hasPaused = true;
       await _gate.future;
     }
-    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+    await super.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      payload: payload,
+      actionable: actionable,
+    );
   }
 }
 
@@ -300,6 +314,198 @@ void main() {
               digestNotificationIdBase + k,
           ]),
         );
+      },
+    );
+  });
+
+  group('the digest Done action (backlog F-1, spec notifications.md N2)', () {
+    List<DigestPlan?> plansOf(Map<int, DigestPlan> byIndex) => [
+      for (var k = 0; k < digestHorizonSlots; k++) byIndex[k],
+    ];
+
+    DigestPlan planWith({String? soleOccurrenceId, int dueTodayCount = 1}) =>
+        DigestPlan(
+          fireAt: DateTime(2026, 7, 24, 8),
+          dueTodayCount: dueTodayCount,
+          overdueCount: 0,
+          soleOccurrenceId: soleOccurrenceId,
+        );
+
+    test(
+      'a slot naming a sole occurrence is scheduled actionable, with a '
+      'payload that DECODES to the occurrence and the acting member',
+      () async {
+        await scheduler.applyDigestPlans(
+          plansOf({0: planWith(soleOccurrenceId: 'occ-1')}),
+          actingMemberId: 'member-7',
+        );
+
+        final call = plugin.pending[1001]!;
+        expect(call.actionable, isTrue);
+        // Asserted on the DECODED map, never on a hand-written JSON string:
+        // string equality would pin key order, which jsonEncode does not
+        // guarantee.
+        expect(jsonDecode(call.payload!), {
+          'v': 1,
+          'occ': 'occ-1',
+          'by': 'member-7',
+        });
+      },
+    );
+
+    test('a slot naming no sole occurrence is scheduled non-actionable with '
+        'no payload at all', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({0: planWith(dueTodayCount: 2)}),
+        actingMemberId: 'member-7',
+      );
+
+      final call = plugin.pending[1001]!;
+      expect(call.actionable, isFalse);
+      expect(call.payload, isNull);
+    });
+
+    test('MIXED horizon in ONE apply: actionability is decided per slot, not '
+        'once per apply', () async {
+      // The assertion that catches a global rather than per-slot gate. Under
+      // the real projection this is the common shape: counts only grow along
+      // the horizon, so a one-occurrence slot is routinely followed by
+      // two-occurrence ones.
+      await scheduler.applyDigestPlans(
+        plansOf({
+          0: planWith(soleOccurrenceId: 'occ-1'),
+          5: planWith(dueTodayCount: 2),
+          9: planWith(soleOccurrenceId: 'occ-9'),
+        }),
+        actingMemberId: 'member-7',
+      );
+
+      expect(plugin.pending[1001]!.actionable, isTrue);
+      expect(plugin.pending[1006]!.actionable, isFalse);
+      expect(plugin.pending[1006]!.payload, isNull);
+      expect(plugin.pending[1010]!.actionable, isTrue);
+      expect(
+        (jsonDecode(plugin.pending[1010]!.payload!) as Map)['occ'],
+        'occ-9',
+      );
+    });
+
+    test('a null actingMemberId still yields a valid payload with by: null '
+        '-- an unattributed completion, never a dropped action', () async {
+      await scheduler.applyDigestPlans(
+        plansOf({0: planWith(soleOccurrenceId: 'occ-1')}),
+      );
+
+      final call = plugin.pending[1001]!;
+      expect(call.actionable, isTrue);
+      expect(jsonDecode(call.payload!), {'v': 1, 'occ': 'occ-1', 'by': null});
+    });
+
+    test('ensureInitialized passes the localized Done title through for the '
+        'iOS category', () async {
+      await scheduler.ensureInitialized();
+      expect(plugin.lastDoneActionTitle, 'Done');
+    });
+
+    test('German locale localizes the Done title', () async {
+      final germanScheduler = NotificationScheduler(
+        plugin: plugin,
+        localeResolver: () => const Locale('de'),
+      );
+      await germanScheduler.ensureInitialized();
+      expect(plugin.lastDoneActionTitle, 'Erledigt');
+    });
+
+    test('the action id is namespaced, so a future per-chore reminder (G-6) '
+        'cannot collide with it on the process-global callback', () {
+      expect(digestDoneActionId, 'digest.done');
+      expect(digestActionsCategoryId, 'digestActions');
+    });
+  });
+
+  group('resolveDigestLocale', () {
+    test('an in-app language override wins over the OS locale', () {
+      // The whole point: the UI honours the override, so the notification
+      // copy must too -- reading only the OS locale gave a user who picked
+      // German on an English phone English notifications behind a German
+      // app.
+      expect(resolveDigestLocale(const Locale('de')), const Locale('de'));
+      expect(resolveDigestLocale(const Locale('en')), const Locale('en'));
+    });
+
+    test('no override falls back to the OS locale', () {
+      expect(
+        resolveDigestLocale(null),
+        PlatformDispatcher.instance.locale,
+        reason:
+            'null means "nothing stored", which is also what an '
+            "unrecognized stored value maps to via localeOverrideProvider's "
+            'read-time self-heal -- it must degrade to the OS locale, not '
+            'throw',
+      );
+    });
+  });
+
+  group('notification channel (backlog E-1)', () {
+    List<DigestPlan?> onlySlotZero() => [
+      DigestPlan(
+        fireAt: DateTime(2026, 7, 25, 8),
+        dueTodayCount: 3,
+        overdueCount: 0,
+      ),
+      for (var k = 1; k < digestHorizonSlots; k++) null,
+    ];
+
+    test(
+      'the channel id is versioned: Android caches a channel name at '
+      'CREATION and offers no rename, so newly-localized copy can only '
+      'reach an existing install on a NEW id',
+      () {
+        expect(digestChannelId, 'digest_v2');
+      },
+    );
+
+    test('schedules with the localized channel name and description', () async {
+      await scheduler.applyDigestPlans(onlySlotZero());
+      expect(plugin.pending[1001]!.channelName, 'Daily summary');
+      expect(
+        plugin.pending[1001]!.channelDescription,
+        'The once-a-day chores digest notification.',
+      );
+    });
+
+    test('German locale produces German channel copy', () async {
+      final germanScheduler = NotificationScheduler(
+        plugin: plugin,
+        localeResolver: () => const Locale('de'),
+      );
+      await germanScheduler.applyDigestPlans(onlySlotZero());
+      expect(plugin.pending[1001]!.channelName, 'Tägliche Zusammenfassung');
+      expect(
+        plugin.pending[1001]!.channelDescription,
+        'Die einmal täglich versendete Aufgaben-Zusammenfassung.',
+      );
+    });
+
+    test(
+      'ensureInitialized deletes the legacy (pre-l10n) channel exactly '
+      'once across repeated calls, so it stops lingering as a dead, '
+      'English-named entry in system Settings',
+      () async {
+        await scheduler.ensureInitialized();
+        await scheduler.ensureInitialized();
+        await scheduler.ensureInitialized();
+        expect(plugin.deleteLegacyDigestChannelCallCount, 1);
+      },
+    );
+
+    test(
+      'the legacy channel is deleted BEFORE anything is scheduled on the '
+      'new one, so a user never briefly holds both',
+      () async {
+        await scheduler.applyDigestPlans(onlySlotZero());
+        expect(plugin.deleteLegacyDigestChannelCallCount, 1);
+        expect(plugin.pending, hasLength(1));
       },
     );
   });

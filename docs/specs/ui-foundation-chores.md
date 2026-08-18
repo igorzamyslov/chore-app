@@ -80,8 +80,19 @@ ids. Icons are always drawn in the category's color at regular weight — the
 
 ### main.dart
 `ProviderScope` → `ChoreApp`. While `bootstrapProvider` loads: blank
-scaffold with a centered `CircularProgressIndicator`; on error: centered
-error text `semantic('app.bootstrap_error')`.
+scaffold with a centered `CircularProgressIndicator`; on error: a centered
+plain-language headline, the raw exception as a de-emphasized detail line
+`semantic('app.bootstrap_error')`, and two actions —
+`semantic('app.bootstrap_error.retry')`, which re-invalidates whichever of
+`householdGateProvider`/`bootstrapProvider` failed, and
+`semantic('app.bootstrap_error.reset')`, which runs the same
+`confirmAndResetAppData` double-confirm flow as the Settings row. The
+escape hatch is mandatory, not decorative (spec
+`docs/feedback/2026-08-08-prerelease-audit.md` S2): Settings is
+unreachable from this screen, so without it a database-open failure bricks
+the app until it is uninstalled. The raw exception stays visible on
+purpose — this app has no crash reporting, so a screenshot of that line is
+the whole bug report.
 
 ## Chores feature
 

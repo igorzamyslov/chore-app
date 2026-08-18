@@ -435,4 +435,56 @@ void main() {
       );
     },
   );
+
+  test('setPendingJoinCode sets the value and bumps updated_at', () async {
+    final created = await repo.ensureSettings();
+    expect(created.pendingJoinCode, isNull);
+    clock.advance(const Duration(minutes: 5));
+
+    await repo.setPendingJoinCode('ABC12345');
+
+    final updated = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(updated.pendingJoinCode, 'ABC12345');
+    expect(updated.updatedAt, isNot(created.updatedAt));
+  });
+
+  test('setPendingJoinCode(null) clears a previously-set value', () async {
+    await repo.setPendingJoinCode('ABC12345');
+    var row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.pendingJoinCode, 'ABC12345');
+
+    await repo.setPendingJoinCode(null);
+    row = await (db.select(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(SettingsRepository.deviceId))).getSingle();
+    expect(row.pendingJoinCode, isNull);
+  });
+
+  test('setPendingJoinCode implicitly creates the row if missing', () async {
+    await repo.setPendingJoinCode('ABC12345');
+    final rows = await db.select(db.settings).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.pendingJoinCode, 'ABC12345');
+  });
+
+  test(
+    'watchSettings emits an updated value after setPendingJoinCode',
+    () async {
+      final emissions = <String?>[];
+      final sub = repo.watchSettings().listen(
+        (settings) => emissions.add(settings.pendingJoinCode),
+      );
+      addTearDown(sub.cancel);
+
+      await pumpEventQueue();
+      await repo.setPendingJoinCode('ABC12345');
+      await pumpEventQueue();
+
+      expect(emissions.last, 'ABC12345');
+    },
+  );
 }

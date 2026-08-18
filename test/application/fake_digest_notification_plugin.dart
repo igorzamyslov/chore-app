@@ -13,6 +13,10 @@ class ScheduledCall {
     required this.title,
     required this.body,
     required this.fireAt,
+    required this.channelName,
+    required this.channelDescription,
+    this.payload,
+    this.actionable = false,
   });
 
   /// The notification id passed to `zonedSchedule`.
@@ -27,9 +31,27 @@ class ScheduledCall {
   /// The fire time passed to `zonedSchedule`.
   final DateTime fireAt;
 
+  /// The localized Android notification channel name passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelName;
+
+  /// The localized Android notification channel description passed to
+  /// `zonedSchedule` (backlog E-1).
+  final String channelDescription;
+
+  /// The JSON action payload passed to `zonedSchedule`, or `null` for a
+  /// non-actionable slot (backlog F-1).
+  final String? payload;
+
+  /// Whether the "Done" action was attached to this notification (backlog
+  /// F-1).
+  final bool actionable;
+
   @override
   String toString() =>
-      'ScheduledCall(id: $id, title: $title, body: $body, fireAt: $fireAt)';
+      'ScheduledCall(id: $id, title: $title, body: $body, fireAt: $fireAt, '
+      'channelName: $channelName, channelDescription: $channelDescription, '
+      'payload: $payload, actionable: $actionable)';
 }
 
 /// A fake [DigestNotificationPlugin] that records every call instead of
@@ -42,11 +64,21 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   /// How many times [initialize] was called.
   int initializeCallCount = 0;
 
+  /// The localized "Done" action title passed to the most recent
+  /// [initialize] call, or `null` if it was never called (backlog F-1).
+  ///
+  /// Used only for the iOS notification category, whose action titles are
+  /// fixed at registration time.
+  String? lastDoneActionTitle;
+
   /// How many times [requestPermission] was called.
   int requestPermissionCallCount = 0;
 
   /// How many times [cancel] was called.
   int cancelCallCount = 0;
+
+  /// How many times `deleteLegacyDigestChannel` was called.
+  int deleteLegacyDigestChannelCallCount = 0;
 
   /// Every [zonedSchedule] call, in order.
   final List<ScheduledCall> scheduledCalls = [];
@@ -68,8 +100,9 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   }
 
   @override
-  Future<void> initialize() async {
+  Future<void> initialize({required String doneActionTitle}) async {
     initializeCallCount++;
+    lastDoneActionTitle = doneActionTitle;
   }
 
   @override
@@ -86,12 +119,20 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
+    String? payload,
+    bool actionable = false,
   }) async {
     final call = ScheduledCall(
       id: id,
       title: title,
       body: body,
       fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      payload: payload,
+      actionable: actionable,
     );
     scheduledCalls.add(call);
     pending[id] = call;
@@ -101,5 +142,10 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
   Future<void> cancel(int id) async {
     cancelCallCount++;
     pending.remove(id);
+  }
+
+  @override
+  Future<void> deleteLegacyDigestChannel() async {
+    deleteLegacyDigestChannelCallCount++;
   }
 }

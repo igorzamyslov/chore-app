@@ -12,9 +12,12 @@ import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
+import 'package:chore_app/features/shopping/shopping_delete.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
+import 'package:chore_app/features/shopping/shopping_item_action_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
+import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,6 +64,22 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
       ),
       body: Column(
         children: [
+          // This screen's only banner (backlog D-5, spec
+          // `docs/specs/sync-freshness.md` §2.5), self-hiding to
+          // `SizedBox.shrink()` whenever sync looks healthy — which is
+          // always, for an unlinked household.
+          //
+          // ABOVE the quick-add row, not below it: the warning is about
+          // whether what you are here to type will reach the person you are
+          // shopping for, so it has to be readable BEFORE the field, not
+          // after it. Deliberately not lifted into a `_BannerRegion` like
+          // the chores list's (`lib/features/chores/chores_list_screen.dart`)
+          // — one member does not need a region. If a second banner ever
+          // lands on this screen, lift both into one, follow that region's
+          // documented contract (every member self-hides; order by urgency
+          // to the person on screen right now), and keep this one above the
+          // quick-add row for the reason above.
+          const SyncHealthBanner(),
           const ShoppingQuickAddRow(),
           Expanded(
             // Bug 3 (field feedback round 2,
@@ -104,6 +123,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                     onTapItem: (item) {
                       FocusManager.instance.primaryFocus?.unfocus();
                       unawaited(showShoppingEditSheet(context, item: item));
+                    },
+                    // Both new gestures (D-2/D-3) unfocus for the same Bug 3
+                    // reason as the two callbacks above: swiping a row away
+                    // and long-pressing one are 'working the list', so the
+                    // suggestion list must not stay open over a list being
+                    // edited. The swipe's unfocus lands when the dismiss
+                    // animation finishes rather than when the drag starts,
+                    // which folds it into the same reflow as the row
+                    // disappearing instead of causing a second one.
+                    onLongPressItem: (item) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(_openMenu(item));
+                    },
+                    onSwipeDeleteItem: (id) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      unawaited(
+                        deleteShoppingItemWithUndo(context, ref, itemId: id),
+                      );
                     },
                     onClear: () => unawaited(
                       _clearChecked(
@@ -190,6 +227,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
   }
+
+  /// Opens the long-press action sheet for [item] and acts on the chosen
+  /// [ShoppingItemMenuAction] (backlog D-3) -- currently just Delete,
+  /// reusing the same `deleteShoppingItemWithUndo` every other delete path
+  /// calls (see `shopping_delete.dart`). Takes no explicit `context`/`ref`
+  /// params -- uses the State's own ambient values, matching
+  /// `chores_list_screen.dart`'s `_openMenu(OccurrenceWithChore occurrence)`
+  /// precedent exactly.
+  Future<void> _openMenu(ShoppingItemWithCategory item) async {
+    final action = await showShoppingItemActionSheet(context);
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case ShoppingItemMenuAction.delete:
+        await deleteShoppingItemWithUndo(context, ref, itemId: item.item.id);
+    }
+  }
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
@@ -230,6 +285,8 @@ class _Body extends StatelessWidget {
     required this.onCartExpansionChanged,
     required this.onCheckedChanged,
     required this.onTapItem,
+    required this.onLongPressItem,
+    required this.onSwipeDeleteItem,
     required this.onClear,
     required this.onUncheckAll,
   });
@@ -239,6 +296,8 @@ class _Body extends StatelessWidget {
   final ValueChanged<bool> onCartExpansionChanged;
   final void Function(String id, {required bool checked}) onCheckedChanged;
   final ValueChanged<ShoppingItemWithCategory> onTapItem;
+  final ValueChanged<ShoppingItemWithCategory> onLongPressItem;
+  final ValueChanged<String> onSwipeDeleteItem;
   final VoidCallback onClear;
   final VoidCallback onUncheckAll;
 
@@ -337,6 +396,8 @@ class _Body extends StatelessWidget {
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onTap: () => onTapItem(item),
+      onLongPress: () => onLongPressItem(item),
+      onSwipeDelete: () => onSwipeDeleteItem(item.item.id),
     );
   }
 }

@@ -204,6 +204,10 @@ void main() {
         await tester.pump(digestRescheduleDebounce);
         expect(plugin.scheduledCalls, isNotEmpty);
 
+        // ...and the resume path reports the one chore it rolled forward, so
+        // the chores list can explain it (backlog B-1 / triage T2.1).
+        expect(container.read(catchUpBannerCountProvider), 1);
+
         // Disposed explicitly here (rather than via `addTearDown`), which
         // cancels the still-armed day-change timer: `flutter_test`'s
         // "a Timer is still pending" leak check runs *before* registered
@@ -282,6 +286,10 @@ void main() {
           plugin.cancelCallCount,
           greaterThanOrEqualTo(cancelCountBefore + digestHorizonSlots),
         );
+        // ...and the catch-up banner stays silent: unlike the digest
+        // recompute, it has genuinely nothing to say when nothing moved
+        // (backlog B-1 / triage T2.1).
+        expect(container.read(catchUpBannerCountProvider), 0);
 
         // See [_disposeAndClose]'s doc comment for why a pump must separate
         // `dispose()` from `close()`.
@@ -315,7 +323,7 @@ void main() {
         expect(container.read(todayProvider), PlainDate(2026, 1, 5));
 
         // Backgrounded overnight; no chores exist at all, so catch-up has
-        // nothing to change and reports `changed == false`.
+        // nothing to change and reports a count of 0.
         currentTime = DateTime(2026, 1, 6, 9);
         catchUpController.triggerOnResume();
 

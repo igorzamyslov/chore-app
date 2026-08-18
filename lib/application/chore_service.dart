@@ -6,8 +6,6 @@
 /// authoritative semantics.
 library;
 
-import 'dart:convert';
-
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -97,10 +95,30 @@ class ChoreService {
   /// recurring chore) inserts the next pending occurrence with the rotation
   /// advanced.
   ///
+  /// [completedBy] is nullable — an UNATTRIBUTED completion — and stays
+  /// `required` so no caller can omit it by accident. Two callers, two
+  /// different right answers, and the asymmetry is deliberate:
+  ///
+  /// - **In-app** (`chores_list_screen.dart`) a null identity is REFUSED: the
+  ///   tap is abandoned and a snackbar asks the user who they are (T1.3). That
+  ///   is right there, because there is a user looking at a screen who can
+  ///   answer.
+  /// - **From a digest notification action** (spec
+  ///   `docs/specs/notifications.md` N2) a null identity is ACCEPTED and
+  ///   recorded as null. There is no UI to ask in, and the alternatives are
+  ///   both worse: dropping the tap silently discards the user's explicit "I
+  ///   did this", and guessing at a member is the misattribution backlog A-5
+  ///   closed.
+  ///
+  /// Nothing else changes: the `completed_by` column has always been nullable
+  /// ([skipOccurrence] already writes null through the same
+  /// `_closeAndAdvance`), and rotation advances on `assigned_member_id`, never
+  /// on `completed_by`.
+  ///
   /// Throws [StateError] if the occurrence is not currently pending.
   Future<void> completeOccurrence(
     String occurrenceId, {
-    required String completedBy,
+    required String? completedBy,
   }) {
     return _closeAndAdvance(
       occurrenceId,
@@ -130,14 +148,22 @@ class ChoreService {
   /// stay overdue. Idempotent: calling this again the same day changes
   /// nothing.
   ///
-  /// Returns whether it changed anything (closed at least one chore's
-  /// occurrence as missed and reinserted it) — `CatchUpController` uses this
-  /// to decide whether a digest recompute is warranted afterward, since the
-  /// common case (nothing overdue) has nothing new for the digest to
-  /// reflect.
-  Future<bool> catchUpOverdue(String householdId) async {
+  /// Returns the number of chores it changed — i.e. how many had their
+  /// pending occurrence closed as `missed` and a fresh one reinserted (0 if
+  /// none, which is the common case).
+  ///
+  /// Nothing in the lifecycle branches on that number: the digest recompute
+  /// `CatchUpController` runs after each catch-up is deliberately
+  /// UNCONDITIONAL (see `_runCatchUp` in `lib/app/providers.dart` for why —
+  /// a day passing is itself a reason to re-arm the horizon). The UI is what
+  /// needs the count: a nonzero result is what lets `CatchUpBanner`
+  /// (`lib/features/chores/catch_up_banner.dart`) tell a returning user that
+  /// this happened, and to how many chores, instead of leaving freshly
+  /// overdue tiles to appear out of nowhere and read as an accusation
+  /// (backlog B-1 / triage T2.1).
+  Future<int> catchUpOverdue(String householdId) async {
     final today = _today;
-    var changed = false;
+    var changedCount = 0;
     await database.transaction(() async {
       final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
@@ -171,10 +197,10 @@ class ChoreService {
           dueDate: latestSlot,
           assignedMemberId: pending.assignedMemberId,
         );
-        changed = true;
+        changedCount++;
       }
     });
-    return changed;
+    return changedCount;
   }
 
   /// Pauses [choreId] and deletes its pending occurrence. History is
@@ -254,9 +280,9 @@ class ChoreService {
 
   /// Updates [choreId] via [ChoreRepository.updateChore] (same parameters,
   /// same "omit to leave unchanged" convention), then, if the edit changed
-  /// `recurrence` and/or `startDate` — compared by serialized value, since
-  /// [Recurrence] has no `==`; a bare `null` only ever equals `null` — in
-  /// the same transaction:
+  /// `recurrence` and/or `startDate` — compared by VALUE, via
+  /// [Recurrence]'s own `==` (backlog E-4); a bare `null` only ever equals
+  /// `null` — in the same transaction:
   ///
   /// - deletes the chore's current pending occurrence (if any);
   /// - if the chore is paused, stops there: a paused chore has no pending
@@ -288,9 +314,15 @@ class ChoreService {
     final today = _today;
     await database.transaction(() async {
       final before = await _requireActiveChore(choreId);
+      // Value equality, straight from `Recurrence.==` (backlog E-4).
+      // This used to compare `jsonEncode(a.toJson())` strings because
+      // `Recurrence` had only identity equality -- equivalent in result
+      // (`toJson` sorts `weekdays`, so order-independence held), but it
+      // allocated two JSON strings on every chore edit and would have
+      // silently stopped noticing a field added to `Recurrence` but not to
+      // `toJson`.
       final recurrenceChanged =
-          recurrence.present &&
-          !_sameRecurrence(recurrence.value, before.chore.recurrence);
+          recurrence.present && recurrence.value != before.chore.recurrence;
       final startDateChanged =
           startDate != null && startDate != before.chore.startDate;
 
@@ -565,18 +597,6 @@ class ChoreService {
     }
   }
 
-  /// Whether [a] and [b] are the same recurrence rule, compared by
-  /// serialized value (mirroring how a [Recurrence] is actually persisted —
-  /// see `RecurrenceConverter.toSql` in `lib/data/db/converters.dart`)
-  /// rather than identity, since [Recurrence] has no `==` override. A bare
-  /// `null` only ever equals `null`.
-  bool _sameRecurrence(Recurrence? a, Recurrence? b) {
-    if (a == null || b == null) {
-      return a == b;
-    }
-    return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
-  }
-
   /// Fetches [choreId]'s details, throwing [StateError] if it doesn't exist.
   Future<ChoreWithDetails> _requireChore(String choreId) async {
     final details = await chores.getChore(choreId);
@@ -596,13 +616,15 @@ class ChoreService {
     return details;
   }
 
-  /// Looks up an occurrence by id directly, since [ChoreRepository] only
-  /// exposes chore-scoped occurrence lookups.
-  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) {
-    return (database.select(
-      database.choreOccurrences,
-    )..where((tbl) => tbl.id.equals(occurrenceId))).getSingleOrNull();
-  }
+  /// Looks up an occurrence by id, whichever chore owns it.
+  ///
+  /// Delegates to [ChoreRepository.getOccurrence] rather than re-issuing the
+  /// query. This was a private copy of that query only because the repository
+  /// exposed nothing but chore-scoped occurrence lookups; the digest
+  /// notification action (spec `docs/specs/notifications.md` N2) needed a
+  /// public one, and two copies of a query is how a third appears.
+  Future<ChoreOccurrence?> _findOccurrence(String occurrenceId) =>
+      chores.getOccurrence(occurrenceId);
 
   /// [choreId]'s occurrences closed (done/skipped/missed) with
   /// `closedOn == today`, ordered newest-first by due date then

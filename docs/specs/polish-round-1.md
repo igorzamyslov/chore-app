@@ -60,6 +60,17 @@ of the chores list, and flows keep passing untouched.
   `digest.preprompt.dismiss`): mark flag only — the digest stays enabled
   but silent until permission arrives via Settings (existing hint row is
   the recovery path). Banner id `digest.preprompt`.
+- **This banner is never re-armed or re-shown** after either action, on any
+  trigger — not on a cooldown, not on a symptom. Its job is to explain the
+  feature before the one-shot OS dialog, and that job is finished the first
+  time it is answered; bringing the same question back to someone who
+  already answered it is the nagging `DESIGN.md` §2 forbids. The durable
+  recovery path for a user who never returns to Settings is instead the
+  Settings tab's ambient attention dot plus the digest toggle's sub-line
+  (backlog B-5 / triage T2.6) — see the "Saying so when the digest cannot
+  be delivered" section of `docs/specs/notifications.md`. That dot is
+  gated on `digestPrepromptShownAt != null`, i.e. it takes over exactly
+  where this banner leaves off, so the two are never on screen together.
 
 ## B. Settings data operations (G8 + G9)
 
@@ -98,6 +109,24 @@ of the chores list, and flows keep passing untouched.
   `docs/feedback/2026-08-07-field-feedback.md` A1), which keeps the
   session and only unlinks the device: Reset is the clean-slate operation,
   Disconnect is the "keep working, just not with this household" one.
+- The flow lives in `confirmAndResetAppData`, a top-level function in
+  `lib/features/settings/reset_flow.dart` rather than a private method on
+  the row widget, so the startup error screen can run it too (spec
+  `docs/specs/ui-foundation-chores.md` "main.dart"; spec
+  `docs/feedback/2026-08-08-prerelease-audit.md` S2). The two dialogs
+  themselves come from the action-agnostic
+  `confirmTwoStepDestructiveAction` in
+  `lib/features/settings/destructive_confirm.dart`: any further
+  irreversible action composes a `DestructiveConfirmStep` pair instead of
+  copying a dialog builder.
+- If the wipe itself throws — the same broken connection that put a user on
+  the startup error screen is what it must write through — that surfaces as
+  the `settingsResetError` snackbar, never as an unhandled exception. That
+  catch is `on Object`, not `on Exception`, because a closed sqlite3
+  connection throws a `StateError`; likewise for the two best-effort
+  side-effects above, where a notification-plugin
+  `LateInitializationError` once escaped an `on Exception` and aborted a
+  double-confirmed wipe. **Do not narrow these catches.**
 
 ## C. Lifecycle robustness
 
@@ -128,7 +157,8 @@ of the chores list, and flows keep passing untouched.
 ### C2. Editing recurrence/start date regenerates the pending occurrence
 - Documented v1 simplification (chore_form_screen.dart) becomes real
   behavior: when an EDIT changes `recurrence` and/or `startDate`
-  (compare by serialized value), the service must, in the same
+  (compare by value — `Recurrence` has a real `==` since backlog E-4; this
+  used to be a `jsonEncode` projection), the service must, in the same
   transaction: delete the chore's pending occurrences and insert a fresh
   one using THE SAME two-floors rule as `unpauseChore` (never before
   today; never at/before the latest closed slot; closed one-off →

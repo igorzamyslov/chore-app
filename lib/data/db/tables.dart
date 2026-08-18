@@ -294,6 +294,24 @@ class Settings extends Table {
   BoolColumn get membershipRevoked =>
       boolean().withDefault(const Constant(false))();
 
+  /// The invite code most recently submitted -- and accepted by the
+  /// server -- on the welcome-join subpage's code-entry step (spec
+  /// `docs/specs/onboarding-v2.md` §1, `docs/research/triage.md` T2.4), or
+  /// `NULL`. Prefills the code field again after a process kill mid-join
+  /// (`WelcomeJoinPage._prefillPendingCode`), so the user is not forced to
+  /// retype an 8-character code they may never have written down.
+  ///
+  /// Deliberately ADVISORY, never authoritative: nothing routes on it --
+  /// which step the join subpage shows is re-derived on every build from
+  /// `currentAuthUserProvider`/`myMembershipProvider` alone (see
+  /// `WelcomeScreen`/`WelcomeJoinPage`'s own doc comments). A stale value
+  /// can therefore only ever sit in a text field the user is free to
+  /// overwrite; it can never trap anyone. Cleared by
+  /// `HouseholdJoinService.joinFresh` on a successful join and by
+  /// `HouseholdCreateService.create` (a join abandoned for a fresh
+  /// household). Added in schemaVersion 12; see `AppDatabase.migration`.
+  TextColumn get pendingJoinCode => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 

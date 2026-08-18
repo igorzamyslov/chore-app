@@ -113,6 +113,7 @@ class SettingsScreen extends ConsumerWidget {
                 data: (settings) => [
                   DigestToggleTile(
                     value: settings.digestEnabled,
+                    permissionDenied: !permissionGranted,
                     onChanged: (enabled) =>
                         settingsRepository.setDigestEnabled(enabled: enabled),
                   ),

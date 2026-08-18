@@ -48,6 +48,13 @@ Future<void> main() async {
   final digestController = container.read(digestRescheduleControllerProvider);
   final catchUpController = container.read(catchUpControllerProvider);
   final syncEngineController = container.read(syncEngineControllerProvider);
+  // Registers the well-known `IsolateNameServer` port the notification-action
+  // background isolate pings (spec `docs/specs/notifications.md` N2). Read for
+  // its side effect only and deliberately NOT passed to `_AppResumeObserver`
+  // below: it has no on-resume behaviour, it only reacts to pings, and it just
+  // has to exist for the container's lifetime so `ref.onDispose` does not
+  // release the port name early.
+  container.read(notificationActionSignalControllerProvider);
   WidgetsBinding.instance.addObserver(
     _AppResumeObserver(
       digestController,
