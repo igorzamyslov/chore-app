@@ -131,7 +131,9 @@ class _ManageCategoriesScreenState
       ref.read(categoryRepositoryProvider).reorderCategories(
         householdId,
         _kind,
-        [for (final category in updated) category.id],
+        [
+          for (final category in updated) category.id,
+        ],
       ),
     );
   }

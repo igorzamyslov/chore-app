@@ -67,10 +67,18 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     navBarBackground: Color(0xFFF1EBE1),
     lift: [
       BoxShadow(color: Color(0x0D3C2D19), offset: Offset(0, 1), blurRadius: 2),
-      BoxShadow(color: Color(0x0D3C2D19), offset: Offset(0, 6), blurRadius: 18),
+      BoxShadow(
+        color: Color(0x0D3C2D19),
+        offset: Offset(0, 6),
+        blurRadius: 18,
+      ),
     ],
     fabShadow: [
-      BoxShadow(color: Color(0x4D1E7A6E), offset: Offset(0, 8), blurRadius: 22),
+      BoxShadow(
+        color: Color(0x4D1E7A6E),
+        offset: Offset(0, 8),
+        blurRadius: 22,
+      ),
     ],
     sheetShadow: [
       BoxShadow(
@@ -91,10 +99,18 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     navBarBackground: Color(0xFF1B1714),
     lift: [
       BoxShadow(color: Color(0x08FFFFFF), offset: Offset(0, 1)),
-      BoxShadow(color: Color(0x59000000), offset: Offset(0, 8), blurRadius: 24),
+      BoxShadow(
+        color: Color(0x59000000),
+        offset: Offset(0, 8),
+        blurRadius: 24,
+      ),
     ],
     fabShadow: [
-      BoxShadow(color: Color(0x80000000), offset: Offset(0, 8), blurRadius: 26),
+      BoxShadow(
+        color: Color(0x80000000),
+        offset: Offset(0, 8),
+        blurRadius: 26,
+      ),
     ],
     sheetShadow: [
       BoxShadow(

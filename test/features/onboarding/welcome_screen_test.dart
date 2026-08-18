@@ -69,8 +69,14 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('welcome.create'));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('welcome.create.name'), findsOneWidget);
-      await tester.enterText(_fieldFor('welcome.create.name'), 'Jordan');
+      expect(
+        find.bySemanticsIdentifier('welcome.create.name'),
+        findsOneWidget,
+      );
+      await tester.enterText(
+        _fieldFor('welcome.create.name'),
+        'Jordan',
+      );
       await tester.pump();
       await tester.tap(find.bySemanticsIdentifier('welcome.create.confirm'));
       await tester.pumpAndSettle();

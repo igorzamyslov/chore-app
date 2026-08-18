@@ -104,7 +104,10 @@ void main() {
     addTearDown(container.dispose);
 
     await _pumpUntil(tester, () => container.read(bootstrapProvider).hasValue);
-    await _pumpUntil(tester, () => container.read(settingsProvider).hasValue);
+    await _pumpUntil(
+      tester,
+      () => container.read(settingsProvider).hasValue,
+    );
     // Confirms the NULL branch specifically, not just "not loaded yet".
     expect(container.read(settingsProvider).value?.locale, isNull);
 
@@ -113,31 +116,37 @@ void main() {
     await database.close();
   });
 
-  testWidgets("an unknown stored value ('fr') maps to null (future-proofing)", (
-    tester,
-  ) async {
-    final database = AppDatabase(NativeDatabase.memory());
-    // bootstrapProvider no longer creates a household (spec
-    // docs/specs/onboarding-v2.md §2) -- seed one directly on the
-    // database BEFORE the container exists.
-    await HouseholdRepository(database).createLocalHousehold('Me');
-    final container = ProviderContainer(
-      overrides: [
-        appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 7, 24, 9))),
-      ],
-    );
-    addTearDown(container.dispose);
+  testWidgets(
+    "an unknown stored value ('fr') maps to null (future-proofing)",
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      // bootstrapProvider no longer creates a household (spec
+      // docs/specs/onboarding-v2.md §2) -- seed one directly on the
+      // database BEFORE the container exists.
+      await HouseholdRepository(database).createLocalHousehold('Me');
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 9)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await _pumpUntil(tester, () => container.read(bootstrapProvider).hasValue);
-    await container.read(settingsRepositoryProvider).setLocale('fr');
-    await _pumpUntil(
-      tester,
-      () => container.read(settingsProvider).value?.locale == 'fr',
-    );
+      await _pumpUntil(
+        tester,
+        () => container.read(bootstrapProvider).hasValue,
+      );
+      await container.read(settingsRepositoryProvider).setLocale('fr');
+      await _pumpUntil(
+        tester,
+        () => container.read(settingsProvider).value?.locale == 'fr',
+      );
 
-    expect(container.read(localeOverrideProvider), isNull);
+      expect(container.read(localeOverrideProvider), isNull);
 
-    await database.close();
-  });
+      await database.close();
+    },
+  );
 }

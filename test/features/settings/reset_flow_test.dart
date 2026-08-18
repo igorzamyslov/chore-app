@@ -189,7 +189,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('There is no cloud backup'), findsNothing);
+      expect(
+        find.textContaining('There is no cloud backup'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
@@ -226,7 +229,9 @@ void main() {
     'confirming both dialogs cancels the scheduled digest notification '
     '(spec docs/feedback/2026-08-08-prerelease-audit.md P3)',
     today: today,
-    overrides: [digestNotificationPluginProvider.overrideWithValue(fakePlugin)],
+    overrides: [
+      digestNotificationPluginProvider.overrideWithValue(fakePlugin),
+    ],
     (tester, database) async {
       final handle = tester.ensureSemantics();
 

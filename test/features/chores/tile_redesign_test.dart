@@ -117,7 +117,10 @@ void main() {
 
       final dueText = tester.widget<Text>(find.text('Overdue · 3 days'));
       final context = tester.element(find.text('Overdue · 3 days'));
-      expect(dueText.style?.color, Theme.of(context).colorScheme.error);
+      expect(
+        dueText.style?.color,
+        Theme.of(context).colorScheme.error,
+      );
     },
   );
 

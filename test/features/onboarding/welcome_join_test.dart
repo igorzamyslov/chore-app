@@ -76,8 +76,14 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('welcome.join'));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('welcome.join.email'), findsOneWidget);
-      await tester.enterText(_fieldFor('welcome.join.email'), 'me@example.com');
+      expect(
+        find.bySemanticsIdentifier('welcome.join.email'),
+        findsOneWidget,
+      );
+      await tester.enterText(
+        _fieldFor('welcome.join.email'),
+        'me@example.com',
+      );
       await tester.pump();
       await tester.tap(find.bySemanticsIdentifier('welcome.join.send'));
       await tester.pumpAndSettle();
@@ -194,7 +200,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Reconnect to Joined household'), findsOneWidget);
-      expect(find.bySemanticsIdentifier('welcome.join.email'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('welcome.join.email'),
+        findsNothing,
+      );
       expect(
         find.bySemanticsIdentifier('settings.account.join.code'),
         findsNothing,

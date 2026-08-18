@@ -4,11 +4,31 @@
 /// selectable anywhere.
 library;
 
+import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
+
+/// Thrown by [MemberService.deleteMember] when the server-side removal of a
+/// CLAIMED member failed (spec `docs/specs/household-lifecycle.md` §3.2).
+///
+/// This is the one action in this app whose failure must be shown to the user
+/// inline rather than swallowed into a silent retry
+/// (`docs/specs/sync-backend.md` §8.3): it needs the network, it changed
+/// nothing, and the person the user was trying to remove is still in the
+/// household. Nothing local has been written when this is thrown.
+class ClaimedMemberRemovalFailure implements Exception {
+  /// Wraps the underlying transport/RPC [cause].
+  const ClaimedMemberRemovalFailure(this.cause);
+
+  /// The error the gateway threw.
+  final Object cause;
+
+  @override
+  String toString() => 'ClaimedMemberRemovalFailure($cause)';
+}
 
 /// Orchestrates member deletion on top of [ChoreRepository] primitives and
 /// a direct write to the `members` table (no dedicated member repository
@@ -22,6 +42,7 @@ class MemberService {
   MemberService({
     required this.database,
     required this.chores,
+    required this.gateway,
     this.clock = const Clock(),
   });
 
@@ -34,6 +55,13 @@ class MemberService {
   /// referential cleanup (rotation/fixed assignee lists, pending
   /// occurrences).
   final ChoreRepository chores;
+
+  /// The Supabase seam used to remove a CLAIMED member server-side (spec
+  /// `docs/specs/household-lifecycle.md` §3.2). Never touched for an
+  /// unclaimed profile, which stays a purely local operation -- so a
+  /// local-only household never reaches the network even though this
+  /// dependency is always present.
+  final HouseholdGateway gateway;
 
   /// The clock used for the soft-delete timestamp. Injectable for
   /// deterministic tests.

@@ -314,7 +314,9 @@ ThemeData _buildTheme({
     // selected / onSurfaceVariant unselected" split at the theme level --
     // see the wave report).
     chipTheme: ChipThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
       side: WidgetStateBorderSide.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           return BorderSide(color: famdo.primaryOutline);

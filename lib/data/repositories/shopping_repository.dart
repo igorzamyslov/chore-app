@@ -89,7 +89,9 @@ class ShoppingRepository {
   /// Watches every active item in [householdId], both checked and
   /// unchecked, ordered: unchecked first, then by category sort order,
   /// then by name.
-  Stream<List<ShoppingItemWithCategory>> watchActiveItems(String householdId) {
+  Stream<List<ShoppingItemWithCategory>> watchActiveItems(
+    String householdId,
+  ) {
     final query =
         db.select(db.shoppingItems).join([
             leftOuterJoin(
@@ -456,7 +458,9 @@ class ShoppingRepository {
     if (ids.isEmpty) {
       return;
     }
-    await (db.update(db.shoppingItems)..where((tbl) => tbl.id.isIn(ids))).write(
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.isIn(ids))).write(
       ShoppingItemsCompanion(
         deletedAt: const Value(null),
         updatedAt: Value(_isoNow()),

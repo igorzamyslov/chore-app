@@ -33,9 +33,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final pending = await ChoreRepository(
-        database,
-      ).pendingOccurrenceOf(chore.id);
+      final pending = await ChoreRepository(database).pendingOccurrenceOf(
+        chore.id,
+      );
       await service.completeOccurrence(pending!.id, completedBy: meMember.id);
       await tester.pumpAndSettle();
 

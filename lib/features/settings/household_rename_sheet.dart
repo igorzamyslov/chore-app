@@ -105,7 +105,10 @@ class _HouseholdRenameSheetState extends ConsumerState<_HouseholdRenameSheet> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     await ref
         .read(householdRepositoryProvider)
-        .renameHousehold(householdId, name);
+        .renameHousehold(
+          householdId,
+          name,
+        );
     if (!mounted) {
       return;
     }

@@ -205,21 +205,24 @@ void main() {
       },
     );
 
-    testWidgets('an unknown color already within bounds is left alone (hue, '
-        'saturation and lightness all preserved)', (tester) async {
-      final context = await _pumpAndGetContext(tester, appLightTheme);
-      // Pure red at HSL lightness 0.3 -- already under the 0.42 light
-      // ceiling, so the clamp should be a no-op.
-      const unknown = Color(0xFF990000);
-      final unknownHsl = HSLColor.fromColor(unknown);
-      expect(unknownHsl.lightness, closeTo(0.3, 0.01));
+    testWidgets(
+      'an unknown color already within bounds is left alone (hue, '
+      'saturation and lightness all preserved)',
+      (tester) async {
+        final context = await _pumpAndGetContext(tester, appLightTheme);
+        // Pure red at HSL lightness 0.3 -- already under the 0.42 light
+        // ceiling, so the clamp should be a no-op.
+        const unknown = Color(0xFF990000);
+        final unknownHsl = HSLColor.fromColor(unknown);
+        expect(unknownHsl.lightness, closeTo(0.3, 0.01));
 
-      final rendered = categoryTone(context, unknown.toARGB32());
-      final renderedHsl = HSLColor.fromColor(rendered);
-      expect(renderedHsl.hue, closeTo(unknownHsl.hue, 1));
-      expect(renderedHsl.saturation, closeTo(unknownHsl.saturation, 0.02));
-      expect(renderedHsl.lightness, closeTo(unknownHsl.lightness, 0.02));
-    });
+        final rendered = categoryTone(context, unknown.toARGB32());
+        final renderedHsl = HSLColor.fromColor(rendered);
+        expect(renderedHsl.hue, closeTo(unknownHsl.hue, 1));
+        expect(renderedHsl.saturation, closeTo(unknownHsl.saturation, 0.02));
+        expect(renderedHsl.lightness, closeTo(unknownHsl.lightness, 0.02));
+      },
+    );
   });
 }
 

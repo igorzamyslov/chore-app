@@ -239,7 +239,10 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.joinHouseholdImportTitle, style: theme.textTheme.titleMedium),
+        Text(
+          l10n.joinHouseholdImportTitle,
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Text(l10n.joinHouseholdImportBody),
         const SizedBox(height: 16),

@@ -371,7 +371,10 @@ void main() {
 
       final detailsBalcony = await repo.getChore(seed.choreBalcony.id);
       expect(detailsBalcony!.chore.deletedAt, isNull);
-      expect(await repo.pendingOccurrenceOf(seed.choreBalcony.id), isNotNull);
+      expect(
+        await repo.pendingOccurrenceOf(seed.choreBalcony.id),
+        isNotNull,
+      );
 
       handle.dispose();
     },
@@ -398,7 +401,9 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('chores.filter.category'));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.bySemanticsIdentifier('chores.filter.category.${seed.bedroom.id}'),
+        find.bySemanticsIdentifier(
+          'chores.filter.category.${seed.bedroom.id}',
+        ),
       );
       await tester.pumpAndSettle();
 

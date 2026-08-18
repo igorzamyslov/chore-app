@@ -357,7 +357,9 @@ void main() {
         assignmentMode: AssignmentMode.anyone,
         recurrence: Recurrence.weekly(weekdays: {today.weekday}),
       );
-      final firstOccurrence = await choreRepo.pendingOccurrenceOf(oldChore.id);
+      final firstOccurrence = await choreRepo.pendingOccurrenceOf(
+        oldChore.id,
+      );
       await choreService.completeOccurrence(
         firstOccurrence!.id,
         completedBy: me.id,

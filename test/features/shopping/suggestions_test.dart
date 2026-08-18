@@ -53,7 +53,10 @@ void main() {
       await openShoppingTab(tester);
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       await tester.enterText(quickAddInput(), 'mi');
       await tester.pumpAndSettle();
@@ -79,12 +82,18 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.bySemanticsIdentifier('shopping.suggestion.2'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.2'),
+        findsNothing,
+      );
 
       // Clearing the field hides the suggestions again.
       await tester.enterText(quickAddInput(), '');
       await tester.pumpAndSettle();
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
@@ -138,7 +147,10 @@ void main() {
       // `docs/specs/theme-v2.md` §4.3) -- unlike the suggestion chip's own
       // `CategoryBadge`, which stays natural-case (asserted above).
       expect(find.text('DAIRY'), findsOneWidget);
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
       expect(
         tester.widget<TextField>(quickAddInput()).controller?.text,
         isEmpty,
@@ -234,7 +246,10 @@ void main() {
       expect(suggestionText(2, 'Cheese'), findsOneWidget);
       expect(suggestionText(3, 'Eggs'), findsOneWidget);
       expect(suggestionText(4, 'Butter'), findsOneWidget);
-      expect(find.bySemanticsIdentifier('shopping.suggestion.5'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.5'),
+        findsNothing,
+      );
       // "Milk" is on the list already — it must not show up as a
       // suggestion here even though its history outranks most of the above.
       for (var i = 0; i < 5; i++) {
@@ -245,12 +260,18 @@ void main() {
       await tester.enterText(quickAddInput(), 'ba');
       await tester.pumpAndSettle();
       expect(suggestionText(0, 'Bananas'), findsOneWidget);
-      expect(find.bySemanticsIdentifier('shopping.suggestion.1'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.1'),
+        findsNothing,
+      );
 
       // Blurring the field hides the list again.
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
@@ -274,7 +295,10 @@ void main() {
       // history so far shows nothing since "Bread" is still active.
       await tester.tap(quickAddInput());
       await tester.pumpAndSettle();
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       // Without ever losing focus, "Bread" gets bought and cleared behind
       // the scenes — it's now eligible, but nothing re-queried the focus
@@ -344,7 +368,10 @@ void main() {
       expect(suggestionText(2, 'Item3'), findsOneWidget);
       expect(suggestionText(3, 'Item2'), findsOneWidget);
       expect(suggestionText(4, 'Item1'), findsOneWidget);
-      expect(find.bySemanticsIdentifier('shopping.suggestion.5'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.5'),
+        findsNothing,
+      );
 
       // Tap the top suggestion ("Item5"): it gets added (now active), so
       // it drops out of the candidate pool entirely, and "Item0" — the
@@ -399,7 +426,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
@@ -444,7 +474,10 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -300));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('shopping.suggestion.0'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('shopping.suggestion.0'),
+        findsNothing,
+      );
 
       handle.dispose();
     },

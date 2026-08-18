@@ -33,16 +33,19 @@ void main() {
       );
     });
 
-    test('falls back to the first member when lastAssignedMemberId is no '
-        'longer in the list', () {
-      expect(
-        nextRotationAssignee(
-          orderedMemberIds: ['a', 'b', 'c'],
-          lastAssignedMemberId: 'removed-member',
-        ),
-        'a',
-      );
-    });
+    test(
+      'falls back to the first member when lastAssignedMemberId is no '
+      'longer in the list',
+      () {
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b', 'c'],
+            lastAssignedMemberId: 'removed-member',
+          ),
+          'a',
+        );
+      },
+    );
 
     test('a single-member rotation always returns that member', () {
       expect(

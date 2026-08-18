@@ -52,44 +52,50 @@ void main() {
 
   tearDown(() => db.close());
 
-  test('rotation-of-3: deleting one assignee drops the chore to a 2-person '
-      'rotation, order preserved', () async {
-    final a = await households.addMember(household.id, name: 'A', color: 1);
-    final b = await households.addMember(household.id, name: 'B', color: 2);
-    final c = await households.addMember(household.id, name: 'C', color: 3);
-    final chore = await choreService.createChore(
-      householdId: household.id,
-      title: 'Dishes',
-      startDate: today,
-      assignmentMode: AssignmentMode.rotation,
-      assigneeMemberIds: [a.id, b.id, c.id],
-    );
+  test(
+    'rotation-of-3: deleting one assignee drops the chore to a 2-person '
+    'rotation, order preserved',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+      final b = await households.addMember(household.id, name: 'B', color: 2);
+      final c = await households.addMember(household.id, name: 'C', color: 3);
+      final chore = await choreService.createChore(
+        householdId: household.id,
+        title: 'Dishes',
+        startDate: today,
+        assignmentMode: AssignmentMode.rotation,
+        assigneeMemberIds: [a.id, b.id, c.id],
+      );
 
-    await memberService.deleteMember(b.id);
+      await memberService.deleteMember(b.id);
 
-    final details = await chores.getChore(chore.id);
-    expect(details!.chore.assignmentMode, AssignmentMode.rotation);
-    expect(details.assigneeMemberIds, [a.id, c.id]);
-  });
+      final details = await chores.getChore(chore.id);
+      expect(details!.chore.assignmentMode, AssignmentMode.rotation);
+      expect(details.assigneeMemberIds, [a.id, c.id]);
+    },
+  );
 
-  test('rotation-of-2: deleting one assignee converts the chore to fixed, '
-      'assigned to the one remaining', () async {
-    final a = await households.addMember(household.id, name: 'A', color: 1);
-    final b = await households.addMember(household.id, name: 'B', color: 2);
-    final chore = await choreService.createChore(
-      householdId: household.id,
-      title: 'Dishes',
-      startDate: today,
-      assignmentMode: AssignmentMode.rotation,
-      assigneeMemberIds: [a.id, b.id],
-    );
+  test(
+    'rotation-of-2: deleting one assignee converts the chore to fixed, '
+    'assigned to the one remaining',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+      final b = await households.addMember(household.id, name: 'B', color: 2);
+      final chore = await choreService.createChore(
+        householdId: household.id,
+        title: 'Dishes',
+        startDate: today,
+        assignmentMode: AssignmentMode.rotation,
+        assigneeMemberIds: [a.id, b.id],
+      );
 
-    await memberService.deleteMember(b.id);
+      await memberService.deleteMember(b.id);
 
-    final details = await chores.getChore(chore.id);
-    expect(details!.chore.assignmentMode, AssignmentMode.fixed);
-    expect(details.assigneeMemberIds, [a.id]);
-  });
+      final details = await chores.getChore(chore.id);
+      expect(details!.chore.assignmentMode, AssignmentMode.fixed);
+      expect(details.assigneeMemberIds, [a.id]);
+    },
+  );
 
   test(
     'fixed: deleting the sole assignee converts the chore to anyone, '
@@ -116,42 +122,47 @@ void main() {
     },
   );
 
-  test('a pending occurrence assigned to the deleted member becomes '
-      'unassigned even when the chore itself keeps its OTHER assignees '
-      '(rotation-of-3, the currently-due slot happens to be theirs)', () async {
-    final a = await households.addMember(household.id, name: 'A', color: 1);
-    final b = await households.addMember(household.id, name: 'B', color: 2);
-    final c = await households.addMember(household.id, name: 'C', color: 3);
-    final chore = await choreService.createChore(
-      householdId: household.id,
-      title: 'Dishes',
-      startDate: today,
-      assignmentMode: AssignmentMode.rotation,
-      // Position 0 (a) is the first due occurrence's assignee; delete b
-      // (position 1) instead, which does NOT touch the current pending
-      // occurrence's assignedMemberId via the chore-level cleanup alone.
-      assigneeMemberIds: [a.id, b.id, c.id],
-    );
-    final pendingBefore = await chores.pendingOccurrenceOf(chore.id);
-    expect(pendingBefore!.assignedMemberId, a.id);
+  test(
+    'a pending occurrence assigned to the deleted member becomes '
+    'unassigned even when the chore itself keeps its OTHER assignees '
+    '(rotation-of-3, the currently-due slot happens to be theirs)',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+      final b = await households.addMember(household.id, name: 'B', color: 2);
+      final c = await households.addMember(household.id, name: 'C', color: 3);
+      final chore = await choreService.createChore(
+        householdId: household.id,
+        title: 'Dishes',
+        startDate: today,
+        assignmentMode: AssignmentMode.rotation,
+        // Position 0 (a) is the first due occurrence's assignee; delete b
+        // (position 1) instead, which does NOT touch the current pending
+        // occurrence's assignedMemberId via the chore-level cleanup alone.
+        assigneeMemberIds: [a.id, b.id, c.id],
+      );
+      final pendingBefore = await chores.pendingOccurrenceOf(chore.id);
+      expect(pendingBefore!.assignedMemberId, a.id);
 
-    await memberService.deleteMember(a.id);
+      await memberService.deleteMember(a.id);
 
-    // The chore rotation drops to [b, c]; the CURRENT pending occurrence
-    // (previously assigned to a) is unassigned rather than silently
-    // reassigned.
-    final details = await chores.getChore(chore.id);
-    expect(details!.assigneeMemberIds, [b.id, c.id]);
-    final pendingAfter = await chores.pendingOccurrenceOf(chore.id);
-    expect(pendingAfter!.assignedMemberId, isNull);
-  });
+      // The chore rotation drops to [b, c]; the CURRENT pending occurrence
+      // (previously assigned to a) is unassigned rather than silently
+      // reassigned.
+      final details = await chores.getChore(chore.id);
+      expect(details!.assigneeMemberIds, [b.id, c.id]);
+      final pendingAfter = await chores.pendingOccurrenceOf(chore.id);
+      expect(pendingAfter!.assignedMemberId, isNull);
+    },
+  );
 
   test(
     'claimed target: calls remove_member FIRST, then runs the same local '
     'referential cleanup (spec docs/specs/household-lifecycle.md §3.2)',
     () async {
       final a = await households.addMember(household.id, name: 'A', color: 1);
-      await (db.update(db.members)..where((tbl) => tbl.id.equals(a.id))).write(
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).write(
         const MembersCompanion(userId: Value('server-user-1')),
       );
 
@@ -173,36 +184,44 @@ void main() {
     },
   );
 
-  test('claimed target whose RPC fails: throws ClaimedMemberRemovalFailure and '
-      'changes NOTHING locally -- the member stays active', () async {
-    final a = await households.addMember(household.id, name: 'A', color: 1);
-    await (db.update(db.members)..where((tbl) => tbl.id.equals(a.id))).write(
-      const MembersCompanion(userId: Value('server-user-1')),
-    );
-    gateway.removeMemberError = Exception('offline');
+  test(
+    'claimed target whose RPC fails: throws ClaimedMemberRemovalFailure and '
+    'changes NOTHING locally -- the member stays active',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).write(
+        const MembersCompanion(userId: Value('server-user-1')),
+      );
+      gateway.removeMemberError = Exception('offline');
 
-    await expectLater(
-      memberService.deleteMember(a.id),
-      throwsA(isA<ClaimedMemberRemovalFailure>()),
-    );
+      await expectLater(
+        memberService.deleteMember(a.id),
+        throwsA(isA<ClaimedMemberRemovalFailure>()),
+      );
 
-    final row = await (db.select(
-      db.members,
-    )..where((tbl) => tbl.id.equals(a.id))).getSingle();
-    expect(row.deletedAt, isNull);
-  });
+      final row = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).getSingle();
+      expect(row.deletedAt, isNull);
+    },
+  );
 
-  test('unclaimed target: purely local, the RPC is never called', () async {
-    final a = await households.addMember(household.id, name: 'A', color: 1);
+  test(
+    'unclaimed target: purely local, the RPC is never called',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
 
-    await memberService.deleteMember(a.id);
+      await memberService.deleteMember(a.id);
 
-    expect(gateway.removeMemberCalls, isEmpty);
-    final row = await (db.select(
-      db.members,
-    )..where((tbl) => tbl.id.equals(a.id))).getSingle();
-    expect(row.deletedAt, isNotNull);
-  });
+      expect(gateway.removeMemberCalls, isEmpty);
+      final row = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+    },
+  );
 
   test(
     'the last-member guard is checked BEFORE the RPC, so a removal the local '
@@ -211,7 +230,9 @@ void main() {
       final me = await (db.select(
         db.members,
       )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
-      await (db.update(db.members)..where((tbl) => tbl.id.equals(me.id))).write(
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
         const MembersCompanion(userId: Value('server-user-1')),
       );
 

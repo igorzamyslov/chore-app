@@ -105,7 +105,10 @@ void main() {
 
       expect(find.bySemanticsIdentifier('actingMember.sheet'), findsNothing);
       expect(
-        memberNameIn(tester, find.bySemanticsIdentifier('chores.actingMember')),
+        memberNameIn(
+          tester,
+          find.bySemanticsIdentifier('chores.actingMember'),
+        ),
         'Anna',
       );
 
@@ -237,7 +240,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        memberNameIn(tester, find.bySemanticsIdentifier('chores.actingMember')),
+        memberNameIn(
+          tester,
+          find.bySemanticsIdentifier('chores.actingMember'),
+        ),
         'Anna',
       );
 

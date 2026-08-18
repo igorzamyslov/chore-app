@@ -100,7 +100,10 @@ void main() {
     ];
 
     test('rejects a list that is not exactly digestHorizonSlots long', () {
-      expect(() => scheduler.applyDigestPlans(const []), throwsArgumentError);
+      expect(
+        () => scheduler.applyDigestPlans(const []),
+        throwsArgumentError,
+      );
     });
 
     test('slot k schedules id digestNotificationIdBase + k', () async {
@@ -212,87 +215,93 @@ void main() {
       expect(plugin.pending[1001]!.body, '2 Aufgaben heute · 1 überfällig');
     });
 
-    test('FIX 2: two concurrent calls from different callers cannot '
-        'interleave their whole-horizon writes -- the later caller is not '
-        'left '
-        'with slots clobbered by an earlier one resuming after it', () async {
-      final gatedPlugin = _GatedPlugin();
-      final gatedScheduler = NotificationScheduler(
-        plugin: gatedPlugin,
-        localeResolver: () => const Locale('en'),
-      );
+    test(
+      'FIX 2: two concurrent calls from different callers cannot '
+      'interleave their whole-horizon writes -- the later caller is not '
+      'left '
+      'with slots clobbered by an earlier one resuming after it',
+      () async {
+        final gatedPlugin = _GatedPlugin();
+        final gatedScheduler = NotificationScheduler(
+          plugin: gatedPlugin,
+          localeResolver: () => const Locale('en'),
+        );
 
-      List<DigestPlan?> plansWithCount(int count) => [
-        for (var k = 0; k < digestHorizonSlots; k++)
-          DigestPlan(
-            fireAt: DateTime(2026, 7, 24 + k, 8),
-            dueTodayCount: count,
-            overdueCount: 0,
+        List<DigestPlan?> plansWithCount(int count) => [
+          for (var k = 0; k < digestHorizonSlots; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: count,
+              overdueCount: 0,
+            ),
+        ];
+
+        // Caller A (e.g. the controller's recompute) starts first; its
+        // very first `zonedSchedule` call blocks on the gate.
+        final callA = gatedScheduler.applyDigestPlans(plansWithCount(1));
+        // Give A's Future chain a turn to actually run up to the gate.
+        await Future<void>.delayed(Duration.zero);
+
+        // Caller B (e.g. the pre-prompt banner's own apply) starts while A
+        // is still paused mid-loop.
+        final callB = gatedScheduler.applyDigestPlans(plansWithCount(2));
+        await Future<void>.delayed(Duration.zero);
+
+        // The gate only pauses the very first `zonedSchedule` call ever
+        // (A's). If B's loop could run concurrently with A's, B -- being
+        // unblocked -- would already have written its whole horizon by
+        // now. Serialized correctly, B is still queued behind A and has
+        // written nothing yet.
+        expect(
+          gatedPlugin.pending,
+          isEmpty,
+          reason: 'caller B must wait behind caller A, not run concurrently',
+        );
+
+        gatedPlugin.release();
+        await callA;
+        await callB;
+
+        // The final horizon is entirely B's. If the two loops had
+        // interleaved (the bug this guards against), A resuming after B
+        // had already written would overwrite some slots with A's stale
+        // count.
+        expect(
+          gatedPlugin.pending.values.every(
+            (call) => call.body == '2 chores today',
           ),
-      ];
+          isTrue,
+          reason: 'no slot may be left over from the earlier, stale call',
+        );
+      },
+    );
 
-      // Caller A (e.g. the controller's recompute) starts first; its
-      // very first `zonedSchedule` call blocks on the gate.
-      final callA = gatedScheduler.applyDigestPlans(plansWithCount(1));
-      // Give A's Future chain a turn to actually run up to the gate.
-      await Future<void>.delayed(Duration.zero);
+    test(
+      'slot 0 firing leaves every later slot armed, with nothing to re-arm '
+      'them — this is the whole point of the horizon (audit P0)',
+      () async {
+        await scheduler.applyDigestPlans([
+          for (var k = 0; k < digestHorizonSlots; k++)
+            DigestPlan(
+              fireAt: DateTime(2026, 7, 24 + k, 8),
+              dueTodayCount: 1,
+              overdueCount: 0,
+            ),
+        ]);
 
-      // Caller B (e.g. the pre-prompt banner's own apply) starts while A
-      // is still paused mid-loop.
-      final callB = gatedScheduler.applyDigestPlans(plansWithCount(2));
-      await Future<void>.delayed(Duration.zero);
+        // The OS delivers slot 0's notification a minute after it fires.
+        // Nothing re-arms it, but every later slot must remain untouched.
+        plugin.deliverDue(DateTime(2026, 7, 24, 8, 1));
 
-      // The gate only pauses the very first `zonedSchedule` call ever
-      // (A's). If B's loop could run concurrently with A's, B -- being
-      // unblocked -- would already have written its whole horizon by
-      // now. Serialized correctly, B is still queued behind A and has
-      // written nothing yet.
-      expect(
-        gatedPlugin.pending,
-        isEmpty,
-        reason: 'caller B must wait behind caller A, not run concurrently',
-      );
-
-      gatedPlugin.release();
-      await callA;
-      await callB;
-
-      // The final horizon is entirely B's. If the two loops had
-      // interleaved (the bug this guards against), A resuming after B
-      // had already written would overwrite some slots with A's stale
-      // count.
-      expect(
-        gatedPlugin.pending.values.every(
-          (call) => call.body == '2 chores today',
-        ),
-        isTrue,
-        reason: 'no slot may be left over from the earlier, stale call',
-      );
-    });
-
-    test('slot 0 firing leaves every later slot armed, with nothing to re-arm '
-        'them — this is the whole point of the horizon (audit P0)', () async {
-      await scheduler.applyDigestPlans([
-        for (var k = 0; k < digestHorizonSlots; k++)
-          DigestPlan(
-            fireAt: DateTime(2026, 7, 24 + k, 8),
-            dueTodayCount: 1,
-            overdueCount: 0,
-          ),
-      ]);
-
-      // The OS delivers slot 0's notification a minute after it fires.
-      // Nothing re-arms it, but every later slot must remain untouched.
-      plugin.deliverDue(DateTime(2026, 7, 24, 8, 1));
-
-      expect(
-        plugin.pending.keys,
-        unorderedEquals([
-          for (var k = 1; k < digestHorizonSlots; k++)
-            digestNotificationIdBase + k,
-        ]),
-      );
-    });
+        expect(
+          plugin.pending.keys,
+          unorderedEquals([
+            for (var k = 1; k < digestHorizonSlots; k++)
+              digestNotificationIdBase + k,
+          ]),
+        );
+      },
+    );
   });
 
   group('cancelDigest', () {

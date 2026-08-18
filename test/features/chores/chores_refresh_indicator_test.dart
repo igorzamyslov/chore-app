@@ -48,10 +48,9 @@ Future<void> _pumpUntilRefreshIndicator(
   );
 }
 
-/// Fires `_refresh` through the `RefreshIndicator`'s own callback rather
-/// than a drag gesture -- the same widget `chores.refresh` already wraps, so
-/// this exercises the production code path without depending on fling
-/// physics.
+/// Fires `_refresh` through the `RefreshIndicator`'s own callback rather than
+/// a drag gesture -- the same widget `chores.refresh` already wraps, so this
+/// exercises the production code path without depending on fling physics.
 Future<void> _triggerRefresh(WidgetTester tester) async {
   final indicator = tester.widget<RefreshIndicator>(
     find.descendant(

@@ -15,37 +15,39 @@ import 'settings_test_utils.dart';
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
-  testChoreApp('renders nothing when the flag is not set', today: today, (
-    tester,
-    database,
-  ) async {
-    final handle = tester.ensureSemantics();
-    await openSettingsTab(tester);
+  testChoreApp(
+    'renders nothing when the flag is not set',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
 
-    expect(
-      find.bySemanticsIdentifier('membership.revoked.banner'),
-      findsNothing,
-    );
+      expect(
+        find.bySemanticsIdentifier('membership.revoked.banner'),
+        findsNothing,
+      );
 
-    handle.dispose();
-  });
+      handle.dispose();
+    },
+  );
 
-  testChoreApp('explains the revocation when the flag is set', today: today, (
-    tester,
-    database,
-  ) async {
-    await SettingsRepository(database).setMembershipRevoked();
+  testChoreApp(
+    'explains the revocation when the flag is set',
+    today: today,
+    (tester, database) async {
+      await SettingsRepository(database).setMembershipRevoked();
 
-    final handle = tester.ensureSemantics();
-    await openSettingsTab(tester);
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
 
-    expect(
-      find.bySemanticsIdentifier('membership.revoked.banner'),
-      findsOneWidget,
-    );
+      expect(
+        find.bySemanticsIdentifier('membership.revoked.banner'),
+        findsOneWidget,
+      );
 
-    handle.dispose();
-  });
+      handle.dispose();
+    },
+  );
 
   testChoreApp(
     'acknowledging without ticking the box keeps local data (D-L3)',

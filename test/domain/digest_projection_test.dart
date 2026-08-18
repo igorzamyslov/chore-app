@@ -211,41 +211,51 @@ void main() {
     }
 
     test('a one-off', () {
-      expectMonotone([
-        _occurrence(dueDate: PlainDate(2026, 1, 20)),
-      ], recipientMemberId: null);
+      expectMonotone(
+        [_occurrence(dueDate: PlainDate(2026, 1, 20))],
+        recipientMemberId: null,
+      );
     });
 
     test('a completion-anchored recurring chore', () {
-      expectMonotone([
-        _occurrence(
-          dueDate: PlainDate(2026, 1, 20),
-          recurrence: Recurrence.everyNDays(
-            3,
-            anchor: RecurrenceAnchor.completion,
+      expectMonotone(
+        [
+          _occurrence(
+            dueDate: PlainDate(2026, 1, 20),
+            recurrence: Recurrence.everyNDays(
+              3,
+              anchor: RecurrenceAnchor.completion,
+            ),
           ),
-        ),
-      ], recipientMemberId: null);
+        ],
+        recipientMemberId: null,
+      );
     });
 
     test('a schedule-anchored daily chore', () {
-      expectMonotone([
-        _occurrence(
-          dueDate: PlainDate(2026, 1, 20),
-          startDate: PlainDate(2026, 1, 20),
-          recurrence: Recurrence.everyNDays(1),
-        ),
-      ], recipientMemberId: null);
+      expectMonotone(
+        [
+          _occurrence(
+            dueDate: PlainDate(2026, 1, 20),
+            startDate: PlainDate(2026, 1, 20),
+            recurrence: Recurrence.everyNDays(1),
+          ),
+        ],
+        recipientMemberId: null,
+      );
     });
 
     test('a schedule-anchored weekly chore', () {
-      expectMonotone([
-        _occurrence(
-          dueDate: PlainDate(2026, 1, 19), // a Monday
-          startDate: PlainDate(2026, 1, 19),
-          recurrence: Recurrence.weekly(weekdays: const {DateTime.monday}),
-        ),
-      ], recipientMemberId: null);
+      expectMonotone(
+        [
+          _occurrence(
+            dueDate: PlainDate(2026, 1, 19), // a Monday
+            startDate: PlainDate(2026, 1, 19),
+            recurrence: Recurrence.weekly(weekdays: const {DateTime.monday}),
+          ),
+        ],
+        recipientMemberId: null,
+      );
     });
 
     test('a mixed set, unscoped', () {
@@ -268,7 +278,10 @@ void main() {
 List<ProjectedOccurrence> _mixedSet() => [
   _occurrence(dueDate: PlainDate(2026, 1, 20), assignedMemberId: 'me'),
   _occurrence(dueDate: PlainDate(2026, 2, 14)),
-  _occurrence(dueDate: PlainDate(2026, 3, 2), assignedMemberId: 'partner'),
+  _occurrence(
+    dueDate: PlainDate(2026, 3, 2),
+    assignedMemberId: 'partner',
+  ),
   _occurrence(
     dueDate: PlainDate(2026, 1, 26),
     startDate: PlainDate(2026, 1, 26),
@@ -282,7 +295,10 @@ List<ProjectedOccurrence> _mixedSet() => [
   ),
   _occurrence(
     dueDate: PlainDate(2026, 3, 9),
-    recurrence: Recurrence.everyNDays(4, anchor: RecurrenceAnchor.completion),
+    recurrence: Recurrence.everyNDays(
+      4,
+      anchor: RecurrenceAnchor.completion,
+    ),
     assignedMemberId: 'partner',
   ),
 ];

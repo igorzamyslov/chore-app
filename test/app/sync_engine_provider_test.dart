@@ -198,58 +198,61 @@ void main() {
     },
   );
 
-  testWidgets('syncEngineProvider stays Noop when signed out, even on an '
-      'otherwise-linked device (spec docs/feedback/2026-08-01-ux-audit.md '
-      'A5)', (tester) async {
-    final database = AppDatabase(NativeDatabase.memory());
-    final transport = FakeSyncTransport();
-    final authGateway = FakeAuthGateway(); // signed out
-    final container = ProviderContainer(
-      overrides: [
-        appDatabaseProvider.overrideWithValue(database),
-        clockProvider.overrideWithValue(Clock.fixed(DateTime.utc(2026))),
-        syncTransportProvider.overrideWithValue(transport),
-        authGatewayProvider.overrideWithValue(authGateway),
-      ],
-    );
-    addTearDown(container.dispose);
-    // bootstrapProvider no longer creates a household (spec
-    // docs/specs/onboarding-v2.md §2) -- seed one directly so
-    // _awaitBootstrap below actually resolves instead of erroring.
-    await container
-        .read(householdRepositoryProvider)
-        .createLocalHousehold('Me');
+  testWidgets(
+    'syncEngineProvider stays Noop when signed out, even on an '
+    'otherwise-linked device (spec docs/feedback/2026-08-01-ux-audit.md '
+    'A5)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final transport = FakeSyncTransport();
+      final authGateway = FakeAuthGateway(); // signed out
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock.fixed(DateTime.utc(2026))),
+          syncTransportProvider.overrideWithValue(transport),
+          authGatewayProvider.overrideWithValue(authGateway),
+        ],
+      );
+      addTearDown(container.dispose);
+      // bootstrapProvider no longer creates a household (spec
+      // docs/specs/onboarding-v2.md §2) -- seed one directly so
+      // _awaitBootstrap below actually resolves instead of erroring.
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
 
-    container.read(syncEngineControllerProvider);
-    final householdId = await _awaitBootstrap(tester, container);
+      container.read(syncEngineControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
 
-    await container
-        .read(settingsRepositoryProvider)
-        .setSyncLinked(
-          householdId: householdId,
-          linkedAt: container.read(clockProvider).now(),
-        );
-    // Give the linked-state write every chance to propagate.
-    await tester.pump(const Duration(seconds: 1));
+      await container
+          .read(settingsRepositoryProvider)
+          .setSyncLinked(
+            householdId: householdId,
+            linkedAt: container.read(clockProvider).now(),
+          );
+      // Give the linked-state write every chance to propagate.
+      await tester.pump(const Duration(seconds: 1));
 
-    expect(
-      container.read(syncEngineProvider),
-      isA<NoopSyncEngine>(),
-      reason:
-          'linked but signed out must still resolve to the inert '
-          'engine -- gating on linked state alone is exactly the bug '
-          'A5 fixes',
-    );
+      expect(
+        container.read(syncEngineProvider),
+        isA<NoopSyncEngine>(),
+        reason:
+            'linked but signed out must still resolve to the inert '
+            'engine -- gating on linked state alone is exactly the bug '
+            'A5 fixes',
+      );
 
-    // Signing in now flips it to a real, started engine.
-    authGateway.signIn(const AuthUser(id: 'u1', email: 'me@example.com'));
-    await _awaitLinkedEngine(tester, container);
+      // Signing in now flips it to a real, started engine.
+      authGateway.signIn(const AuthUser(id: 'u1', email: 'me@example.com'));
+      await _awaitLinkedEngine(tester, container);
 
-    // Signing back out flips it right back to Noop.
-    await authGateway.signOut();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(container.read(syncEngineProvider), isA<NoopSyncEngine>());
+      // Signing back out flips it right back to Noop.
+      await authGateway.signOut();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(container.read(syncEngineProvider), isA<NoopSyncEngine>());
 
-    await database.close();
-  });
+      await database.close();
+    },
+  );
 }

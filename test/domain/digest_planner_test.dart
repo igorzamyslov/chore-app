@@ -61,14 +61,17 @@ void main() {
       },
     );
 
-    test('DST fall-back boundary (2026-10-25, EU clocks fold 03:00->02:00): '
-        'same guarantee on the other transition', () {
-      final now = DateTime(2026, 10, 25, 9);
-      final slot = nextDigestSlot(now: now, digestMinutes: 480); // 08:00
-      expect(slot, DateTime(2026, 10, 26, 8));
-      expect(slot.hour, 8);
-      expect(slot.minute, 0);
-    });
+    test(
+      'DST fall-back boundary (2026-10-25, EU clocks fold 03:00->02:00): '
+      'same guarantee on the other transition',
+      () {
+        final now = DateTime(2026, 10, 25, 9);
+        final slot = nextDigestSlot(now: now, digestMinutes: 480); // 08:00
+        expect(slot, DateTime(2026, 10, 26, 8));
+        expect(slot.hour, 8);
+        expect(slot.minute, 0);
+      },
+    );
 
     test('rejects an out-of-range digestMinutes', () {
       expect(
@@ -184,8 +187,11 @@ void main() {
 
     test('rejects a daily segment below one day', () {
       expect(
-        () =>
-            digestSlots(now: DateTime(2026), digestMinutes: 480, dailyDays: 0),
+        () => digestSlots(
+          now: DateTime(2026),
+          digestMinutes: 480,
+          dailyDays: 0,
+        ),
         throwsArgumentError,
       );
     });
@@ -242,7 +248,9 @@ void main() {
           // independently of whatever the shipped default happens to be.
           weeklySlots: 0,
         ),
-        [for (var k = 0; k < 5; k++) DateTime(2026, 7, 24 + k, 8)],
+        [
+          for (var k = 0; k < 5; k++) DateTime(2026, 7, 24 + k, 8),
+        ],
       );
     });
 

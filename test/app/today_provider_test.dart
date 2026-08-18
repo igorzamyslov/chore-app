@@ -18,7 +18,9 @@ void main() {
     test('seeds from clockProvider', () {
       final container = ProviderContainer(
         overrides: [
-          clockProvider.overrideWithValue(Clock.fixed(DateTime(2026, 1, 5, 9))),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 1, 5, 9)),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -40,32 +42,37 @@ void main() {
       expect(container.read(todayProvider), PlainDate(2026, 1, 6));
     });
 
-    test('refresh() notifies nobody when the calendar day has not changed — so '
-        'calling it on every app resume never re-subscribes the streams that '
-        'watch it', () {
-      var currentTime = DateTime(2026, 1, 5, 9);
-      final container = ProviderContainer(
-        overrides: [clockProvider.overrideWithValue(Clock(() => currentTime))],
-      );
-      addTearDown(container.dispose);
-      var notifications = 0;
-      container.listen<PlainDate>(
-        todayProvider,
-        (previous, next) => notifications++,
-      );
+    test(
+      'refresh() notifies nobody when the calendar day has not changed — so '
+      'calling it on every app resume never re-subscribes the streams that '
+      'watch it',
+      () {
+        var currentTime = DateTime(2026, 1, 5, 9);
+        final container = ProviderContainer(
+          overrides: [
+            clockProvider.overrideWithValue(Clock(() => currentTime)),
+          ],
+        );
+        addTearDown(container.dispose);
+        var notifications = 0;
+        container.listen<PlainDate>(
+          todayProvider,
+          (previous, next) => notifications++,
+        );
 
-      // Same day, later hour: three resumes, no notification.
-      currentTime = DateTime(2026, 1, 5, 14);
-      container.read(todayProvider.notifier).refresh();
-      currentTime = DateTime(2026, 1, 5, 22);
-      container.read(todayProvider.notifier).refresh();
-      container.read(todayProvider.notifier).refresh();
-      expect(notifications, 0);
+        // Same day, later hour: three resumes, no notification.
+        currentTime = DateTime(2026, 1, 5, 14);
+        container.read(todayProvider.notifier).refresh();
+        currentTime = DateTime(2026, 1, 5, 22);
+        container.read(todayProvider.notifier).refresh();
+        container.read(todayProvider.notifier).refresh();
+        expect(notifications, 0);
 
-      // Crossing into the next day notifies exactly once.
-      currentTime = DateTime(2026, 1, 6, 0, 0, 1);
-      container.read(todayProvider.notifier).refresh();
-      expect(notifications, 1);
-    });
+        // Crossing into the next day notifies exactly once.
+        currentTime = DateTime(2026, 1, 6, 0, 0, 1);
+        container.read(todayProvider.notifier).refresh();
+        expect(notifications, 1);
+      },
+    );
   });
 }

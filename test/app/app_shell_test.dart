@@ -48,7 +48,10 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('shell.tab.chores'));
       await tester.pumpAndSettle();
       expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('Chores')),
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Chores'),
+        ),
         findsOneWidget,
       );
 

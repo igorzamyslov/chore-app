@@ -57,7 +57,9 @@ class ExportDataTile extends ConsumerWidget {
       final fileName = exportFileName(clock);
       await SharePlus.instance.share(
         ShareParams(
-          files: [XFile.fromData(bytes, mimeType: 'application/json')],
+          files: [
+            XFile.fromData(bytes, mimeType: 'application/json'),
+          ],
           fileNameOverrides: [fileName],
         ),
       );

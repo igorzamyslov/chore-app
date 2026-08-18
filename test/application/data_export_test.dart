@@ -288,36 +288,39 @@ void main() {
       },
     );
 
-    test('chores: recurrence stays the raw JSON string, never decoded; '
-        'a one-off chore has a null recurrence; soft-deleted chores are '
-        'included', () async {
-      final document = await buildExportDocument(
-        database: db,
-        clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
-      );
-      final tables = document['tables']! as Map<String, Object?>;
-      final chores = (tables['chores']! as List<dynamic>)
-          .cast<Map<String, dynamic>>();
+    test(
+      'chores: recurrence stays the raw JSON string, never decoded; '
+      'a one-off chore has a null recurrence; soft-deleted chores are '
+      'included',
+      () async {
+        final document = await buildExportDocument(
+          database: db,
+          clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
+        );
+        final tables = document['tables']! as Map<String, Object?>;
+        final chores = (tables['chores']! as List<dynamic>)
+            .cast<Map<String, dynamic>>();
 
-      expect(chores, hasLength(2));
+        expect(chores, hasLength(2));
 
-      final recurring = chores.singleWhere((row) => row['id'] == 'ch1');
-      expect(recurring['recurrence'], isA<String>());
-      final decodedRecurrence =
-          jsonDecode(recurring['recurrence']! as String)
-              as Map<String, dynamic>;
-      expect(
-        decodedRecurrence,
-        Recurrence.weekly(weekdays: {DateTime.saturday}).toJson(),
-      );
-      expect(recurring['start_date'], '2026-07-25');
-      expect(recurring['assignment_mode'], 'rotation');
-      expect(recurring['deleted_at'], isNull);
+        final recurring = chores.singleWhere((row) => row['id'] == 'ch1');
+        expect(recurring['recurrence'], isA<String>());
+        final decodedRecurrence =
+            jsonDecode(recurring['recurrence']! as String)
+                as Map<String, dynamic>;
+        expect(
+          decodedRecurrence,
+          Recurrence.weekly(weekdays: {DateTime.saturday}).toJson(),
+        );
+        expect(recurring['start_date'], '2026-07-25');
+        expect(recurring['assignment_mode'], 'rotation');
+        expect(recurring['deleted_at'], isNull);
 
-      final oneOff = chores.singleWhere((row) => row['id'] == 'ch2');
-      expect(oneOff['recurrence'], isNull);
-      expect(oneOff['deleted_at'], 't1');
-    });
+        final oneOff = chores.singleWhere((row) => row['id'] == 'ch2');
+        expect(oneOff['recurrence'], isNull);
+        expect(oneOff['deleted_at'], 't1');
+      },
+    );
 
     test('chore_assignees: rotation positions, raw column names', () async {
       final document = await buildExportDocument(
@@ -369,23 +372,26 @@ void main() {
       expect(deleted['deleted_at'], 't1');
     });
 
-    test('settings: booleans come back as the 0/1 SQLite actually stores, '
-        'shown-once flags are raw null', () async {
-      final document = await buildExportDocument(
-        database: db,
-        clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
-      );
-      final tables = document['tables']! as Map<String, Object?>;
-      final settingsRows = (tables['settings']! as List<dynamic>)
-          .cast<Map<String, dynamic>>();
+    test(
+      'settings: booleans come back as the 0/1 SQLite actually stores, '
+      'shown-once flags are raw null',
+      () async {
+        final document = await buildExportDocument(
+          database: db,
+          clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
+        );
+        final tables = document['tables']! as Map<String, Object?>;
+        final settingsRows = (tables['settings']! as List<dynamic>)
+            .cast<Map<String, dynamic>>();
 
-      expect(settingsRows, hasLength(1));
-      final settings = settingsRows.single;
-      expect(settings['digest_enabled'], 1);
-      expect(settings['digest_minutes'], 480);
-      expect(settings['onboarding_name_prompt_shown_at'], isNull);
-      expect(settings['digest_preprompt_shown_at'], isNull);
-    });
+        expect(settingsRows, hasLength(1));
+        final settings = settingsRows.single;
+        expect(settings['digest_enabled'], 1);
+        expect(settings['digest_minutes'], 480);
+        expect(settings['onboarding_name_prompt_shown_at'], isNull);
+        expect(settings['digest_preprompt_shown_at'], isNull);
+      },
+    );
   });
 
   group('exportFileName', () {

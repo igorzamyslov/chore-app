@@ -14,33 +14,36 @@ void main() {
   // apply here; silence it to keep test output readable.
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
-  testWidgets('bootstrap: loading indicator, then the welcome gate (spec '
-      'docs/specs/onboarding-v2.md: a fresh install with no household shows '
-      'WelcomeScreen, not the chores list)', (tester) async {
-    final database = AppDatabase(NativeDatabase.memory());
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appDatabaseProvider.overrideWithValue(database),
-          clockProvider.overrideWithValue(
-            Clock.fixed(DateTime(2026, 7, 24, 9)),
-          ),
-        ],
-        child: const ChoreApp(),
-      ),
-    );
+  testWidgets(
+    'bootstrap: loading indicator, then the welcome gate (spec '
+    'docs/specs/onboarding-v2.md: a fresh install with no household shows '
+    'WelcomeScreen, not the chores list)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(
+              Clock.fixed(DateTime(2026, 7, 24, 9)),
+            ),
+          ],
+          child: const ChoreApp(),
+        ),
+      );
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    final handle = tester.ensureSemantics();
-    expect(find.bySemanticsIdentifier('welcome.create'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    handle.dispose();
+      final handle = tester.ensureSemantics();
+      expect(find.bySemanticsIdentifier('welcome.create'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      handle.dispose();
 
-    await database.close();
-  });
+      await database.close();
+    },
+  );
 
   testWidgets('bootstrap error renders the error state', (tester) async {
     final database = AppDatabase(NativeDatabase.memory());

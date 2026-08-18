@@ -24,7 +24,10 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('Chores')),
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Chores'),
+        ),
         findsOneWidget,
       );
     },

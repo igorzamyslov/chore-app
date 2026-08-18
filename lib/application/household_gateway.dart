@@ -238,13 +238,12 @@ abstract class HouseholdGateway {
   /// must not assume it does (spec §3.5): GoTrue JWTs are stateless, so
   /// while deleting the auth row cascades refresh tokens and server-side
   /// sessions, an already-issued access token keeps working until its `exp`.
-  /// For the rest of that window `auth.uid()` still resolves, every claim is
-  /// already nulled, and so a pull's `hasMembership` probe SUCCEEDS and
+  /// For the rest of that window `auth.uid()` still resolves and every claim
+  /// is already nulled, so a pull's `hasMembership` probe SUCCEEDS and
   /// answers false -- indistinguishable from being removed by somebody else.
-  /// `HouseholdExitService.deleteAccount` therefore signs out locally as
-  /// part of its own flow, before any pull can observe that state, rather
-  /// than letting §3.5's revocation path produce the right outcome by
-  /// accident.
+  /// A caller must therefore sign out locally as part of its own flow,
+  /// before any pull can observe that state, rather than letting §3.5's
+  /// revocation path produce the right outcome by accident.
   Future<void> deleteAccount();
 
   /// Plain selects (RLS-scoped) of every row belonging to [householdId],
@@ -414,10 +413,13 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       for (final chore in snapshot.chores) chore.id: chore.householdId,
     };
     if (snapshot.choreAssignees.isNotEmpty) {
-      await _client.from('chore_assignees').upsert([
-        for (final assignee in snapshot.choreAssignees)
-          row_mappers.choreAssigneeRow(assignee, choreHouseholdIds),
-      ], onConflict: 'chore_id,member_id');
+      await _client.from('chore_assignees').upsert(
+        [
+          for (final assignee in snapshot.choreAssignees)
+            row_mappers.choreAssigneeRow(assignee, choreHouseholdIds),
+        ],
+        onConflict: 'chore_id,member_id',
+      );
     }
     if (snapshot.choreOccurrences.isNotEmpty) {
       await _client.from('chore_occurrences').upsert([
@@ -514,9 +516,9 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
   @override
   Future<void> deleteAccount() async {
     // One call does the whole job: the RPC is `postgres`-owned and SECURITY
-    // DEFINER, so its `delete from auth.users` is permitted (D-L4, proven
-    // by the pgTAP gate in `supabase/tests/002_membership_exit_test.sql`).
-    // No edge function, no service-role key anywhere near the client.
+    // DEFINER, so its `delete from auth.users` is permitted (D-L4, proven by
+    // the pgTAP gate in `supabase/tests/002_membership_exit_test.sql`). No
+    // edge function, no service-role key anywhere near the client.
     await _client.rpc<dynamic>('delete_account');
   }
 

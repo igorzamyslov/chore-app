@@ -50,7 +50,10 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('settings.digest.toggle'));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('settings.digest.time'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('settings.digest.time'),
+        findsNothing,
+      );
 
       final row = await database.select(database.settings).getSingle();
       expect(row.digestEnabled, isFalse);

@@ -228,7 +228,9 @@ void main() {
       expect(find.text('by Me'), findsNWidgets(2));
 
       // Reopen only the overdue one; the future-due one stays closed.
-      final overdueClosed = await repo.latestClosedOccurrence(overdueChore.id);
+      final overdueClosed = await repo.latestClosedOccurrence(
+        overdueChore.id,
+      );
       await tester.tap(
         find.bySemanticsIdentifier('chores.done.${overdueClosed!.id}.reopen'),
       );

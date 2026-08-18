@@ -102,19 +102,22 @@ void main() {
     },
   );
 
-  testWidgets('month unit, nth-weekday mode: the fixed-schedule card names the '
-      'actual configured ordinal and weekday', (tester) async {
-    // 2026-07-24 is the 4th Friday of July 2026.
-    await pumpAnchorRow(
-      tester,
-      unit: RecurrenceUnit.month,
-      weekdays: const {},
-      monthlyMode: MonthlyMode.nthWeekday,
-      startDate: PlainDate(2026, 7, 24),
-    );
+  testWidgets(
+    'month unit, nth-weekday mode: the fixed-schedule card names the '
+    'actual configured ordinal and weekday',
+    (tester) async {
+      // 2026-07-24 is the 4th Friday of July 2026.
+      await pumpAnchorRow(
+        tester,
+        unit: RecurrenceUnit.month,
+        weekdays: const {},
+        monthlyMode: MonthlyMode.nthWeekday,
+        startDate: PlainDate(2026, 7, 24),
+      );
 
-    expect(find.text('Every month on the 4th Friday'), findsOneWidget);
-  });
+      expect(find.text('Every month on the 4th Friday'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'the after-last-completion card keeps naming the actual interval too',

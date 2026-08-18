@@ -35,8 +35,9 @@ class SyncRepository {
   )..where((tbl) => tbl.syncDirty.equals(true))).get();
 
   /// Every `members` row with `syncDirty == true`.
-  Future<List<Member>> dirtyMembers() =>
-      (db.select(db.members)..where((tbl) => tbl.syncDirty.equals(true))).get();
+  Future<List<Member>> dirtyMembers() => (db.select(
+    db.members,
+  )..where((tbl) => tbl.syncDirty.equals(true))).get();
 
   /// Every `categories` row with `syncDirty == true`.
   Future<List<Category>> dirtyCategories() => (db.select(

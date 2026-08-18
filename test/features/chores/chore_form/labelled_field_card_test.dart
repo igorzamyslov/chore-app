@@ -71,41 +71,44 @@ void main() {
     },
   );
 
-  testWidgets('the border is outlineVariant unfocused and primaryOutline (2px) '
-      'once focused', (tester) async {
-    final controller = TextEditingController();
-    await pumpField(tester, controller);
+  testWidgets(
+    'the border is outlineVariant unfocused and primaryOutline (2px) '
+    'once focused',
+    (tester) async {
+      final controller = TextEditingController();
+      await pumpField(tester, controller);
 
-    final context = tester.element(find.byType(LabelledFieldCard));
-    final colorScheme = Theme.of(context).colorScheme;
-    final famdo = famdoColors(context);
+      final context = tester.element(find.byType(LabelledFieldCard));
+      final colorScheme = Theme.of(context).colorScheme;
+      final famdo = famdoColors(context);
 
-    // Unfocused: outlineVariant, 1px.
-    var border = cardDecoration(tester).border! as Border;
-    expect(border.top.color, colorScheme.outlineVariant);
-    expect(border.top.width, 1);
+      // Unfocused: outlineVariant, 1px.
+      var border = cardDecoration(tester).border! as Border;
+      expect(border.top.color, colorScheme.outlineVariant);
+      expect(border.top.width, 1);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(LabelledFieldCard),
-        matching: find.byType(TextField),
-      ),
-    );
-    await tester.pump();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(LabelledFieldCard),
+          matching: find.byType(TextField),
+        ),
+      );
+      await tester.pump();
 
-    // Focused: primaryOutline, 2px.
-    border = cardDecoration(tester).border! as Border;
-    expect(border.top.color, famdo.primaryOutline);
-    expect(border.top.width, 2);
+      // Focused: primaryOutline, 2px.
+      border = cardDecoration(tester).border! as Border;
+      expect(border.top.color, famdo.primaryOutline);
+      expect(border.top.width, 2);
 
-    // Moving focus away reverts to the unfocused styling.
-    await tester.tap(find.byType(TextField).last);
-    await tester.pump();
+      // Moving focus away reverts to the unfocused styling.
+      await tester.tap(find.byType(TextField).last);
+      await tester.pump();
 
-    border = cardDecoration(tester).border! as Border;
-    expect(border.top.color, colorScheme.outlineVariant);
-    expect(border.top.width, 1);
-  });
+      border = cardDecoration(tester).border! as Border;
+      expect(border.top.color, colorScheme.outlineVariant);
+      expect(border.top.width, 1);
+    },
+  );
 
   testWidgets(
     'an inline error renders below the card without clearing the entered '
