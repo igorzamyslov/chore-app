@@ -67,12 +67,34 @@ class MemberService {
   /// deterministic tests.
   final Clock clock;
 
-  /// Soft-deletes the member [memberId], in ONE transaction:
+  /// Soft-deletes the member [memberId].
   ///
-  /// 1. Guards (both throw [StateError], changing nothing): the member is
-  ///    claimed (`userId != null` -- "kicking a person" belongs to the
-  ///    sync spec's P4 with role enforcement, not here), or the member is
-  ///    the household's last remaining ACTIVE member.
+  /// Routing by claim state (spec `docs/specs/household-lifecycle.md` §3.2,
+  /// F10), which replaced the old flat refusal of any claimed member:
+  ///
+  /// - **unclaimed** (`userId == null`) -- purely local, exactly as before;
+  /// - **claimed** -- `remove_member` on the server FIRST (which unclaims
+  ///   and soft-deletes the profile there), then the identical local
+  ///   cleanup. A failed RPC throws [ClaimedMemberRemovalFailure] with
+  ///   nothing written locally.
+  ///
+  /// Any member may remove any other: `members.role` is vestigial (D1/D-L2)
+  /// and no role is consulted here or anywhere else. Removing one's OWN row
+  /// is not this method's job and is rejected by the server (§2.2); the UI
+  /// hides the action and points at Leave instead
+  /// (`lib/features/settings/member_edit_sheet.dart`).
+  ///
+  /// The two guards -- the member exists and is active, and the household
+  /// keeps at least one active member -- are evaluated TWICE on the claimed
+  /// path: once before the RPC, so a removal the local rules refuse never
+  /// reaches the server, and once inside the transaction, which is the
+  /// atomic one. The RPC deliberately runs OUTSIDE the transaction: a
+  /// network round trip inside one holds drift's write lock across it and
+  /// cannot be rolled back anyway.
+  ///
+  /// Everything from here on runs in ONE transaction:
+  ///
+  /// 1. Both guards again (each throws [StateError], changing nothing).
   /// 2. Referential cleanup, over every active (non-soft-deleted) chore of
   ///    the member's household:
   ///    - rotation chores containing [memberId] in their assignee order:
@@ -97,31 +119,20 @@ class MemberService {
   /// makes that possible -- display joins never filter on `deletedAt`, see
   /// `lib/app/providers.dart`'s members-query classification).
   Future<void> deleteMember(String memberId) async {
+    final claimed = (await _requireRemovable(memberId)).userId != null;
+    if (claimed) {
+      try {
+        await gateway.removeMember(memberId);
+      } on Object catch (error) {
+        // `on Object`, not `on Exception`: this net exists to turn ANY
+        // server-side failure into the one inline error surface the spec
+        // mandates (§3.2), and an Error that escaped it would crash the
+        // sheet instead. Nothing local has been written at this point.
+        throw ClaimedMemberRemovalFailure(error);
+      }
+    }
     await database.transaction(() async {
-      final member = await (database.select(
-        database.members,
-      )..where((tbl) => tbl.id.equals(memberId))).getSingleOrNull();
-      if (member == null || member.deletedAt != null) {
-        throw StateError('No active member with id $memberId');
-      }
-      if (member.userId != null) {
-        throw StateError(
-          'Cannot delete member $memberId: it is claimed by an account',
-        );
-      }
-      final activeMembers =
-          await (database.select(database.members)..where(
-                (tbl) =>
-                    tbl.householdId.equals(member.householdId) &
-                    tbl.deletedAt.isNull(),
-              ))
-              .get();
-      if (activeMembers.length <= 1) {
-        throw StateError(
-          'Cannot delete member $memberId: it is the last remaining '
-          'member of household ${member.householdId}',
-        );
-      }
+      final member = await _requireRemovable(memberId);
 
       final activeChores = await chores.getActiveChores(member.householdId);
       for (final details in activeChores) {
@@ -178,5 +189,35 @@ class MemberService {
         ),
       );
     });
+  }
+
+  /// Reads [memberId] and asserts both removal guards, throwing [StateError]
+  /// (changing nothing) when either fails: the member must exist and be
+  /// active, and its household must keep at least one active member
+  /// afterwards.
+  ///
+  /// Called once BEFORE the `remove_member` RPC and once inside the
+  /// transaction -- see [deleteMember] for why both.
+  Future<Member> _requireRemovable(String memberId) async {
+    final member = await (database.select(
+      database.members,
+    )..where((tbl) => tbl.id.equals(memberId))).getSingleOrNull();
+    if (member == null || member.deletedAt != null) {
+      throw StateError('No active member with id $memberId');
+    }
+    final activeMembers =
+        await (database.select(database.members)..where(
+              (tbl) =>
+                  tbl.householdId.equals(member.householdId) &
+                  tbl.deletedAt.isNull(),
+            ))
+            .get();
+    if (activeMembers.length <= 1) {
+      throw StateError(
+        'Cannot delete member $memberId: it is the last remaining '
+        'member of household ${member.householdId}',
+      );
+    }
+    return member;
   }
 }
