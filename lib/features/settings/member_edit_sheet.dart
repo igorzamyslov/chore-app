@@ -249,12 +249,24 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     if (!confirmed || !mounted) {
       return;
     }
-    // Unreachable in practice: `_canDelete` above already hides this action
-    // for a claimed or last-remaining member, so `MemberService.deleteMember`
-    // throwing here would be a genuine bug (or an exceedingly rare
-    // cross-device race), not an expected runtime failure -- left to crash
-    // rather than folded into an inline error state, mirroring
-    // `_AdoptRow._adopt` (`account_section.dart`)'s identical reasoning.
+    // Unreachable in practice TODAY: `_canDelete` above still hides this
+    // action for a claimed (`userId != null`) or last-remaining member, so
+    // `MemberService.deleteMember` throwing here would be a genuine bug (or
+    // an exceedingly rare cross-device race), not an expected runtime
+    // failure -- left to crash rather than folded into an inline error
+    // state, mirroring `_AdoptRow._adopt` (`account_section.dart`)'s
+    // identical reasoning.
+    //
+    // WHOEVER UNHIDES THIS FOR CLAIMED MEMBERS (F10, backlog C-2) MUST
+    // REVISIT THE LINE ABOVE. `deleteMember` now routes by claim state and
+    // the claimed path throws `ClaimedMemberRemovalFailure`, which is an
+    // EXPECTED failure, not a bug: it needs the network, it changed nothing
+    // locally, and the person the user tried to remove is still in the
+    // household. That exception's own doc comment requires it be shown
+    // inline. "Left to crash" is correct only while `_canDelete` keeps the
+    // claimed path unreachable; relax that gate without adding the inline
+    // error state and a real network failure on a destructive action is
+    // silently lost.
     await ref.read(memberServiceProvider).deleteMember(existing.id);
     if (!mounted) {
       return;
