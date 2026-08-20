@@ -961,6 +961,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t reach the household. Your changes are saved here and will sync later.';
 
   @override
+  String get syncRefreshErrorRevoked =>
+      'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.';
+
+  @override
   String get syncHealthBannerMessage =>
       'This device hasn\'t reached the rest of the household in a while. Your changes are saved — try pulling down to refresh.';
 

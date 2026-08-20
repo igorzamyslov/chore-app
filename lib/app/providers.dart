@@ -670,6 +670,12 @@ final memberServiceProvider = Provider<MemberService>((ref) {
   return MemberService(
     database: ref.watch(appDatabaseProvider),
     chores: ref.watch(choreRepositoryProvider),
+    // Only ever used for a CLAIMED target (spec
+    // `docs/specs/household-lifecycle.md` §3.2). Under NoopHouseholdGateway
+    // (Supabase unconfigured) a claimed member cannot exist in the first
+    // place -- nothing ever populated `user_id` -- so the unreachable-throw
+    // is correct rather than a hazard.
+    gateway: ref.watch(householdGatewayProvider),
     clock: ref.watch(clockProvider),
   );
 });

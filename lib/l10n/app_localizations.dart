@@ -1452,6 +1452,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t reach the household. Your changes are saved here and will sync later.'**
   String get syncRefreshError;
 
+  /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED pull-to-refresh is what discovered that this device's membership was revoked (spec docs/specs/household-lifecycle.md 3.5). SupabaseSyncEngine.refreshNow() has already cleared the sync link by the time it returns false for this case, so syncRefreshError's 'will sync later' would be a promise the app cannot keep.
+  ///
+  /// In en, this message translates to:
+  /// **'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.'**
+  String get syncRefreshErrorRevoked;
+
   /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
   ///
   /// In en, this message translates to:

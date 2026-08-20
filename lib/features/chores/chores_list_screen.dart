@@ -500,9 +500,33 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) async {
   if (ok || !context.mounted) {
     return;
   }
+  // WHEN THIS BRANCH IS ACTUALLY REACHED, which is narrower than it looks:
+  // `syncEngineProvider` is gated on `settings.syncHouseholdId`, and the
+  // engine's own startup pull and 60s poll run this same revocation probe. So
+  // in the common case the ENGINE notices first, calls `clearSyncLink()`, and
+  // `syncEngineProvider` becomes a `NoopSyncEngine` whose `refreshNow()`
+  // returns true -- meaning a later pull-to-refresh reports success and says
+  // nothing. That is not a gap: a device that has been revoked is told so by
+  // the revocation notice (spec `docs/specs/household-lifecycle.md` §3.5),
+  // which is the primary surface. This string covers the narrower race where
+  // the user's own gesture is the first probe after the server-side removal,
+  // and it exists because in exactly that case `syncRefreshError`'s "will
+  // sync later" is a promise the app has already made false.
+  // refreshNow() returns false for two different situations, and only one of
+  // them is a delay. If the failure was a revocation, `_pullSinceInner` has
+  // ALREADY called setMembershipRevoked() and clearSyncLink() before
+  // returning -- so syncRefreshError's "will sync later" is not optimism, it
+  // is false. Read the just-written row with a one-shot query rather than
+  // settingsProvider's stream, which may not have re-emitted the write yet.
+  final revoked = (await ref.read(settingsRepositoryProvider).ensureSettings())
+      .membershipRevoked;
+  if (!context.mounted) {
+    return;
+  }
+  final l10n = AppLocalizations.of(context);
   showAppSnackbar(
     context,
-    message: AppLocalizations.of(context).syncRefreshError,
+    message: revoked ? l10n.syncRefreshErrorRevoked : l10n.syncRefreshError,
   );
 }
 

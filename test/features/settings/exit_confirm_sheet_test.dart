@@ -80,4 +80,84 @@ void main() {
     expect(result!.confirmed, isFalse);
     expect(result.alsoDeleteLocalData, isFalse);
   });
+
+  testWidgets(
+    'a long body at a large text scale on a small phone does not overflow '
+    '(regression: the sheet had no scroll view, and D-L5/D-L6 add copy '
+    'longer than either of the two strings live before slice 4)',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      // The longest real string this cluster adds -- the German of
+      // accountDeleteFinalBodyDeletePhone, German running longer again than
+      // the English. Literal text rather than the l10n getter on purpose:
+      // that key does not exist until slice 6, and this regression guard
+      // must not depend on task order.
+      const longBody =
+          'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, '
+          'und die Kopie auf diesem Gerät — Mitglieder, Aufgaben und '
+          'Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. '
+          'Beides lässt sich nicht rückgängig machen. Wenn du vorher eine '
+          'Kopie deiner Daten willst, nutze „Exportieren“ unter '
+          'Einstellungen → Daten.';
+
+      ExitConfirmResult? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () async {
+                  result = await showExitConfirmSheet(
+                    context,
+                    title: 'Delete your account?',
+                    body: longBody,
+                    // As long as the real German 'Konto löschen', which is
+                    // what overflows the button row horizontally next to
+                    // Cancel at this scale.
+                    actionLabel: 'Konto löschen',
+                    semanticPrefix: 'settings.account.deleteAccount',
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'both axes must survive: the Column needs a scroll view, and the '
+            'button row needs to stack rather than overflow horizontally',
+      );
+
+      // Not merely un-crashed -- the action has to be REACHABLE. ensureVisible
+      // fails outright if nothing in the sheet scrolls, and tap fails if the
+      // button is not hit-testable where it ended up, so the two together
+      // are what distinguish a real fix from a clip.
+      await tester.ensureVisible(find.text('Konto löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Konto löschen'));
+      await tester.pumpAndSettle();
+
+      expect(result?.confirmed, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

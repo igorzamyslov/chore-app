@@ -200,6 +200,52 @@ abstract class HouseholdGateway {
     required int memberColor,
   });
 
+  /// RPC `remove_member` (spec `docs/specs/household-lifecycle.md` §2.2,
+  /// F10): unclaims AND soft-deletes another member's profile server-side.
+  ///
+  /// Any member may remove any other (D-L2 -- the household is flat by D1;
+  /// no role is consulted). The server REJECTS the caller's own member row,
+  /// pointing at [leaveHousehold] instead, so this is never the way to
+  /// leave. Idempotent on an already-removed row, so a retry after a
+  /// partial failure is safe.
+  Future<void> removeMember(String memberId);
+
+  /// RPC `leave_household` (spec `docs/specs/household-lifecycle.md` §2.2,
+  /// F9): unclaims the caller's own member row in [householdId] and NOTHING
+  /// else -- the profile stays active, so the family keeps seeing the person
+  /// and their history, and they can claim it again later through an invite.
+  ///
+  /// If that leaves the household with no claimed members at all, the server
+  /// cascades it (§2.4, D-L5): the online household and its shared history
+  /// are soft-deleted and its invite codes stop working. The Leave confirm
+  /// must say so before calling this (§3.4).
+  ///
+  /// Takes the household id explicitly because `members.user_id` is UNIQUE
+  /// *per household*, so an account may legitimately belong to several.
+  Future<void> leaveHousehold(String householdId);
+
+  /// RPC `delete_account` (spec `docs/specs/household-lifecycle.md` §2.2,
+  /// F11, D-L4): unclaims the caller's member row in EVERY household they
+  /// belong to, cascades any household left with no claimed members (§2.4),
+  /// and erases the `auth.users` row.
+  ///
+  /// Local data on THIS device is deliberately untouched -- GDPR erasure
+  /// covers the server copy and the account, not the user's own device
+  /// (D-L3). Wiping this device is the confirm sheet's separate, unchecked
+  /// opt-in.
+  ///
+  /// **The session does NOT become invalid when this returns**, and callers
+  /// must not assume it does (spec §3.5): GoTrue JWTs are stateless, so
+  /// while deleting the auth row cascades refresh tokens and server-side
+  /// sessions, an already-issued access token keeps working until its `exp`.
+  /// For the rest of that window `auth.uid()` still resolves and every claim
+  /// is already nulled, so a pull's `hasMembership` probe SUCCEEDS and
+  /// answers false -- indistinguishable from being removed by somebody else.
+  /// A caller must therefore sign out locally as part of its own flow,
+  /// before any pull can observe that state, rather than letting §3.5's
+  /// revocation path produce the right outcome by accident.
+  Future<void> deleteAccount();
+
   /// Plain selects (RLS-scoped) of every row belonging to [householdId],
   /// as a [HouseholdSnapshot].
   Future<HouseholdSnapshot> downloadHousehold(String householdId);
@@ -268,6 +314,15 @@ class NoopHouseholdGateway implements HouseholdGateway {
     required String memberName,
     required int memberColor,
   }) => _unreachable();
+
+  @override
+  Future<void> removeMember(String memberId) => _unreachable();
+
+  @override
+  Future<void> leaveHousehold(String householdId) => _unreachable();
+
+  @override
+  Future<void> deleteAccount() => _unreachable();
 
   @override
   Future<HouseholdSnapshot> downloadHousehold(String householdId) =>
@@ -440,6 +495,31 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       },
     );
     return result as String;
+  }
+
+  @override
+  Future<void> removeMember(String memberId) async {
+    await _client.rpc<dynamic>(
+      'remove_member',
+      params: {'p_member_id': memberId},
+    );
+  }
+
+  @override
+  Future<void> leaveHousehold(String householdId) async {
+    await _client.rpc<dynamic>(
+      'leave_household',
+      params: {'p_household_id': householdId},
+    );
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    // One call does the whole job: the RPC is `postgres`-owned and SECURITY
+    // DEFINER, so its `delete from auth.users` is permitted (D-L4, proven by
+    // the pgTAP gate in `supabase/tests/002_membership_exit_test.sql`). No
+    // edge function, no service-role key anywhere near the client.
+    await _client.rpc<dynamic>('delete_account');
   }
 
   @override
