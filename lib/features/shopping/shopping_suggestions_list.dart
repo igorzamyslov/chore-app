@@ -2,8 +2,8 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
-import 'package:chore_app/features/categories/category_badge.dart';
 import 'package:flutter/material.dart';
 
 /// Renders [suggestions] (already ranked and limited by
@@ -12,8 +12,10 @@ import 'package:flutter/material.dart';
 /// 20, unselected style -- the app's shared `ChipThemeData` already gives
 /// any [ActionChip] that look, so this widget only had to change container
 /// from a column of full-width rows to a wrap of chips): each shows the
-/// item's name and, when its most recent history row set one, its category
-/// (icon + name in the category's own color).
+/// item's name and, when its most recent history row set one, its category's
+/// ICON ONLY, leading, in the category's own color -- the name is carried as
+/// the icon's `semanticLabel` rather than drawn, since a category name is
+/// regularly longer than the item it describes.
 ///
 /// Tapping a chip calls [onTap] with that suggestion; the caller (the
 /// quick-add row) adds it immediately, subject to the same duplicate
@@ -82,11 +84,30 @@ class _SuggestionChip extends StatelessWidget {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(suggestion.name),
             if (category != null) ...[
+              // Icon only, and LEADING. Deliberately not `CategoryBadge`
+              // (which is icon + name): a category name is regularly longer
+              // than the item it describes -- "Haushaltswaren" against
+              // "Milch" -- so on a chip it doubled the width and pushed the
+              // useful half, the item name, out of a glanceable position.
+              // Leading keeps the names left-aligned down the wrap, which is
+              // what the eye scans.
+              //
+              // `semanticLabel` carries the category name that is no longer
+              // drawn: an `Icon` without one is invisible to a screen
+              // reader, so dropping the text would otherwise have removed
+              // the category from the accessible tree entirely rather than
+              // just from the pixels. The chip still reads
+              // "<category>, <item>".
+              Icon(
+                categoryIcon(category.icon),
+                color: categoryTone(context, category.color),
+                size: 16,
+                semanticLabel: category.name,
+              ),
               const SizedBox(width: 6),
-              CategoryBadge(category: category),
             ],
+            Text(suggestion.name),
           ],
         ),
         onPressed: onTap,

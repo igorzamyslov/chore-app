@@ -68,13 +68,48 @@ void main() {
         ),
         findsOneWidget,
       );
+      // The category is shown as its ICON ONLY, and leading: a category
+      // name is regularly longer than the item it describes, so drawing it
+      // doubled the chip width and pushed the item name out of a glanceable
+      // position. Three separate things are pinned here, because dropping
+      // the text could silently drop the information too.
+      final chip0 = find.bySemanticsIdentifier('shopping.suggestion.0');
+      // 1. The name is NOT drawn any more.
       expect(
-        find.descendant(
-          of: find.bySemanticsIdentifier('shopping.suggestion.0'),
-          matching: find.text('Dairy'),
-        ),
-        findsOneWidget,
+        find.descendant(of: chip0, matching: find.text('Dairy')),
+        findsNothing,
       );
+      // 2. But it IS still announced. An `Icon` without a `semanticLabel`
+      //    is invisible to a screen reader, so this is the assertion that
+      //    stops the change from being a regression for anyone not looking
+      //    at the pixels. Asserted on the chip's MERGED label rather than as
+      //    a node of its own: `ActionChip` is a semantics container and
+      //    folds its descendants in, so what a screen reader actually reads
+      //    out is one node carrying both halves.
+      // 2. But it IS still announced. An `Icon` without a `semanticLabel`
+      //    is invisible to a screen reader, so this is the assertion that
+      //    stops the change from being a regression for anyone not looking
+      //    at the pixels. Asserted on the CHIP's node, not the `semantic()`
+      //    wrapper's: the wrapper carries the identifier and an empty label,
+      //    while `ActionChip` is the semantics container that folds its
+      //    descendants in. What a reader announces here is "Dairy\nmilk".
+      expect(
+        tester
+            .getSemantics(
+              find.descendant(of: chip0, matching: find.byType(ActionChip)),
+            )
+            .label,
+        allOf(contains('Dairy'), contains('milk')),
+      );
+      // 3. The icon sits to the LEFT of the item name. Compared by x rather
+      //    than by child order so it pins what the user actually sees.
+      final iconX = tester
+          .getTopLeft(find.descendant(of: chip0, matching: find.byType(Icon)))
+          .dx;
+      final nameX = tester
+          .getTopLeft(find.descendant(of: chip0, matching: find.text('milk')))
+          .dx;
+      expect(iconX, lessThan(nameX));
       expect(
         find.descendant(
           of: find.bySemanticsIdentifier('shopping.suggestion.1'),
@@ -144,8 +179,10 @@ void main() {
       // input cleared, focus kept for the next entry.
       expect(find.text('Milk'), findsOneWidget);
       // The aisle header renders the category name uppercased (spec
-      // `docs/specs/theme-v2.md` §4.3) -- unlike the suggestion chip's own
-      // `CategoryBadge`, which stays natural-case (asserted above).
+      // `docs/specs/theme-v2.md` §4.3). This is now the ONLY place the
+      // category name is drawn on this screen: the suggestion chip shows
+      // the icon alone (asserted above), so a bare `find.text('DAIRY')`
+      // can no longer be satisfied by a chip.
       expect(find.text('DAIRY'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('shopping.suggestion.0'),
