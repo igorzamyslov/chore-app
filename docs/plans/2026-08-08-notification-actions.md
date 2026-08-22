@@ -1651,7 +1651,7 @@ carve-out. **Three of these items are gates on design decisions this plan could
 not verify from source; they are marked GATE and their fallbacks are stated so
 whoever runs them does not have to re-derive the alternative.**
 
-- [ ] **GATE — the background isolate can open the database at all.** Android:
+- [x] **GATE — the background isolate can open the database at all.** **CONFIRMED on a real Android device against v0.7.0 (build 10), 2026-08-18** (reported by Igor): tapping "Done" on the digest marks the chore done in the app. So `openConnection()`'s `path_provider` channel lookup DOES work in the background engine, the fallback below was not needed, and Tasks 7-9 no longer rest on an unverified premise. Original check, kept for the record: Android:
       one due-today chore, force the digest (temporarily set the digest time a
       minute out), tap "Done" **with the app fully swiped away**, confirm the
       chore shows as done on next app open. If it does not, the likely cause is
