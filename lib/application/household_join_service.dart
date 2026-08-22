@@ -328,8 +328,9 @@ class HouseholdJoinService {
   ///
   /// Otherwise identical to [join]'s steps 2-4: resolve [choice] (claim/
   /// join-as-new/reconnect), download the joined household, insert it, and
-  /// repoint `settings` (acting member + linked state). Resolves to the
-  /// joined household's id -- there is no archive file name to report,
+  /// repoint `settings` (acting member + linked state), plus clear the
+  /// welcome-join code prefill this path is the only writer of. Resolves to
+  /// the joined household's id -- there is no archive file name to report,
   /// unlike [HouseholdJoinResult].
   Future<String> joinFresh({required JoinChoice choice, String? code}) async {
     final resolved = await _resolveChoice(choice, code);
@@ -350,6 +351,12 @@ class HouseholdJoinService {
         householdId: joinedHouseholdId,
         linkedAt: clock.now(),
       );
+      // The invite code (if any) that got the caller here has done its job,
+      // so clear the code-field prefill it was stored for (spec
+      // `docs/specs/onboarding-v2.md` §1, `Settings.pendingJoinCode`).
+      // Hygiene rather than safety: the welcome gate never reappears once a
+      // household exists, so nothing reads the value again either way.
+      await settings.setPendingJoinCode(null);
     });
 
     return joinedHouseholdId;

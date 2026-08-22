@@ -41,10 +41,6 @@ Future<void> _insertChore(
       );
 }
 
-void expectRecurrenceEquals(Recurrence? actual, Recurrence? expected) {
-  expect(actual?.toJson(), expected?.toJson());
-}
-
 void main() {
   group('PlainDateConverter', () {
     late AppDatabase db;
@@ -131,7 +127,11 @@ void main() {
         final chore = await (db.select(
           db.chores,
         )..where((tbl) => tbl.id.equals('c$i'))).getSingle();
-        expectRecurrenceEquals(chore.recurrence, combos[i]);
+        // A direct value comparison, now that `Recurrence` has `==`
+        // (backlog E-4). This used to go through a `toJson()` projection
+        // helper, which could not tell a genuine round-trip from two rules
+        // that merely serialize alike.
+        expect(chore.recurrence, combos[i]);
       }
     });
 

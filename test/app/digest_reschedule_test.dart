@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
+import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
@@ -52,12 +53,25 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
+    String? payload,
+    bool actionable = false,
   }) async {
     if (id == pauseOnId && !_hasPaused) {
       _hasPaused = true;
       await _gate.future;
     }
-    await super.zonedSchedule(id: id, title: title, body: body, fireAt: fireAt);
+    await super.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      payload: payload,
+      actionable: actionable,
+    );
   }
 }
 
@@ -979,6 +993,243 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       expect(plugin.pending, isEmpty);
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'the digest copy follows the IN-APP language override, not the OS '
+    'locale: a user who picked German on an English-language phone was '
+    'getting English notifications behind a German app',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      // Deliberately NOT overriding the OS locale: the test binary's own
+      // locale is English, which is exactly the situation being fixed --
+      // the override must beat it.
+      await container.read(settingsRepositoryProvider).setLocale('de');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(
+        container.read(clockProvider).now(),
+      );
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Blumen gießen',
+            startDate: today,
+            assignmentMode: AssignmentMode.anyone,
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      final armed = plugin.pending[digestNotificationIdBase]!;
+      expect(armed.body, '1 Aufgabe heute');
+      expect(armed.channelName, 'Tägliche Zusammenfassung');
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'a single due-today chore arms slot 0 with a payload naming ITS pending '
+    'occurrence (backlog F-1)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(
+        container.read(clockProvider).now(),
+      );
+      final chore = await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Water the plants',
+            startDate: today,
+            assignmentMode: AssignmentMode.anyone,
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      // Fetched rather than hard-coded: the id is generated.
+      final pending = await container
+          .read(choreRepositoryProvider)
+          .pendingOccurrenceOf(chore.id);
+
+      final slotZero = plugin.pending[digestNotificationIdBase]!;
+      expect(slotZero.actionable, isTrue);
+      final payload = decodeDigestActionPayload(slotZero.payload);
+      expect(payload!.occurrenceId, pending!.id);
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'two due-today chores arm slot 0 with NO action: "the chore" would be '
+    'ambiguous (backlog F-1)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(
+        container.read(clockProvider).now(),
+      );
+      for (final title in ['Water the plants', 'Take out trash']) {
+        await container
+            .read(choreServiceProvider)
+            .createChore(
+              householdId: householdId,
+              title: title,
+              startDate: today,
+              assignmentMode: AssignmentMode.anyone,
+            );
+      }
+      await tester.pump(digestRescheduleDebounce);
+
+      final slotZero = plugin.pending[digestNotificationIdBase]!;
+      expect(slotZero.body, '2 chores today');
+      expect(slotZero.actionable, isFalse);
+      expect(slotZero.payload, null);
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'ONE recompute produces DIFFERENT actionability per slot: slot 0 is '
+    'actionable while a later slot, which counts both chores, is not '
+    '(backlog F-1)',
+    (tester) async {
+      // The assertion that catches a global rather than per-slot gate, and
+      // one that could not exist at all on a single-notification digest.
+      final now = DateTime(2026, 7, 24, 7);
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock.fixed(now)),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(now);
+      final todayChore = await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Today only',
+            startDate: today,
+            assignmentMode: AssignmentMode.anyone,
+          );
+
+      // The slot index is DERIVED from digestSlots rather than hard-coded, so
+      // this survives a change to the horizon's shape. Slot 3 is inside the
+      // daily segment (digestDailyHorizonDays = 14).
+      final settings = await container
+          .read(settingsRepositoryProvider)
+          .ensureSettings();
+      final slots = digestSlots(
+        now: now,
+        digestMinutes: settings.digestMinutes,
+      );
+      const laterSlotIndex = 3;
+      expect(
+        laterSlotIndex,
+        lessThan(digestDailyHorizonDays),
+        reason: 'the second chore must land inside the daily segment',
+      );
+      await container
+          .read(choreServiceProvider)
+          .createChore(
+            householdId: householdId,
+            title: 'Later',
+            startDate: PlainDate.fromDateTime(slots[laterSlotIndex]),
+            assignmentMode: AssignmentMode.anyone,
+          );
+      await tester.pump(digestRescheduleDebounce);
+
+      final slotZero = plugin.pending[digestNotificationIdBase]!;
+      expect(slotZero.body, '1 chore today');
+      expect(slotZero.actionable, isTrue);
+      expect(
+        decodeDigestActionPayload(slotZero.payload)!.occurrenceId,
+        (await container
+                .read(choreRepositoryProvider)
+                .pendingOccurrenceOf(todayChore.id))!
+            .id,
+      );
+
+      // By that later date the first chore is overdue AND the second is due,
+      // so the slot counts two and cannot name one.
+      final laterSlot =
+          plugin.pending[digestNotificationIdBase + laterSlotIndex]!;
+      expect(laterSlot.body, '1 chore today · 1 overdue');
+      expect(
+        laterSlot.actionable,
+        isFalse,
+        reason:
+            'actionability is per slot: the same recompute must be able to '
+            'produce different answers for different slots',
+      );
+      expect(laterSlot.payload, null);
 
       await _disposeAndClose(tester, container, database);
     },

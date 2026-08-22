@@ -214,6 +214,33 @@ void main() {
     );
 
     test(
+      'passing a recurrence that is EQUAL BY VALUE to the stored one -- a '
+      'fresh instance, with weekdays in a different order -- is not a '
+      'change, so the pending occurrence survives (backlog E-4: this used '
+      'to need a jsonEncode projection, because Recurrence had only '
+      'identity equality)',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Weekly',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.weekly(weekdays: {1, 3, 5}),
+        );
+        final before = await repo.pendingOccurrenceOf(chore.id);
+
+        await serviceOn(PlainDate(2026, 1, 5)).updateChore(
+          chore.id,
+          recurrence: Value(Recurrence.weekly(weekdays: {5, 3, 1})),
+        );
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, before!.id);
+        expect(pending.dueDate, before.dueDate);
+      },
+    );
+
+    test(
       'changing assignmentMode/assignees alone (no recurrence/startDate '
       'change) still leaves the pending occurrence untouched',
       () async {

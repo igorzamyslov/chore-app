@@ -70,8 +70,29 @@
              zonedSchedule, and re-arm it after the device reboots. No
              SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM receiver or permission is
              registered here — the digest deliberately uses
-             AndroidScheduleMode.inexactAllowWhileIdle, which needs neither. -->
+             AndroidScheduleMode.inexactAllowWhileIdle, which needs neither.
+             The third receiver below is what makes the digest's notification
+             ACTION work; it is likewise a component declaration, not a
+             permission, so none of the three adds a <uses-permission>. -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- Required for notification ACTION buttons — the digest's "Done"
+             action (spec docs/specs/notifications.md N2, backlog F-1) — to
+             reach anything at all.
+             WHY IT MUST BE DECLARED HERE: the plugin's own AndroidManifest.xml
+             declares no receivers whatsoever (verified in the installed 22.1.0
+             package — it contains two <uses-permission> lines and nothing
+             else), so every receiver is the app's job. And an action built with
+             showsUserInterface: false is dispatched through
+             PendingIntent.getBroadcast targeting exactly this class; if Android
+             cannot resolve the component, the tap does nothing and reports
+             nothing, anywhere.
+             That failure mode is indistinguishable from a working app right up
+             until a user taps the button, so it warrants an assertion on the
+             built RELEASE artifact (docs/handover-2026-08-14-planning.md §6),
+             the same way INTERNET and allowBackup already are. Not added here:
+             .github/workflows/release.yml is out of scope for this change —
+             raised in the PR instead. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

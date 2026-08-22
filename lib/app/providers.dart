@@ -25,9 +25,20 @@
 /// [syncEngineProvider]'s own linked-state branching against a fake
 /// transport, bypassing the compile-time [supabaseConfigured] gate that a
 /// test binary can't otherwise flip; see its own doc comment.
+/// [syncHealthStatusProvider] (spec `docs/specs/sync-freshness.md` §2.5) is
+/// a seventh, used only by the two D-5 banner widget tests
+/// (`test/features/chores/sync_health_banner_test.dart`,
+/// `test/features/shopping/sync_health_banner_test.dart`) to check that
+/// banner's own render/hide wiring without reconstructing a real unhealthy
+/// condition -- every other test, including
+/// `test/app/sync_health_status_provider_test.dart`, computes it for real.
 library;
 
 import 'dart:async';
+import 'dart:isolate';
+// `IsolateNameServer` lives in `dart:ui`, not `dart:isolate`; `ReceivePort`
+// lives in `dart:isolate`.
+import 'dart:ui' show IsolateNameServer;
 
 import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/application/auth_gateway.dart';
@@ -38,6 +49,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/application/member_service.dart';
+import 'package:chore_app/application/notification_action_handler.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/application/stats_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
@@ -48,8 +60,10 @@ import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/data/repositories/stats_repository.dart';
+import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/domain/sync_health.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart' show Locale;
@@ -207,16 +221,14 @@ final settingsProvider = StreamProvider<DeviceSettings>((ref) {
 /// itself is in an `AsyncError` state (e.g. a broken database connection),
 /// which would otherwise crash the loading/error screens this locale also
 /// applies to.
+/// The stored-value mapping is [localeFromStoredSetting], shared with the
+/// notification-action isolate's `readDigestLocale` (which has no container to
+/// read this provider from) so the two cannot disagree about what a stored
+/// `settings.locale` means.
 final localeOverrideProvider = Provider<Locale?>((ref) {
-  final stored = ref.watch(settingsProvider).valueOrNull?.locale;
-  switch (stored) {
-    case 'en':
-      return const Locale('en');
-    case 'de':
-      return const Locale('de');
-    default:
-      return null;
-  }
+  return localeFromStoredSetting(
+    ref.watch(settingsProvider).valueOrNull?.locale,
+  );
 });
 
 /// The manual theme override chosen via Settings (spec
@@ -454,6 +466,106 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   return engine;
 });
 
+/// The moment this device most recently had a genuine chance to reach its
+/// household at all -- `null` while not linked+signed in (spec
+/// `docs/specs/sync-freshness.md` §2.5).
+///
+/// Rebuilt (and so re-stamped from [clockProvider]) exactly twice: when
+/// [syncEngineProvider] swaps identity -- a fresh linked engine session --
+/// and when [SyncEngineController.triggerOnResume] invalidates it on app
+/// resume. It deliberately does NOT depend on anything a pull writes, so a
+/// running session's stamp stays put.
+///
+/// [computeSyncHealth] uses it as a FLOOR under the pull-staleness
+/// reference point. Without it, `syncLastPulledAt` is genuinely hours old
+/// in the moment the engine comes back -- so the banner would appear for
+/// the second or two until the session's first pull lands, on every cold
+/// start or resume after more than five minutes away, i.e. on most
+/// launches. That flash is the exact cry-wolf failure §2.5's thresholds
+/// exist to avoid; with the floor each foreground session gets the same
+/// five-missed-cycles grace it would get mid-session.
+final syncObservingSinceProvider = Provider<DateTime?>((ref) {
+  if (ref.watch(syncEngineProvider) is NoopSyncEngine) {
+    return null;
+  }
+  return ref.watch(clockProvider).now();
+});
+
+/// The wall-clock moment this device's synced tables most recently
+/// transitioned from "nothing dirty" to "something dirty" (spec
+/// `docs/specs/sync-freshness.md` §2.5), `null` while clean. In-memory
+/// only, derived live from [SyncRepository.watchAnyDirty] -- an app restart
+/// giving the benefit of the doubt is fine: if the underlying row really is
+/// still stuck dirty, the clock simply starts again from the restart rather
+/// than the signal being lost entirely.
+///
+/// Deliberately built by calling [SyncRepository.watchAnyDirty] directly
+/// inside this provider's own stream, NOT by composing a separate
+/// `StreamProvider` via its `.stream` modifier -- that modifier is
+/// `@Deprecated` in this project's pinned riverpod version (2.6.1) and
+/// would trip `flutter analyze --fatal-infos`.
+///
+/// Only ever watched from [syncHealthStatusProvider]'s linked branch, so an
+/// unlinked app (every widget test, every E2E run) never opens this drift
+/// stream at all.
+final dirtySinceProvider = StreamProvider<DateTime?>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final clock = ref.watch(clockProvider);
+  return dirtySinceStream(SyncRepository(db).watchAnyDirty(), clock.now);
+});
+
+/// The D-5 indicator's source of truth (spec
+/// `docs/specs/sync-freshness.md` §2.5): [SyncHealthStatus.healthy]
+/// whenever the device isn't linked+signed-in at all -- the same gate
+/// [syncEngineProvider] itself applies, so "not linked" and "linked, signed
+/// out" (which has its own honest treatment in Settings → Account) never
+/// show anything here, exactly like the pull-to-refresh indicator.
+/// Otherwise inferred by [computeSyncHealth] from the persisted cursor/link
+/// timestamps ([settingsProvider]), [syncObservingSinceProvider], and the
+/// live [dirtySinceProvider] watch. Never reads `SyncEngine`'s own
+/// swallowed errors (spec `docs/specs/sync-backend.md` §8.3, deliberately
+/// untouched by this indicator -- see §2.5 for why).
+///
+/// **The one-shot [Timer] below is load-bearing, not a convenience.** A
+/// purely reactive version of this provider would never fire in the case it
+/// exists for: a device that cannot reach the server persists nothing (a
+/// failed `pullSince` writes no cursor), and [dirtySinceStream] pins its
+/// timestamp to when the dirty streak STARTED, so a second local write
+/// re-emits an equal `AsyncData` that Riverpod correctly treats as no
+/// change. With nothing in the graph moving, no threshold could ever be
+/// observed as crossed. The timer is armed ONLY on this linked branch --
+/// after the early return above -- so it never exists in a widget test or
+/// E2E run (both are permanently unlinked), exactly like the engine's own
+/// poll timer, and carries none of this project's "a Timer is still
+/// pending" test hazard. See [syncHealthRecheckInterval].
+final syncHealthStatusProvider = Provider<SyncHealthStatus>((ref) {
+  final observingSince = ref.watch(syncObservingSinceProvider);
+  if (observingSince == null) {
+    return SyncHealthStatus.healthy;
+  }
+  final settings = ref.watch(settingsProvider).valueOrNull;
+  final linkedAtRaw = settings?.syncLinkedAt;
+  if (linkedAtRaw == null) {
+    // Momentarily true right after linking, before this provider's settings
+    // watch has seen the post-link write land -- treat as healthy rather
+    // than guessing.
+    return SyncHealthStatus.healthy;
+  }
+  final timer = Timer(syncHealthRecheckInterval, ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+
+  final lastPulledAtRaw = settings?.syncLastPulledAt;
+  return computeSyncHealth(
+    now: ref.watch(clockProvider).now(),
+    lastPulledAt: lastPulledAtRaw == null
+        ? null
+        : DateTime.parse(lastPulledAtRaw),
+    linkedAt: DateTime.parse(linkedAtRaw),
+    observingSince: observingSince,
+    dirtySince: ref.watch(dirtySinceProvider).valueOrNull,
+  );
+});
+
 /// The bootstrap household's own row (currently just its `name`), kept in
 /// sync with the database. Backs the Account section's 'linked' subtitle
 /// (spec `docs/specs/sync-backend.md` §7.3 last paragraph), which names the
@@ -473,7 +585,15 @@ final currentHouseholdProvider = StreamProvider<Household>((ref) async* {
 final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
   ref,
 ) {
-  return FlutterLocalNotificationsAdapter();
+  // `handleNotificationAction` is the top-level `@pragma('vm:entry-point')`
+  // handler the OS runs in a FRESH background isolate when a notification
+  // action is tapped (spec `docs/specs/notifications.md` N2). It shares nothing
+  // with this container -- it opens its own database connection -- and is
+  // passed here only so the plugin can record its callback handle at
+  // `initialize` time.
+  return FlutterLocalNotificationsAdapter(
+    onBackgroundResponse: handleNotificationAction,
+  );
 });
 
 /// The digest notification scheduler, built on
@@ -481,6 +601,12 @@ final digestNotificationPluginProvider = Provider<DigestNotificationPlugin>((
 final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
   return NotificationScheduler(
     plugin: ref.watch(digestNotificationPluginProvider),
+    // `read`, not `watch`, and resolved per call rather than once here: a
+    // language switch must reach the NEXT reschedule without rebuilding
+    // this provider, which would drop the scheduler's `_initialized` flag
+    // and its in-flight serialized-apply queue. See [resolveDigestLocale]
+    // for why the OS locale alone is the wrong source.
+    localeResolver: () => resolveDigestLocale(ref.read(localeOverrideProvider)),
   );
 });
 
@@ -497,6 +623,34 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
 final notificationPermissionGrantedProvider = StateProvider<bool>(
   (ref) => true,
 );
+
+/// How many chores [ChoreService.catchUpOverdue] has rolled forward without
+/// the user having acknowledged it yet — `0` meaning "there is nothing to
+/// explain", which is the overwhelmingly common case.
+///
+/// Backlog B-1 / triage T2.1: catch-up is silent by construction. It runs
+/// before the first frame ([bootstrapProvider]) or in the background
+/// ([CatchUpController]), and the only trace it leaves is a reinserted
+/// pending occurrence that renders as an ordinary overdue tile — so to
+/// somebody coming back after a lapse, the list reads as an unexplained
+/// accusation. Both call sites ADD their nonzero count here, and
+/// `CatchUpBanner` (`lib/features/chores/catch_up_banner.dart`) is the only
+/// reader; dismissing it resets this to `0`.
+///
+/// Adding rather than overwriting is deliberate: a day-change run firing
+/// while an earlier banner is still unacknowledged must not drop the
+/// earlier count on the floor.
+///
+/// Deliberately NOT persisted, unlike the once-ever `settings` flags behind
+/// the first-run banners (`onboardingNamePromptShownAt`,
+/// `digestPrepromptShownAt`): catch-up is a recurring background event, not
+/// an onboarding step, so a genuinely new lapse has to be able to explain
+/// itself again even though an earlier one was dismissed. A plain
+/// [StateProvider] for the same reason as
+/// [notificationPermissionGrantedProvider]: widget tests can override it
+/// directly to exercise the banner's own visible/hidden/copy states without
+/// standing up a real overdue backlog first.
+final catchUpBannerCountProvider = StateProvider<int>((ref) => 0);
 
 /// The chore lifecycle service, built on [appDatabaseProvider],
 /// [choreRepositoryProvider], and [clockProvider].
@@ -516,6 +670,12 @@ final memberServiceProvider = Provider<MemberService>((ref) {
   return MemberService(
     database: ref.watch(appDatabaseProvider),
     chores: ref.watch(choreRepositoryProvider),
+    // Only ever used for a CLAIMED target (spec
+    // `docs/specs/household-lifecycle.md` §3.2). Under NoopHouseholdGateway
+    // (Supabase unconfigured) a claimed member cannot exist in the first
+    // place -- nothing ever populated `user_id` -- so the unreachable-throw
+    // is correct rather than a hazard.
+    gateway: ref.watch(householdGatewayProvider),
     clock: ref.watch(clockProvider),
   );
 });
@@ -570,7 +730,17 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
     return Completer<String>().future;
   }
   await ref.watch(categoryRepositoryProvider).seedDefaults(householdId);
-  await ref.watch(choreServiceProvider).catchUpOverdue(householdId);
+  // Whatever this run rolled forward has to be explainable on the very first
+  // frame (backlog B-1) -- this is the run nobody can see happening, since it
+  // completes before any widget builds. Safe to write another provider from
+  // here: we are past an `await`, so this is a microtask after the build, not
+  // a mutation during it.
+  final caughtUpCount = await ref
+      .watch(choreServiceProvider)
+      .catchUpOverdue(householdId);
+  if (caughtUpCount > 0) {
+    ref.read(catchUpBannerCountProvider.notifier).state += caughtUpCount;
+  }
   final cutoffUtc = ref
       .watch(clockProvider)
       .now()
@@ -1098,13 +1268,20 @@ class DigestRescheduleController {
       return;
     }
 
+    final actingMemberId = _ref.read(actingMemberProvider)?.id;
     await scheduler.applyDigestPlans(
       buildDigestPlans(
         now: _ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
-        recipientMemberId: _ref.read(actingMemberProvider)?.id,
+        recipientMemberId: actingMemberId,
       ),
+      // Carried into each actionable slot's payload so the background isolate
+      // never has to re-derive it -- it could not do so correctly (no auth
+      // session) and a simplified guess would re-introduce the A-5
+      // misattribution for every linked household. See
+      // `DigestActionPayload.actingMemberId`.
+      actingMemberId: actingMemberId,
     );
   }
 }
@@ -1166,6 +1343,10 @@ DateTime nextLocalMidnight(DateTime now) {
 /// unconditionally — see [_runCatchUp]. This is what re-arms the digest's
 /// rolling horizon for an app that simply stays open, which no other
 /// trigger covers.
+///
+/// When catch-up DID move something, [_runCatchUp] also adds that count to
+/// [catchUpBannerCountProvider], so the chores list can explain it rather
+/// than let chores reappear as overdue for no visible reason (backlog B-1).
 ///
 /// On the same two triggers this controller ALSO refreshes [todayProvider]
 /// — unconditionally, whether or not catch-up changed anything — which is
@@ -1237,7 +1418,15 @@ class CatchUpController {
     if (householdId == null) {
       return;
     }
-    await _ref.read(choreServiceProvider).catchUpOverdue(householdId);
+    final changedCount = await _ref
+        .read(choreServiceProvider)
+        .catchUpOverdue(householdId);
+    if (changedCount > 0) {
+      // ADDS rather than assigns: a day-change run firing while an earlier
+      // banner is still unacknowledged must not drop the earlier count (see
+      // [catchUpBannerCountProvider]).
+      _ref.read(catchUpBannerCountProvider.notifier).state += changedCount;
+    }
     // Deliberately unconditional, and NOT gated on catch-up having changed
     // something: the digest is armed only a bounded horizon ahead
     // (`digestHorizonSlots` slots, reaching `digestDailyHorizonDays - 1 +
@@ -1259,6 +1448,99 @@ final catchUpControllerProvider = Provider<CatchUpController>((ref) {
   ref.onDispose(controller.dispose);
   return controller;
 });
+
+/// Receives the background notification-action isolate's ping and refreshes
+/// the app from disk (spec `docs/specs/notifications.md` N2, backlog F-1).
+///
+/// Same shape and same discipline as [DigestRescheduleController] /
+/// [CatchUpController] / [SyncEngineController]: constructed exactly once,
+/// from `main.dart`, before `runApp`, and NEVER read from inside the
+/// `lib/app`/`lib/features` widget tree — see [DigestRescheduleController]'s
+/// doc comment for the reasoning (every widget test builds `ChoreApp`
+/// directly, never through `main()`).
+///
+/// It has no on-resume behaviour of its own and so is absent from
+/// `_AppResumeObserver`; it only has to exist, so that its `ReceivePort` is
+/// registered for the process's lifetime.
+///
+/// ## Why a ping is needed at all
+///
+/// The "Done" action is handled in a SEPARATE background isolate which opens
+/// its own [AppDatabase] connection (see
+/// `lib/application/notification_action_handler.dart`). Drift's reactive
+/// `.watch()` streams only re-emit for writes made through the SAME
+/// `QueryExecutor`, and two isolates in one process do not share that
+/// stream-invalidation bus — so a completion written over there is invisible to
+/// every stream over here, indefinitely. Verified from the plugin's own Android
+/// source (see `FlutterLocalNotificationsAdapter.initialize`): an action with
+/// `showsUserInterface: false` routes to the background isolate even when the
+/// app is in the FOREGROUND, so the existing app-resume observer is not a
+/// substitute — a user who pulls down the shade over the open app would
+/// otherwise see nothing change.
+class NotificationActionSignalController {
+  /// Registers the well-known port and starts listening immediately.
+  NotificationActionSignalController(this._ref) {
+    // Remove BEFORE registering: a hot restart tears down the container
+    // without running `dispose`, leaving the old mapping in the VM-wide
+    // registry, and `registerPortWithName` fails rather than replaces. This
+    // ordering is what makes a hot restart survivable.
+    IsolateNameServer.removePortNameMapping(notificationActionPortName);
+    IsolateNameServer.registerPortWithName(
+      _port.sendPort,
+      notificationActionPortName,
+    );
+    _subscription = _port.listen((_) => _onPing());
+  }
+
+  final Ref _ref;
+  final ReceivePort _port = ReceivePort();
+  late final StreamSubscription<dynamic> _subscription;
+
+  /// Stops listening, closes the port and releases the name. Wired via
+  /// `ref.onDispose`.
+  void dispose() {
+    unawaited(_subscription.cancel());
+    _port.close();
+    IsolateNameServer.removePortNameMapping(notificationActionPortName);
+  }
+
+  void _onPing() {
+    // **The invalidates are the part that guarantees correctness**, and the
+    // triggers below are only a latency optimisation. The write came through a
+    // different `AppDatabase` connection, so drift's stream-invalidation bus
+    // never saw it and these two streams would otherwise keep serving
+    // pre-completion rows to whatever screen is open.
+    _ref
+      ..invalidate(pendingOccurrencesProvider)
+      ..invalidate(closedTodayOccurrencesProvider);
+    // `invalidate` does not synchronously deliver a fresh value, so THIS
+    // recompute may well read pre-invalidation data. That is fine and is not a
+    // race worth fixing: `DigestRescheduleController` already
+    // `ref.listen`s `pendingOccurrencesProvider`, so the invalidated stream's
+    // fresh emission drives a second, correct recompute right behind this one.
+    // What this call buys is that the common case is fast, not that it is
+    // right.
+    _ref.read(digestRescheduleControllerProvider).triggerRecompute();
+    // The same two calls `main.dart`'s `_AppResumeObserver` makes.
+    // `completeOccurrence` marked the row `syncDirty` regardless of which
+    // connection wrote it (a column write, not a stream side effect), so the
+    // existing push path needs no new code. `triggerOnResume` returns void and
+    // wraps its own fire-and-forget push, so no `unawaited` here — mirroring
+    // that observer's own call site.
+    _ref.read(syncEngineControllerProvider).triggerOnResume();
+  }
+}
+
+/// Activates [NotificationActionSignalController] the moment it's first read.
+///
+/// Read exactly once, from `main.dart`, before `runApp` — see the controller's
+/// own doc comment for why it must never be read from inside the widget tree.
+final notificationActionSignalControllerProvider =
+    Provider<NotificationActionSignalController>((ref) {
+      final controller = NotificationActionSignalController(ref);
+      ref.onDispose(controller.dispose);
+      return controller;
+    });
 
 /// Owns the P3 sync engine's app-resume trigger (spec
 /// `docs/specs/sync-backend.md` §8.3: "pull on ... app resume") --
@@ -1309,6 +1591,14 @@ class SyncEngineController {
   /// (the OS can suspend/kill the debounce `Timer`), so resume must also
   /// recover it, not only fetch what changed remotely.
   void triggerOnResume() {
+    // Re-arms the D-5 indicator's grace period (spec
+    // `docs/specs/sync-freshness.md` §2.5): the pull cursor is legitimately
+    // as old as the time spent backgrounded, and the push/pull this method
+    // kicks off is the device's first chance in that whole span to prove
+    // otherwise. Without this the banner would flash on every resume after
+    // more than five minutes away. Invalidated BEFORE the push, so the
+    // stamp can never land after a pull the push triggers.
+    _ref.invalidate(syncObservingSinceProvider);
     unawaited(_ref.read(syncEngineProvider).pushDirty());
   }
 

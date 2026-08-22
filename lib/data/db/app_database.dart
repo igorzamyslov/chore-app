@@ -53,14 +53,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       // v1 -> v2 (spec `docs/specs/notifications.md`): adds the `settings`
       // table. [migrator.createTable] always builds the table from its
-      // *current* (here, v11) column set, so a fresh v1 -> v11 jump already
+      // *current* (here, v12) column set, so a fresh v1 -> v12 jump already
       // gets every later column for free — the branches below only need
       // to backfill whichever columns an install that already has an
       // older-shaped `settings` table is still missing (a "create then
@@ -117,11 +117,23 @@ class AppDatabase extends _$AppDatabase {
           // revoked) -- no data rewrite. Lives here, inside the `else`
           // branch, rather than as an unconditional backfill below: unlike
           // `households`/`members`/etc (which existed since schemaVersion
-          // 1), `settings` itself didn't exist before v2, so a v1 -> v11
+          // 1), `settings` itself didn't exist before v2, so a v1 -> v12
           // jump already gets this column for free via [createTable]
           // above, and adding it again here would throw a
           // duplicate-column error.
           await migrator.addColumn(settings, settings.membershipRevoked);
+        }
+        if (from < 12) {
+          // v11 -> v12 (spec `docs/specs/onboarding-v2.md` §1): the
+          // nullable `settings.pendingJoinCode` prefill column, defaulting
+          // to `NULL` (no join in progress) -- no data rewrite. Lives here,
+          // inside the `else` branch, for exactly the reason spelled out
+          // for `membershipRevoked` directly above: `settings` did not
+          // exist before v2, so a v1 -> v12 jump builds the table at full
+          // current width via [createTable], and a second unconditional
+          // `addColumn` for the same column would throw a duplicate-column
+          // error.
+          await migrator.addColumn(settings, settings.pendingJoinCode);
         }
       }
       if (from < 8) {

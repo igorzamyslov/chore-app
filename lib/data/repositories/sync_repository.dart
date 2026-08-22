@@ -24,6 +24,43 @@ class SyncRepository {
   /// The database this repository reads from and writes to.
   final AppDatabase db;
 
+  /// Watches whether ANY synced-table row is currently `syncDirty` --
+  /// re-emits whenever a write touches any of the seven synced tables (the
+  /// `readsFrom` wiring below), regardless of which table changed. Backs
+  /// `dirtySinceProvider` (`lib/app/providers.dart`), the D-5 indicator's
+  /// "this device has unsent changes" signal (spec
+  /// `docs/specs/sync-freshness.md` §2.5).
+  ///
+  /// A single `EXISTS` over a `UNION ALL` rather than seven separate
+  /// watches: SQLite short-circuits `EXISTS` on the first matching row, and
+  /// one stream means one drift subscription for a boolean the caller only
+  /// ever needs collapsed anyway.
+  Stream<bool> watchAnyDirty() {
+    return db
+        .customSelect(
+          'SELECT EXISTS( '
+          'SELECT 1 FROM households WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM members WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM categories WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM chores WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM chore_assignees WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM chore_occurrences WHERE sync_dirty = 1 '
+          'UNION ALL SELECT 1 FROM shopping_items WHERE sync_dirty = 1 '
+          ') AS any_dirty',
+          readsFrom: {
+            db.households,
+            db.members,
+            db.categories,
+            db.chores,
+            db.choreAssignees,
+            db.choreOccurrences,
+            db.shoppingItems,
+          },
+        )
+        .watchSingle()
+        .map((row) => row.read<int>('any_dirty') == 1);
+  }
+
   // ---------------------------------------------------------------------
   // Dirty select (push, step 1) -- ordered by `id` purely for deterministic
   // test output; push order across ROWS of the same table has no FK

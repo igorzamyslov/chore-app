@@ -19,6 +19,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../features/settings/fake_household_gateway.dart';
 import 'fake_sync_transport.dart';
 
 /// A [FakeSyncTransport] whose [pullTable] throws on [failOnTable] --
@@ -460,6 +461,10 @@ void main() {
         await MemberService(
           database: db,
           chores: ChoreRepository(db),
+          // Unclaimed target, so the claim-state routing (spec
+          // `docs/specs/household-lifecycle.md` §3.2) never reaches the
+          // gateway -- this test is about the local soft-delete's push.
+          gateway: FakeHouseholdGateway(),
         ).deleteMember(second.id);
         await engine.pushDirty();
 

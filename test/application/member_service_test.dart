@@ -2,7 +2,9 @@
 /// `docs/feedback/2026-08-01-ux-audit.md` A1): the full referential
 /// matrix -- rotation-of-3 drops to 2, rotation-of-2 converts to fixed,
 /// fixed converts to anyone with its pending occurrence unassigned -- plus
-/// both guards and the "history is untouched" invariant.
+/// both guards, the claim-state routing (spec
+/// `docs/specs/household-lifecycle.md` §3.2, F10) and the "history is
+/// untouched" invariant.
 library;
 
 import 'package:chore_app/application/chore_service.dart';
@@ -16,12 +18,15 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../features/settings/fake_household_gateway.dart';
+
 void main() {
   late AppDatabase db;
   late HouseholdRepository households;
   late ChoreRepository chores;
   late ChoreService choreService;
   late MemberService memberService;
+  late FakeHouseholdGateway gateway;
   late Household household;
 
   final today = PlainDate(2026, 7, 24);
@@ -35,9 +40,11 @@ void main() {
       chores: chores,
       clock: Clock.fixed(DateTime(2026, 7, 24, 9)),
     );
+    gateway = FakeHouseholdGateway();
     memberService = MemberService(
       database: db,
       chores: chores,
+      gateway: gateway,
       clock: Clock.fixed(DateTime(2026, 7, 24, 9)),
     );
     household = await households.createLocalHousehold('Me');
@@ -149,7 +156,8 @@ void main() {
   );
 
   test(
-    'guard: throws for a claimed member (userId != null), changing nothing',
+    'claimed target: calls remove_member FIRST, then runs the same local '
+    'referential cleanup (spec docs/specs/household-lifecycle.md §3.2)',
     () async {
       final a = await households.addMember(household.id, name: 'A', color: 1);
       await (db.update(
@@ -158,15 +166,81 @@ void main() {
         const MembersCompanion(userId: Value('server-user-1')),
       );
 
+      await memberService.deleteMember(a.id);
+
+      expect(gateway.removeMemberCalls, [a.id]);
+      final row = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+      expect(
+        row.syncDirty,
+        isTrue,
+        reason:
+            'the local soft-delete still pushes deleted_at -- a harmless '
+            'no-op convergence on a row the server already soft-deleted '
+            '(§3.2), so the engine needs no special case',
+      );
+    },
+  );
+
+  test(
+    'claimed target whose RPC fails: throws ClaimedMemberRemovalFailure and '
+    'changes NOTHING locally -- the member stays active',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).write(
+        const MembersCompanion(userId: Value('server-user-1')),
+      );
+      gateway.removeMemberError = Exception('offline');
+
       await expectLater(
         memberService.deleteMember(a.id),
-        throwsA(isA<StateError>()),
+        throwsA(isA<ClaimedMemberRemovalFailure>()),
       );
 
       final row = await (db.select(
         db.members,
       )..where((tbl) => tbl.id.equals(a.id))).getSingle();
       expect(row.deletedAt, isNull);
+    },
+  );
+
+  test(
+    'unclaimed target: purely local, the RPC is never called',
+    () async {
+      final a = await households.addMember(household.id, name: 'A', color: 1);
+
+      await memberService.deleteMember(a.id);
+
+      expect(gateway.removeMemberCalls, isEmpty);
+      final row = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(a.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+    },
+  );
+
+  test(
+    'the last-member guard is checked BEFORE the RPC, so a removal the local '
+    'rules refuse never reaches the server',
+    () async {
+      final me = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.householdId.equals(household.id))).getSingle();
+      await (db.update(
+        db.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(userId: Value('server-user-1')),
+      );
+
+      await expectLater(
+        memberService.deleteMember(me.id),
+        throwsA(isA<StateError>()),
+      );
+      expect(gateway.removeMemberCalls, isEmpty);
     },
   );
 

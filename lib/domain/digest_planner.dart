@@ -26,6 +26,7 @@ class DigestPlan {
     required this.fireAt,
     required this.dueTodayCount,
     required this.overdueCount,
+    this.soleOccurrenceId,
   });
 
   /// The device-local moment the notification should fire.
@@ -43,20 +44,39 @@ class DigestPlan {
   /// date (due strictly before it).
   final int overdueCount;
 
+  /// The id of the single pending occurrence this slot is about, or `null`
+  /// when the slot is about more than one (spec
+  /// `docs/specs/notifications.md` N2).
+  ///
+  /// Non-null exactly when `dueTodayCount + overdueCount == 1` — the one
+  /// case where the chore a notification ACTION names is unambiguous, so
+  /// this is what gates the digest's "Done" button per slot.
+  ///
+  /// **This class does not enforce that invariant**, deliberately:
+  /// [planDigestSlot] stays pure and carries whatever the caller determined,
+  /// and `projectDigestCounts` (`lib/domain/digest_projection.dart`) is the
+  /// single place that decides it — because it is the only place that
+  /// applies the same recipient scoping and the same projected-due-date
+  /// comparison the counts themselves do. Re-deriving the gate here would
+  /// be a second copy of both rules.
+  final String? soleOccurrenceId;
+
   @override
   bool operator ==(Object other) =>
       other is DigestPlan &&
       other.fireAt == fireAt &&
       other.dueTodayCount == dueTodayCount &&
-      other.overdueCount == overdueCount;
+      other.overdueCount == overdueCount &&
+      other.soleOccurrenceId == soleOccurrenceId;
 
   @override
-  int get hashCode => Object.hash(fireAt, dueTodayCount, overdueCount);
+  int get hashCode =>
+      Object.hash(fireAt, dueTodayCount, overdueCount, soleOccurrenceId);
 
   @override
   String toString() =>
       'DigestPlan(fireAt: $fireAt, dueTodayCount: $dueTodayCount, '
-      'overdueCount: $overdueCount)';
+      'overdueCount: $overdueCount, soleOccurrenceId: $soleOccurrenceId)';
 }
 
 /// The next digest slot after [now]: today at the wall-clock time
@@ -214,11 +234,16 @@ List<DateTime> digestSlots({
 /// [dueTodayCount] and [overdueCount] must already be computed for
 /// [fireAt]'s own calendar date — see
 /// `lib/domain/digest_projection.dart`.
+///
+/// [soleOccurrenceId] is threaded through untouched; this function does not
+/// decide it and applies no invariant to it — see
+/// [DigestPlan.soleOccurrenceId].
 DigestPlan? planDigestSlot({
   required DateTime fireAt,
   required bool enabled,
   required int dueTodayCount,
   required int overdueCount,
+  String? soleOccurrenceId,
 }) {
   if (!enabled) {
     return null;
@@ -230,6 +255,7 @@ DigestPlan? planDigestSlot({
     fireAt: fireAt,
     dueTodayCount: dueTodayCount,
     overdueCount: overdueCount,
+    soleOccurrenceId: soleOccurrenceId,
   );
 }
 

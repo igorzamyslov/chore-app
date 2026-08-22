@@ -17,6 +17,17 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get appBootstrapErrorTitle =>
+      'Deine Daten konnten nicht geöffnet werden';
+
+  @override
+  String get notificationChannelDigestName => 'Tägliche Zusammenfassung';
+
+  @override
+  String get notificationChannelDigestDescription =>
+      'Die einmal täglich versendete Aufgaben-Zusammenfassung.';
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -54,6 +65,9 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0 · $_temp1';
   }
+
+  @override
+  String get notificationActionDone => 'Erledigt';
 
   @override
   String get commonCancel => 'Abbrechen';
@@ -285,6 +299,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get digestPrepromptDismissAction => 'Nicht jetzt';
+
+  @override
+  String catchUpBannerMessage(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Wir haben $count überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.',
+      one:
+          'Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get catchUpBannerDismissTooltip => 'Schließen';
 
   @override
   String get choresSnackbarDone => 'Erledigt';
@@ -670,6 +700,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDigestToggleTitle => 'Tägliche Zusammenfassung';
 
   @override
+  String get settingsDigestToggleDeniedHint =>
+      'Wird nicht zugestellt — Benachrichtigungen sind aus';
+
+  @override
   String get settingsDigestTimeLabel => 'Benachrichtigungszeit';
 
   @override
@@ -871,7 +905,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Melde dich an, um deinen Haushalt geräteübergreifend zu synchronisieren.';
+      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.';
 
   @override
   String get settingsAccountEmailLabel => 'E-Mail-Adresse';
@@ -932,6 +966,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get syncRefreshError =>
       'Haushalt nicht erreichbar. Deine Änderungen sind hier gespeichert und werden später synchronisiert.';
+
+  @override
+  String get syncRefreshErrorRevoked =>
+      'Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.';
+
+  @override
+  String get syncHealthBannerMessage =>
+      'Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.';
 
   @override
   String get settingsAccountSignOutError =>
@@ -1214,6 +1256,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm2Action => 'Alles löschen';
+
+  @override
+  String get settingsResetError =>
+      'Zurücksetzen ist fehlgeschlagen. Versuch es noch mal.';
 
   @override
   String get exitConfirmDeleteLocalLabel =>

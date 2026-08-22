@@ -140,6 +140,29 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// assert this stays `0` in those cases.
   int findMyMembershipCallCount = 0;
 
+  /// Every [removeMember] call's member id, in call order.
+  final List<String> removeMemberCalls = [];
+
+  /// Set to make the next [removeMember] call throw this instead of
+  /// succeeding -- the claimed-removal failure surface (spec
+  /// `docs/specs/household-lifecycle.md` §3.2) is the one place in this app a
+  /// failed action must be shown inline, so tests need to force it.
+  Exception? removeMemberError;
+
+  /// Every [leaveHousehold] call's household id, in call order.
+  final List<String> leaveHouseholdCalls = [];
+
+  /// Set to make the next [leaveHousehold] call throw this instead of
+  /// succeeding.
+  Exception? leaveHouseholdError;
+
+  /// How many times [deleteAccount] has been called.
+  int deleteAccountCallCount = 0;
+
+  /// Set to make the next [deleteAccount] call throw this instead of
+  /// succeeding.
+  Exception? deleteAccountError;
+
   final Set<String> _createdHouseholdIds = {};
 
   @override
@@ -232,6 +255,33 @@ class FakeHouseholdGateway implements HouseholdGateway {
       throw error;
     }
     return joinResultHouseholdId;
+  }
+
+  @override
+  Future<void> removeMember(String memberId) async {
+    removeMemberCalls.add(memberId);
+    final error = removeMemberError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
+  Future<void> leaveHousehold(String householdId) async {
+    leaveHouseholdCalls.add(householdId);
+    final error = leaveHouseholdError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCallCount++;
+    final error = deleteAccountError;
+    if (error != null) {
+      throw error;
+    }
   }
 
   @override

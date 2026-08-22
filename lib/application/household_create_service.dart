@@ -50,13 +50,20 @@ class HouseholdCreateService {
   final SettingsRepository settings;
 
   /// Creates the household with a single admin member named [name], seeds
-  /// its default categories, and marks the onboarding name-prompt flag,
-  /// all in one transaction. Resolves to the new household's id.
+  /// its default categories, marks the onboarding name-prompt flag, and
+  /// clears any leftover welcome-join code prefill, all in one transaction.
+  /// Resolves to the new household's id.
   Future<String> create(String name) {
     return database.transaction(() async {
       final household = await households.createLocalHousehold(name);
       await categories.seedDefaults(household.id);
       await settings.markOnboardingNamePromptShown();
+      // A user who abandoned an in-progress join to start fresh instead
+      // shouldn't leave that invite code sitting in `settings` (spec
+      // `docs/specs/onboarding-v2.md` §1, `Settings.pendingJoinCode`).
+      // Hygiene rather than safety: the welcome gate never reappears once a
+      // household exists, so nothing reads the value again either way.
+      await settings.setPendingJoinCode(null);
       return household.id;
     });
   }

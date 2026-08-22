@@ -1,7 +1,9 @@
 import 'package:chore_app/app/app.dart';
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,8 +21,9 @@ Finder _fieldFor(String identifier) {
 
 /// Widget-level tests for the welcome gate's root screen (spec
 /// `docs/specs/onboarding-v2.md` §1/§2/§3): the gate showing on an empty
-/// database, the join card's Noop-gated visibility, the create path, and
-/// mid-flow-kill resuming at the gate.
+/// database, the join card's Noop-gated visibility, the create path,
+/// mid-flow-kill resuming at the gate, and the auto-resume that puts a
+/// signed-in-but-householdless user straight back on the join subpage.
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -185,6 +188,68 @@ void main() {
         reason: 'state is simply "no household yet" -- resumes at the gate',
       );
       expect(await database.select(database.households).get(), isEmpty);
+      handle.dispose();
+    },
+  );
+
+  testFreshChoreApp(
+    'creating a new household clears any pendingJoinCode left over from an '
+    'abandoned join attempt -- spec docs/specs/onboarding-v2.md §1',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await SettingsRepository(database).setPendingJoinCode('OLDCODE1');
+
+      await tester.tap(find.bySemanticsIdentifier('welcome.create'));
+      await tester.pumpAndSettle();
+      await tester.enterText(_fieldFor('welcome.create.name'), 'Sam');
+      await tester.pump();
+      await tester.tap(find.bySemanticsIdentifier('welcome.create.confirm'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('shell.tab.chores'), findsOneWidget);
+      final row = await database.select(database.settings).getSingle();
+      expect(row.pendingJoinCode, isNull);
+
+      handle.dispose();
+    },
+  );
+
+  testFreshChoreApp(
+    'a signed-in user with no household yet lands directly on the join '
+    'subpage on cold start, not the two-card chooser -- only the join flow '
+    'could have signed this device in with no local household to show for '
+    'it (spec docs/specs/onboarding-v2.md §1, docs/research/triage.md T2.4)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      expect(find.bySemanticsIdentifier('welcome.create'), findsNothing);
+      expect(find.bySemanticsIdentifier('welcome.join'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('settings.account.join.code'),
+        findsOneWidget,
+      );
+
+      // The escape hatch: backing out returns to the two-card chooser, and
+      // staying signed in does NOT immediately re-push the subpage -- the
+      // auto-push fires at most once per `WelcomeScreen` instance, so the
+      // back button stays meaningful rather than looping.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('welcome.create'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('settings.account.join.code'),
+        findsNothing,
+      );
+
       handle.dispose();
     },
   );

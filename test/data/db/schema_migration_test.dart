@@ -43,7 +43,7 @@ Future<void> _dropMemberDeletedAtColumn(AppDatabase seed) async {
 /// Drops `membership_revoked` (schema v10, spec
 /// `docs/specs/household-lifecycle.md` §3.5) from `settings` on [seed] --
 /// mirrors `_dropMemberDeletedAtColumn`'s reasoning for the same
-/// collateral-drop pattern: [seed] always opens at the *current* (now v11)
+/// collateral-drop pattern: [seed] always opens at the *current* (now v12)
 /// schema first, so every test below that simulates a pre-v10 install
 /// needs this, or the later `onUpgrade` would try to `ADD COLUMN
 /// membership_revoked` on a column that's already there.
@@ -56,22 +56,83 @@ Future<void> _dropMembershipRevokedColumn(AppDatabase seed) async {
 /// Drops the `(status, closed_on)` index (schema v11, spec
 /// `docs/specs/stats.md` §2.3) from `chore_occurrences` on [seed] -- the
 /// same collateral-drop pattern as the column helpers above, one rung down
-/// the schema-object hierarchy, and needed by *every* test below rather
-/// than only the pre-v11 ones.
+/// the schema-object hierarchy, and needed by every test below whose seed
+/// rewinds `user_version` BELOW 11 -- all of them except the `11 -> 12`
+/// test, whose seed must KEEP the index (at `from == 11` the `from < 11`
+/// branch never runs, so a real v11 install still has it).
 ///
-/// The reason it is needed everywhere: `onUpgrade`'s `from < 11` branch
+/// The reason it is needed at all: `onUpgrade`'s `from < 11` branch
 /// issues a plain `CREATE INDEX` (drift's [Migrator.createIndex] has no
 /// `IF NOT EXISTS` form), which is exactly right in production -- no
 /// install at any shipped version 1..10 can have this index, so a
 /// collision would be a genuine bug worth throwing on. But [seed] always
-/// opens at the *current* (v11) schema first, so `onCreate` has already
+/// opens at the *current* (v12) schema first, so `onCreate` has already
 /// created the index, and rewinding `user_version` alone does not remove
-/// it. Without this drop, every rewound test would hit "index ... already
-/// exists" -- an artifact of the harness, not of the migration.
+/// it. Without this drop, a test rewound below 11 would hit "index ...
+/// already exists" -- an artifact of the harness, not of the migration.
 Future<void> _dropStatusClosedOnIndex(AppDatabase seed) async {
   await seed.customStatement(
     'DROP INDEX IF EXISTS chore_occurrences_status_closed_on_idx',
   );
+}
+
+/// Drops `pending_join_code` (schema v12, spec
+/// `docs/specs/onboarding-v2.md` §1) from `settings` on [seed] -- mirrors
+/// `_dropMembershipRevokedColumn`'s reasoning for the same collateral-drop
+/// pattern: [seed] always opens at the *current* (now v12) schema first, so
+/// every test below that simulates a pre-v12 install needs this, or the
+/// later `onUpgrade` would try to `ADD COLUMN pending_join_code` on a
+/// column that's already there.
+Future<void> _dropPendingJoinCodeColumn(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE settings DROP COLUMN pending_join_code',
+  );
+}
+
+/// Every `settings` column added by a migration AFTER the table itself
+/// arrived at v2 -- which is exactly the set a pre-v12 seed below has to
+/// drop and the upgrade under test has to put back.
+const _settingsColumnsAddedAfterV2 = [
+  'acting_member_id', // v3
+  'locale', // v4
+  'onboarding_name_prompt_shown_at', // v5
+  'digest_preprompt_shown_at', // v5
+  'sync_household_id', // v6
+  'sync_linked_at', // v6
+  'theme_mode', // v7
+  'sync_last_pulled_at', // v8
+  'membership_revoked', // v10
+  'pending_join_code', // v12
+];
+
+/// The names of the columns [table] actually has on disk, straight from
+/// `PRAGMA table_info`.
+///
+/// This is the EXISTENCE half of every column-addition assertion below, and
+/// it is not decoration: a bare `expect(row.someNullableColumn, isNull)` is
+/// VACUOUS. Drift maps an ABSENT nullable column to `null` on read, so such
+/// an assertion passes identically whether the migration added the column or
+/// did nothing whatsoever. That is not a theory -- deleting the `from < 7`
+/// branch left all four tests asserting `themeMode` green, including the one
+/// whose title is "adds themeMode".
+///
+/// Non-nullable columns do self-guard (drift throws rather than inventing a
+/// value -- deleting the `households.syncDirty` backfill turned the
+/// `7 -> 12` test red on the spot), but the assertions below cover both
+/// kinds anyway, so nobody reading them has to remember which column is
+/// which.
+///
+/// A SET of names, asserted with `containsAll`, rather than the per-column
+/// `hasLength(1)` count that the `9 -> 12` and `11 -> 12` tests use inline:
+/// `containsAll` says exactly what each test is about ("this upgrade
+/// produced these columns") and needs no edit when a later migration adds
+/// one more. The two shapes are equal in strength -- SQLite rejects a
+/// duplicate `ADD COLUMN` at migration time, so a name can never appear
+/// twice on disk -- so those two are left exactly as they are, since the
+/// prose around them documents the else-branch placement reasoning.
+Future<Set<String>> _columnNames(AppDatabase db, String table) async {
+  final rows = await db.customSelect("PRAGMA table_info('$table')").get();
+  return rows.map((row) => row.read<String>('name')).toSet();
 }
 
 void main() {
@@ -90,7 +151,7 @@ void main() {
 
       // Simulate a pre-existing v1 install without hand-copying v1's
       // CREATE TABLE SQL (which would drift out of sync with tables.dart
-      // over time): open the *current* (v11) schema once against a real
+      // over time): open the *current* (v12) schema once against a real
       // file so `onCreate` materializes every table, including the v2-only
       // `settings` table, then drop that table (plus `syncDirty` from
       // every OTHER table -- see `_dropSyncDirtyColumns`, added at v8 --
@@ -98,9 +159,9 @@ void main() {
       // `_dropMemberDeletedAtColumn`) and roll `user_version` back to 1 —
       // reproducing exactly what a real v1 database on a user's device
       // looks like. Dropping the whole `settings` table also covers
-      // `membership_revoked` (added at v10) -- there's no separate
-      // collateral drop needed for it here, unlike the versioned-upgrade
-      // tests below.
+      // `membership_revoked` (added at v10) and `pending_join_code` (added
+      // at v12) -- there's no separate collateral drop needed for either
+      // here, unlike the versioned-upgrade tests below.
       final seed = AppDatabase(NativeDatabase(file));
       await seed.customStatement('DROP TABLE settings');
       await _dropSyncDirtyColumns(seed);
@@ -109,9 +170,9 @@ void main() {
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 1` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 1, 11)` —
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 1, 12)` —
       // exactly the real upgrade path a v1 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -133,6 +194,14 @@ void main() {
       expect(row.digestMinutes, 480);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the two assertions above
+      // cannot fail on their own (see `_columnNames`). This is the
+      // v1 -> v12 path, where `createTable` is solely responsible for
+      // every column after v2: if it ever stopped building the table at
+      // full current width, the `else` branch's backfills would NOT
+      // cover for it, because this path never enters that branch.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, containsAll(_settingsColumnsAddedAfterV2));
 
       // Pre-existing v1 data survived the upgrade untouched.
       final households = await upgraded.select(upgraded.households).get();
@@ -142,8 +211,8 @@ void main() {
 
   test(
     'a fresh (never-opened) database is created at the current '
-    'schemaVersion (11) directly, settings table included with every '
-    'column -- membershipRevoked among them',
+    'schemaVersion (12) directly, settings table included with every '
+    'column -- membershipRevoked and pendingJoinCode among them',
     () async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
@@ -152,7 +221,8 @@ void main() {
       // `Migrator.createAll()` already creates every table at the full
       // CURRENT column set, `settings` included) — this just guards
       // against a regression where a fresh install would need `onUpgrade`
-      // to get a column, `membershipRevoked` (added at v10) included.
+      // to get a column -- `membershipRevoked` (added at v10) and
+      // `pendingJoinCode` (added at v12) included.
       final rows = await db.select(db.settings).get();
       expect(rows, isEmpty);
 
@@ -167,11 +237,18 @@ void main() {
           );
       final row = await db.select(db.settings).getSingle();
       expect(row.membershipRevoked, isFalse);
+      expect(row.pendingJoinCode, isNull);
+      // Existence, not just default value -- `expect(row.pendingJoinCode,
+      // isNull)` above cannot fail on its own (see `_columnNames`), which
+      // would hollow out this test's entire purpose: it exists to prove a
+      // fresh install needs no `onUpgrade` to get its columns.
+      final columns = await _columnNames(db, 'settings');
+      expect(columns, containsAll(_settingsColumnsAddedAfterV2));
     },
   );
 
   test(
-    'schemaVersion 3 -> 11 upgrade adds locale, both shown-once flags, the '
+    'schemaVersion 3 -> 12 upgrade adds locale, both shown-once flags, the '
     'sync-linked columns, themeMode, syncLastPulledAt, and '
     'membershipRevoked (NULL/false by default), keeping the existing '
     'settings row',
@@ -230,12 +307,13 @@ void main() {
       await _dropMemberDeletedAtColumn(seed);
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 3` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 3, 11)` —
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 3, 12)` —
       // exactly the real upgrade path a v3 user's device would go through.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
@@ -250,6 +328,24 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'locale',
+          'onboarding_name_prompt_shown_at',
+          'digest_preprompt_shown_at',
+          'sync_household_id',
+          'sync_linked_at',
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -259,9 +355,9 @@ void main() {
   );
 
   test(
-    'schemaVersion 2 -> 11 upgrade adds every later settings column, '
+    'schemaVersion 2 -> 12 upgrade adds every later settings column, '
     'keeping the existing settings row -- this app never actually stops '
-    'at an intermediate version once schemaVersion is 11, so this '
+    'at an intermediate version once schemaVersion is 12, so this '
     'supersedes earlier per-step tests',
     () async {
       final dir = await Directory.systemTemp.createTemp(
@@ -274,8 +370,8 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v2 install: open the *current* (v11) schema
-      // once so `onCreate` materializes every table with its full v11
+      // Simulate a pre-existing v2 install: open the *current* (v12) schema
+      // once so `onCreate` materializes every table with its full v12
       // column set, insert a settings row, then drop every column newer
       // than v2 (plus `syncDirty` from every other table -- see
       // `_dropSyncDirtyColumns`, added at v8 -- `members.deletedAt`, added
@@ -322,12 +418,13 @@ void main() {
       await _dropMemberDeletedAtColumn(seed);
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 2` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 2, 11)`.
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 2, 12)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -342,6 +439,11 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above cannot
+      // fail on their own (see `_columnNames`). A v2 seed drops every
+      // post-v2 column, so this upgrade owes all of them.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, containsAll(_settingsColumnsAddedAfterV2));
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.digestEnabled, isTrue);
@@ -350,7 +452,7 @@ void main() {
   );
 
   test(
-    'schemaVersion 5 -> 11 upgrade adds syncHouseholdId, syncLinkedAt, '
+    'schemaVersion 5 -> 12 upgrade adds syncHouseholdId, syncLinkedAt, '
     'themeMode, syncLastPulledAt, and membershipRevoked (NULL/false by '
     'default, no data rewrite), keeping the existing settings row',
     () async {
@@ -364,8 +466,8 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v5 install: open the *current* (v11) schema
-      // once so `onCreate` materializes every table with its full v11
+      // Simulate a pre-existing v5 install: open the *current* (v12) schema
+      // once so `onCreate` materializes every table with its full v12
       // column set, insert a settings row with a non-NULL actingMemberId
       // (so the upgrade's "existing row survives" guarantee is actually
       // exercised), then drop every column newer than v5 (plus `syncDirty`
@@ -402,12 +504,13 @@ void main() {
       await _dropMemberDeletedAtColumn(seed);
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 5` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 5, 11)`
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 5, 12)`
       // -- exactly the real upgrade path a v5 user's device would go
       // through.
       final upgraded = AppDatabase(NativeDatabase(file));
@@ -420,6 +523,21 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'sync_household_id',
+          'sync_linked_at',
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -429,7 +547,7 @@ void main() {
   );
 
   test(
-    'schemaVersion 6 -> 11 upgrade adds themeMode, syncLastPulledAt, and '
+    'schemaVersion 6 -> 12 upgrade adds themeMode, syncLastPulledAt, and '
     'membershipRevoked (NULL/false by default, no data rewrite), keeping '
     'the existing settings row',
     () async {
@@ -443,8 +561,8 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v6 install: open the *current* (v11) schema
-      // once so `onCreate` materializes every table with its full v11
+      // Simulate a pre-existing v6 install: open the *current* (v12) schema
+      // once so `onCreate` materializes every table with its full v12
       // column set, insert a settings row with a non-NULL actingMemberId
       // and a non-NULL syncHouseholdId (so the upgrade's "existing row
       // survives" guarantee is actually exercised for both pre-existing
@@ -477,12 +595,13 @@ void main() {
       await _dropMemberDeletedAtColumn(seed);
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 6` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 6, 11)`
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 6, 12)`
       // -- exactly the real upgrade path a v6 user's device would go
       // through.
       final upgraded = AppDatabase(NativeDatabase(file));
@@ -493,6 +612,19 @@ void main() {
       expect(row.themeMode, isNull);
       expect(row.syncLastPulledAt, isNull);
       expect(row.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'theme_mode',
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // The pre-existing row's own data survived the upgrade untouched.
       expect(row.createdAt, 't0');
       expect(row.actingMemberId, 'member-1');
@@ -503,7 +635,7 @@ void main() {
   );
 
   test(
-    'schemaVersion 7 -> 11 upgrade adds syncDirty (default false) to every '
+    'schemaVersion 7 -> 12 upgrade adds syncDirty (default false) to every '
     'synced table and syncLastPulledAt/membershipRevoked (NULL/false) to '
     'settings, keeping existing rows',
     () async {
@@ -517,8 +649,8 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v7 install: open the *current* (v11) schema
-      // once so `onCreate` materializes every table with its full v11
+      // Simulate a pre-existing v7 install: open the *current* (v12) schema
+      // once so `onCreate` materializes every table with its full v12
       // column set, insert one row into every synced table (so the
       // upgrade's "existing rows survive, syncDirty defaults to false"
       // guarantee is actually exercised everywhere, not just on
@@ -627,12 +759,13 @@ void main() {
       );
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 7` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 7, 11)`
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 7, 12)`
       // -- exactly the real upgrade path a v7 user's device would go
       // through.
       final upgraded = AppDatabase(NativeDatabase(file));
@@ -648,6 +781,13 @@ void main() {
       expect(member.name, 'Me');
       expect(member.syncDirty, isFalse);
       expect(member.deletedAt, isNull);
+      // `deletedAt` is nullable, so the assertion directly above cannot
+      // fail on its own (see `_columnNames`) -- unlike the `syncDirty` ones
+      // around it. `members` has existed since v1, so the table-age
+      // reasoning differs from `settings`, but the READ vacuity is
+      // identical: it is a property of nullability, not of the table.
+      final memberColumns = await _columnNames(upgraded, 'members');
+      expect(memberColumns, containsAll(['sync_dirty', 'deleted_at']));
 
       final category = await upgraded.select(upgraded.categories).getSingle();
       expect(category.id, 'c1');
@@ -680,6 +820,18 @@ void main() {
       final settingsRow = await upgraded.select(upgraded.settings).getSingle();
       expect(settingsRow.syncLastPulledAt, isNull);
       expect(settingsRow.membershipRevoked, isFalse);
+      // Existence, not just default value -- the assertions above
+      // cannot fail on their own (see `_columnNames`). Every `settings`
+      // column this test's own seed dropped must be back.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll([
+          'sync_last_pulled_at',
+          'membership_revoked',
+          'pending_join_code',
+        ]),
+      );
       // Pre-existing settings data survived the upgrade untouched.
       expect(settingsRow.createdAt, 't0');
       expect(settingsRow.digestEnabled, isTrue);
@@ -687,7 +839,7 @@ void main() {
   );
 
   test(
-    'schemaVersion 8 -> 11 upgrade adds members.deletedAt and '
+    'schemaVersion 8 -> 12 upgrade adds members.deletedAt and '
     'settings.membershipRevoked (NULL/false by default, no data rewrite), '
     'keeping the existing member row',
     () async {
@@ -701,8 +853,8 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v8 install: open the *current* (v11) schema
-      // once so `onCreate` materializes every table with its full v11
+      // Simulate a pre-existing v8 install: open the *current* (v12) schema
+      // once so `onCreate` materializes every table with its full v12
       // column set -- `settings` included, even though this test never
       // inserts a row into it, so its `membership_revoked` column (added
       // at v10) must be dropped too, or the upgrade below throws a
@@ -741,12 +893,13 @@ void main() {
       await _dropMemberDeletedAtColumn(seed);
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 8` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 8, 11)`
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 8, 12)`
       // -- exactly the real upgrade path a v8 user's device would go
       // through.
       final upgraded = AppDatabase(NativeDatabase(file));
@@ -761,14 +914,26 @@ void main() {
       expect(member.createdAt, 't0');
       // The new column defaults to NULL (active) -- no data rewrite.
       expect(member.deletedAt, isNull);
+      // ... which, `deletedAt` being nullable, is an assertion that cannot
+      // fail on its own (see `_columnNames`). This is the one that can.
+      final memberColumns = await _columnNames(upgraded, 'members');
+      expect(memberColumns, contains('deleted_at'));
 
       final settingsRow = await upgraded.select(upgraded.settings).get();
       expect(settingsRow, isEmpty);
+      // No settings ROW here, but the two settings COLUMNS this upgrade
+      // adds must exist all the same -- this test's seed dropped them, and
+      // nothing above would notice if the upgrade skipped them.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(
+        settingsColumns,
+        containsAll(['membership_revoked', 'pending_join_code']),
+      );
     },
   );
 
   test(
-    'schemaVersion 9 -> 11 upgrade adds settings.membershipRevoked '
+    'schemaVersion 9 -> 12 upgrade adds settings.membershipRevoked '
     '(false by default, no data rewrite), keeping the existing settings '
     'row -- this is the ONLY upgrade path any real (shipped, v9) install '
     'will actually execute',
@@ -784,9 +949,9 @@ void main() {
       final file = File('${dir.path}/test.sqlite');
 
       // Simulate a pre-existing v9 install -- the schema every shipped
-      // build (0.4.1+7) is actually running: open the *current* (v11)
+      // build (0.4.1+7) is actually running: open the *current* (v12)
       // schema once so `onCreate` materializes every table with its full
-      // v11 column set, insert a settings row with non-NULL
+      // v12 column set, insert a settings row with non-NULL
       // actingMemberId/syncHouseholdId (so the upgrade's "existing row
       // survives" guarantee is actually exercised), then drop only
       // `settings.membership_revoked` (every OTHER column already exists
@@ -807,12 +972,13 @@ void main() {
           );
       await _dropMembershipRevokedColumn(seed);
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 9');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
+      // Re-opening the same file with the real (schemaVersion: 12)
       // `AppDatabase` now sees `user_version == 9` on disk vs. a declared
-      // `schemaVersion` of 11, so drift runs `onUpgrade(migrator, 9, 11)`
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 9, 12)`
       // -- exactly the real upgrade path every shipped user's device will
       // go through.
       final upgraded = AppDatabase(NativeDatabase(file));
@@ -831,8 +997,8 @@ void main() {
       // against the flat/unconditional `addColumn` placement this upgrade
       // must NOT use (see `AppDatabase.migration`'s doc comment on why it
       // lives inside the `else` branch): that placement would have this
-      // test pass anyway (the column still ends up added once on a 9 -> 11
-      // upgrade) while silently duplicate-adding it on a 1 -> 11 jump, so
+      // test pass anyway (the column still ends up added once on a 9 -> 12
+      // upgrade) while silently duplicate-adding it on a 1 -> 12 jump, so
       // this assertion alone would not catch that regression -- it exists
       // to pin the shape of THIS upgrade path specifically.
       final columns = await upgraded
@@ -846,7 +1012,7 @@ void main() {
   );
 
   test(
-    'schemaVersion 10 -> 11 upgrade creates the (status, closed_on) index on '
+    'schemaVersion 10 -> 12 upgrade creates the (status, closed_on) index on '
     'chore_occurrences',
     () async {
       final dir = await Directory.systemTemp.createTemp(
@@ -859,7 +1025,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v10 install: open the *current* (v11)
+      // Simulate a pre-existing v10 install: open the *current* (v12)
       // schema once so `onCreate` materializes every table, then drop only
       // the index this migration adds (see
       // `_dropStatusClosedOnIndex` -- the same collateral-drop reasoning
@@ -867,12 +1033,13 @@ void main() {
       // hierarchy) and roll `user_version` back to 10.
       final seed = AppDatabase(NativeDatabase(file));
       await _dropStatusClosedOnIndex(seed);
+      await _dropPendingJoinCodeColumn(seed);
       await seed.customStatement('PRAGMA user_version = 10');
       await seed.close();
 
-      // Re-opening the same file with the real (schemaVersion: 11)
-      // `AppDatabase` sees `user_version == 10` vs. a declared 11, so
-      // drift runs `onUpgrade(migrator, 10, 11)`.
+      // Re-opening the same file with the real (schemaVersion: 12)
+      // `AppDatabase` sees `user_version == 10` vs. a declared 12, so
+      // drift runs `onUpgrade(migrator, 10, 12)`.
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
@@ -883,6 +1050,98 @@ void main() {
           )
           .get();
       expect(rows, hasLength(1));
+
+      // This seed also rewinds past v12, so the same upgrade owes it
+      // `pending_join_code` -- and nothing else in this test would notice
+      // if it never arrived.
+      final settingsColumns = await _columnNames(upgraded, 'settings');
+      expect(settingsColumns, contains('pending_join_code'));
+    },
+  );
+
+  test(
+    'schemaVersion 11 -> 12 upgrade adds settings.pendingJoinCode (NULL by '
+    'default, no data rewrite), keeping the existing settings row -- this is '
+    'the ONLY upgrade path any real (shipped, v11) install will actually '
+    'execute',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v12_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // Simulate a pre-existing v11 install: open the *current* (v12)
+      // schema once so `onCreate` materializes every table with its full
+      // v12 column set, insert a settings row with non-NULL
+      // actingMemberId/syncHouseholdId (so the upgrade's "existing row
+      // survives" guarantee is actually exercised), then drop only
+      // `settings.pending_join_code` (every OTHER column already exists at
+      // v11 -- see `_dropPendingJoinCodeColumn`) and roll `user_version`
+      // back to 11 -- reproducing exactly what a real v11 database on a
+      // user's device looks like. Deliberately no `_dropStatusClosedOnIndex`
+      // here, unlike every rewinding test above: at `from == 11` the
+      // `from < 11` branch never runs, so the index `onCreate` already
+      // built must STAY, or this test would stop reproducing a real v11
+      // install.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+              syncHouseholdId: const Value('household-1'),
+            ),
+          );
+      await _dropPendingJoinCodeColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 11');
+      await seed.close();
+
+      // Re-opening the same file with the real (schemaVersion: 12)
+      // `AppDatabase` now sees `user_version == 11` on disk vs. a declared
+      // `schemaVersion` of 12, so drift runs `onUpgrade(migrator, 11, 12)`
+      // -- exactly the real upgrade path every shipped user's device will
+      // go through.
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      final row = await upgraded.select(upgraded.settings).getSingle();
+      // The new column defaults to NULL (no join in progress).
+      expect(row.pendingJoinCode, isNull);
+      // The pre-existing row's own data survived the upgrade untouched.
+      expect(row.createdAt, 't0');
+      expect(row.actingMemberId, 'member-1');
+      expect(row.syncHouseholdId, 'household-1');
+      expect(row.membershipRevoked, isFalse);
+      expect(row.digestEnabled, isTrue);
+      expect(row.digestMinutes, 480);
+
+      // Exactly one `pending_join_code` column on `settings`. This, NOT
+      // the `isNull` assertion above, is what proves the migration ran:
+      // drift maps an ABSENT nullable column to `null` on read, so
+      // `expect(row.pendingJoinCode, isNull)` passes just as happily when
+      // nothing added the column at all (verified by deleting the
+      // migration branch: only this assertion went red). Any future
+      // nullable-column migration test needs the same guard.
+      //
+      // What it does NOT catch is the flat/unconditional `addColumn`
+      // placement -- that still adds the column exactly once on a 11 -> 12
+      // upgrade, and duplicate-adds only on a 1 -> 12 jump, where the
+      // `1 -> 2` test above is the one that fails.
+      final columns = await upgraded
+          .customSelect("PRAGMA table_info('settings')")
+          .get();
+      final pendingJoinCodeColumns = columns.where(
+        (row) => row.read<String>('name') == 'pending_join_code',
+      );
+      expect(pendingJoinCodeColumns, hasLength(1));
     },
   );
 }

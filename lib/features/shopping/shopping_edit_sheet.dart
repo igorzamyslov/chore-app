@@ -1,14 +1,12 @@
 /// The item edit bottom sheet: rename, adjust quantity/category, or delete.
 library;
 
-import 'dart:async';
-
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
-import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/categories/category_picker.dart';
+import 'package:chore_app/features/shopping/shopping_delete.dart';
 import 'package:chore_app/features/shopping/shopping_edit_validation.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
@@ -173,25 +171,21 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
   }
 
   Future<void> _delete() async {
-    final repository = ref.read(shoppingRepositoryProvider);
-    final itemId = widget.item.item.id;
-    await repository.deleteItem(itemId);
+    // The snackbar is shown (and this sheet popped) before the row
+    // disappears from view, so the undo mirrors the chores undo tone (spec
+    // `docs/specs/polish-round-1.md` C3): soft delete makes UNDO a plain
+    // restore, clearing `deleted_at`. The logic itself lives in
+    // `shopping_delete.dart`, shared with swipe-to-delete (D-2) and the
+    // long-press menu's Delete row (D-3) — this button is one of three
+    // doors into exactly one behavior.
+    await deleteShoppingItemWithUndo(
+      context,
+      ref,
+      itemId: widget.item.item.id,
+    );
     if (!mounted) {
       return;
     }
-    final l10n = AppLocalizations.of(context);
-    // Shown (and the sheet popped) before the row disappears from view, so
-    // the undo mirrors the chores undo tone (spec
-    // `docs/specs/polish-round-1.md` C3): soft delete makes UNDO a plain
-    // restore, clearing `deleted_at`.
-    showAppSnackbar(
-      context,
-      message: l10n.shoppingDeletedSnackbar,
-      action: SnackBarAction(
-        label: l10n.shoppingDeletedUndo,
-        onPressed: () => unawaited(repository.restoreItem(itemId)),
-      ),
-    );
     Navigator.of(context).pop();
   }
 }

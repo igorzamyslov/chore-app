@@ -13,6 +13,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
 import 'package:chore_app/features/chores/active_chores_presence.dart';
+import 'package:chore_app/features/chores/catch_up_banner.dart';
 import 'package:chore_app/features/chores/chore_action_sheet.dart';
 import 'package:chore_app/features/chores/chore_delete_dialog.dart';
 import 'package:chore_app/features/chores/chore_done_section.dart';
@@ -25,6 +26,7 @@ import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -111,14 +113,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           ),
         ],
       ),
-      // The first-run banners (spec docs/specs/polish-round-1.md A2/A3)
-      // render above the list content, never blocking it: both are
-      // self-hiding (SizedBox.shrink) when their own conditions don't hold,
-      // so this Column adds nothing visible once a household is past both.
       body: Column(
         children: [
-          const OnboardingNameBanner(),
-          const DigestPrepromptBanner(),
+          const _BannerRegion(),
           // Only once occurrences have actually loaded -- avoids a
           // zero-count flash while pendingOccurrencesProvider's stream is
           // still resolving. ChoreProgressCard hides itself when M == 0.
@@ -443,6 +440,53 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 }
 
+/// The chores list's banner stack: everything that may appear above the list
+/// content without ever blocking it.
+///
+/// **Adding a banner?** Add it here, and only here. Every member of this
+/// region must be self-hiding — returning `SizedBox.shrink()` when its own
+/// condition doesn't hold — so the region collapses to nothing at all in the
+/// ordinary case, which is what lets them be listed unconditionally.
+///
+/// Order is by urgency to the person looking at the screen right now, not by
+/// age of the feature:
+///
+/// 1. [SyncHealthBanner] — this device hasn't reached the household in a
+///    while (backlog D-5, spec `docs/specs/sync-freshness.md` §2.5). First
+///    because it is the only member that QUALIFIES everything else on the
+///    screen: if sync is not getting through, the list may be missing other
+///    members' changes and this person's own completions may not have
+///    arrived, so reading it changes how you read the tiles — and it is the
+///    only member naming an action the user can take right now. The other
+///    three are, in their different ways, retrospective or evergreen.
+/// 2. [CatchUpBanner] — what just happened to your chores (backlog B-1).
+///    Somebody returning after a lapse needs the explanation for the overdue
+///    tiles they are already looking at before anything evergreen, but that
+///    explanation is retrospective and needs no action.
+/// 3. [OnboardingNameBanner] — first-run name prompt (spec
+///    `docs/specs/polish-round-1.md` A2).
+/// 4. [DigestPrepromptBanner] — first-run digest prompt (spec A3, which
+///    requires it to sit below A2).
+///
+/// `MainAxisSize.min` is load-bearing: this sits inside the screen's own
+/// unbounded [Column], so a max-height nested column would overflow.
+class _BannerRegion extends StatelessWidget {
+  const _BannerRegion();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SyncHealthBanner(),
+        CatchUpBanner(),
+        OnboardingNameBanner(),
+        DigestPrepromptBanner(),
+      ],
+    );
+  }
+}
+
 /// Runs a USER-INITIATED sync and reports failure (spec
 /// `docs/specs/sync-freshness.md` §2.3).
 ///
@@ -456,9 +500,33 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) async {
   if (ok || !context.mounted) {
     return;
   }
+  // WHEN THIS BRANCH IS ACTUALLY REACHED, which is narrower than it looks:
+  // `syncEngineProvider` is gated on `settings.syncHouseholdId`, and the
+  // engine's own startup pull and 60s poll run this same revocation probe. So
+  // in the common case the ENGINE notices first, calls `clearSyncLink()`, and
+  // `syncEngineProvider` becomes a `NoopSyncEngine` whose `refreshNow()`
+  // returns true -- meaning a later pull-to-refresh reports success and says
+  // nothing. That is not a gap: a device that has been revoked is told so by
+  // the revocation notice (spec `docs/specs/household-lifecycle.md` §3.5),
+  // which is the primary surface. This string covers the narrower race where
+  // the user's own gesture is the first probe after the server-side removal,
+  // and it exists because in exactly that case `syncRefreshError`'s "will
+  // sync later" is a promise the app has already made false.
+  // refreshNow() returns false for two different situations, and only one of
+  // them is a delay. If the failure was a revocation, `_pullSinceInner` has
+  // ALREADY called setMembershipRevoked() and clearSyncLink() before
+  // returning -- so syncRefreshError's "will sync later" is not optimism, it
+  // is false. Read the just-written row with a one-shot query rather than
+  // settingsProvider's stream, which may not have re-emitted the write yet.
+  final revoked = (await ref.read(settingsRepositoryProvider).ensureSettings())
+      .membershipRevoked;
+  if (!context.mounted) {
+    return;
+  }
+  final l10n = AppLocalizations.of(context);
   showAppSnackbar(
     context,
-    message: AppLocalizations.of(context).syncRefreshError,
+    message: revoked ? l10n.syncRefreshErrorRevoked : l10n.syncRefreshError,
   );
 }
 
