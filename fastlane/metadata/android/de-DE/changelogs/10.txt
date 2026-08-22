@@ -1,0 +1,11 @@
+Einkaufsliste: Wisch einen Artikel nach links zum Löschen, oder drücke lang für mehr.
+
+Wenn überfällige Aufgaben nach vorn geschoben werden, erklärt die App das jetzt.
+
+Erledige eine Aufgabe direkt aus der täglichen Erinnerung.
+
+Sind deine Erinnerungen aus, sagt dir das die Einstellungen und hilft weiter.
+
+Ein Hinweis erscheint, wenn dieses Gerät den Haushalt länger nicht erreicht hat.
+
+Die Anmeldung mitten im Beitritt übersteht jetzt den Wechsel zur Mail-App.

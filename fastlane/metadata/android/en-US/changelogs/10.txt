@@ -1,0 +1,11 @@
+Shopping list: swipe an item left to delete it, or long-press it for more.
+
+When the app moves overdue chores forward, it now explains that instead of leaving you to guess.
+
+Mark a chore done straight from the daily reminder.
+
+If your reminders are switched off, Settings now says so and offers to fix it.
+
+A notice appears when this device hasn't reached the rest of your household in a while.
+
+Signing in part-way through joining a household now survives switching to your mail app.
