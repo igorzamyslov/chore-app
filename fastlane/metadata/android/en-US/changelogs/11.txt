@@ -1,0 +1,1 @@
+Shopping suggestions now show only the category's icon, and show it on the left, so a long category name no longer crowds out the item name.

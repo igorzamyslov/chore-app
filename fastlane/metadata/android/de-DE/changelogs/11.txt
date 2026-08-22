@@ -1,0 +1,1 @@
+Vorschläge in der Einkaufsliste zeigen jetzt nur das Symbol der Kategorie, und zwar links, damit ein langer Kategoriename nicht mehr den Artikelnamen verdrängt.
