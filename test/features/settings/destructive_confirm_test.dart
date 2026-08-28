@@ -12,7 +12,6 @@ library;
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -33,11 +32,12 @@ void main() {
       late String longBody;
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
+          // The generated bundle the real `ChoreApp` uses, not a hand-rolled
+          // list: a list missing `GlobalCupertinoLocalizations` makes
+          // MaterialApp warn "locale de is not supported by all of its
+          // localization delegates", and that warning trips
+          // `takeException()` below before this test's own subject does.
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           // German, because German runs longer than the English of the same
           // string and is the locale that reaches this layout first.
