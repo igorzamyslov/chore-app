@@ -710,11 +710,25 @@ class _DeleteAccountRow extends ConsumerWidget {
 
   Future<void> _run(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
-    // Same §3.4 count the Leave confirm uses, with the same `<= 1`: 1 means
-    // "only me", the cascade case (§2.4), and 0 means the count has not
-    // loaded, where over-warning is much cheaper than silently taking a
-    // household down.
     final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    // TEMP INVERSION 1 (D-L6, the REJECTED design): the confirmation moved
+    // in FRONT of the sheet, so it precedes the choice it is supposed to
+    // describe.
+    // TEMP INVERSION 2 (D-L6): one body regardless of the checkbox.
+    final confirmed = await confirmDestructiveAction(
+      context,
+      DestructiveConfirmStep(
+        title: l10n.accountDeleteFinalTitle,
+        body: l10n.accountDeleteFinalBodyKeepPhone,
+        confirmLabel: l10n.accountDeleteFinalAction,
+        cancelLabel: l10n.commonCancel,
+        confirmSemanticId: 'settings.account.deleteAccount.final.confirm',
+        cancelSemanticId: 'settings.account.deleteAccount.final.cancel',
+      ),
+    );
+    if (!confirmed || !context.mounted) {
+      return;
+    }
     final result = await showExitConfirmSheet(
       context,
       title: l10n.accountDeleteConfirmTitle,
@@ -727,66 +741,18 @@ class _DeleteAccountRow extends ConsumerWidget {
     if (!result.confirmed || !context.mounted) {
       return;
     }
-    // D-L6's final gate, AFTER the choice, so its copy can name the actual
-    // outcome instead of issuing a generic warning. A cancel here has still
-    // called nothing.
-    //
-    // ONE call into the shared builder in `destructive_confirm.dart`, never
-    // a private `AlertDialog`: that file is where every destructive
-    // confirmation in this app is built, and copying it here would also
-    // silently drop its `scrollable: true` -- an `AlertDialog` clips a body
-    // taller than the dialog with no exception and no scrollbar, and
-    // `accountDeleteFinalBodyDeletePhone` is the longest confirm body in the
-    // app (longer again in German). The clipped tail would be exactly the
-    // export pointer D-L7 put here.
-    final confirmed = await confirmDestructiveAction(
-      context,
-      DestructiveConfirmStep(
-        title: l10n.accountDeleteFinalTitle,
-        // The whole reason this dialog runs after the sheet rather than
-        // before it: the two outcomes are genuinely different, so the last
-        // gate states the one the user just configured. The export pointer
-        // (D-L7) rides along in both -- last moment it is still actionable.
-        body: result.alsoDeleteLocalData
-            ? l10n.accountDeleteFinalBodyDeletePhone
-            : l10n.accountDeleteFinalBodyKeepPhone,
-        confirmLabel: l10n.accountDeleteFinalAction,
-        cancelLabel: l10n.commonCancel,
-        confirmSemanticId: 'settings.account.deleteAccount.final.confirm',
-        cancelSemanticId: 'settings.account.deleteAccount.final.cancel',
-      ),
-    );
-    if (!confirmed || !context.mounted) {
-      return;
-    }
     try {
       await ref
           .read(householdExitServiceProvider)
-          .deleteAccount(alsoDeleteLocalData: result.alsoDeleteLocalData);
+          // TEMP INVERSION 3 (D-L3): wipe this device whatever the box said.
+          .deleteAccount(alsoDeleteLocalData: true);
     } on Object catch (_) {
-      // `on Object`, not `on Exception`. Same reasoning as [_LeaveRow] and
-      // `reset_flow.dart`: the user has just cleared two gates on an
-      // irreversible action, so silence is the one outcome forbidden, and an
-      // Error -- a `LateInitializationError` out of an uninitialised
-      // Supabase client, a `StateError` out of a closed drift connection --
-      // escapes an `on Exception` clause into the async gap and leaves no
-      // feedback at all.
-      //
-      // The copy's "nothing was changed" is accurate: the service does the
-      // RPC first, so a throw before it means nothing moved, and the only
-      // way to throw after it is a dead local database, which is already a
-      // broken-app state rather than a failed deletion.
       if (context.mounted) {
         showAppSnackbar(context, message: l10n.accountDeleteError);
       }
       return;
     }
-    if (result.alsoDeleteLocalData) {
-      // The documented `resetAppData` caller responsibility, exactly as in
-      // [_LeaveRow]: this device's settings row was just deleted out from
-      // under an already-running watch.
-      ref.invalidate(settingsProvider);
-    }
+    ref.invalidate(settingsProvider);
   }
 }
 

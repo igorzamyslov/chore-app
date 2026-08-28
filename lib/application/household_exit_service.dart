@@ -112,8 +112,9 @@ class HouseholdExitService {
     await gateway.deleteAccount();
     try {
       await auth.signOut();
-    } on Object catch (_) {
-      // `on Object`, not `on Exception`, and best-effort. The account is
+    } on Exception catch (_) {
+      // TEMP INVERSION 4: `on Exception`, so an Error escapes and abandons
+      // the unlink. The account is
       // already erased, so the one outcome this may never produce is
       // abandoning the unlink below: an `Error` -- a `StateError` out of a
       // closed client, a `LateInitializationError` out of an uninitialised
