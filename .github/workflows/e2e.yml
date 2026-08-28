@@ -1,5 +1,6 @@
-# E2E flows via Maestro. Android runs on every push (Linux + KVM);
-# iOS runs on main only (macOS runners cost ~10x Linux).
+# E2E flows via Maestro. Android runs on every push and every PR (Linux +
+# KVM); iOS runs on main, or on any branch on demand via the Actions "Run
+# workflow" button. See the `ios` job's comment for why it is not on PRs.
 #
 # NOTE: authored before the repo had a remote — expect first-run
 # adjustments (runner image names, KVM availability) when CI goes live.
@@ -9,6 +10,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual trigger (added 2026-08-28, backlog A-6). This is the pre-merge
+  # iOS path: dispatch this workflow on a feature branch and the `ios` job
+  # below runs on it, with attribution, BEFORE the merge — which is the
+  # thing A-6 actually asks for. Wave 4's D-2/D-3 swipe gesture was exactly
+  # the PR that needed it and reached main unverified on iOS instead.
+  # Deliberately a manual trigger rather than a wider automatic one, because
+  # of the flake documented on the `ios` job.
+  workflow_dispatch:
 
 jobs:
   android:
@@ -86,7 +95,64 @@ jobs:
           retention-days: 14
 
   ios:
-    if: github.ref == 'refs/heads/main'
+    # DECISION 2026-08-28 (backlog A-6): stays off automatic PR runs, and the
+    # reason is the flake below, NOT the cost. Cost is real (macOS ≈ 10x
+    # Linux, and this job takes ~17-20 min) and was the original reason for
+    # the gate, but it is no longer the blocking one.
+    #
+    # WHAT THE FLAKE ACTUALLY IS. Run 31800958022 (625ea72) is the only red
+    # `ios` run in the 30 most recent runs of this workflow on main; 2 of 14
+    # flows failed on `welcome.create is visible`. The backlog originally
+    # recorded that as the app not being in fresh-install state — a
+    # clearState/state-isolation bug. Its Maestro debug artifact says
+    # otherwise, on three counts:
+    #   - The failure-step accessibility hierarchy holds the status bar and
+    #     an app window titled "Famdo" and NOTHING inside it: no welcome
+    #     gate, and no tab shell either. A leaked household would have shown
+    #     the shell. The screenshot is a blank white frame.
+    #   - It is not a slow runner. Across that run's 14 flows the wait for
+    #     `welcome.create` was 4.8-9.0s in all 12 passes and a full 60s in
+    #     both failures. Bimodal: about seven seconds, or never. A bigger
+    #     timeout buys nothing.
+    #   - It is not a hang or a crash. XCTest runs in-process and logged the
+    #     app's main thread answering ("MT responded in time"), snapshotting
+    #     cleanly in 0.01s — with zero Flutter nodes in the tree.
+    # So the Flutter view permanently fails to present on a fresh install,
+    # roughly 3% of flows / 17% of runs. Root cause unknown.
+    #
+    # WHY THAT BLOCKS PRs. Widening the trigger without a fix makes ~1 PR run
+    # in 6 red for a reason unrelated to the PR — strictly worse than the
+    # status quo, because a red that means nothing trains people to ignore
+    # reds that mean something. No fix is available yet: the flake did not
+    # reproduce on wave-4 code, there is no local reproduction, and the
+    # remedies that fit a bimodal shape (a Maestro `retry`, a CLI
+    # --retry-on-failure) cannot be A/B'd against the 2.7.0 pin without a
+    # simulator run — and unverified Maestro changes are exactly what that pin
+    # exists to prevent (see the Install Maestro step). A `paths:` filter
+    # would not help either: nearly every PR here touches lib/**, which is
+    # iOS-relevant, so "PRs touching iOS-relevant paths" is in practice
+    # "all PRs".
+    #
+    # WHY iOS clearState IS HARSHER THAN ANDROID'S, which is probably where a
+    # root cause lives: the simulator log shows Maestro implementing
+    # `clearState: true` on iOS as uninstall + reinstall — a brand-new bundle
+    # container and a genuinely cold start for every one of the 14 flows,
+    # which also discards most of the warm-up launch below. On Android
+    # clearState clears app data and leaves the app installed.
+    #
+    # REQUIRED-CHECK INTERACTION, so nobody re-derives it: main's only
+    # required status check today is `pgtap`. `ios` must not be made required
+    # until the trigger is widened AND the flake is fixed. Note the shape
+    # that deadlocks: a workflow-level `paths:` filter means the workflow
+    # never runs, so no `ios` check run is ever created and a required check
+    # waits forever. A job-level `if` skip like this one is not that — it
+    # still produces a skipped check run.
+    #
+    # WIDEN THIS when a run of the full suite on a macOS runner comes back
+    # green enough times to put the per-flow blank-frame rate near zero, or
+    # when the flows can retry a launch that presents nothing. Until then the
+    # pre-merge path is the manual `workflow_dispatch` in `on:` above.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

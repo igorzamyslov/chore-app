@@ -82,6 +82,50 @@ jobs:
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
             | grep -qE "allowBackup\(0x[0-9a-f]+\)=false" \
             || { echo "::error::Release APK does not have allowBackup=false — Android would auto-backup a live SQLite file and the auth session onto other devices"; exit 1; }
+      - name: Verify release APK can dispatch notification actions
+        # F-1's digest "Done" action (spec docs/specs/notifications.md N2,
+        # backlog F-1) is dispatched with PendingIntent.getBroadcast aimed at
+        # exactly this class. flutter_local_notifications 22.1.0 declares no
+        # receivers of its own (its own manifest is two <uses-permission>
+        # lines and nothing else), so the declaration in
+        # android/app/src/main/AndroidManifest.xml is the only thing that
+        # makes the component resolvable -- and a refactor that drops it
+        # produces an app that looks completely working until someone taps
+        # the button, at which point Android discards the broadcast and
+        # reports nothing, anywhere. Invisible to every emulator, every E2E
+        # run and every unit test, so it gets the same treatment as INTERNET
+        # and allowBackup above: asserted on the artifact users actually
+        # install. `dump badging` cannot do it -- it does not surface
+        # receivers, the same way it does not surface allowBackup.
+        #
+        # The pattern was verified against a real merged manifest (aapt2
+        # 36.0.0) BOTH ways before shipping: it matches the real receiver
+        # line, and it does NOT match that line with a non-existent class
+        # name substituted. A fail-closed gate whose pattern cannot match
+        # would break every future release, at tag time, for whoever is
+        # trying to ship. The resource id stays 0x[0-9a-f]+ rather than the
+        # literal 0x01010003 for the same reason the allowBackup check does
+        # it: aapt2 fills it in from the platform's public.xml, so don't
+        # hardcode it.
+        #
+        # Two limits, stated rather than papered over. The sampled build was
+        # a DEBUG one: the three <receiver> elements live in src/main, which
+        # every variant merges, and a Flutter release build does not minify
+        # or rename manifest components, so the compiled form is the same --
+        # inferred, not sampled. And this matches the android:name ATTRIBUTE,
+        # not the enclosing <receiver> element, because xmltree puts them on
+        # separate lines and a multi-line match would be more fragile than
+        # what it buys; nothing else in this app would ever carry that class
+        # name. The sibling ScheduledNotificationReceiver and
+        # ScheduledNotificationBootReceiver fail just as invisibly and are
+        # deliberately NOT asserted here -- their compiled lines have not
+        # been sampled, and an unverified pattern in this step is worse than
+        # no pattern at all.
+        run: |
+          AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
+          "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
+            | grep -qE 'name\(0x[0-9a-f]+\)="com\.dexterous\.flutterlocalnotifications\.ActionBroadcastReceiver"' \
+            || { echo "::error::Release APK does not declare ActionBroadcastReceiver — tapping Done on a digest notification would silently do nothing"; exit 1; }
       - name: Rename artifact
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk \
