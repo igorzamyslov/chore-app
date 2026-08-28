@@ -17,6 +17,12 @@ on:
   # the PR that needed it and reached main unverified on iOS instead.
   # Deliberately a manual trigger rather than a wider automatic one, because
   # of the flake documented on the `ios` job.
+  # CAVEAT, so nobody hunts for a missing button: GitHub only offers
+  # workflow_dispatch for a workflow that exists on the DEFAULT branch. This
+  # trigger is therefore inert until it lands on `main`, and cannot be
+  # exercised from the PR that introduces it — after which any branch can be
+  # picked as the run target. A dispatched run also runs `android` (there is
+  # no per-job trigger), which is the cheap half and worth having anyway.
   workflow_dispatch:
 
 jobs:
