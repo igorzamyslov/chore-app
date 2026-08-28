@@ -175,7 +175,11 @@ jobs:
     # that deadlocks: a workflow-level `paths:` filter means the workflow
     # never runs, so no `ios` check run is ever created and a required check
     # waits forever. A job-level `if` skip like this one is not that — it
-    # still produces a skipped check run.
+    # still produces a skipped check run. db.yml's header records the same
+    # trap from the other side: `pgtap` IS required, so it carries no
+    # `paths:` filter and instead always runs and decides internally whether
+    # to pay for the stack. That is the pattern to copy if `ios` ever needs
+    # to be both required and conditional.
     #
     # WIDEN THIS on either of the triggers named above — a genuine iOS-only
     # regression that reached main, or the dispatch path falling out of use.
