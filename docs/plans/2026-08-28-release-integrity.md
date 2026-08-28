@@ -217,7 +217,8 @@ red PR run in 32 — ordinary flaky-test territory, and not on its own enough
 to keep iOS off PRs. What decides it is **value per macOS minute**: in 61
 runs this job has never gone red for an iOS-specific code regression, so it
 has *no catch record*, while a macOS runner is ≈10× Linux, the job takes
-17-20 minutes, and PR pushes here arrive in bursts
+16-27 minutes (measured across recent `main` runs), and PR pushes here
+arrive in bursts
 (`wave4/shopping-gestures` produced four PR runs inside an hour). Paying that
 on every push for a job that has never caught anything is poor value; paying
 it on demand for the PR that actually touches iOS-sensitive surfaces

@@ -119,7 +119,8 @@ jobs:
     # WHAT DECIDES IT IS VALUE PER MACOS MINUTE. In all 61 runs this job has
     # never once gone red for an iOS-specific code regression: every red is
     # bring-up or the flake below. Zero confirmed catches. Meanwhile a macOS
-    # runner is ≈10x Linux, this job takes ~17-20 min, and PR pushes here
+    # runner is ≈10x Linux, this job takes 16-27 min (measured across recent
+    # main runs), and PR pushes here
     # come in bursts (wave4/shopping-gestures produced four PR runs inside an
     # hour). Paying that on every push for a job with no catch record is bad
     # value; paying it on demand for the PR that actually touches iOS-
