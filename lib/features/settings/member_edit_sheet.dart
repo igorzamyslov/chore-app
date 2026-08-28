@@ -146,9 +146,14 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     // comment forbids (a started sync engine writes
     // `settings.syncLastPulledAt` on every pull, so an unscoped watch
     // rebuilds this sheet on each of them).
+    // TEMP INVERSION, reverted by the next commit: proves the three
+    // reachability tests actually discriminate the pinned check in both
+    // directions rather than passing for some other reason. Swapping the
+    // arms (rather than deleting the check) keeps every _DeleteGate value
+    // constructed, so the red lands at the test step and not at analyze.
     return ref.watch(memberIdentityModeProvider) == MemberIdentityMode.pinned
-        ? _DeleteGate.allowed
-        : _DeleteGate.unreachable;
+        ? _DeleteGate.unreachable
+        : _DeleteGate.allowed;
   }
 
   /// The explanation that replaces the vanished Delete button for [gate]
