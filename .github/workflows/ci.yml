@@ -27,6 +27,16 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get --enforce-lockfile
+      # A runner always has `.dart_tool/` by this point, so the package
+      # resolution half of this check is vacuous here — the other half is not.
+      # It asserts the project's trailing-comma mode is still `preserve`,
+      # catching a very_good_analysis upgrade that drops the setting or an edit
+      # to analysis_options.yaml that shadows it. Backlog A-7.
+      - run: tool/check_formatter_config.sh
+      # NOTE: this step CANNOT detect the wrong-formatter-config bug the check
+      # above guards against. `preserve` is stable on the fallback mode's
+      # output, so a tree reflowed by a misconfigured `dart format` passes
+      # here. Do not drop the check on the grounds that this step covers it.
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze --fatal-infos --fatal-warnings
       # SUPABASE_* defines empty: keeps `supabaseConfigured` false for the
