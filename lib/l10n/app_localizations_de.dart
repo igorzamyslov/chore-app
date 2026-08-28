@@ -793,6 +793,16 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String memberRemoveDialogBodyClaimed(String memberName) {
+    return '$memberName nutzt diesen Haushalt auf einem eigenen Gerät. Wenn du die Person entfernst, synchronisiert dieses Gerät nicht mehr — es behält alles, was es schon hat, als eigene lokale Kopie. Profil und Verlauf bleiben hier im Haushalt: In Wechsel-Aufgaben fällt die Person aus der Reihenfolge, fest zugewiesene Aufgaben stehen wieder allen offen, und alles, was ihr gerade zugewiesen ist, wird frei. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.';
+  }
+
+  @override
+  String memberRemoveError(String memberName) {
+    return '$memberName konnte nicht entfernt werden. Dafür braucht die App eine Verbindung zum Online-Haushalt — es wurde nichts geändert. Versuch es noch mal.';
+  }
+
+  @override
   String get householdRenameTitle => 'Haushalt umbenennen';
 
   @override

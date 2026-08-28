@@ -787,6 +787,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String memberRemoveDialogBodyClaimed(String memberName) {
+    return '$memberName uses this household on their own phone. Removing them stops that phone from syncing — it keeps everything it already has, as its own local copy. Their profile and history stay here with the household: rotation chores drop them from the turn order, chores fixed to them open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.';
+  }
+
+  @override
+  String memberRemoveError(String memberName) {
+    return 'Couldn\'t remove $memberName. This needs a connection to the online household — nothing was changed. Try again.';
+  }
+
+  @override
   String get householdRenameTitle => 'Rename household';
 
   @override

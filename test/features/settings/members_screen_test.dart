@@ -742,4 +742,108 @@ void main() {
       handle.dispose();
     },
   );
+
+  // Declared out here, not inside the callbacks, so the `overrides` list and
+  // the assertions below see the same gateway instance.
+  final gatewayForRemoval = FakeHouseholdGateway();
+  final failingGateway = FakeHouseholdGateway()
+    ..removeMemberError = Exception('offline');
+
+  testChoreApp(
+    'removing a claimed member: the confirm names the consequence for their '
+    'phone, and confirming calls remove_member then cleans up locally',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(gatewayForRemoval),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('members.edit.delete'));
+      await tester.pumpAndSettle();
+
+      // The claimed body, not the unclaimed one: the effect on the removed
+      // person's own phone is the one consequence the person tapping Delete
+      // cannot see from here.
+      expect(find.textContaining('their own phone'), findsOneWidget);
+
+      await tester.tap(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gatewayForRemoval.removeMemberCalls, [anna.id]);
+      expect(find.text('Anna'), findsNothing);
+      final removed = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(anna.id))).getSingle();
+      expect(removed.deletedAt, isNotNull);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a failed removal is shown inline and changes nothing (spec '
+    'docs/specs/household-lifecycle.md §3.2)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(failingGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('members.edit.delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      // The sheet stays open, says why, and Anna is still a member. This is
+      // the ONE failure this app surfaces rather than swallowing into a
+      // silent retry (deliberately overriding docs/specs/sync-backend.md
+      // §8.3): it needed the network, it changed nothing, and the person
+      // the user tried to remove is still here.
+      expect(
+        find.bySemanticsIdentifier('members.remove.error'),
+        findsOneWidget,
+      );
+      expect(find.textContaining("Couldn't remove Anna"), findsOneWidget);
+      final after = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(anna.id))).getSingle();
+      expect(after.deletedAt, isNull);
+
+      handle.dispose();
+    },
+  );
 }
