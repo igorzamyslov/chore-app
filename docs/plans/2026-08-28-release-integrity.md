@@ -158,8 +158,9 @@ message.
 
 ## Task 2 — diagnose A-6 before touching its trigger
 
-Evidence, all from run `31800958022` (`625ea72`, the only red `ios` run in
-the 30 most recent `e2e.yml` runs on `main`):
+Evidence, all from run `31800958022` (`625ea72`) — the only `ios` red on
+`main` since the 2026-08-01 cold-start hardening; see the rate bullet
+below for the full history:
 
 - **Not a state leak.** The failure-step accessibility hierarchy for both
   failed flows contains the status bar and the app window titled "Famdo" and
@@ -199,7 +200,7 @@ documented precedent is `e2e/README.md` convention 8 rule 3's "permanently
 blank" race — but that one is Android-specific and needs a `permissions:`
 stanza, which neither failing flow has.
 
-- [ ] Correct the A-6 row in `docs/backlog.md` to the verified mechanism. The
+- [x] Correct the A-6 row in `docs/backlog.md` to the verified mechanism. The
   recorded *decision* framing stays closed; the recorded *cause* is a factual
   claim that the artefacts contradict, and leaving it would send the next
   agent hunting a `clearState` bug that is not there.
@@ -255,9 +256,9 @@ is `pgtap`, and `ios` must not be made required until the trigger is widened
 would deadlock a required check forever, because the workflow then never runs
 and the check run is never created for branch protection to satisfy.
 
-- [ ] Add `workflow_dispatch:` to `e2e.yml`'s `on:`.
-- [ ] Widen the `ios` job's `if:` to admit `workflow_dispatch`.
-- [ ] Replace the file-header's one-line "iOS runs on main only (macOS
+- [x] Add `workflow_dispatch:` to `e2e.yml`'s `on:`.
+- [x] Widen the `ios` job's `if:` to admit `workflow_dispatch`.
+- [x] Replace the file-header's one-line "iOS runs on main only (macOS
   runners cost ~10x Linux)" and add a comment on the `ios` job carrying the
   diagnosis, the decision, the required-check interaction, and the condition
   under which the gate should be widened — in the voice of the neighbouring
