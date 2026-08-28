@@ -61,10 +61,41 @@ jobs:
         # that permission only in the debug/profile manifests, so no debug
         # build — simulator, emulator, or E2E — can ever reproduce it.
         # Assert on the actual artifact, the only thing users install.
+        #
+        # DUMP TO A FILE, NEVER `aapt2 | grep -q` (this step and the two
+        # after it all follow this; changed 2026-08-28, and each does its own
+        # dump so no one of them depends on another surviving future edits).
+        #
+        # `grep -q` exits the instant it matches, so aapt2 takes SIGPIPE and
+        # returns 141. With `pipefail` set, that becomes the pipeline's
+        # status -- so a SUCCESSFUL match reports failure and the `||` branch
+        # fires with a message accusing the APK of the exact thing it just
+        # proved. Verified both ways locally: with `pipefail` set, the same
+        # grep over the same content exits 0 reading a file and 1 through a
+        # pipe, once the producer writes past the 64KB pipe buffer.
+        #
+        # BE PRECISE ABOUT WHY THIS IS NOT ALREADY BROKEN, because the
+        # obvious reading is wrong in both directions. `pipefail` is NOT in
+        # effect here: a bare `run:` gets GitHub's default `bash -e {0}`, and
+        # pipefail arrives only with an explicit `shell: bash` or a
+        # `defaults.run.shell: bash` -- neither of which any workflow in this
+        # repo sets. So the piped form worked, and would have kept working.
+        # It is a LATENT trap, not a live bug: adding `shell: bash` is a
+        # commonly recommended hardening, and the day someone does it this
+        # gate starts failing every release, at tag time, blaming the
+        # artifact for something it just demonstrated. The second condition
+        # is a dump larger than 64KB, which this manifest (~13KB) is not yet.
+        # Two independent latches, both plausible, and the failure lands on
+        # whoever is trying to ship. Removed rather than documented.
+        #
+        # Redirecting first also separates "aapt2 itself broke" (caught by
+        # `-e` on the dump line) from "the assertion failed", which the pipe
+        # form conflated into one exit status.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump permissions build/app/outputs/flutter-apk/app-release.apk \
-            | grep -q "android.permission.INTERNET" \
+            > "$RUNNER_TEMP/release-permissions.txt"
+          grep -q "android.permission.INTERNET" "$RUNNER_TEMP/release-permissions.txt" \
             || { echo "::error::Release APK lacks INTERNET permission — sync would fail silently on every device"; exit 1; }
       - name: Verify release APK has auto-backup disabled
         # Decision D-B1 (docs/backlog.md; implementation plan
@@ -77,11 +108,63 @@ jobs:
         # manifest does. Same "assert on the shipped artifact, not a debug
         # build" rule as the INTERNET check above -- this is invisible in
         # every emulator and E2E run.
+        #
+        # Dumped to a file rather than piped -- see the INTERNET check above
+        # for why `aapt2 | grep -q` is a latent false-failure hazard.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
-            | grep -qE "allowBackup\(0x[0-9a-f]+\)=false" \
+            > "$RUNNER_TEMP/release-manifest.txt"
+          grep -qE "allowBackup\(0x[0-9a-f]+\)=false" "$RUNNER_TEMP/release-manifest.txt" \
             || { echo "::error::Release APK does not have allowBackup=false — Android would auto-backup a live SQLite file and the auth session onto other devices"; exit 1; }
+      - name: Verify release APK can dispatch notification actions
+        # F-1's digest "Done" action (spec docs/specs/notifications.md N2,
+        # backlog F-1) is dispatched with PendingIntent.getBroadcast aimed at
+        # exactly this class. flutter_local_notifications 22.1.0 declares no
+        # receivers of its own (its own manifest is two <uses-permission>
+        # lines and nothing else), so the declaration in
+        # android/app/src/main/AndroidManifest.xml is the only thing that
+        # makes the component resolvable -- and a refactor that drops it
+        # produces an app that looks completely working until someone taps
+        # the button, at which point Android discards the broadcast and
+        # reports nothing, anywhere. Invisible to every emulator, every E2E
+        # run and every unit test, so it gets the same treatment as INTERNET
+        # and allowBackup above: asserted on the artifact users actually
+        # install. `dump badging` cannot do it -- it does not surface
+        # receivers, the same way it does not surface allowBackup.
+        #
+        # The pattern was verified against a real merged manifest (aapt2
+        # 36.0.0) BOTH ways before shipping: it matches the real receiver
+        # line, and it does NOT match that line with a non-existent class
+        # name substituted. A fail-closed gate whose pattern cannot match
+        # would break every future release, at tag time, for whoever is
+        # trying to ship. The resource id stays 0x[0-9a-f]+ rather than the
+        # literal 0x01010003 for the same reason the allowBackup check does
+        # it: aapt2 fills it in from the platform's public.xml, so don't
+        # hardcode it.
+        #
+        # Two limits, stated rather than papered over. The sampled build was
+        # a DEBUG one: the three <receiver> elements live in src/main, which
+        # every variant merges, and a Flutter release build does not minify
+        # or rename manifest components, so the compiled form is the same --
+        # inferred, not sampled. And this matches the android:name ATTRIBUTE,
+        # not the enclosing <receiver> element, because xmltree puts them on
+        # separate lines and a multi-line match would be more fragile than
+        # what it buys; nothing else in this app would ever carry that class
+        # name. The sibling ScheduledNotificationReceiver and
+        # ScheduledNotificationBootReceiver fail just as invisibly and are
+        # deliberately NOT asserted here -- their compiled lines have not
+        # been sampled, and an unverified pattern in this step is worse than
+        # no pattern at all.
+        # Dumped to a file rather than piped -- see the INTERNET check above
+        # for why `aapt2 | grep -q` is a latent false-failure hazard.
+        run: |
+          AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
+          "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
+            > "$RUNNER_TEMP/release-manifest.txt"
+          grep -qE 'name\(0x[0-9a-f]+\)="com\.dexterous\.flutterlocalnotifications\.ActionBroadcastReceiver"' \
+            "$RUNNER_TEMP/release-manifest.txt" \
+            || { echo "::error::Release APK does not declare ActionBroadcastReceiver — tapping Done on a digest notification would silently do nothing"; exit 1; }
       - name: Rename artifact
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk \
