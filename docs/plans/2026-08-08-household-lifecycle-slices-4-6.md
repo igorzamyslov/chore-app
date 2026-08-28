@@ -2825,7 +2825,7 @@ it changes no SQL.
 - Consumes: `public.delete_account()` in its final form.
 - Produces: nothing in code.
 
-- [ ] **Step 1: Confirm the gate — through CI, not on this machine**
+- [x] **Step 1: Confirm the gate — through CI, not on this machine**
 
 The instruction here used to be:
 
@@ -2870,7 +2870,7 @@ does **not** cover the done criteria's manual live smoke (five scenarios, two
 devices, the app itself), which needs a running stack plus a device and stays
 OPEN.
 
-- [ ] **Step 2: Record it in the spec**
+- [x] **Step 2: Record it in the spec**
 
 Add a `### 5.1 Slice 1 verification record` subsection to
 `docs/specs/household-lifecycle.md` §5, converting D-L4 from expectation to
@@ -2893,7 +2893,7 @@ actually executed (the CI `pgtap` run and its SHA) and with what is still
 open (the manual live smoke), so a later reader cannot mistake one for the
 other.
 
-- [ ] **Step 3: Correct `sync-backend.md` §2's `delete_account()` bullet**
+- [x] **Step 3: Correct `sync-backend.md` §2's `delete_account()` bullet**
 
 That bullet still describes the D-L4 fallback — "deletes the auth user via an
 edge function with service-role key (the RPC marks; the edge function
@@ -2904,7 +2904,7 @@ record, and at this plan's Appendix A for the retained fallback.
 Do NOT touch the same file's §5 "double-confirm patterned on G9" for
 delete-account: under D-L6 that is accurate again.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/specs/ supabase/tests/
@@ -2923,7 +2923,7 @@ git commit -m "Record the D-L4 gate result: the in-RPC auth.users delete works"
 - Consumes: `public.delete_account()` (slice 1 Task 6 + commit `f184f4a`).
 - Produces: `HouseholdGateway.deleteAccount() → Future<void>` across all three implementations.
 
-- [ ] **Step 1: Add the fake's side**
+- [x] **Step 1: Add the fake's side**
 
 ```dart
   /// How many times [deleteAccount] has been called.
@@ -2945,7 +2945,7 @@ git commit -m "Record the D-L4 gate result: the in-RPC auth.users delete works"
   }
 ```
 
-- [ ] **Step 2: Add it to the interface and `NoopHouseholdGateway`**
+- [x] **Step 2: Add it to the interface and `NoopHouseholdGateway`**
 
 ```dart
   /// Deletes the signed-in account (spec
@@ -2969,7 +2969,7 @@ git commit -m "Record the D-L4 gate result: the in-RPC auth.users delete works"
   Future<void> deleteAccount() => _unreachable();
 ```
 
-- [ ] **Step 3: Implement it on `SupabaseHouseholdGateway` as the single RPC**
+- [x] **Step 3: Implement it on `SupabaseHouseholdGateway` as the single RPC**
 
 ```dart
   @override
@@ -2982,7 +2982,7 @@ git commit -m "Record the D-L4 gate result: the in-RPC auth.users delete works"
   }
 ```
 
-- [ ] **Step 4: Analyze and commit**
+- [x] **Step 4: Analyze and commit**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos
@@ -3003,7 +3003,7 @@ git commit -m "Add deleteAccount to HouseholdGateway (spec §2.2, F11)"
 - Consumes: `HouseholdGateway.deleteAccount` (Task 22), `AuthGateway.signOut`.
 - Produces: `HouseholdExitService.deleteAccount({required bool alsoDeleteLocalData})`; `FakeAuthGateway.signOutError`.
 
-- [ ] **Step 1: Give the auth fake a failure hook**
+- [x] **Step 1: Give the auth fake a failure hook**
 
 In `test/features/settings/fake_auth_gateway.dart`:
 
@@ -3033,7 +3033,7 @@ In `test/features/settings/fake_auth_gateway.dart`:
   }
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Append to `test/application/household_exit_service_test.dart`:
 
@@ -3116,7 +3116,7 @@ That last test is the one the original plan was missing, and without it the
 plan's own `on Exception` (below, corrected) would have passed every test it
 wrote.
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -3124,7 +3124,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 
 Expected: FAIL to compile — `deleteAccount` is not defined on the service.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 In `lib/application/household_exit_service.dart`, next to `leaveHousehold`:
 
@@ -3176,7 +3176,7 @@ In `lib/application/household_exit_service.dart`, next to `leaveHousehold`:
   }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -3185,7 +3185,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 Expected: PASS, 10 tests (slice 5 left 5 in the file; the four above plus the
 `on Object` case make 10).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/application/household_exit_service.dart test/
@@ -3214,7 +3214,7 @@ sheet (consequences, UNCHECKED "also delete this phone's copy" box, action) →
 one final confirmation whose copy names the exact outcome the checkbox just
 selected → the RPC. Two gates. Cancelling at either does nothing at all.
 
-- [ ] **Step 1: Add the l10n strings**
+- [x] **Step 1: Add the l10n strings**
 
 In `lib/l10n/app_en.arb`:
 
@@ -3295,7 +3295,7 @@ Regenerate:
 env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Append to `test/features/settings/account_exit_rows_test.dart`:
 
@@ -3554,7 +3554,7 @@ with the fakes declared alongside the slice-5 ones:
     ..deleteAccountError = Exception('offline');
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart
@@ -3562,7 +3562,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exi
 
 Expected: FAIL — `settings.account.deleteAccount` does not exist.
 
-- [ ] **Step 4: Implement the row**
+- [x] **Step 4: Implement the row**
 
 In `lib/features/settings/account_section.dart`, add it to BOTH signed-in
 branches — last in each, below everything else, because it is the most
@@ -3742,7 +3742,7 @@ class _DeleteAccountRow extends ConsumerWidget {
    `reset_flow.dart`, which no longer exists: that dialog builder was
    extracted into `destructive_confirm.dart`.
 
-- [ ] **Step 4a: Promote the one-step builder in `destructive_confirm.dart`**
+- [x] **Step 4a: Promote the one-step builder in `destructive_confirm.dart`**
 
 `_showStep` there is already exactly this dialog. Promote it to a documented
 public `confirmDestructiveAction(BuildContext, DestructiveConfirmStep)`, and
@@ -3759,7 +3759,7 @@ Do NOT touch the existing `settings.reset.*` semantic ids — they are
 load-bearing for `reset_flow_test.dart` and `test/widget_test.dart`, which
 select only by id.
 
-- [ ] **Step 4b: Refresh Task 12's overflow fixture**
+- [x] **Step 4b: Refresh Task 12's overflow fixture**
 
 `test/features/settings/exit_confirm_sheet_test.dart`'s `longBody` literal
 claims to be "the longest real string this cluster adds -- the German of
@@ -3769,7 +3769,7 @@ literal into line with the string actually shipped so the guard keeps
 guarding what it says it guards. Keep it a literal, for the reason its own
 comment gives.
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart test/features/settings/account_section_test.dart
@@ -3781,7 +3781,7 @@ no row-count assertion. Its two `byType(ListTile)` lookups are both scoped by
 `find.descendant` under a specific semantic id (and one adds `.first`), so a
 new row in the section cannot disturb either. Do not go editing it.
 
-- [ ] **Step 6: Full suite and analyze**
+- [x] **Step 6: Full suite and analyze**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos && env -u GIT_DIR -u GIT_INDEX_FILE flutter test
@@ -3789,7 +3789,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos && env -u GIT_DIR
 
 Expected: `No issues found!` and all tests passing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add lib/ test/
@@ -3847,6 +3847,46 @@ git commit -m "Add the Delete account action (spec §2.2, F11, D-L4)"
   RPC and point at §5's D-L4 verification record (and at Appendix A here for
   the retained fallback). Same file's §5 "double-confirm patterned on G9" for
   delete-account is now accurate again under D-L6 — leave it alone.
+
+## Landing record — slices 4–6 (C-2 complete, one criterion OPEN)
+
+Slices 4, 5 and 6 have all landed. Against the list above:
+
+**Satisfied, and seen to be satisfied in CI on the slice-6 branch:**
+
+- `flutter analyze --fatal-infos --fatal-warnings` clean; `flutter test`
+  green (the `checks` job runs both, in that order, in one job).
+- `supabase test db` green with **no SQL behaviour changed by these slices**:
+  `Files=2, Tests=69 ... Result: PASS`. Slice 6's only `supabase/` edit was
+  two stale assertion totals in a comment, and it was made deliberately —
+  `db.yml` skips the Supabase stack entirely for a diff that does not touch
+  `supabase/**`, so a Dart-only slice would have reported a ~20s green having
+  executed no SQL. Recorded in `household-lifecycle.md` §5.1 with the run id.
+- Every string added exists in BOTH arb files, every `app_en.arb` key has an
+  `@`-description, and `memberEditDeleteBlockedClaimed` is gone from both.
+- `exit_confirm_sheet` scrolls (Task 12) and its regression test is green.
+  Slice 6 also brought its `longBody` fixture back into line with the string
+  it claims to be — the export pointer had drifted.
+- No role check introduced. `grep -rn "MemberRole" lib/features/
+  lib/application/household_exit_service.dart` finds only the pre-existing
+  `role: MemberRole.member` literal in `join_flow_steps.dart`.
+- The D-L3 default holds in all three exits, with a test each.
+- D-L6 holds: sheet, then ONE dialog. Proven by inversion, not just by
+  assertion — moving the confirmation in front of the sheet, using one body
+  for both checkbox states, and forcing the wipe on regardless each turned
+  the suite red at the test step.
+
+**OPEN, and it is the important one:**
+
+- The **manual live smoke against the local stack** has NOT been performed,
+  for any of the five scenarios, in any of slices 4–6. It needs a running
+  Supabase stack plus two devices, and `supabase`/`docker` are off the
+  wave-5 allow list; it also cannot be reached through CI, since E2E stays
+  offline (§4). A green `pgtap` is not a substitute: it exercises the SQL
+  contract directly, never the client's use of it, so nothing has yet
+  confirmed that the app's three exits actually drive those RPCs correctly
+  end to end. This is the real gate for everything server-touching in C-2
+  and it must be run before the work is trusted in the field.
 
 ---
 
