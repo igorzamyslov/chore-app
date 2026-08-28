@@ -68,12 +68,16 @@ class FakeAuthGateway implements AuthGateway {
   Future<void> signOut() async {
     final error = signOutError;
     if (error != null) {
-      // ignore: only_throw_errors -- the WHOLE POINT of this hook is that it
-      // can carry something that is neither an Exception nor an Error, so a
-      // test can prove `HouseholdExitService.deleteAccount` catches
-      // `on Object` rather than `on Exception`. Narrowing the field to
-      // satisfy the lint would delete the coverage it exists for. Only this
-      // fake does it, and only for that reason.
+      // The WHOLE POINT of [signOutError] is that its static type is
+      // `Object?`, so a test can throw something that is not an [Exception]
+      // and prove `HouseholdExitService.deleteAccount` catches `on Object`
+      // rather than `on Exception`. Narrowing the field to satisfy
+      // `only_throw_errors` would delete the coverage the field exists for.
+      // The ignore has to sit on the line directly above the throw --
+      // `// ignore:` applies to the next line only, and a block comment
+      // between the two makes it an `unnecessary_ignore` while the original
+      // lint still fires.
+      // ignore: only_throw_errors
       throw error;
     }
     currentUser = null;
