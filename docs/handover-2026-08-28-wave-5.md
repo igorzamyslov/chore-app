@@ -19,6 +19,16 @@ migration is still v13.**
 Nothing was released. `main` is untouched by this wave; everything is on
 `integration/wave-5` awaiting the human's single reviewed merge.
 
+**Final state, verified not predicted.** `integration/wave-5` at `2a0e3a9`,
+47 files vs `main`, +5915/-420. All four jobs on PR #24 at that SHA:
+`android` pass (15m56s), `checks` pass (4m5s) with **1037 tests passing**,
+`pgtap` pass (2m14s), `ios` skipping. That `pgtap` is a **genuine** run, not
+the fast skip — `Files=2, Tests=69, Result: PASS` — because slice 6's
+`supabase/` correction is in the accumulated diff, so the integration state
+itself got real SQL verification. `dart format` reports 283 files, 0 changed,
+and `flutter gen-l10n` is a zero diff, so no stream leaked formatter churn or a
+hand-written localization file.
+
 ---
 
 ## 2. What shipped
