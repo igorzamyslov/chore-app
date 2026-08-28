@@ -936,14 +936,57 @@ git commit -m "Route member removal by claim state (spec §3.2, F10)"
 
 ### Task 15: The member edit sheet stops hiding Delete for claimed members
 
+> **REFRESHED 2026-08-28** (wave 5, Task 0 pass — the plan was written
+> 2026-08-08 and the tree has moved since). Corrections below are marked
+> `[REFRESH]`. Summary of what was stale in Tasks 15–16:
+> 1. The German copy in both tasks used "Handy". `app_de.arb` uses "Gerät"
+>    23 times and "Handy" **zero** times, and the wave-5 rules make that
+>    binding. Corrected in place for Tasks 15–16 only — **the same defect is
+>    still present in the German copy of Tasks 19, 20, 21, 23 and 24** (plan
+>    lines 416, 2301, 2302, 3013, 3016, 3017). Whoever executes those must
+>    fix it there; it was out of this pass's scope.
+> 2. Step 5 claimed the pre-existing deletion tests are "unaffected". False:
+>    `test/features/settings/members_screen_test.dart:403` asserts Delete is
+>    HIDDEN for a claimed member *and* asserts the literal
+>    `memberEditDeleteBlockedClaimed` copy this task deletes. Task 15 inverts
+>    its premise, so it must be UPDATED (not deleted, not weakened).
+> 3. Step 2's third new test (claimed + signed out + unlinked) duplicates
+>    that same pre-existing test. Replaced with the genuinely uncovered
+>    branch: signed IN but UNLINKED.
+> 4. Step 4's `_deleteBlockedReason` re-`watch`es `membersProvider`, directly
+>    contradicting the existing doc comment on that method ("passed in rather
+>    than re-read to avoid a second `membersProvider` watch") and duplicating
+>    the gate ordering in two places that can drift. Replaced with a single
+>    `_DeleteGate` enum computed once per build.
+> 5. Step 4's `_canRemoveClaimed` watches the BARE `settingsProvider`. The
+>    codebase forbids that in so many words (`syncEngineProvider` and
+>    `memberIdentityModeProvider` doc comments: "Watches a `select`ed record,
+>    never the bare `settingsProvider`" — a started sync engine writes
+>    `settings.syncLastPulledAt` on every pull, so an unscoped watch rebuilds
+>    on each). `memberIdentityModeProvider == MemberIdentityMode.pinned` is
+>    *already* exactly "signed in AND linked", with that discipline. Reuse it.
+> 6. Neither task mentioned two comments that Task 15 falsifies and must
+>    therefore update: the library doc comment at
+>    `member_edit_sheet.dart:1-4` ("Delete is visible only when … unclaimed
+>    (no `userId`)") and the in-`build` T1.7 comment at :162-168.
+> 7. Verified still true and NOT changed: Task 14 is on main
+>    (`MemberService.deleteMember` routes by claim state and throws
+>    `ClaimedMemberRemovalFailure`), `memberServiceProvider` has its
+>    `gateway`, and `FakeHouseholdGateway` already has `removeMemberCalls` /
+>    `removeMemberError`. No E2E flow selects `members.edit.delete*` or the
+>    blocked-reason copy, so no Maestro id is at risk.
+
 **Files:**
 - Modify: `lib/features/settings/member_edit_sheet.dart`
 - Modify: `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb`
 - Modify: `test/features/settings/members_screen_test.dart`
 
 **Interfaces:**
-- Consumes: `currentAuthUserProvider`, `settingsProvider`, `membersProvider`.
-- Produces: no new symbol — `_canDelete` and `_deleteBlockedReason` change meaning.
+- Consumes: `currentAuthUserProvider`, `memberIdentityModeProvider`,
+  `membersProvider`. ([REFRESH] `memberIdentityModeProvider`, not the bare
+  `settingsProvider` — see correction 5.)
+- Produces: no new symbol — `_canDelete` and `_deleteBlockedReason` change
+  meaning. ([REFRESH] plus a private `_DeleteGate` enum, correction 4.)
 
 The new rule, in one table (`me` = the member whose `userId` equals the
 signed-in auth user's id):
@@ -976,11 +1019,12 @@ keys:
 `@` metadata entry from both arb files, in this task, rather than leaving a
 stale string behind.
 
-In `lib/l10n/app_de.arb` (du-form):
+In `lib/l10n/app_de.arb` (du-form). **[REFRESH]** "Handy" → "Gerät"
+(correction 1):
 
 ```json
   "memberEditDeleteBlockedSelf": "Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.",
-  "memberEditDeleteBlockedOffline": "Dieses Profil wird auf dem Handy einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.",
+  "memberEditDeleteBlockedOffline": "Dieses Profil wird auf dem Gerät einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.",
 ```
 
 Regenerate:
@@ -991,8 +1035,17 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 
 - [ ] **Step 2: Write the failing tests**
 
-Append inside the existing `main()` of
-`test/features/settings/members_screen_test.dart` (it already imports
+**[REFRESH] Step 2a comes FIRST (correction 2): update the pre-existing
+claimed test.** `test/features/settings/members_screen_test.dart:403`
+("member delete action (spec A1) is hidden, not disabled, for a claimed
+member") claims `me`, leaves the device signed OUT and UNLINKED, and asserts
+the literal `memberEditDeleteBlockedClaimed` copy. Under the new rule that
+member is still undeletable — but for the *offline* reason, not the *claimed*
+one. Update its name and its copy assertion to the new intended behaviour;
+do NOT delete it and do NOT drop the assertion. It is now the coverage for
+the "claimed, signed out and unlinked" row of the table above.
+
+Then append inside the existing `main()` of the same file (it already imports
 `FakeAuthGateway`, `FakeHouseholdGateway`, `SettingsRepository` and
 `openManageMembers`):
 
@@ -1005,9 +1058,11 @@ Append inside the existing `main()` of
     required String userId,
   }) async {
     final householdId = await currentHouseholdId(database);
+    // [REFRESH] a real seed color, matching every other member in this
+    // file, rather than the bare `2` of the original draft.
     final member = await HouseholdRepository(
       database,
-    ).addMember(householdId, name: name, color: 2);
+    ).addMember(householdId, name: name, color: 0xFF8C7BC9);
     await (database.update(
       database.members,
     )..where((tbl) => tbl.id.equals(member.id))).write(
@@ -1087,12 +1142,20 @@ Append inside the existing `main()` of
     },
   );
 
+  // [REFRESH] correction 3: the original third test here was signed OUT and
+  // UNLINKED, which is exactly what the pre-existing test updated in Step 2a
+  // already covers. Replaced with the genuinely uncovered half of
+  // `_canRemoveClaimed`: signed IN but still UNLINKED (no `setSyncLinked`).
+  // Without this, a `_canRemoveClaimed` that checked only `signedIn` would
+  // stay green.
   testChoreApp(
-    'claimed target while unlinked: Delete hidden, reason explains the '
-    'connection requirement rather than a permission',
+    'claimed target while signed in but NOT linked: Delete hidden, reason '
+    'explains the connection requirement rather than a permission',
     today: today,
     overrides: [
-      authGatewayProvider.overrideWithValue(FakeAuthGateway()),
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(currentUser: const AuthUser(id: 'me', email: 'me@x.y')),
+      ),
       householdGatewayProvider.overrideWithValue(FakeHouseholdGateway()),
     ],
     (tester, database) async {
@@ -1131,53 +1194,138 @@ copy does not exist.
 
 - [ ] **Step 4: Implement**
 
-In `lib/features/settings/member_edit_sheet.dart`, replace `_canDelete` and
-`_deleteBlockedReason`:
+**[REFRESH] corrections 4 + 5.** The original draft of this step is kept
+below the line for reference, but do NOT implement it as written: its
+`_deleteBlockedReason` re-`watch`es `membersProvider` (which the method's own
+existing doc comment says it deliberately avoids) and duplicates the gate
+ordering in two methods that can silently drift apart, and its
+`_canRemoveClaimed` watches the bare `settingsProvider` (forbidden — see
+`memberIdentityModeProvider`'s doc comment; that provider already IS "signed
+in AND linked" with the required `select` discipline).
+
+Implement ONE gate, computed once per build, in
+`lib/features/settings/member_edit_sheet.dart`:
 
 ```dart
-  /// The signed-in account's own claimed member row, if the member being
-  /// edited IS it. Self-removal is the server's rejection (§2.2) and the
-  /// UI's Leave action, never Delete.
-  bool get _isOwnClaimedRow {
+/// Why the member edit sheet's Delete affordance is or isn't offered
+/// (spec `docs/specs/household-lifecycle.md` §3.2, F10).
+///
+/// One value computed once per build rather than a `_canDelete` bool plus a
+/// separately-derived reason string: the two used to encode the same
+/// precedence twice and could drift, and re-deriving the reason meant a
+/// second `membersProvider` watch.
+enum _DeleteGate {
+  /// Adding a new member -- no delete affordance applies, nothing to
+  /// explain.
+  notApplicable,
+
+  /// Delete is offered.
+  allowed,
+
+  /// The household's last active member: removing it would leave zero.
+  /// Outranks every other reason, including [ownClaimedRow] (a one-member
+  /// household whose sole member is you).
+  lastMember,
+
+  /// The caller's own claimed row. Self-removal is the server's rejection
+  /// (§2.2) and the UI's Leave action, never Delete.
+  ownClaimedRow,
+
+  /// A claimed target while this device is signed out or unlinked, so the
+  /// `remove_member` RPC cannot be made at all.
+  unreachable,
+}
+```
+
+and in the state class, replacing `_canDelete` and `_deleteBlockedReason`:
+
+```dart
+  /// The current delete gate (spec `docs/specs/household-lifecycle.md`
+  /// §3.2, F10).
+  ///
+  /// Claim state no longer blocks outright: a claimed profile IS removable,
+  /// via the `remove_member` RPC, by ANY member (D-L2 -- there is no role
+  /// gate and none is coming). What still blocks is
+  /// [_DeleteGate.lastMember], [_DeleteGate.ownClaimedRow] and
+  /// [_DeleteGate.unreachable], in that precedence.
+  ///
+  /// [membersProvider] is already the roster query (soft-deleted members
+  /// excluded, `HouseholdRepository.watchMembers`), so its current length
+  /// already reflects "active members" -- if the member being edited is one
+  /// of only one, deleting it would leave zero.
+  _DeleteGate get _deleteGate {
     final member = widget.member;
-    final authUserId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
-    return member != null &&
-        authUserId != null &&
-        member.userId == authUserId;
+    if (member == null) {
+      return _DeleteGate.notApplicable;
+    }
+    final activeMembers = ref.watch(membersProvider).value ?? const <Member>[];
+    if (activeMembers.length <= 1) {
+      return _DeleteGate.lastMember;
+    }
+    if (member.userId == null) {
+      return _DeleteGate.allowed;
+    }
+    // Compared against `currentAuthUserProvider` directly rather than via
+    // `claimedMemberProvider`: that provider is gated on
+    // MemberIdentityMode.pinned, so while signed in but unlinked it returns
+    // null and this row would fall through to `unreachable` -- whose copy
+    // ("used on someone else's device") is flatly wrong about your own
+    // profile. Signed OUT there is no id to compare and `unreachable` is
+    // the honest answer.
+    if (member.userId == ref.watch(currentAuthUserProvider).valueOrNull?.id) {
+      return _DeleteGate.ownClaimedRow;
+    }
+    // The RPC needs a signed-in session AND a linked household, which is
+    // precisely MemberIdentityMode.pinned. Reused rather than re-derived
+    // from `settingsProvider`, whose bare watch is forbidden (that provider
+    // re-emits on every sync pull's `syncLastPulledAt` write).
+    return ref.watch(memberIdentityModeProvider) == MemberIdentityMode.pinned
+        ? _DeleteGate.allowed
+        : _DeleteGate.unreachable;
   }
 
-  /// Whether removing a CLAIMED member is possible right now: the RPC needs
-  /// both a signed-in session and a linked household (spec §3.2).
+  /// The explanation that replaces the vanished Delete button (T1.7 --
+  /// `docs/research/persona-anna.md` finding 6, `docs/research/triage.md`
+  /// T1.7), or `null` when Delete is shown or doesn't apply.
+  ///
+  /// Worded as an accident prevented, not a permission (spec D1,
+  /// `docs/specs/sync-backend.md` §2: the household is flat by design --
+  /// this is "removing this profile would break something" or "this can't
+  /// reach the household right now", never "you aren't allowed to").
+  String? _deleteBlockedReason(AppLocalizations l10n, _DeleteGate gate) {
+    return switch (gate) {
+      _DeleteGate.notApplicable || _DeleteGate.allowed => null,
+      _DeleteGate.lastMember => l10n.memberEditDeleteBlockedLastMember,
+      _DeleteGate.ownClaimedRow => l10n.memberEditDeleteBlockedSelf,
+      _DeleteGate.unreachable => l10n.memberEditDeleteBlockedOffline,
+    };
+  }
+```
+
+`build` then does:
+
+```dart
+    final deleteGate = _deleteGate;
+    final canDelete = deleteGate == _DeleteGate.allowed;
+    final deleteBlockedReason = _deleteBlockedReason(l10n, deleteGate);
+```
+
+Also update the two comments this task falsifies (correction 6): the library
+doc comment at the top of the file still says Delete is visible only for an
+unclaimed member, and the in-`build` T1.7 comment still says "a claimed or
+last-remaining member gets no Delete button".
+
+<details><summary>Original draft of Step 4 (do not implement)</summary>
+
+```dart
+  bool get _isOwnClaimedRow { ... }
   bool get _canRemoveClaimed {
     final signedIn = ref.watch(currentAuthUserProvider).valueOrNull != null;
     final linked =
         ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
     return signedIn && linked;
   }
-
-  /// Whether the delete action should be shown at all (spec: HIDDEN, not
-  /// disabled).
-  ///
-  /// Claim state no longer blocks outright (spec
-  /// `docs/specs/household-lifecycle.md` §3.2, F10): a claimed profile IS
-  /// removable, via the `remove_member` RPC, by ANY member (D-L2 -- there
-  /// is no role gate and none is coming). What still blocks: the
-  /// household's last active member, the caller's own claimed row, and a
-  /// claimed target while this device cannot reach the server.
-  bool get _canDelete {
-    final member = widget.member;
-    if (member == null) {
-      return false;
-    }
-    final activeMembers = ref.watch(membersProvider).value ?? const <Member>[];
-    if (activeMembers.length <= 1) {
-      return false;
-    }
-    if (member.userId == null) {
-      return true;
-    }
-    return !_isOwnClaimedRow && _canRemoveClaimed;
-  }
+  bool get _canDelete { ... }
 ```
 
 and the reason:
@@ -1208,14 +1356,26 @@ are true (a one-member household whose sole member is you). Keep the doc
 comment's "worded as an accident prevented, not a permission" paragraph — it
 is still the rule, and `memberEditDeleteBlockedOffline` obeys it.
 
+</details>
+
 - [ ] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/members_screen_test.dart
 ```
 
-Expected: PASS, all tests in the file (including the pre-existing deletion
-ones, which use unclaimed members and are unaffected).
+Expected: PASS, all tests in the file. **[REFRESH]** the original text here
+said the pre-existing deletion tests are "unaffected"; that is false for the
+claimed-member one — see correction 2 / Step 2a, which updates it. The
+last-member and unclaimed ones genuinely are unaffected.
+
+**[REFRESH]** Task 15 also leaves the long `WHOEVER UNHIDES THIS FOR CLAIMED
+MEMBERS` comment in `_delete` (`member_edit_sheet.dart:252-269`) factually
+stale for exactly one commit: that comment states "left to crash" is correct
+*only while `_canDelete` hides the claimed path*, and this task is what stops
+it doing so. Task 16 replaces `_delete` wholesale and with it that comment.
+This is why 15 and 16 must land in the same PR and must never be shipped
+apart.
 
 - [ ] **Step 6: Commit**
 
@@ -1255,10 +1415,11 @@ In `lib/l10n/app_en.arb`:
   },
 ```
 
-In `lib/l10n/app_de.arb` (du-form):
+In `lib/l10n/app_de.arb` (du-form). **[REFRESH]** "Handy" → "Gerät"
+(correction 1):
 
 ```json
-  "memberRemoveDialogBodyClaimed": "{memberName} nutzt diesen Haushalt auf einem eigenen Handy. Wenn du die Person entfernst, synchronisiert dieses Handy nicht mehr — es behält alles, was es schon hat, als eigene lokale Kopie. Profil und Verlauf bleiben hier im Haushalt: In Wechsel-Aufgaben fällt die Person aus der Reihenfolge, fest zugewiesene Aufgaben stehen wieder allen offen, und alles, was ihr gerade zugewiesen ist, wird frei. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.",
+  "memberRemoveDialogBodyClaimed": "{memberName} nutzt diesen Haushalt auf einem eigenen Gerät. Wenn du die Person entfernst, synchronisiert dieses Gerät nicht mehr — es behält alles, was es schon hat, als eigene lokale Kopie. Profil und Verlauf bleiben hier im Haushalt: In Wechsel-Aufgaben fällt die Person aus der Reihenfolge, fest zugewiesene Aufgaben stehen wieder allen offen, und alles, was ihr gerade zugewiesen ist, wird frei. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.",
   "memberRemoveError": "{memberName} konnte nicht entfernt werden. Dafür braucht die App eine Verbindung zum Online-Haushalt — es wurde nichts geändert. Versuch es noch mal.",
 ```
 
