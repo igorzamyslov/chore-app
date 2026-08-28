@@ -2055,7 +2055,7 @@ git commit -m "Add leaveHousehold to HouseholdGateway (spec §2.2, F9)"
 - Consumes: `HouseholdGateway.leaveHousehold` (Task 18), `SettingsRepository.clearSyncLink()` (slice 2 Task 7 — which also nulls every local `members.userId`), `SettingsRepository.clearMembershipRevoked()` (slice 3 Task 10), `resetAppData` (`lib/application/data_reset.dart`).
 - Produces: `HouseholdExitService`, `householdExitServiceProvider`, `claimedMemberCountProvider`. `deleteAccount` is added to the same class in Task 23.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/application/household_exit_service_test.dart`:
 
@@ -2193,7 +2193,7 @@ void main() {
 `AuthUser`'s import comes from `package:chore_app/application/auth_gateway.dart` —
 add it if the analyzer asks.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -2201,7 +2201,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 
 Expected: FAIL to compile — `household_exit_service.dart` does not exist.
 
-- [ ] **Step 3: Implement the service**
+- [x] **Step 3: Implement the service**
 
 Create `lib/application/household_exit_service.dart`:
 
@@ -2299,7 +2299,7 @@ class HouseholdExitService {
 }
 ```
 
-- [ ] **Step 4: Add the providers**
+- [x] **Step 4: Add the providers**
 
 In `lib/app/providers.dart`, next to `householdLinkServiceProvider`:
 
@@ -2331,7 +2331,7 @@ final claimedMemberCountProvider = Provider<int>((ref) {
 });
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -2339,7 +2339,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/application/household_exit_service.dart lib/app/providers.dart test/application/household_exit_service_test.dart
@@ -2378,7 +2378,7 @@ git commit -m "Add HouseholdExitService.leaveHousehold (spec §2.2, F9)"
 - Consumes: `showExitConfirmSheet` / `ExitConfirmResult` (slice 2 Task 9), `householdExitServiceProvider`, `claimedMemberCountProvider` (Task 19), `showAppSnackbar`.
 - Produces: `_LeaveRow` in the Account section's linked branch, semantic ids `settings.account.leave` / `settings.account.leave.{deleteLocal,cancel,confirm}` (the last three come from the shared sheet's `semanticPrefix`).
 
-- [ ] **Step 1: Add the l10n strings**
+- [x] **Step 1: Add the l10n strings**
 
 In `lib/l10n/app_en.arb`:
 
@@ -2427,7 +2427,7 @@ Regenerate:
 env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `test/features/settings/account_exit_rows_test.dart`:
 
@@ -2637,7 +2637,7 @@ Declare the shared fakes at the top of `main()`, as in Task 16:
   final cancelGateway = FakeHouseholdGateway();
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart
@@ -2645,7 +2645,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exi
 
 Expected: FAIL — `settings.account.leave` does not exist.
 
-- [ ] **Step 4: Implement the row**
+- [x] **Step 4: Implement the row**
 
 In `lib/features/settings/account_section.dart`, add `_LeaveRow` to the
 signed-in + linked branch of `AccountSectionBody.build`, ABOVE
@@ -2747,7 +2747,7 @@ class _LeaveRow extends ConsumerWidget {
 
 Add the imports this needs (`exit_confirm_sheet.dart`).
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart test/features/settings/account_section_test.dart
@@ -2761,7 +2761,7 @@ counts, and both of its `find.byType(ListTile)` uses (lines 87, 799) are
 size-coupled to the Account section. (If a future count does appear: adjust
 the count, never the assertion's intent.)
 
-- [ ] **Step 6: Analyze and commit**
+- [x] **Step 6: Analyze and commit**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos
@@ -2770,6 +2770,30 @@ git commit -m "Add the Leave household action with the last-member cascade warni
 ```
 
 **Slice 5 is now complete.**
+
+> **DONE 2026-08-28** (wave 5). Tasks 19-20 landed on
+> `wave5/household-lifecycle-slices-5-6`, PR **#31** -- #27's successor,
+> because #27 was already MERGED and every workflow here runs on
+> `pull_request` only, so pushes to a merged PR's branch trigger nothing.
+> `checks`, `pgtap` and `android` all green; `ios` skips on PRs by design.
+> 1020 tests.
+>
+> Both of this slice's decisions were inverted inside their methods and
+> confirmed red AT THE TEST STEP, along with the `scrollable` fix. Note for
+> anyone repeating that: `scrollable: false` is the `AlertDialog` default,
+> so passing it explicitly fails `avoid_redundant_argument_values` at
+> `analyze` and the tests never run -- remove the argument instead.
+>
+> **STILL UNVERIFIED, and it is the real gate:** this plan's done criteria
+> also require a manual live smoke against the local Supabase stack -- for
+> slice 5, step 2 (leave with another claimed member present: the household
+> survives and the profile stays claimable) and step 3 (last claimed member
+> leaves: `households.deleted_at` is stamped and a previously issued invite
+> code is rejected). Neither was run: `supabase` is outside wave 5's local
+> allow list. `pgtap`'s green does NOT stand in for it -- db.yml only
+> stands up the stack when the diff touches `supabase/**` or `db.yml`, and
+> slice 5 is Dart-only, so that green reports a suite that never ran
+> against these paths.
 
 ---
 
