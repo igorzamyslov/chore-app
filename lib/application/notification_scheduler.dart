@@ -443,17 +443,52 @@ class NotificationScheduler {
 
   bool _initialized = false;
 
-  /// The tail of the serialized-apply chain: resolves once whichever
-  /// [applyDigestPlans] call is currently running -- from ANY caller --
-  /// has finished writing its own [digestHorizonSlots] slots. A new call
-  /// waits on this before starting its own loop; see [applyDigestPlans]'s
-  /// doc comment.
+  /// The tail of the serialized chain of digest *writes*: resolves once
+  /// whichever write is currently running -- from ANY caller -- has
+  /// finished touching its share of the [digestHorizonSlots] ids. A new
+  /// write waits on this before issuing a single platform call of its own;
+  /// see [_enqueueDigestWrite].
   ///
-  /// Deliberately never allowed to complete with an error: a failed apply
-  /// must not permanently jam the queue for every apply that comes after
+  /// Both [applyDigestPlans] and [cancelDigest] ride this one queue
+  /// (backlog G-12). It is deliberately NOT named `_applyTail`: a cancel
+  /// interleaving with an apply is the same hazard as two applies
+  /// interleaving, and worse in its consequence -- a wipe whose cancel loop
+  /// ran while an apply was mid-loop can be left with slots the apply
+  /// re-armed behind it, i.e. a wiped app that still notifies.
+  ///
+  /// Deliberately never allowed to complete with an error: a failed write
+  /// must not permanently jam the queue for every write that comes after
   /// it. The error itself still reaches the caller that made THAT call,
-  /// via the future [applyDigestPlans] returns to them.
-  Future<void> _applyTail = Future<void>.value();
+  /// via the future its own method returned to them.
+  Future<void> _digestWriteTail = Future<void>.value();
+
+  /// Chains [write] onto [_digestWriteTail] and hands the caller the future
+  /// for its own link, so concurrent digest writes run one after another
+  /// instead of interleaving their platform calls.
+  ///
+  /// **Synchronous on purpose, and this is load-bearing.** The tail is read
+  /// and reassigned before any suspension point, so two callers in the same
+  /// turn cannot both capture the same predecessor. An `async` version that
+  /// awaited the predecessor before reassigning would let exactly that
+  /// happen and the serialization would be silently vacuous.
+  ///
+  /// Ordering is FIFO **by arrival**, not by completion, which is the
+  /// correct tiebreak in both directions: each caller decided what it
+  /// wanted from state it read at call time, so the caller that arrived
+  /// later holds the later view of the world and gets the last word. A
+  /// cancel arriving during an apply therefore leaves nothing armed (the
+  /// wipe wins), and an apply arriving during a cancel therefore still ends
+  /// up armed (a legitimate post-wipe recompute wins).
+  ///
+  /// Keeps the two error properties documented on [_digestWriteTail]: the
+  /// tail is assigned the error-swallowing variant, the caller is given the
+  /// raw one.
+  Future<void> _enqueueDigestWrite(Future<void> Function() write) {
+    final waitForPrevious = _digestWriteTail.catchError((_) {});
+    final thisWrite = waitForPrevious.then((_) => write());
+    _digestWriteTail = thisWrite.catchError((_) {});
+    return thisWrite;
+  }
 
   /// Initializes the underlying plugin. Idempotent: only the first call
   /// does anything. Safe to call on every bootstrap/resume.
@@ -497,15 +532,16 @@ class NotificationScheduler {
   /// could otherwise interleave their writes to the very same
   /// [digestHorizonSlots] ids (`DigestRescheduleController`
   /// and `DigestPrepromptBanner._enable` both call this independently).
-  /// This method therefore chains every call onto [_applyTail], so a call
-  /// that arrives while another is still mid-loop waits for it to finish
-  /// completely before writing a single slot of its own, no matter which
-  /// caller either one is. `DigestRescheduleController`'s own in-flight/
-  /// queued bookkeeping (`_inFlightRecompute`/`_recomputeQueued`) is a
-  /// separate, narrower guarantee on top of this one: it *coalesces*
-  /// redundant triggers from that one call site into a single re-run, it
-  /// does not by itself protect the horizon from a second, independent
-  /// caller such as the banner.
+  /// This method therefore chains every call onto [_digestWriteTail], so a
+  /// call that arrives while another is still mid-loop waits for it to
+  /// finish completely before writing a single slot of its own, no matter
+  /// which caller either one is — and [cancelDigest] rides the same queue,
+  /// so a wipe cannot interleave with an apply either (backlog G-12).
+  /// `DigestRescheduleController`'s own in-flight/queued bookkeeping
+  /// (`_inFlightRecompute`/`_recomputeQueued`) is a separate, narrower
+  /// guarantee on top of this one: it *coalesces* redundant triggers from
+  /// that one call site into a single re-run, it does not by itself protect
+  /// the horizon from a second, independent caller such as the banner.
   ///
   /// Deliberately never requests the OS notification permission itself; see
   /// the class doc and spec `docs/specs/polish-round-1.md` A3.
@@ -532,12 +568,9 @@ class NotificationScheduler {
         'Must be exactly digestHorizonSlots ($digestHorizonSlots)',
       );
     }
-    final waitForPrevious = _applyTail.catchError((_) {});
-    final thisApply = waitForPrevious.then(
-      (_) => _applyDigestPlansNow(plans, actingMemberId),
+    return _enqueueDigestWrite(
+      () => _applyDigestPlansNow(plans, actingMemberId),
     );
-    _applyTail = thisApply.catchError((_) {});
-    return thisApply;
   }
 
   Future<void> _applyDigestPlansNow(
@@ -576,7 +609,35 @@ class NotificationScheduler {
   }
 
   /// Cancels every day of the digest horizon.
-  Future<void> cancelDigest() async {
+  ///
+  /// Rides the same [_digestWriteTail] queue as [applyDigestPlans] (backlog
+  /// G-12), so a cancel and an apply can never interleave their writes to
+  /// the same [digestHorizonSlots] ids. Without that, a wipe
+  /// (`lib/features/settings/reset_flow.dart`) racing the notification
+  /// action's horizon rewrite (`rewriteDigestHorizon`) could finish its
+  /// cancel loop while the apply was mid-loop, and the apply would then
+  /// re-arm slots the cancel had already cleared -- a wiped app that still
+  /// notifies about a household that no longer exists.
+  ///
+  /// Because the queue is FIFO by arrival, a cancel issued while an apply
+  /// is in flight runs after it (nothing stays armed) and an apply issued
+  /// while a cancel is in flight runs after it (a legitimate post-wipe
+  /// recompute still arms). See [_enqueueDigestWrite].
+  ///
+  /// One consequence for the wipe path, accepted deliberately: this may now
+  /// WAIT behind an in-flight apply, where before it proceeded immediately.
+  /// That path is documented as best-effort and must never block the wipe,
+  /// but it already awaited [ensureInitialized] -- i.e. a
+  /// `plugin.initialize()` platform call -- so the wipe already depended on
+  /// this plugin's calls returning; the `on Object` guard there was always
+  /// about a throw, not a hang. A timeout on the queue wait would
+  /// reintroduce precisely the interleaving this fixes.
+  Future<void> cancelDigest() => _enqueueDigestWrite(_cancelDigestNow);
+
+  Future<void> _cancelDigestNow() async {
+    // Inside the serialized body, not in front of the queue wait: an await
+    // before the tail is captured would be a suspension point that
+    // subverts the ordering. Same placement as _applyDigestPlansNow's.
     await ensureInitialized();
     for (final id in digestNotificationIds) {
       await plugin.cancel(id);
