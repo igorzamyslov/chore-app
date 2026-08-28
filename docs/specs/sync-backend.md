@@ -98,11 +98,23 @@ Deltas vs local:
     p_member_name, p_color)`) links `user_id = auth.uid()` to an
     unclaimed profile or inserts a fresh member row (G5).
   - `delete_account()` (G6): unlinks `user_id` from all member rows
-    (profiles + history stay with their households), deletes households
-    where the caller is the ONLY claimed member (cascade soft-delete),
-    then deletes the auth user via an edge function with service-role
-    key (the RPC marks; the edge function `delete-user` finishes). The
-    app then drops back to local-only mode; local data is untouched.
+    (profiles + history stay with their households), soft-deletes
+    households where the caller was the ONLY claimed member (cascade),
+    then deletes the auth user **itself, in the same RPC** —
+    `delete from auth.users where id = auth.uid()`, legal because the
+    function is `postgres`-owned and `SECURITY DEFINER`. **There is no
+    edge function and no service-role key anywhere near the client.**
+    This bullet described an RPC-marks / edge-function-`delete-user`-
+    finishes split until 2026-08-28; decision **D-L4** in
+    `household-lifecycle.md` §1 replaced it with the single RPC, and §5.1
+    there is the verification record. The fallback analysis is retained,
+    unimplemented, in Appendix A of
+    `docs/plans/2026-08-08-household-lifecycle-slices-4-6.md`, for the day
+    the in-RPC delete regresses. The `delete from auth.users` is the sole
+    exception to this project's DELETE-is-granted-nowhere rule and does
+    not generalise. The app then drops back to local-only mode; local data
+    on the user's own device is untouched unless they tick the
+    `household-lifecycle.md` §3.3 opt-in (D-L3).
 - **Tests: pgTAP** in `supabase/tests/` — the isolation matrix (member of
   A cannot read/write anything of B, for every table and every verb),
   invite lifecycle (expiry, revocation, double-claim rejection), RPC

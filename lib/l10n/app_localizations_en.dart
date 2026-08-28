@@ -977,6 +977,41 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t leave the household. This needs a connection — nothing was changed. Try again.';
 
   @override
+  String get settingsAccountDeleteAccount => 'Delete my account';
+
+  @override
+  String get accountDeleteConfirmTitle => 'Delete your account?';
+
+  @override
+  String get accountDeleteConfirmBody =>
+      'Your account and your email address are deleted from the server. This can\'t be undone. Your profile stays with each household you\'re part of, so the others keep their history — you\'re just no longer linked to it.';
+
+  @override
+  String get accountDeleteConfirmBodyLastMember =>
+      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+
+  @override
+  String get accountDeleteConfirmAction => 'Delete account';
+
+  @override
+  String get accountDeleteFinalTitle => 'Delete your account now?';
+
+  @override
+  String get accountDeleteFinalBodyKeepPhone =>
+      'Your account and your email address are erased from the server. That can\'t be undone. This phone keeps everything it has, as its own local copy. To keep a copy of your data somewhere else first, use Export data under Settings → Data.';
+
+  @override
+  String get accountDeleteFinalBodyDeletePhone =>
+      'Your account and your email address are erased from the server, and this phone\'s copy — members, chores and shopping list — is deleted too, so the app starts fresh. Neither can be undone. To keep a copy of your data first, use Export data under Settings → Data.';
+
+  @override
+  String get accountDeleteFinalAction => 'Delete account';
+
+  @override
+  String get accountDeleteError =>
+      'Couldn\'t delete your account. This needs a connection — nothing was changed. Try again.';
+
+  @override
   String get settingsAccountSendError =>
       'Couldn\'t send the sign-in link. Please try again.';
 

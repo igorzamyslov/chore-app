@@ -36,6 +36,19 @@ class FakeAuthGateway implements AuthGateway {
   /// call order.
   final List<String> sentMagicLinks = [];
 
+  /// Set to make the next [signOut] call throw this instead of succeeding.
+  ///
+  /// Models the realistic post-erasure case: `delete_account()` has already
+  /// removed the `auth.users` row, so the sign-out round trip that follows
+  /// it can legitimately fail.
+  ///
+  /// `Object?`, unlike [sendMagicLinkError] and the gateway fake's hooks:
+  /// `HouseholdExitService.deleteAccount` catches `on Object` rather than
+  /// `on Exception`, and a hook that can only carry an [Exception] cannot
+  /// tell the two clauses apart -- the rule would be untestable and free to
+  /// regress. One test throws a [StateError] through here.
+  Object? signOutError;
+
   @override
   Stream<AuthUser?> watchUser() async* {
     yield currentUser;
@@ -53,6 +66,20 @@ class FakeAuthGateway implements AuthGateway {
 
   @override
   Future<void> signOut() async {
+    final error = signOutError;
+    if (error != null) {
+      // The WHOLE POINT of [signOutError] is that its static type is
+      // `Object?`, so a test can throw something that is not an [Exception]
+      // and prove `HouseholdExitService.deleteAccount` catches `on Object`
+      // rather than `on Exception`. Narrowing the field to satisfy
+      // `only_throw_errors` would delete the coverage the field exists for.
+      // The ignore has to sit on the line directly above the throw --
+      // `// ignore:` applies to the next line only, and a block comment
+      // between the two makes it an `unnecessary_ignore` while the original
+      // lint still fires.
+      // ignore: only_throw_errors
+      throw error;
+    }
     currentUser = null;
     _controller.add(null);
   }

@@ -6,7 +6,8 @@
 /// (once linked) a subtitle naming the household plus the B3 'Invite a
 /// member' row (spec `docs/feedback/2026-08-01-ux-audit.md` B3) and the F9
 /// 'Leave the household' row (spec
-/// `docs/specs/household-lifecycle.md` §3.3); and a
+/// `docs/specs/household-lifecycle.md` §3.3); plus, LAST in both signed-in
+/// states, the F11 'Delete my account' row (§2.2, D-L4/D-L6); and a
 /// static 'coming soon' row when Supabase isn't configured
 /// ([NoopAuthGateway]).
 library;
@@ -19,6 +20,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
@@ -38,7 +40,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// when `myMembershipProvider` finds a membership), the P2b adopt row (spec
 /// §7.3), and the P2c join row while `settings.syncHouseholdId` is still
 /// `null` -- or, once linked, the Invite row, the F9 Leave row and the A1.2
-/// disconnect row.
+/// disconnect row. Both signed-in branches end with the F11 delete-account
+/// row: an account can exist with no household link, so erasure must not
+/// require linking first.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -90,6 +94,10 @@ class AccountSectionBody extends ConsumerWidget {
           if (membership != null) _ReconnectRow(membership: membership),
           const _AdoptRow(),
           const _JoinRow(),
+          // Last in the section, below everything else: the most
+          // destructive row here. Present in this UNLINKED branch too --
+          // see [_DeleteAccountRow] for why.
+          const _DeleteAccountRow(),
         ],
       );
     }
@@ -103,6 +111,7 @@ class AccountSectionBody extends ConsumerWidget {
         // two, and Disconnect stays the quieter, purely local one.
         _LeaveRow(householdId: householdId, householdName: householdName),
         const _DisconnectRow(),
+        const _DeleteAccountRow(),
       ],
     );
   }
@@ -594,6 +603,159 @@ class _LeaveRow extends ConsumerWidget {
       // settings row was just deleted out from under an already-running
       // watch (see `ResetDataTile` and `MembershipRevokedNotice`, which
       // both do exactly this).
+      ref.invalidate(settingsProvider);
+    }
+  }
+}
+
+/// The 'Delete my account' action (spec
+/// `docs/specs/household-lifecycle.md` §2.2, F11, D-L4), shown whenever this
+/// device is signed in -- linked or not, since an account can exist with no
+/// household link at all and GDPR erasure must not require linking first.
+///
+/// Under D-B2 (open-source distribution only) this is GDPR-driven rather
+/// than store-mandated: still genuinely required, not a launch gate.
+///
+/// LAST in both signed-in branches, below [_DisconnectRow]. That is not the
+/// same rule slice 5 used to put [_LeaveRow] above [_DisconnectRow], and it
+/// does not contradict it either. That rule was about which of two rows is
+/// the PRIMARY action: Leave is the real thing you came for, Disconnect the
+/// quieter purely-local footnote that must not compete with it. Delete
+/// account is nobody's primary action -- it is an exit hatch you go looking
+/// for -- so it follows the convention the rest of Settings already uses for
+/// those: destructive last. `SettingsGroup`'s Data group is
+/// `[ExportDataTile(), ResetDataTile()]`, in that order, for the same
+/// reason.
+///
+/// Drawn in `error`, the same treatment `ResetDataTile` gets -- the only
+/// other irreversible-feeling row in Settings. It reaches that colour
+/// differently, and deliberately: `ResetDataTile` uses
+/// `SettingsRow(destructive: true)`, while every row in THIS section
+/// ([_InviteRow], [_LeaveRow], [_DisconnectRow], [_ReconnectRow],
+/// [_AdoptRow], [_JoinRow]) is a plain [ListTile]. Matching the section
+/// beats matching the one row elsewhere: a lone `SettingsRow` among six
+/// `ListTile`s would read as a rendering bug.
+///
+/// Guarded by TWO gates, in this order (decision D-L6):
+///
+/// 1. the SAME shared exit sheet the other two exits use (§3.3, D-L3),
+///    whose "also delete this phone's copy" checkbox is unchecked here too.
+///    This is the CHOICE step.
+/// 2. one final confirmation, whose body is picked by what the checkbox
+///    ended up as -- so it names the actual outcome rather than issuing a
+///    generic warning.
+///
+/// Configure, then confirm. Reset app data is confirm -> confirm only
+/// because it has nothing to configure; this is the same rhythm with the
+/// first step carrying the choice, and it exists at all because reset is
+/// purely local and fully recoverable while this is irreversible
+/// server-side erasure. Putting a confirmation FIRST was rejected: a
+/// confirmation that precedes the decision cannot describe the consequence,
+/// so it degrades into a speed bump.
+///
+/// [_LeaveRow] and member-removal deliberately keep the single sheet: both
+/// are recoverable (rejoin with an invite, re-invite the person), so an
+/// extra gate there would be friction with no safety benefit.
+///
+/// No role check, here or anywhere in this cluster: `members.role` is
+/// vestigial (D1/D-L2).
+class _DeleteAccountRow extends ConsumerWidget {
+  const _DeleteAccountRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    return semantic(
+      'settings.account.deleteAccount',
+      child: ListTile(
+        leading: Icon(Icons.person_remove_outlined, color: errorColor),
+        title: Text(
+          l10n.settingsAccountDeleteAccount,
+          style: TextStyle(color: errorColor),
+        ),
+        onTap: () => _run(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _run(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    // Same §3.4 count the Leave confirm uses, with the same `<= 1`: 1 means
+    // "only me", the cascade case (§2.4), and 0 means the count has not
+    // loaded, where over-warning is much cheaper than silently taking a
+    // household down.
+    final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    final result = await showExitConfirmSheet(
+      context,
+      title: l10n.accountDeleteConfirmTitle,
+      body: lastClaimed
+          ? l10n.accountDeleteConfirmBodyLastMember
+          : l10n.accountDeleteConfirmBody,
+      actionLabel: l10n.accountDeleteConfirmAction,
+      semanticPrefix: 'settings.account.deleteAccount',
+    );
+    if (!result.confirmed || !context.mounted) {
+      return;
+    }
+    // D-L6's final gate, AFTER the choice, so its copy can name the actual
+    // outcome instead of issuing a generic warning. A cancel here has still
+    // called nothing.
+    //
+    // ONE call into the shared builder in `destructive_confirm.dart`, never
+    // a private `AlertDialog`: that file is where every destructive
+    // confirmation in this app is built, and copying it here would also
+    // silently drop its `scrollable: true` -- an `AlertDialog` clips a body
+    // taller than the dialog with no exception and no scrollbar, and
+    // `accountDeleteFinalBodyDeletePhone` is the longest confirm body in the
+    // app (longer again in German). The clipped tail would be exactly the
+    // export pointer D-L7 put here.
+    final confirmed = await confirmDestructiveAction(
+      context,
+      DestructiveConfirmStep(
+        title: l10n.accountDeleteFinalTitle,
+        // The whole reason this dialog runs after the sheet rather than
+        // before it: the two outcomes are genuinely different, so the last
+        // gate states the one the user just configured. The export pointer
+        // (D-L7) rides along in both -- last moment it is still actionable.
+        body: result.alsoDeleteLocalData
+            ? l10n.accountDeleteFinalBodyDeletePhone
+            : l10n.accountDeleteFinalBodyKeepPhone,
+        confirmLabel: l10n.accountDeleteFinalAction,
+        cancelLabel: l10n.commonCancel,
+        confirmSemanticId: 'settings.account.deleteAccount.final.confirm',
+        cancelSemanticId: 'settings.account.deleteAccount.final.cancel',
+      ),
+    );
+    if (!confirmed || !context.mounted) {
+      return;
+    }
+    try {
+      await ref
+          .read(householdExitServiceProvider)
+          .deleteAccount(alsoDeleteLocalData: result.alsoDeleteLocalData);
+    } on Object catch (_) {
+      // `on Object`, not `on Exception`. Same reasoning as [_LeaveRow] and
+      // `reset_flow.dart`: the user has just cleared two gates on an
+      // irreversible action, so silence is the one outcome forbidden, and an
+      // Error -- a `LateInitializationError` out of an uninitialised
+      // Supabase client, a `StateError` out of a closed drift connection --
+      // escapes an `on Exception` clause into the async gap and leaves no
+      // feedback at all.
+      //
+      // The copy's "nothing was changed" is accurate: the service does the
+      // RPC first, so a throw before it means nothing moved, and the only
+      // way to throw after it is a dead local database, which is already a
+      // broken-app state rather than a failed deletion.
+      if (context.mounted) {
+        showAppSnackbar(context, message: l10n.accountDeleteError);
+      }
+      return;
+    }
+    if (result.alsoDeleteLocalData) {
+      // The documented `resetAppData` caller responsibility, exactly as in
+      // [_LeaveRow]: this device's settings row was just deleted out from
+      // under an already-running watch.
       ref.invalidate(settingsProvider);
     }
   }

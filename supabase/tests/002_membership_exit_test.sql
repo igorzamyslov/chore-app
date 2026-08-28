@@ -283,7 +283,7 @@ select is(
 -- cascade their household, so neither ever exercises this branch: a
 -- migration that flipped the FK to `on delete cascade` -- hard-deleting a
 -- household Uli still lives in, in violation of this project's
--- soft-deletes-only invariant -- would pass 54/54 without this case.
+-- soft-deletes-only invariant -- would pass 69/69 without this case.
 insert into auth.users (id, email)
 values ('00000000-0000-0000-0000-0000000000d5', 'kai@test.local'),
        ('00000000-0000-0000-0000-0000000000d6', 'uli@test.local');
@@ -346,7 +346,7 @@ select is(
 -- reachable through it. Nothing else in this suite (or 001) asserts a
 -- has_function_privilege/has_table_privilege fact, so a future migration
 -- containing `grant execute on all functions in schema public to
--- authenticated` would pass 54/54 unnoticed. These three internal
+-- authenticated` would pass 69/69 unnoticed. These three internal
 -- helpers are SECURITY DEFINER and must only ever be reachable through
 -- the public RPCs that wrap them.
 select is(

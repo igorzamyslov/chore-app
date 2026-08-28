@@ -1276,6 +1276,46 @@
   "@householdLeaveError": {
     "description": "Snackbar shown when the leave_household call failed. States plainly that nothing changed, so the retry is an ordinary retry rather than a repair."
   },
+  "settingsAccountDeleteAccount": "Delete my account",
+  "@settingsAccountDeleteAccount": {
+    "description": "Account-section row that permanently deletes the signed-in account (spec docs/specs/household-lifecycle.md \u00a72.2, F11). Shown whenever signed in, linked or not: an account can exist with no household link, and GDPR erasure must not require linking first."
+  },
+  "accountDeleteConfirmTitle": "Delete your account?",
+  "@accountDeleteConfirmTitle": {
+    "description": "Title of the delete-account confirm sheet -- the FIRST of D-L6's two gates, and the one carrying D-L3's keep-or-delete-this-phone checkbox."
+  },
+  "accountDeleteConfirmBody": "Your account and your email address are deleted from the server. This can't be undone. Your profile stays with each household you're part of, so the others keep their history \u2014 you're just no longer linked to it.",
+  "@accountDeleteConfirmBody": {
+    "description": "Body of the delete-account exit sheet when claimed members remain in the household(s). The export pointer deliberately lives on the FINAL dialog instead (D-L6/D-L7), where it is the last thing read before the point of no return."
+  },
+  "accountDeleteConfirmBodyLastMember": "Your account and your email address are deleted from the server. This can't be undone. You're the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
+  "@accountDeleteConfirmBodyLastMember": {
+    "description": "Body of the delete-account confirm when the caller is the last claimed member, so \u00a72.4's cascade will fire -- the same plain warning D-L5 requires for leaving."
+  },
+  "accountDeleteConfirmAction": "Delete account",
+  "@accountDeleteConfirmAction": {
+    "description": "Confirm button of the delete-account sheet. Confirming here opens the final confirmation (D-L6); it does not start the deletion."
+  },
+  "accountDeleteFinalTitle": "Delete your account now?",
+  "@accountDeleteFinalTitle": {
+    "description": "Title of delete-account's FINAL confirmation (decision D-L6), shown after the shared exit sheet -- the last gate before an irreversible erasure. Same AlertDialog grammar as settingsResetConfirm2*, because both go through the one shared builder in destructive_confirm.dart."
+  },
+  "accountDeleteFinalBodyKeepPhone": "Your account and your email address are erased from the server. That can't be undone. This phone keeps everything it has, as its own local copy. To keep a copy of your data somewhere else first, use Export data under Settings \u2192 Data.",
+  "@accountDeleteFinalBodyKeepPhone": {
+    "description": "Body of the final delete-account confirmation when the sheet's 'also delete this phone's copy' box was left UNCHECKED (the D-L3 default). Names the exact outcome the user just configured, which is the whole reason this dialog comes after the sheet rather than before it. 'Export data' is settingsExportEntry's exact label, under settingsDataSectionTitle -- the pointer has to be followable (D-L7)."
+  },
+  "accountDeleteFinalBodyDeletePhone": "Your account and your email address are erased from the server, and this phone's copy \u2014 members, chores and shopping list \u2014 is deleted too, so the app starts fresh. Neither can be undone. To keep a copy of your data first, use Export data under Settings \u2192 Data.",
+  "@accountDeleteFinalBodyDeletePhone": {
+    "description": "Body of the final delete-account confirmation when the sheet's checkbox WAS ticked. Deliberately reads differently from accountDeleteFinalBodyKeepPhone -- the point of confirming after the choice is that the two cases are distinguishable. 'Neither can be undone' is unique to this string and is what the widget test selects on."
+  },
+  "accountDeleteFinalAction": "Delete account",
+  "@accountDeleteFinalAction": {
+    "description": "Destructive action of the final delete-account confirmation; the next thing that happens is the RPC."
+  },
+  "accountDeleteError": "Couldn't delete your account. This needs a connection \u2014 nothing was changed. Try again.",
+  "@accountDeleteError": {
+    "description": "Snackbar shown when account deletion failed. 'Try again' is literal: the RPC runs before anything local moves, so a failure leaves the account and the device exactly as they were."
+  },
   "settingsAccountSendError": "Couldn't send the sign-in link. Please try again.",
   "@settingsAccountSendError": {
     "description": "Snackbar shown when sending the magic-link email fails."

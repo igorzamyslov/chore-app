@@ -1,28 +1,32 @@
-/// The shared two-step confirmation used by every irreversible action in
-/// Settings (spec `docs/specs/polish-round-1.md` B2).
+/// The shared confirmation every irreversible action in Settings goes
+/// through (spec `docs/specs/polish-round-1.md` B2).
 ///
-/// Two chained dialogs, not one: the first states what will be lost and is
-/// state-aware where that matters, the second is a bare "last chance". A
-/// cancel at either step is a no-op — the caller has not started its work
-/// yet when [confirmTwoStepDestructiveAction] returns `false`, so there is
-/// nothing to undo.
+/// Two entry points, ONE dialog builder — which is the point of this file.
+/// [confirmDestructiveAction] shows a single confirmation;
+/// [confirmTwoStepDestructiveAction] chains two of them, the first stating
+/// what will be lost (state-aware where that matters) and the second a bare
+/// "last chance". A cancel at any step is a no-op: the caller has not
+/// started its work yet when either returns `false`, so there is nothing to
+/// undo.
 ///
 /// This lives in its own file rather than inside `reset_flow.dart` because
-/// it is deliberately action-agnostic: adding another two-step destructive
-/// action means composing a [DestructiveConfirmStep] pair, NOT copying a
-/// dialog builder.
+/// it is deliberately action-agnostic: adding another destructive action
+/// means composing [DestructiveConfirmStep]s, NEVER copying a dialog
+/// builder. Copying one is not merely duplication — it silently drops
+/// `scrollable: true`, and the comment inside says what that costs.
 ///
-/// 'Reset app data' is currently the only caller, and an earlier version of
-/// this comment predicted the household exits would be the next. They are
-/// NOT, and that is settled rather than pending:
-/// `docs/specs/household-lifecycle.md` §3.3 gives all three exits ONE
-/// confirm shape — the shared sheet in `exit_confirm_sheet.dart`, whose
+/// Why there is a one-step entry point at all, since
+/// `docs/specs/household-lifecycle.md` §3.3 gives all three household exits
+/// ONE confirm shape (the shared sheet in `exit_confirm_sheet.dart`, whose
 /// body is followed by D-L3's unchecked "also delete this phone's copy"
-/// checkbox, which a [DestructiveConfirmStep] has nowhere to put. Leave and
-/// member-removal have exactly one confirmation each. Delete-account is the
-/// one exit that also gets a second gate (D-L6), and it gets it as a single
-/// final dialog AFTER that sheet — so if a one-step variant of this builder
-/// is ever wanted, that is the caller that wants it.
+/// checkbox, which a [DestructiveConfirmStep] has nowhere to put): leave and
+/// member-removal do indeed have exactly one confirmation each and use that
+/// sheet, not this file. Delete-account is the one exit that also gets a
+/// second gate (D-L6), and it gets it as a single final dialog AFTER the
+/// sheet. An earlier version of this comment predicted that caller would
+/// eventually want a one-step variant; slice 6 is that caller, and
+/// [confirmDestructiveAction] is what it uses. The sheet still owns the
+/// CHOICE; this owns only the last gate.
 ///
 /// Semantic ids are passed in per step rather than derived from a prefix on
 /// purpose: the existing reset ids are irregular
@@ -81,16 +85,32 @@ Future<bool> confirmTwoStepDestructiveAction(
   required DestructiveConfirmStep first,
   required DestructiveConfirmStep second,
 }) async {
-  if (!await _showStep(context, first)) {
+  if (!await confirmDestructiveAction(context, first)) {
     return false;
   }
   if (!context.mounted) {
     return false;
   }
-  return _showStep(context, second);
+  return confirmDestructiveAction(context, second);
 }
 
-Future<bool> _showStep(
+/// Shows ONE destructive confirmation and resolves to whether it was
+/// confirmed.
+///
+/// `false` for a cancel and for a barrier dismiss alike — every path that is
+/// not an explicit confirmation — so a caller can treat `true` as the user's
+/// go-ahead and needs no null handling.
+///
+/// This is the single dialog [confirmTwoStepDestructiveAction] chains, shared
+/// rather than duplicated so there stays exactly ONE place in the app that
+/// builds a destructive confirmation. Both entry points therefore get
+/// `scrollable: true` and the same `error`-coloured confirm for free, which
+/// is not cosmetic — see the comment inside.
+///
+/// Use this only for a gate that is genuinely the LAST step. A household
+/// exit's choice belongs on `exit_confirm_sheet.dart`'s sheet, which can
+/// carry D-L3's checkbox; this cannot.
+Future<bool> confirmDestructiveAction(
   BuildContext context,
   DestructiveConfirmStep step,
 ) async {
