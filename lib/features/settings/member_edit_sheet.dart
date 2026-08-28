@@ -7,11 +7,17 @@
 /// claimed one is removable through the `remove_member` RPC by ANY member
 /// (D-L2 -- there is no role gate and none is coming). See [_DeleteGate] for
 /// the three cases that still hide it.
+///
+/// Removing a claimed profile is the one action in this sheet that can fail
+/// for a reason the user has to see, since it needs the network. That
+/// failure is rendered inline (semantic id `members.remove.error`) rather
+/// than swallowed into a silent retry.
 library;
 
 import 'package:chore_app/app/color_swatch_picker.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/features/settings/member_delete_dialog.dart';
@@ -77,6 +83,15 @@ class _MemberEditSheet extends ConsumerStatefulWidget {
 class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
   late final TextEditingController _nameController;
   late int _color;
+
+  /// The localized message for a failed CLAIMED-member removal (spec
+  /// `docs/specs/household-lifecycle.md` §3.2), or `null` when nothing has
+  /// failed. Cleared on every new attempt.
+  String? _removalError;
+
+  /// True while the `remove_member` round trip is in flight -- Delete is
+  /// disabled meanwhile, so a double tap cannot fire two RPCs.
+  bool _removing = false;
 
   bool get _isEditing => widget.member != null;
 
@@ -249,13 +264,44 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
                 ),
               ),
             ),
+          // The ONE inline failure surface in this app (spec
+          // `docs/specs/household-lifecycle.md` §3.2). Takes the same
+          // visual slot as the blocked-reason explanation above -- and the
+          // two are mutually exclusive in practice, since a removal can
+          // only fail after Delete was shown.
+          if (_removalError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: semantic(
+                'members.remove.error',
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 20,
+                      color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _removalError!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Row(
             children: [
               if (canDelete)
                 semantic(
                   'members.edit.delete',
                   child: TextButton(
-                    onPressed: _delete,
+                    onPressed: _removing ? null : _delete,
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.error,
                     ),
@@ -299,25 +345,43 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     if (existing == null) {
       return;
     }
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showMemberDeleteDialog(
       context,
       memberName: existing.name,
+      claimed: existing.userId != null,
     );
     if (!confirmed || !mounted) {
       return;
     }
-    // INCOMPLETE AS OF THIS COMMIT, AND THE VERY NEXT ONE COMPLETES IT.
-    // [_DeleteGate] above no longer hides this action for a claimed target,
-    // so `MemberService.deleteMember` can now take its claimed path and
-    // throw `ClaimedMemberRemovalFailure` -- an EXPECTED failure, not a bug:
-    // it needs the network, it changed nothing locally, and the person the
-    // user tried to remove is still in the household. That exception's own
-    // doc comment requires it be shown inline, which the inline error state
-    // added in the next commit (spec
-    // `docs/specs/household-lifecycle.md` §3.2) does. Until then a real
-    // network failure on a destructive action crashes the sheet. Tasks 15
-    // and 16 are a pair for exactly this reason and must never ship apart.
-    await ref.read(memberServiceProvider).deleteMember(existing.id);
+    setState(() {
+      _removing = true;
+      _removalError = null;
+    });
+    try {
+      await ref.read(memberServiceProvider).deleteMember(existing.id);
+    } on ClaimedMemberRemovalFailure catch (_) {
+      // The ONE inline error in this app (spec
+      // `docs/specs/household-lifecycle.md` §3.2): the removal needs the
+      // network, nothing was written, and the person the user tried to
+      // remove is still in the household, so the user must be told --
+      // unlike every local action in this sheet, and unlike
+      // `docs/specs/sync-backend.md` §8.3's swallow-and-retry posture for
+      // background sync.
+      if (mounted) {
+        setState(() {
+          _removing = false;
+          _removalError = l10n.memberRemoveError(existing.name);
+        });
+      }
+      return;
+    }
+    // Any OTHER throw stays uncaught. [_DeleteGate] already excludes every
+    // locally-refusable case, so a StateError from
+    // `MemberService.deleteMember`'s guards here is a genuine bug (or an
+    // exceedingly rare cross-device race), exactly as it was before this
+    // slice -- and `MemberService` has already wrapped everything the
+    // gateway can throw, `on Object`, into the failure above.
     if (!mounted) {
       return;
     }
