@@ -424,15 +424,22 @@ title and body, and more glaring on a button than in body text. The
 stored-value → `Locale` mapping is shared with `localeOverrideProvider` via
 `localeFromStoredSetting` so the two cannot drift apart.
 
-**Known, bounded hazard:** `applyDigestPlans`' `_applyTail` serialization is
+**Known, bounded hazard:** the `_digestWriteTail` serialization is
 per-instance and does NOT cross isolates, so the background isolate and the
 main isolate can interleave writes to the same 24 ids. Self-correcting
 whenever it can occur — it requires the app to be alive, and an alive app
 receives the ping after the isolate's write, so the main isolate's last apply
 always runs on post-completion data. Do not attempt a cross-isolate lock.
-Relatedly, `cancelDigest()` remains unserialized against `applyDigestPlans`;
-with a second process-level writer that is now reachable in principle (a wipe
-racing an action) and is tracked rather than fixed here.
+
+**Serialization within an isolate covers cancels too**, since backlog G-12
+(2026-08-28, `docs/plans/2026-08-28-g12-cancel-digest-serialization.md`):
+`cancelDigest()` rides the same `_digestWriteTail` queue as
+`applyDigestPlans`, so a wipe cannot interleave with an apply and be left
+with slots the apply re-armed behind it. The queue is FIFO by arrival, which
+is the correct order in both directions — a cancel arriving during an apply
+leaves nothing armed, and an apply arriving during a cancel still ends up
+armed, so a legitimate post-wipe recompute is not silenced. The field is
+named for *writes*, not applies, precisely because both ride it.
 
 **Cross-isolate UI refresh:** the main isolate registers a well-known
 `IsolateNameServer` port at bootstrap. On a ping, it invalidates
