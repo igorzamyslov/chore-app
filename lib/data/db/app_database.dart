@@ -195,9 +195,29 @@ class AppDatabase extends _$AppDatabase {
   );
 }
 
+/// The drift database's base name. `drift_flutter` turns this into a file
+/// called `$databaseName.sqlite` inside `getApplicationDocumentsDirectory()`.
+///
+/// A named constant rather than a literal because
+/// `ios/Runner/AppDelegate.swift` **mirrors these file names** to exclude them
+/// from iCloud/iTunes backup (backlog A-3b), and no CI job on a pull request
+/// compiles or runs that Swift — so a rename here that forgot the Swift side
+/// would silently un-exclude the database, with nothing red anywhere. The
+/// mirror is pinned by `test/data/db/ios_backup_exclusion_test.dart`.
+const String databaseName = 'chore_app';
+
 /// Opens the on-device, platform-appropriate database file.
 ///
 /// Kept separate from [AppDatabase]'s constructor (which only depends on
 /// plain drift and takes a [QueryExecutor]) so tests can construct
 /// `AppDatabase(NativeDatabase.memory())` without pulling in Flutter.
-QueryExecutor openConnection() => driftDatabase(name: 'chore_app');
+///
+/// **Called from two isolates** — `appDatabaseProvider` on the main isolate and
+/// `notification_action_handler.dart`'s background isolate (F-1). Nothing that
+/// needs a platform channel may be added here: the background engine's ability
+/// to resolve `path_provider` at all is the one thing in this codebase that was
+/// proven on a physical device, and every channel added to this path is another
+/// way to lose that. Launch-time-only work belongs in `main.dart` or in the
+/// platform runner (see A-3b's backup exclusion, which is pure Swift for
+/// exactly this reason).
+QueryExecutor openConnection() => driftDatabase(name: databaseName);
