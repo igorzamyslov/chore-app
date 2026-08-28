@@ -984,6 +984,41 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Haushalt konnte nicht verlassen werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.';
 
   @override
+  String get settingsAccountDeleteAccount => 'Mein Konto löschen';
+
+  @override
+  String get accountDeleteConfirmTitle => 'Konto löschen?';
+
+  @override
+  String get accountDeleteConfirmBody =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Dein Profil bleibt in jedem Haushalt, zu dem du gehörst, die anderen behalten also ihren Verlauf — du bist nur nicht mehr damit verknüpft.';
+
+  @override
+  String get accountDeleteConfirmBodyLastMember =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+
+  @override
+  String get accountDeleteConfirmAction => 'Konto löschen';
+
+  @override
+  String get accountDeleteFinalTitle => 'Konto jetzt löschen?';
+
+  @override
+  String get accountDeleteFinalBodyKeepPhone =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Dieses Gerät behält alles, was es hat, als eigene lokale Kopie. Wenn du vorher woanders eine Kopie deiner Daten sichern willst, nutze „Daten exportieren“ unter Einstellungen → Daten.';
+
+  @override
+  String get accountDeleteFinalBodyDeletePhone =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, und die Kopie auf diesem Gerät — Mitglieder, Aufgaben und Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. Beides lässt sich nicht rückgängig machen. Wenn du vorher eine Kopie deiner Daten willst, nutze „Daten exportieren“ unter Einstellungen → Daten.';
+
+  @override
+  String get accountDeleteFinalAction => 'Konto löschen';
+
+  @override
+  String get accountDeleteError =>
+      'Dein Konto konnte nicht gelöscht werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.';
+
+  @override
   String get settingsAccountSendError =>
       'Der Anmeldelink konnte nicht gesendet werden. Versuch es noch mal.';
 

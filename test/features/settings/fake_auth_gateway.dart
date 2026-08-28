@@ -36,6 +36,19 @@ class FakeAuthGateway implements AuthGateway {
   /// call order.
   final List<String> sentMagicLinks = [];
 
+  /// Set to make the next [signOut] call throw this instead of succeeding.
+  ///
+  /// Models the realistic post-erasure case: `delete_account()` has already
+  /// removed the `auth.users` row, so the sign-out round trip that follows
+  /// it can legitimately fail.
+  ///
+  /// `Object?`, unlike [sendMagicLinkError] and the gateway fake's hooks:
+  /// `HouseholdExitService.deleteAccount` catches `on Object` rather than
+  /// `on Exception`, and a hook that can only carry an [Exception] cannot
+  /// tell the two clauses apart -- the rule would be untestable and free to
+  /// regress. One test throws a [StateError] through here.
+  Object? signOutError;
+
   @override
   Stream<AuthUser?> watchUser() async* {
     yield currentUser;
@@ -53,6 +66,10 @@ class FakeAuthGateway implements AuthGateway {
 
   @override
   Future<void> signOut() async {
+    final error = signOutError;
+    if (error != null) {
+      throw error;
+    }
     currentUser = null;
     _controller.add(null);
   }

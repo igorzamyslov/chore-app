@@ -70,6 +70,14 @@ class HouseholdExitService {
     await _finishLocally(alsoDeleteLocalData: alsoDeleteLocalData);
   }
 
+  /// Deletes the signed-in account (spec §2.2, F11, D-L4).
+  ///
+  /// TEMPORARY, INCOMPLETE (slice 6's TDD red): the server call only, with
+  /// neither the sign-out nor the local tail. The next commit finishes it.
+  Future<void> deleteAccount({required bool alsoDeleteLocalData}) async {
+    await gateway.deleteAccount();
+  }
+
   /// Shared local tail of both exits, reached only once the server RPC has
   /// already succeeded.
   ///
