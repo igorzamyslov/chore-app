@@ -1,12 +1,18 @@
-/// Widget tests for the shared two-step destructive confirmation
+/// Widget tests for the shared destructive confirmation
 /// (`lib/features/settings/destructive_confirm.dart`, spec
 /// `docs/specs/polish-round-1.md` B2).
 ///
-/// The behavioural coverage of the reset flow that uses it lives in
-/// `reset_flow_test.dart`, driven through the real app. This file exists for
-/// the one thing that file cannot reach: the dialog's own layout at a large
-/// text scale on a small surface. The Settings screen does not itself lay
-/// out at 320x640 with a 2x scale, so this needs a bare harness.
+/// The behavioural coverage of the two callers lives elsewhere, driven
+/// through the real app: `reset_flow_test.dart` for the two-step chain and
+/// `account_exit_rows_test.dart` for delete-account's D-L6 final gate. This
+/// file exists for the one thing neither can reach: the dialog's own layout
+/// at a large text scale on a small surface. The Settings screen does not
+/// itself lay out at 320x640 with a 2x scale, so this needs a bare harness.
+///
+/// Both entry points are covered, because they share the dialog builder and
+/// therefore share the clipping bug: the second test would have caught the
+/// hand-rolled `AlertDialog` slice 6 was originally planned to copy, which
+/// omitted `scrollable: true` for the LONGEST confirm body in the app.
 library;
 
 import 'package:chore_app/features/settings/destructive_confirm.dart';
@@ -123,6 +129,98 @@ void main() {
         find.bySemanticsIdentifier('settings.reset.confirm2'),
         findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    'the ONE-step entry point scrolls too, on the longest confirm body in '
+    "the app (delete-account's D-L6 final gate, German): it shares the "
+    'builder, so it cannot regress separately',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final handle = tester.ensureSemantics();
+      late String longBody;
+      bool? confirmed;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('de'),
+          home: Builder(
+            builder: (context) {
+              final l10n = AppLocalizations.of(context);
+              // The live caller's real copy through the getters, not pasted:
+              // this is the string D-L7's export pointer ends, and a clipped
+              // tail would lose exactly that sentence.
+              longBody = l10n.accountDeleteFinalBodyDeletePhone;
+              return Scaffold(
+                body: ElevatedButton(
+                  onPressed: () async {
+                    confirmed = await confirmDestructiveAction(
+                      context,
+                      DestructiveConfirmStep(
+                        title: l10n.accountDeleteFinalTitle,
+                        body: longBody,
+                        confirmLabel: l10n.accountDeleteFinalAction,
+                        cancelLabel: l10n.commonCancel,
+                        confirmSemanticId:
+                            'settings.account.deleteAccount.final.confirm',
+                        cancelSemanticId:
+                            'settings.account.deleteAccount.final.cancel',
+                      ),
+                    );
+                  },
+                  child: const Text('open'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      final scrollable = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(Scrollable),
+      );
+      expect(
+        scrollable,
+        findsOneWidget,
+        reason: 'the dialog body must be reachable, not clipped',
+      );
+
+      final bodyFinder = find.text(longBody);
+      final before = tester.getTopLeft(bodyFinder).dy;
+      await tester.drag(scrollable, const Offset(0, -120));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(bodyFinder).dy,
+        lessThan(before),
+        reason: 'dragging must actually move the body, not just not crash',
+      );
+
+      // One dialog, not two: this entry point resolves on the FIRST confirm.
+      await tester.tap(
+        find.bySemanticsIdentifier(
+          'settings.account.deleteAccount.final.confirm',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(confirmed, isTrue);
+      expect(find.byType(AlertDialog), findsNothing);
       expect(tester.takeException(), isNull);
 
       handle.dispose();

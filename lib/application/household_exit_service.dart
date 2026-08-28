@@ -14,6 +14,10 @@
 ///
 /// The server call goes FIRST on purpose: if it fails, nothing local has
 /// changed and a retry is an ordinary retry rather than a repair.
+///
+/// They differ in exactly one place: `deleteAccount` signs out between
+/// steps 1 and 2, `leaveHousehold` deliberately does not (D-L8 -- leaving a
+/// household is not leaving the app).
 library;
 
 import 'package:chore_app/application/auth_gateway.dart';
@@ -35,8 +39,11 @@ class HouseholdExitService {
   /// The Supabase seam the exit RPCs go through.
   final HouseholdGateway gateway;
 
-  /// The auth seam -- used only by `deleteAccount`, whose session is dead
-  /// the moment the auth row is gone.
+  /// The auth seam -- used only by `deleteAccount`, which signs this device
+  /// out as part of the erasure. NOT because the session dies with the auth
+  /// row: it does not, and assuming so is the mistake
+  /// [HouseholdGateway.deleteAccount] documents at length. See
+  /// [deleteAccount].
   final AuthGateway auth;
 
   /// This device's link state.
@@ -72,10 +79,50 @@ class HouseholdExitService {
 
   /// Deletes the signed-in account (spec §2.2, F11, D-L4).
   ///
-  /// TEMPORARY, INCOMPLETE (slice 6's TDD red): the server call only, with
-  /// neither the sign-out nor the local tail. The next commit finishes it.
+  /// The server unclaims this account's member row in EVERY household it
+  /// belongs to, cascades any household left with no claimed members
+  /// (§2.4), and erases the `auth.users` row. Then this device signs out.
+  ///
+  /// **The sign-out is load-bearing, not bookkeeping** -- see
+  /// [HouseholdGateway.deleteAccount], which spells out why callers must not
+  /// assume the session dies with the auth row. GoTrue JWTs are stateless:
+  /// deleting the row cascades refresh tokens and server-side sessions, but
+  /// an already-issued access token keeps working until its `exp`. For the
+  /// rest of that window `auth.uid()` still resolves while every claim is
+  /// already nulled, so a pull's `hasMembership` probe SUCCEEDS and answers
+  /// false -- indistinguishable from having been removed by somebody else,
+  /// which would hand the user §3.5's "you were removed" notice for
+  /// something they did themselves. Signing out here, before any pull can
+  /// observe that state, is what prevents it.
+  ///
+  /// A FAILING sign-out is nevertheless tolerated, and that is not a
+  /// contradiction. The erasure has already happened; [_finishLocally] runs
+  /// immediately afterwards, and `syncEngineProvider` is gated on
+  /// `settings.syncHouseholdId`, so the unlink closes the same window from
+  /// the other side. Aborting here would instead leave this device LINKED to
+  /// a server side that no longer exists -- the §0.1 silent-stale trap slice
+  /// 3 exists to prevent.
+  ///
+  /// [alsoDeleteLocalData] is the D-L3 opt-in, `false` by default here
+  /// exactly as in the other two exits: GDPR erasure covers the server copy
+  /// and the account, not the user's own device. Callers must invalidate
+  /// `settingsProvider` afterwards when it was `true` (the documented
+  /// [resetAppData] contract).
   Future<void> deleteAccount({required bool alsoDeleteLocalData}) async {
     await gateway.deleteAccount();
+    try {
+      await auth.signOut();
+    } on Object catch (_) {
+      // `on Object`, not `on Exception`, and best-effort. The account is
+      // already erased, so the one outcome this may never produce is
+      // abandoning the unlink below: an `Error` -- a `StateError` out of a
+      // closed client, a `LateInitializationError` out of an uninitialised
+      // Supabase client -- escapes an `on Exception` clause and would strand
+      // this device linked to a server side that is gone. The realistic
+      // failure is mundane, too: the sign-out round trip can legitimately
+      // fail precisely BECAUSE the account it names no longer exists.
+    }
+    await _finishLocally(alsoDeleteLocalData: alsoDeleteLocalData);
   }
 
   /// Shared local tail of both exits, reached only once the server RPC has

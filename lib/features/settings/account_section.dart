@@ -20,6 +20,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
@@ -39,7 +40,9 @@ import 'package:intl/intl.dart';
 /// when `myMembershipProvider` finds a membership), the P2b adopt row (spec
 /// §7.3), and the P2c join row while `settings.syncHouseholdId` is still
 /// `null` -- or, once linked, the Invite row, the F9 Leave row and the A1.2
-/// disconnect row.
+/// disconnect row. Both signed-in branches end with the F11 delete-account
+/// row: an account can exist with no household link, so erasure must not
+/// require linking first.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -724,8 +727,38 @@ class _DeleteAccountRow extends ConsumerWidget {
     if (!result.confirmed || !context.mounted) {
       return;
     }
-    // TEMPORARY, INCOMPLETE (slice 6's TDD red): D-L6's final gate belongs
-    // HERE, after the choice. The next commit adds it.
+    // D-L6's final gate, AFTER the choice, so its copy can name the actual
+    // outcome instead of issuing a generic warning. A cancel here has still
+    // called nothing.
+    //
+    // ONE call into the shared builder in `destructive_confirm.dart`, never
+    // a private `AlertDialog`: that file is where every destructive
+    // confirmation in this app is built, and copying it here would also
+    // silently drop its `scrollable: true` -- an `AlertDialog` clips a body
+    // taller than the dialog with no exception and no scrollbar, and
+    // `accountDeleteFinalBodyDeletePhone` is the longest confirm body in the
+    // app (longer again in German). The clipped tail would be exactly the
+    // export pointer D-L7 put here.
+    final confirmed = await confirmDestructiveAction(
+      context,
+      DestructiveConfirmStep(
+        title: l10n.accountDeleteFinalTitle,
+        // The whole reason this dialog runs after the sheet rather than
+        // before it: the two outcomes are genuinely different, so the last
+        // gate states the one the user just configured. The export pointer
+        // (D-L7) rides along in both -- last moment it is still actionable.
+        body: result.alsoDeleteLocalData
+            ? l10n.accountDeleteFinalBodyDeletePhone
+            : l10n.accountDeleteFinalBodyKeepPhone,
+        confirmLabel: l10n.accountDeleteFinalAction,
+        cancelLabel: l10n.commonCancel,
+        confirmSemanticId: 'settings.account.deleteAccount.final.confirm',
+        cancelSemanticId: 'settings.account.deleteAccount.final.cancel',
+      ),
+    );
+    if (!confirmed || !context.mounted) {
+      return;
+    }
     try {
       await ref
           .read(householdExitServiceProvider)

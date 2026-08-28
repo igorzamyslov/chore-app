@@ -96,14 +96,19 @@ void main() {
       // The longest real string this cluster adds -- the German of
       // accountDeleteFinalBodyDeletePhone, German running longer again than
       // the English. Literal text rather than the l10n getter on purpose:
-      // that key does not exist until slice 6, and this regression guard
-      // must not depend on task order.
+      // this guard predates the key (it is slice 4 Task 12, the key is slice
+      // 6 Task 24) and must not depend on task order. Slice 6 brought the
+      // literal back into line with the shipped string, which had drifted by
+      // one phrase -- the export pointer names `settingsExportEntry`'s real
+      // label, 'Daten exportieren'. Keep them in step: the comment's claim
+      // to be the real copy is the only thing making this fixture the right
+      // worst case.
       const longBody =
           'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, '
           'und die Kopie auf diesem Gerät — Mitglieder, Aufgaben und '
           'Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. '
           'Beides lässt sich nicht rückgängig machen. Wenn du vorher eine '
-          'Kopie deiner Daten willst, nutze „Exportieren“ unter '
+          'Kopie deiner Daten willst, nutze „Daten exportieren“ unter '
           'Einstellungen → Daten.';
 
       ExitConfirmResult? result;
