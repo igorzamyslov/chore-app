@@ -616,6 +616,17 @@ class _LeaveRow extends ConsumerWidget {
 /// Under D-B2 (open-source distribution only) this is GDPR-driven rather
 /// than store-mandated: still genuinely required, not a launch gate.
 ///
+/// LAST in both signed-in branches, below [_DisconnectRow]. That is not the
+/// same rule slice 5 used to put [_LeaveRow] above [_DisconnectRow], and it
+/// does not contradict it either. That rule was about which of two rows is
+/// the PRIMARY action: Leave is the real thing you came for, Disconnect the
+/// quieter purely-local footnote that must not compete with it. Delete
+/// account is nobody's primary action -- it is an exit hatch you go looking
+/// for -- so it follows the convention the rest of Settings already uses for
+/// those: destructive last. `SettingsGroup`'s Data group is
+/// `[ExportDataTile(), ResetDataTile()]`, in that order, for the same
+/// reason.
+///
 /// Drawn in `error`, the same treatment `ResetDataTile` gets -- the only
 /// other irreversible-feeling row in Settings. It reaches that colour
 /// differently, and deliberately: `ResetDataTile` uses
