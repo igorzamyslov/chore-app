@@ -48,10 +48,9 @@ Future<bool> showMemberDeleteDialog(
         scrollable: true,
         title: Text(l10n.memberDeleteDialogTitle(memberName)),
         content: Text(
-          // TEMP INVERSION B, reverted by the next commit.
           claimed
-              ? l10n.memberDeleteDialogBody(memberName)
-              : l10n.memberRemoveDialogBodyClaimed(memberName),
+              ? l10n.memberRemoveDialogBodyClaimed(memberName)
+              : l10n.memberDeleteDialogBody(memberName),
         ),
         actions: [
           semantic(
