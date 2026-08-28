@@ -316,7 +316,25 @@ void main() {
       await tester.pumpAndSettle();
 
       // D-L6: the shared sheet comes FIRST -- the choice, before any
-      // confirmation of it -- with the D-L3 box unchecked.
+      // confirmation of it. This pair goes before the checkbox lookup on
+      // purpose: both orderings fail if a confirmation is moved in front of
+      // the sheet, but `tester.widget<CheckboxListTile>` fails with
+      // 'Bad state: No element', which says nothing about what broke, while
+      // these two name the rule.
+      expect(
+        find.bySemanticsIdentifier(
+          'settings.account.deleteAccount.final.confirm',
+        ),
+        findsNothing,
+        reason: 'D-L6: the final gate must not precede the sheet',
+      );
+      expect(
+        find.bySemanticsIdentifier(
+          'settings.account.deleteAccount.deleteLocal',
+        ),
+        findsOneWidget,
+        reason: 'the sheet, with D-L3 checkbox, is the first thing shown',
+      );
       final box = tester.widget<CheckboxListTile>(
         find.descendant(
           of: find.bySemanticsIdentifier(
@@ -325,18 +343,10 @@ void main() {
           matching: find.byType(CheckboxListTile),
         ),
       );
-      expect(box.value, isFalse);
+      expect(box.value, isFalse, reason: 'D-L3: unchecked by default');
       // Last claimed member: the cascade warning, same plain wording D-L5
       // requires for leaving.
       expect(find.textContaining('last person here'), findsOneWidget);
-      // And the final gate is NOT up yet. This is the assertion that fails
-      // if a confirmation is ever moved in front of the sheet.
-      expect(
-        find.bySemanticsIdentifier(
-          'settings.account.deleteAccount.final.confirm',
-        ),
-        findsNothing,
-      );
 
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.deleteAccount.confirm'),
