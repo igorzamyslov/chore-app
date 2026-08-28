@@ -24,11 +24,11 @@ import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
+import 'package:chore_app/features/settings/last_synced_line.dart';
 import 'package:chore_app/features/settings/membership_revoked_notice.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 /// The Account section's body: a static disabled row when
 /// [authGatewayProvider] resolves to [NoopAuthGateway] (Supabase not
@@ -153,21 +153,6 @@ class _SignedInTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final householdName = this.householdName;
-    // §2.4: read from the same `syncLastPulledAt` cursor the engine already
-    // persists on every successful pull (SettingsRepository.
-    // setSyncLastPulledAt) -- only meaningful once linked, so this stays
-    // `null` (and renders nothing) while `householdName` is.
-    final lastPulledAtRaw = householdName == null
-        ? null
-        : ref.watch(settingsProvider).valueOrNull?.syncLastPulledAt;
-    final lastSyncedText = lastPulledAtRaw == null
-        ? null
-        : _lastSyncedText(
-            l10n,
-            Localizations.localeOf(context).toString(),
-            now: ref.watch(clockProvider).now(),
-            lastPulledAt: DateTime.parse(lastPulledAtRaw),
-          );
     return semantic(
       'settings.account.signedIn',
       child: ListTile(
@@ -180,11 +165,14 @@ class _SignedInTile extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(l10n.settingsAccountLinkedSubtitle(householdName)),
-                  if (lastSyncedText != null)
-                    semantic(
-                      'settings.account.lastSynced',
-                      child: Text(lastSyncedText),
-                    ),
+                  // §2.4's relative last-sync line, read from the
+                  // `syncLastPulledAt` cursor the engine persists on every
+                  // successful pull. Mounted only here, on the linked
+                  // branch, since the cursor is meaningless while unlinked;
+                  // it renders nothing until there is a cursor, and keeps
+                  // its own text fresh while the screen stays open
+                  // (backlog A-2b).
+                  const LastSyncedLine(),
                 ],
               ),
         trailing: semantic(
@@ -242,33 +230,6 @@ class _SignedInTile extends ConsumerWidget {
       }
     }
   }
-}
-
-/// The relative "Last synced" text for [_SignedInTile] (spec
-/// `docs/specs/sync-freshness.md` §2.4): 'just now' under a minute,
-/// otherwise pluralized minutes/hours up to a day, else a locale-formatted
-/// weekday + month + day (e.g. 'Fri, Jul 31') via `package:intl` -- never a
-/// hardcoded weekday/month name, mirroring
-/// `chore_occurrence_tile.dart`'s `futureDueText`.
-String _lastSyncedText(
-  AppLocalizations l10n,
-  String localeName, {
-  required DateTime now,
-  required DateTime lastPulledAt,
-}) {
-  final elapsed = now.difference(lastPulledAt);
-  if (elapsed.inMinutes < 1) {
-    return l10n.settingsAccountLastSyncedJustNow;
-  }
-  if (elapsed.inHours < 1) {
-    return l10n.settingsAccountLastSyncedMinutes(elapsed.inMinutes);
-  }
-  if (elapsed.inHours < 24) {
-    return l10n.settingsAccountLastSyncedHours(elapsed.inHours);
-  }
-  return l10n.settingsAccountLastSyncedOn(
-    DateFormat.MMMEd(localeName).format(lastPulledAt.toLocal()),
-  );
 }
 
 /// The B3 'Invite a member' row (spec
