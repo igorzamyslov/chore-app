@@ -19,6 +19,12 @@ Also closed: **A-7 (worktree formatter trap — fixed with a check; a
 checked-in formatter config was measured impossible, 2026-08-28)**.
 Also closed: **G-12 (`cancelDigest()` now rides the same serialized
 digest-write queue as `applyDigestPlans`, 2026-08-28)**.
+Also closed: **A-3b (iOS backup exclusion on the local database; the row's
+own "Files" column and its `-wal`/`-shm` torn-restore mechanism were both
+wrong, and are corrected in the row, 2026-08-28)**.
+Also closed: **A-2b (the Settings "Last synced" line now ticks itself; the
+row's pending-timer premise was refuted against `flutter_test`'s source,
+2026-08-28)**.
 
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
