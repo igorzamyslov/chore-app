@@ -45,6 +45,7 @@ import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/application/household_create_service.dart';
+import 'package:chore_app/application/household_exit_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
@@ -353,6 +354,41 @@ final householdLinkServiceProvider = Provider<HouseholdLinkService>((ref) {
     settings: ref.watch(settingsRepositoryProvider),
     clock: ref.watch(clockProvider),
   );
+});
+
+/// The leave-household / delete-account service (spec
+/// `docs/specs/household-lifecycle.md` §2.2), built on
+/// [householdGatewayProvider], [authGatewayProvider],
+/// [settingsRepositoryProvider] and [appDatabaseProvider].
+final householdExitServiceProvider = Provider<HouseholdExitService>((ref) {
+  return HouseholdExitService(
+    gateway: ref.watch(householdGatewayProvider),
+    auth: ref.watch(authGatewayProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    database: ref.watch(appDatabaseProvider),
+  );
+});
+
+/// How many ACTIVE members of the current household are claimed by an
+/// account -- the count the Leave confirm branches on (spec §3.4, D-L5).
+///
+/// Read from LOCAL rows, which §3.1's G-A/G-B fixes just made honest:
+/// `members.userId` is populated by every pull and cleared on unlink. It
+/// can still be up to one pull cycle stale, so the warning it drives is
+/// best-effort -- the server recomputes the cascade condition inside the
+/// RPC (§2.4) and is authoritative either way.
+///
+/// Only ACTIVE members are counted, and that comes for free:
+/// [membersProvider] is backed by `HouseholdRepository.watchMembers`, which
+/// already filters `deletedAt is null`.
+///
+/// `0` while [membersProvider] has not loaded, which the Leave confirm
+/// treats as the cascade case along with `1` -- the conservative direction,
+/// since over-warning about a cascade is a far cheaper mistake than
+/// silently cascading a household.
+final claimedMemberCountProvider = Provider<int>((ref) {
+  final members = ref.watch(membersProvider).value ?? const <Member>[];
+  return members.where((member) => member.userId != null).length;
 });
 
 /// The P2c join-flow service (spec `docs/specs/sync-backend.md` §7.4), built
