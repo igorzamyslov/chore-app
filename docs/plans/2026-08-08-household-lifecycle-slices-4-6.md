@@ -1964,6 +1964,88 @@ git commit -m "Add leaveHousehold to HouseholdGateway (spec §2.2, F9)"
 
 ### Task 19: `HouseholdExitService.leaveHousehold`
 
+> **REFRESHED 2026-08-28** (wave 5, Task 0 pass — the plan was written
+> 2026-08-08 and the tree has moved twice since). Corrections below are
+> marked `[REFRESH]`. Summary of what was stale in Tasks 19–20:
+>
+> 1. **Task 20's German copy used "Handy"** (plan lines 2304, 2305).
+>    `app_de.arb` uses "Gerät" **25** times and "Handy" **zero** times, and
+>    the wave-5 rules make that binding. Corrected in place for Tasks 19–20
+>    only — **the same defect is still present in Tasks 21/23/24** (plan
+>    lines 3016, 3019, 3020). Line 416 is inside already-shipped Task 12 and
+>    is historical plan text; the shipped `app_de.arb` correctly says
+>    "Gerät" there, so that implementer already caught it. Left as history.
+> 2. **Task 19's test file imports `package:drift/drift.dart` and uses
+>    nothing from it** → `unused_import` under `--fatal-infos`, so the file
+>    would fail `analyze` rather than failing the way Step 2 predicts.
+>    `db.select(db.households)` is an inherited `GeneratedDatabase` method
+>    and needs no drift import; the sibling
+>    `test/application/household_link_service_test.dart` imports only
+>    `package:drift/native.dart` and does exactly this. Dropped.
+> 3. **Task 20's test file imports `package:flutter/material.dart` and uses
+>    nothing from it** → same `unused_import` failure. Dropped.
+> 4. **Step 3's `_finishLocally` calls `clearMembershipRevoked()` BEFORE
+>    `clearSyncLink()`, which is backwards on two counts.** (a) It does not
+>    close the race it exists for: while the device is still linked,
+>    `syncEngineProvider` is live, so a pull already in flight can set the
+>    flag again immediately after it is cleared. Clearing the LINK first is
+>    what makes any further pull impossible, so it is the ordering that
+>    actually shuts the window. (b) It puts a purely defensive write ahead of
+>    the load-bearing one: a throw in `clearMembershipRevoked` would strand
+>    the device LINKED while the server has already unclaimed it — precisely
+>    the §0.1 silent-stale trap slice 3 exists to prevent. Reordered, and the
+>    defensive call is now wrapped `on Object` (wave-5 rule: a safety net
+>    that must not block a user-confirmed destructive action — here the
+>    opt-in `resetAppData` that follows it).
+> 5. **Task 20's `_leave` catches `on Exception`.** Wave-5 rules and
+>    `reset_flow.dart`'s established shape require `on Object` here: an
+>    `Error` (a `LateInitializationError` out of an uninitialised Supabase
+>    client, a `StateError` out of a closed drift connection) escaping the
+>    async gap gives the user no feedback at all on an action they
+>    explicitly confirmed. Corrected, with the reasoning at the catch site.
+> 6. **Step 5's warning that `account_section_test.dart` may need a
+>    `findsNWidgets(...)` update is not needed.** Verified: that file has no
+>    unscoped widget counts at all; both of its `find.byType(ListTile)` uses
+>    (lines 87, 799) are `find.descendant`-scoped to a semantic id. Nothing
+>    outside this task's file set is size-coupled to the Account section —
+>    `members_screen_test.dart`'s two `findsNWidgets(2)` are on the Members
+>    screen. And **no E2E flow selects any `settings.account.*` id**
+>    (`grep -rn "settings.account" e2e/` is empty), so no Maestro id is at
+>    risk.
+> 7. **Verified still true and NOT changed:** Task 18 is done —
+>    `leaveHousehold` is on the interface (`household_gateway.dart:225`),
+>    the `NoopHouseholdGateway` stub (:322) and `SupabaseHouseholdGateway`
+>    (:509), and `FakeHouseholdGateway` already has `leaveHouseholdCalls` /
+>    `leaveHouseholdError` (it has the `deleteAccount` hooks too, i.e. Task
+>    22 is done as well). `householdLinkServiceProvider` is still at
+>    `providers.dart:349`, so Step 4's placement holds. The
+>    `settingsAccountLeave` copy this task adds is the exact label
+>    already cross-referenced by the shipped `memberEditDeleteBlockedSelf`
+>    in both locales ("Leave the household" / "Haushalt verlassen") — do
+>    not reword it without changing that string too.
+> 8. **Verified, not a defect:** Step 4's `claimedMemberCountProvider` doc
+>    says "`members` where `userId != null and deletedAt is null`" while the
+>    code filters only `userId != null`. Correct as written —
+>    `membersProvider` → `HouseholdRepository.watchMembers`
+>    (`household_repository.dart:190`) already filters
+>    `deletedAt.isNull()`.
+>
+> **Refused, and NOT done here** (recorded so it is not read as an
+> oversight): the wave-5 brief asked for Leave's confirm to compose
+> `destructive_confirm.dart` — promoting its private `_showStep` to a public
+> single-dialog builder. Refused: `docs/specs/household-lifecycle.md` §3.3
+> is BINDING and says "One confirm shape for all three exits (D-L3)" — the
+> shared sheet, whose body is followed by the unchecked "also delete this
+> phone's copy" checkbox. `DestructiveConfirmStep` has no checkbox and
+> `confirmTwoStepDestructiveAction` returns a bare `bool`, so using it for
+> Leave would delete D-L3 from this exit. `showExitConfirmSheet`
+> (`exit_confirm_sheet.dart`, slice 2 Task 9) IS the shared exit builder and
+> already has a second caller (`membership_revoked_notice.dart`), so
+> composing it copies no dialog builder at all. The promotion is still the
+> right move for **Task 24's** final confirmation, which is genuinely one
+> dialog after the sheet (D-L6) — that is where it gets its first caller,
+> and that task should do it.
+
 **Files:**
 - Create: `lib/application/household_exit_service.dart`
 - Create: `test/application/household_exit_service_test.dart`
@@ -1973,7 +2055,7 @@ git commit -m "Add leaveHousehold to HouseholdGateway (spec §2.2, F9)"
 - Consumes: `HouseholdGateway.leaveHousehold` (Task 18), `SettingsRepository.clearSyncLink()` (slice 2 Task 7 — which also nulls every local `members.userId`), `SettingsRepository.clearMembershipRevoked()` (slice 3 Task 10), `resetAppData` (`lib/application/data_reset.dart`).
 - Produces: `HouseholdExitService`, `householdExitServiceProvider`, `claimedMemberCountProvider`. `deleteAccount` is added to the same class in Task 23.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/application/household_exit_service_test.dart`:
 
@@ -1984,11 +2066,16 @@ Create `test/application/household_exit_service_test.dart`:
 /// the caller explicitly asked for it to go.
 library;
 
+// [REFRESH] `package:drift/drift.dart` dropped from this list: nothing here
+// uses a drift symbol (`db.select(...)` is inherited from
+// `GeneratedDatabase`), and an unused import fails `--fatal-infos`. The
+// `auth_gateway.dart` import is now spelled out rather than left to "add it
+// if the analyzer asks" — the last test needs `AuthUser`.
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/household_exit_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
-import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -2106,7 +2193,7 @@ void main() {
 `AuthUser`'s import comes from `package:chore_app/application/auth_gateway.dart` —
 add it if the analyzer asks.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -2114,7 +2201,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 
 Expected: FAIL to compile — `household_exit_service.dart` does not exist.
 
-- [ ] **Step 3: Implement the service**
+- [x] **Step 3: Implement the service**
 
 Create `lib/application/household_exit_service.dart`:
 
@@ -2192,11 +2279,19 @@ class HouseholdExitService {
 
   /// Shared local tail of both exits.
   Future<void> _finishLocally({required bool alsoDeleteLocalData}) async {
+    // [REFRESH] Unlink FIRST, then clear the flag -- the original ordering
+    // was backwards both ways round. See correction 4 in the REFRESH block.
+    await settings.clearSyncLink();
     // Defensive: a pull in flight while the user was reading the confirm
     // could have set slice 3's revocation flag (§3.5). Somebody who chose
     // to leave must not then be told they were removed.
-    await settings.clearMembershipRevoked();
-    await settings.clearSyncLink();
+    try {
+      await settings.clearMembershipRevoked();
+    } on Object {
+      // Best-effort, and `on Object` deliberately: this is cosmetic, while
+      // the wipe below is a thing the user explicitly confirmed. Nothing
+      // thrown here -- Exception or Error -- may block it.
+    }
     if (alsoDeleteLocalData) {
       await resetAppData(database);
     }
@@ -2204,7 +2299,7 @@ class HouseholdExitService {
 }
 ```
 
-- [ ] **Step 4: Add the providers**
+- [x] **Step 4: Add the providers**
 
 In `lib/app/providers.dart`, next to `householdLinkServiceProvider`:
 
@@ -2236,7 +2331,7 @@ final claimedMemberCountProvider = Provider<int>((ref) {
 });
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_service_test.dart
@@ -2244,7 +2339,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/application/household_exit_se
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/application/household_exit_service.dart lib/app/providers.dart test/application/household_exit_service_test.dart
@@ -2259,12 +2354,31 @@ git commit -m "Add HouseholdExitService.leaveHousehold (spec §2.2, F9)"
 - Modify: `lib/features/settings/account_section.dart`
 - Modify: `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb`
 - Create: `test/features/settings/account_exit_rows_test.dart`
+- **[REFRESH]** Modify: `lib/features/settings/destructive_confirm.dart` —
+  its `AlertDialog` never set `scrollable: true`, so a long body overflows
+  at a large text scale on a small surface. This is the THIRD instance of
+  the bug class Task 12 fixed in `exit_confirm_sheet.dart` and Task 16
+  fixed in `member_delete_dialog.dart`; the live victim is the reset flow,
+  whose `settingsResetConfirm1BodyLinked` is a long German paragraph. Fixed
+  here because slice 5 is the pass that audited this file. Its library doc
+  comment is corrected at the same time: it claims the `settings.reset.*`
+  ids are "load-bearing for the Maestro E2E flows", but
+  `grep -rn "settings.reset" e2e/` is EMPTY — they are load-bearing for
+  `test/features/settings/reset_flow_test.dart` and `test/widget_test.dart`.
+  It also claims Leave will be its next caller; per §3.3 Leave uses the
+  shared sheet (see the REFRESH block's "Refused" note).
+- **[REFRESH]** Create: `test/features/settings/destructive_confirm_test.dart`
+  — the overflow regression guard for the above, modelled on
+  `exit_confirm_sheet_test.dart`'s.
+- **[REFRESH]** Modify: `lib/features/settings/member_delete_dialog.dart` —
+  doc-comment only: lines 27-28 say Leave uses
+  `confirmTwoStepDestructiveAction`. It does not.
 
 **Interfaces:**
 - Consumes: `showExitConfirmSheet` / `ExitConfirmResult` (slice 2 Task 9), `householdExitServiceProvider`, `claimedMemberCountProvider` (Task 19), `showAppSnackbar`.
 - Produces: `_LeaveRow` in the Account section's linked branch, semantic ids `settings.account.leave` / `settings.account.leave.{deleteLocal,cancel,confirm}` (the last three come from the shared sheet's `semanticPrefix`).
 
-- [ ] **Step 1: Add the l10n strings**
+- [x] **Step 1: Add the l10n strings**
 
 In `lib/l10n/app_en.arb`:
 
@@ -2301,8 +2415,8 @@ In `lib/l10n/app_de.arb` (du-form):
 ```json
   "settingsAccountLeave": "Haushalt verlassen",
   "householdLeaveConfirmTitle": "{householdName} verlassen?",
-  "householdLeaveConfirmBody": "Dein Profil bleibt im Haushalt, die anderen sehen dich und alles, was du erledigt hast, weiterhin. Dieses Handy synchronisiert nicht mehr. Du kannst später mit einem neuen Einladungscode zurückkommen.",
-  "householdLeaveConfirmBodyLastMember": "Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Handy ändert sich nichts, außer du setzt unten das Häkchen.",
+  "householdLeaveConfirmBody": "Dein Profil bleibt im Haushalt, die anderen sehen dich und alles, was du erledigt hast, weiterhin. Dieses Gerät synchronisiert nicht mehr. Du kannst später mit einem neuen Einladungscode zurückkommen.",
+  "householdLeaveConfirmBodyLastMember": "Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.",
   "householdLeaveConfirmAction": "Verlassen",
   "householdLeaveError": "Der Haushalt konnte nicht verlassen werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.",
 ```
@@ -2313,7 +2427,7 @@ Regenerate:
 env -u GIT_DIR -u GIT_INDEX_FILE flutter gen-l10n
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `test/features/settings/account_exit_rows_test.dart`:
 
@@ -2329,8 +2443,12 @@ import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+// [REFRESH] `package:flutter/material.dart` dropped: nothing here uses a
+// material symbol, and an unused import fails `--fatal-infos`.
+// `package:drift/drift.dart` STAYS -- `Value` is used below.
+// `testChoreApp` and `currentHouseholdId` come from `pump_app.dart`;
+// `openSettingsTab` from `settings_test_utils.dart`.
 import 'package:drift/drift.dart' hide isNotNull, isNull;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
@@ -2519,7 +2637,7 @@ Declare the shared fakes at the top of `main()`, as in Task 16:
   final cancelGateway = FakeHouseholdGateway();
 ```
 
-- [ ] **Step 3: Run to verify it fails**
+- [x] **Step 3: Run to verify it fails**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart
@@ -2527,7 +2645,7 @@ env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exi
 
 Expected: FAIL — `settings.account.leave` does not exist.
 
-- [ ] **Step 4: Implement the row**
+- [x] **Step 4: Implement the row**
 
 In `lib/features/settings/account_section.dart`, add `_LeaveRow` to the
 signed-in + linked branch of `AccountSectionBody.build`, ABOVE
@@ -2609,7 +2727,9 @@ class _LeaveRow extends ConsumerWidget {
             householdId: householdId,
             alsoDeleteLocalData: result.alsoDeleteLocalData,
           );
-    } on Exception catch (_) {
+    } on Object catch (_) {
+      // [REFRESH] `on Object`, not `on Exception` -- see correction 5 in the
+      // REFRESH block, and `reset_flow.dart` for the established shape.
       if (context.mounted) {
         showAppSnackbar(context, message: l10n.householdLeaveError);
       }
@@ -2627,18 +2747,21 @@ class _LeaveRow extends ConsumerWidget {
 
 Add the imports this needs (`exit_confirm_sheet.dart`).
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter test test/features/settings/account_exit_rows_test.dart test/features/settings/account_section_test.dart
 ```
 
 Expected: PASS in both files. `account_section_test.dart` must stay green —
-the new row appears in the linked branch it already exercises, so any
-`findsNWidgets(...)` count there may need updating; adjust the count, never
-the assertion's intent.
+the new row appears in the linked branch it already exercises. **[REFRESH]**
+Verified: no count there needs updating. That file has no unscoped widget
+counts, and both of its `find.byType(ListTile)` uses (lines 87, 799) are
+`find.descendant`-scoped to a semantic id. Nothing else in the suite is
+size-coupled to the Account section. (If a future count does appear: adjust
+the count, never the assertion's intent.)
 
-- [ ] **Step 6: Analyze and commit**
+- [x] **Step 6: Analyze and commit**
 
 ```bash
 env -u GIT_DIR -u GIT_INDEX_FILE flutter analyze --fatal-infos
@@ -2647,6 +2770,30 @@ git commit -m "Add the Leave household action with the last-member cascade warni
 ```
 
 **Slice 5 is now complete.**
+
+> **DONE 2026-08-28** (wave 5). Tasks 19-20 landed on
+> `wave5/household-lifecycle-slices-5-6`, PR **#31** -- #27's successor,
+> because #27 was already MERGED and every workflow here runs on
+> `pull_request` only, so pushes to a merged PR's branch trigger nothing.
+> `checks`, `pgtap` and `android` all green; `ios` skips on PRs by design.
+> 1020 tests.
+>
+> Both of this slice's decisions were inverted inside their methods and
+> confirmed red AT THE TEST STEP, along with the `scrollable` fix. Note for
+> anyone repeating that: `scrollable: false` is the `AlertDialog` default,
+> so passing it explicitly fails `avoid_redundant_argument_values` at
+> `analyze` and the tests never run -- remove the argument instead.
+>
+> **STILL UNVERIFIED, and it is the real gate:** this plan's done criteria
+> also require a manual live smoke against the local Supabase stack -- for
+> slice 5, step 2 (leave with another claimed member present: the household
+> survives and the profile stays claimable) and step 3 (last claimed member
+> leaves: `households.deleted_at` is stamped and a previously issued invite
+> code is rejected). Neither was run: `supabase` is outside wave 5's local
+> allow list. `pgtap`'s green does NOT stand in for it -- db.yml only
+> stands up the stack when the diff touches `supabase/**` or `db.yml`, and
+> slice 5 is Dart-only, so that green reports a suite that never ran
+> against these paths.
 
 ---
 

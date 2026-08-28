@@ -954,6 +954,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountDisconnectConfirmAction => 'Disconnect';
 
   @override
+  String get settingsAccountLeave => 'Leave the household';
+
+  @override
+  String householdLeaveConfirmTitle(String householdName) {
+    return 'Leave $householdName?';
+  }
+
+  @override
+  String get householdLeaveConfirmBody =>
+      'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.';
+
+  @override
+  String get householdLeaveConfirmBodyLastMember =>
+      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+
+  @override
+  String get householdLeaveConfirmAction => 'Leave';
+
+  @override
+  String get householdLeaveError =>
+      'Couldn\'t leave the household. This needs a connection — nothing was changed. Try again.';
+
+  @override
   String get settingsAccountSendError =>
       'Couldn\'t send the sign-in link. Please try again.';
 
