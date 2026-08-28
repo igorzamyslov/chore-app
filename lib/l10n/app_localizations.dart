@@ -1146,12 +1146,6 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get memberEditColorLabel;
 
-  /// RETIRED BY THE NEXT COMMIT -- kept only so this deliberately-red commit still compiles (member_edit_sheet.dart is its last caller until the implementation lands). T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId).
-  ///
-  /// In en, this message translates to:
-  /// **'This profile is linked to an account, so it can\'t be removed here.'**
-  String get memberEditDeleteBlockedClaimed;
-
   /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
   ///
   /// In en, this message translates to:

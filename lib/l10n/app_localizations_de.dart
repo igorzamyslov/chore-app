@@ -771,10 +771,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get memberEditColorLabel => 'Farbe';
 
   @override
-  String get memberEditDeleteBlockedClaimed =>
-      'Dieses Profil ist mit einem Konto verknüpft und kann hier nicht entfernt werden.';
-
-  @override
   String get memberEditDeleteBlockedLastMember =>
       'Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.';
 

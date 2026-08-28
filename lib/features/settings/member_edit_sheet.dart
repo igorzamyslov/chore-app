@@ -1,7 +1,12 @@
 /// The member add/edit bottom sheet: rename, recolor, save, delete (spec
-/// `docs/feedback/2026-08-01-ux-audit.md` A1). Delete is visible only when
-/// the member is deletable: unclaimed (no `userId`) AND not the
-/// household's last active member.
+/// `docs/feedback/2026-08-01-ux-audit.md` A1).
+///
+/// Delete is visible only when the member is actually removable, which as of
+/// F10 (spec `docs/specs/household-lifecycle.md` §3.2) no longer excludes
+/// claimed profiles: an unclaimed profile is removable locally, and a
+/// claimed one is removable through the `remove_member` RPC by ANY member
+/// (D-L2 -- there is no role gate and none is coming). See [_DeleteGate] for
+/// the three cases that still hide it.
 library;
 
 import 'package:chore_app/app/color_swatch_picker.dart';
@@ -28,6 +33,36 @@ Future<void> showMemberEditSheet(BuildContext context, {Member? member}) {
     showDragHandle: true,
     builder: (sheetContext) => _MemberEditSheet(member: member),
   );
+}
+
+/// Why the member edit sheet's Delete affordance is or is not offered (spec
+/// `docs/specs/household-lifecycle.md` §3.2, F10).
+///
+/// One value computed once per build, rather than a `canDelete` bool plus a
+/// separately-derived reason string: those two encoded the same precedence
+/// in two places that could drift, and re-deriving the reason meant a second
+/// [membersProvider] watch the reason helper's own doc comment said it was
+/// avoiding.
+enum _DeleteGate {
+  /// Adding a new member: no delete affordance applies at all, so there is
+  /// nothing to explain either.
+  notApplicable,
+
+  /// Delete is offered.
+  allowed,
+
+  /// The household's last active member -- removing it would leave zero.
+  /// Outranks every other reason, including [ownClaimedRow], which matters
+  /// for a one-member household whose sole member is you.
+  lastMember,
+
+  /// The caller's own claimed row. Self-removal is what the server rejects
+  /// (§2.2) and what the Leave action is for; it is never Delete.
+  ownClaimedRow,
+
+  /// A claimed target while this device is signed out or unlinked, so the
+  /// `remove_member` RPC cannot be made at all.
+  unreachable,
 }
 
 class _MemberEditSheet extends ConsumerStatefulWidget {
@@ -69,46 +104,70 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
   List<Member> get _currentMembers =>
       ref.read(membersProvider).value ?? const <Member>[];
 
-  /// Whether the delete action should be shown at all (spec: HIDDEN, not
-  /// disabled, for a claimed or last-remaining member).
+  /// Whether the delete action should be shown at all, and if not, why
+  /// (spec: HIDDEN, never disabled).
+  ///
+  /// Claim state no longer blocks outright (spec
+  /// `docs/specs/household-lifecycle.md` §3.2, F10): a claimed profile IS
+  /// removable, via the `remove_member` RPC, by ANY member -- D-L2, there is
+  /// no role gate here or anywhere else. What still blocks is
+  /// [_DeleteGate.lastMember], [_DeleteGate.ownClaimedRow] and
+  /// [_DeleteGate.unreachable], in that precedence.
   ///
   /// [membersProvider] is already the roster query (soft-deleted members
   /// excluded, `HouseholdRepository.watchMembers`), so its current length
   /// already reflects "active members" -- if the member being edited is
   /// one of only one, deleting it would leave zero.
-  bool get _canDelete {
+  _DeleteGate get _deleteGate {
     final member = widget.member;
-    if (member == null || member.userId != null) {
-      return false;
+    if (member == null) {
+      return _DeleteGate.notApplicable;
     }
     final activeMembers = ref.watch(membersProvider).value ?? const <Member>[];
-    return activeMembers.length > 1;
+    if (activeMembers.length <= 1) {
+      return _DeleteGate.lastMember;
+    }
+    if (member.userId == null) {
+      return _DeleteGate.allowed;
+    }
+    // Compared against [currentAuthUserProvider] directly rather than
+    // through `claimedMemberProvider`: that provider is gated on
+    // MemberIdentityMode.pinned, so while signed in but unlinked it returns
+    // null and one's own row would fall through to
+    // [_DeleteGate.unreachable] -- whose copy ("used on someone else's
+    // phone") is flatly wrong about your own profile. Signed OUT there is no
+    // id to compare against and `unreachable` is the honest answer.
+    if (member.userId == ref.watch(currentAuthUserProvider).valueOrNull?.id) {
+      return _DeleteGate.ownClaimedRow;
+    }
+    // The RPC needs a signed-in session AND a linked household, which is
+    // precisely MemberIdentityMode.pinned -- reused rather than re-derived
+    // from `settingsProvider`, whose bare watch that provider's own doc
+    // comment forbids (a started sync engine writes
+    // `settings.syncLastPulledAt` on every pull, so an unscoped watch
+    // rebuilds this sheet on each of them).
+    return ref.watch(memberIdentityModeProvider) == MemberIdentityMode.pinned
+        ? _DeleteGate.allowed
+        : _DeleteGate.unreachable;
   }
 
-  /// The reason [canDelete] (the current build's [_canDelete] value, passed
-  /// in rather than re-read to avoid a second [membersProvider] watch) is
-  /// `false`, for the explanation that replaces the vanished Delete button
+  /// The explanation that replaces the vanished Delete button for [gate]
   /// (T1.7 -- `docs/research/persona-anna.md` finding 6,
-  /// `docs/research/triage.md` T1.7): `null` while adding a new member (no
-  /// delete affordance applies at all, so there's nothing to explain) or
-  /// while genuinely deletable.
+  /// `docs/research/triage.md` T1.7), or `null` when Delete is shown or no
+  /// delete affordance applies (adding a new member).
   ///
-  /// Worded as an accident prevented, not a permission (spec D1,
-  /// `docs/specs/sync-backend.md` §2: the household is flat by design --
-  /// this is "removing this profile would break something", never "you
+  /// Worded as an accident prevented or a precondition missing, never a
+  /// permission (spec D1, `docs/specs/sync-backend.md` §2: the household is
+  /// flat by design -- this is "removing this profile would break
+  /// something" or "this can't reach the household right now", never "you
   /// aren't allowed to").
-  String? _deleteBlockedReason(
-    AppLocalizations l10n, {
-    required bool canDelete,
-  }) {
-    final member = widget.member;
-    if (member == null || canDelete) {
-      return null;
-    }
-    if (member.userId != null) {
-      return l10n.memberEditDeleteBlockedClaimed;
-    }
-    return l10n.memberEditDeleteBlockedLastMember;
+  String? _deleteBlockedReason(AppLocalizations l10n, _DeleteGate gate) {
+    return switch (gate) {
+      _DeleteGate.notApplicable || _DeleteGate.allowed => null,
+      _DeleteGate.lastMember => l10n.memberEditDeleteBlockedLastMember,
+      _DeleteGate.ownClaimedRow => l10n.memberEditDeleteBlockedSelf,
+      _DeleteGate.unreachable => l10n.memberEditDeleteBlockedOffline,
+    };
   }
 
   int _firstFreeColor() {
@@ -125,11 +184,9 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
-    final canDelete = _canDelete;
-    final deleteBlockedReason = _deleteBlockedReason(
-      l10n,
-      canDelete: canDelete,
-    );
+    final deleteGate = _deleteGate;
+    final canDelete = deleteGate == _DeleteGate.allowed;
+    final deleteBlockedReason = _deleteBlockedReason(l10n, deleteGate);
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
@@ -159,10 +216,10 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
             semanticIdPrefix: 'members.edit.color',
           ),
           const SizedBox(height: 24),
-          // T1.7: a claimed or last-remaining member gets no Delete button
-          // (see _canDelete) -- previously nothing took its place, a quiet
-          // dead end where the (already-shipped) A1 audit item told the
-          // user deletion would now work. This explanation takes the
+          // T1.7: a member the sheet cannot remove gets no Delete button
+          // (see [_DeleteGate]) -- previously nothing took its place, a
+          // quiet dead end where the (already-shipped) A1 audit item told
+          // the user deletion would now work. This explanation takes the
           // button's place instead, on its own line (never squeezed into
           // the Row below, which visual QA already flagged for overflow at
           // large text scales -- see settings_group.dart's stacking fix).
@@ -249,24 +306,17 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
     if (!confirmed || !mounted) {
       return;
     }
-    // Unreachable in practice TODAY: `_canDelete` above still hides this
-    // action for a claimed (`userId != null`) or last-remaining member, so
-    // `MemberService.deleteMember` throwing here would be a genuine bug (or
-    // an exceedingly rare cross-device race), not an expected runtime
-    // failure -- left to crash rather than folded into an inline error
-    // state, mirroring `_AdoptRow._adopt` (`account_section.dart`)'s
-    // identical reasoning.
-    //
-    // WHOEVER UNHIDES THIS FOR CLAIMED MEMBERS (F10, backlog C-2) MUST
-    // REVISIT THE LINE ABOVE. `deleteMember` now routes by claim state and
-    // the claimed path throws `ClaimedMemberRemovalFailure`, which is an
-    // EXPECTED failure, not a bug: it needs the network, it changed nothing
-    // locally, and the person the user tried to remove is still in the
-    // household. That exception's own doc comment requires it be shown
-    // inline. "Left to crash" is correct only while `_canDelete` keeps the
-    // claimed path unreachable; relax that gate without adding the inline
-    // error state and a real network failure on a destructive action is
-    // silently lost.
+    // INCOMPLETE AS OF THIS COMMIT, AND THE VERY NEXT ONE COMPLETES IT.
+    // [_DeleteGate] above no longer hides this action for a claimed target,
+    // so `MemberService.deleteMember` can now take its claimed path and
+    // throw `ClaimedMemberRemovalFailure` -- an EXPECTED failure, not a bug:
+    // it needs the network, it changed nothing locally, and the person the
+    // user tried to remove is still in the household. That exception's own
+    // doc comment requires it be shown inline, which the inline error state
+    // added in the next commit (spec
+    // `docs/specs/household-lifecycle.md` §3.2) does. Until then a real
+    // network failure on a destructive action crashes the sheet. Tasks 15
+    // and 16 are a pair for exactly this reason and must never ship apart.
     await ref.read(memberServiceProvider).deleteMember(existing.id);
     if (!mounted) {
       return;
