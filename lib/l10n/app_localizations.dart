@@ -1434,6 +1434,42 @@ abstract class AppLocalizations {
   /// **'Disconnect'**
   String get settingsAccountDisconnectConfirmAction;
 
+  /// Account-section row that leaves the online household (spec docs/specs/household-lifecycle.md §3.3, F9). Sits beside Disconnect, which is a different, purely local action. memberEditDeleteBlockedSelf quotes this exact label, so changing it means changing that string too.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the household'**
+  String get settingsAccountLeave;
+
+  /// Title of the leave-household confirm sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave {householdName}?'**
+  String householdLeaveConfirmTitle(String householdName);
+
+  /// Body of the leave-household confirm when other claimed members remain (spec §3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.'**
+  String get householdLeaveConfirmBody;
+
+  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  String get householdLeaveConfirmBodyLastMember;
+
+  /// Confirm button of the leave-household sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get householdLeaveConfirmAction;
+
+  /// Snackbar shown when the leave_household call failed. States plainly that nothing changed, so the retry is an ordinary retry rather than a repair.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t leave the household. This needs a connection — nothing was changed. Try again.'**
+  String get householdLeaveError;
+
   /// Snackbar shown when sending the magic-link email fails.
   ///
   /// In en, this message translates to:

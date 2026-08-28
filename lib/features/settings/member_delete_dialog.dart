@@ -23,12 +23,19 @@ import 'package:flutter/material.dart';
 /// person tapping Delete cannot see from here. The title is deliberately
 /// shared: "Delete {memberName}?" is right either way.
 ///
-/// Stays a ONE-step confirm, not the two-step
-/// `confirmTwoStepDestructiveAction` that Leave and Delete account use
-/// (`destructive_confirm.dart`): removal is recoverable (the person can be
-/// re-invited, and their profile and history stay in the household either
-/// way), and the existing `members.edit.delete.cancel`/`.confirm` semantic
-/// ids stay load-bearing.
+/// Stays a ONE-step confirm, and so does Leave -- spec
+/// `docs/specs/household-lifecycle.md` §3.3 gives every exit one confirm
+/// shape, and only delete-account adds a second gate after it (D-L6). (An
+/// earlier version of this comment said Leave uses the two-step
+/// `confirmTwoStepDestructiveAction` chain in `destructive_confirm.dart`;
+/// it does not, and 'Reset app data' remains that builder's only caller.)
+/// Removal is recoverable either way -- the person can be re-invited, and
+/// their profile and history stay in the household -- and the existing
+/// `members.edit.delete.cancel`/`.confirm` semantic ids stay load-bearing.
+///
+/// This dialog is deliberately NOT the shared §3.3 exit SHEET either: that
+/// sheet's D-L3 checkbox asks what happens to THIS device, which is the
+/// wrong question for an action taken on somebody else's profile.
 Future<bool> showMemberDeleteDialog(
   BuildContext context, {
   required String memberName,

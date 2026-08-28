@@ -961,6 +961,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountDisconnectConfirmAction => 'Trennen';
 
   @override
+  String get settingsAccountLeave => 'Haushalt verlassen';
+
+  @override
+  String householdLeaveConfirmTitle(String householdName) {
+    return '$householdName verlassen?';
+  }
+
+  @override
+  String get householdLeaveConfirmBody =>
+      'Dein Profil bleibt im Haushalt, die anderen sehen dich und alles, was du erledigt hast, weiterhin. Dieses Gerät synchronisiert nicht mehr. Du kannst später mit einem neuen Einladungscode zurückkommen.';
+
+  @override
+  String get householdLeaveConfirmBodyLastMember =>
+      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+
+  @override
+  String get householdLeaveConfirmAction => 'Verlassen';
+
+  @override
+  String get householdLeaveError =>
+      'Der Haushalt konnte nicht verlassen werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.';
+
+  @override
   String get settingsAccountSendError =>
       'Der Anmeldelink konnte nicht gesendet werden. Versuch es noch mal.';
 

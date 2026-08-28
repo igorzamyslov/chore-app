@@ -8,18 +8,31 @@
 /// nothing to undo.
 ///
 /// This lives in its own file rather than inside `reset_flow.dart` because
-/// it is deliberately action-agnostic: 'Reset app data' was the first
-/// caller, and leave-household / delete-account are the next
-/// (`docs/specs/household-lifecycle.md`). Adding a second destructive
+/// it is deliberately action-agnostic: adding another two-step destructive
 /// action means composing a [DestructiveConfirmStep] pair, NOT copying a
 /// dialog builder.
+///
+/// 'Reset app data' is currently the only caller, and an earlier version of
+/// this comment predicted the household exits would be the next. They are
+/// NOT, and that is settled rather than pending:
+/// `docs/specs/household-lifecycle.md` §3.3 gives all three exits ONE
+/// confirm shape — the shared sheet in `exit_confirm_sheet.dart`, whose
+/// body is followed by D-L3's unchecked "also delete this phone's copy"
+/// checkbox, which a [DestructiveConfirmStep] has nowhere to put. Leave and
+/// member-removal have exactly one confirmation each. Delete-account is the
+/// one exit that also gets a second gate (D-L6), and it gets it as a single
+/// final dialog AFTER that sheet — so if a one-step variant of this builder
+/// is ever wanted, that is the caller that wants it.
 ///
 /// Semantic ids are passed in per step rather than derived from a prefix on
 /// purpose: the existing reset ids are irregular
 /// (`settings.reset.cancel1`/`confirm1`, then `settings.reset.cancel`/
-/// `confirm2`) and they are load-bearing for the Maestro E2E flows, which
-/// select only by id. A prefix scheme would have to either break them or
-/// encode the irregularity, so the ids stay explicit and greppable.
+/// `confirm2`) and they are load-bearing for `reset_flow_test.dart` and
+/// `test/widget_test.dart`, which select only by id. (An earlier version of
+/// this comment said Maestro; no E2E flow references them —
+/// `grep -rn "settings.reset" e2e/` is empty.) A prefix scheme would have to
+/// either break them or encode the irregularity, so the ids stay explicit
+/// and greppable.
 library;
 
 import 'package:chore_app/app/semantics.dart';
@@ -86,6 +99,15 @@ Future<bool> _showStep(
     context: context,
     builder: (dialogContext) {
       return AlertDialog(
+        // An `AlertDialog` puts its content in a bare `Flexible` unless
+        // asked to be scrollable, so a body taller than the dialog is
+        // silently CLIPPED -- no exception, no scrollbar, and the rest of
+        // the sentence simply unreachable. `settingsResetConfirm1BodyLinked`
+        // in German already reaches that at a large text scale on a small
+        // phone. Same class of bug Task 12 fixed in `exit_confirm_sheet.dart`
+        // and Task 16 in `member_delete_dialog.dart`; guarded by
+        // `test/features/settings/destructive_confirm_test.dart`.
+        scrollable: true,
         title: Text(step.title),
         content: Text(step.body),
         actions: [

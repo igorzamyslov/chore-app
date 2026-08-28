@@ -4,7 +4,9 @@
 /// unlinked) the P2d reconnect row (only when this account is already a
 /// claimed member elsewhere), the P2b adopt row, and the P2c join row, or
 /// (once linked) a subtitle naming the household plus the B3 'Invite a
-/// member' row (spec `docs/feedback/2026-08-01-ux-audit.md` B3); and a
+/// member' row (spec `docs/feedback/2026-08-01-ux-audit.md` B3) and the F9
+/// 'Leave the household' row (spec
+/// `docs/specs/household-lifecycle.md` §3.3); and a
 /// static 'coming soon' row when Supabase isn't configured
 /// ([NoopAuthGateway]).
 library;
@@ -17,6 +19,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/features/settings/membership_revoked_notice.dart';
@@ -34,7 +37,8 @@ import 'package:intl/intl.dart';
 /// shows the signed-in tile joined by the P2d reconnect row (spec §7.6, only
 /// when `myMembershipProvider` finds a membership), the P2b adopt row (spec
 /// §7.3), and the P2c join row while `settings.syncHouseholdId` is still
-/// `null` -- or, once linked, the Invite row and the A1.2 disconnect row.
+/// `null` -- or, once linked, the Invite row, the F9 Leave row and the A1.2
+/// disconnect row.
 class AccountSectionBody extends ConsumerWidget {
   /// Creates the section body.
   const AccountSectionBody({super.key});
@@ -95,6 +99,9 @@ class AccountSectionBody extends ConsumerWidget {
       children: [
         _SignedInTile(user: user, householdName: householdName),
         _InviteRow(householdId: householdId),
+        // Leave reads before Disconnect: it is the more consequential of the
+        // two, and Disconnect stays the quieter, purely local one.
+        _LeaveRow(householdId: householdId, householdName: householdName),
         const _DisconnectRow(),
       ],
     );
@@ -524,6 +531,109 @@ class _DisconnectRow extends ConsumerWidget {
     );
     if (confirmed ?? false) {
       await ref.read(householdLinkServiceProvider).disconnect();
+    }
+  }
+}
+
+/// The 'Leave the household' action (spec
+/// `docs/specs/household-lifecycle.md` §3.3, F9), shown only while signed in
+/// AND linked -- the `leave_household` RPC needs both.
+///
+/// Deliberately adjacent to, and deliberately NOT the same as,
+/// [_DisconnectRow]: Disconnect is purely local, keeps this account's
+/// `user_id` on the server and preserves the §7.6 reconnect path, while
+/// Leave severs the membership server-side. The two bodies of copy must keep
+/// saying which is which.
+///
+/// As the LAST claimed member, the confirm switches to the D-L5 warning:
+/// the online household and its shared history go with you. It says so
+/// plainly and then does it -- never silently, never blocked.
+///
+/// Exactly ONE confirmation, the shared §3.3 exit sheet
+/// ([showExitConfirmSheet]) -- the same widget the §3.5 revocation notice
+/// uses, and the reason this row builds no dialog of its own. It is NOT the
+/// two-step `confirmTwoStepDestructiveAction` chain: that has nowhere to put
+/// D-L3's "also delete this phone's copy" checkbox, and leaving is
+/// recoverable (rejoin with a fresh invite), so a second gate would be
+/// friction with no safety benefit. Only delete-account earns a second one
+/// (D-L6), and it earns it AFTER this sheet, not instead of it.
+///
+/// No role check, here or anywhere in this cluster: `members.role` is
+/// vestigial (D1/D-L2).
+class _LeaveRow extends ConsumerWidget {
+  const _LeaveRow({required this.householdId, required this.householdName});
+
+  /// The linked household's id, passed to `leave_household`.
+  final String householdId;
+
+  /// The linked household's name for the confirm title, or `null` while
+  /// `currentHouseholdProvider` is still resolving (momentary, mirroring
+  /// [_SignedInTile]'s own linked-subtitle timing).
+  final String? householdName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.account.leave',
+      child: ListTile(
+        leading: const Icon(Icons.logout),
+        title: Text(l10n.settingsAccountLeave),
+        onTap: () => _leave(context, ref),
+      ),
+    );
+  }
+
+  Future<void> _leave(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    // §3.4: the local claimed count decides which warning the user reads.
+    // `<= 1` rather than `== 1`: 1 is "only me", the cascade case (D-L5),
+    // and 0 means the count has not loaded (or this device's own claim has
+    // not arrived yet), where over-warning about a cascade is much cheaper
+    // than silently taking a household down.
+    final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    final result = await showExitConfirmSheet(
+      context,
+      title: l10n.householdLeaveConfirmTitle(householdName ?? ''),
+      body: lastClaimed
+          ? l10n.householdLeaveConfirmBodyLastMember
+          : l10n.householdLeaveConfirmBody,
+      actionLabel: l10n.householdLeaveConfirmAction,
+      semanticPrefix: 'settings.account.leave',
+    );
+    if (!result.confirmed) {
+      return;
+    }
+    try {
+      await ref
+          .read(householdExitServiceProvider)
+          .leaveHousehold(
+            householdId: householdId,
+            alsoDeleteLocalData: result.alsoDeleteLocalData,
+          );
+    } on Object catch (_) {
+      // `on Object`, not `on Exception`. The user has just confirmed a
+      // destructive action, so the one outcome this must never produce is
+      // silence: an Error -- a `LateInitializationError` out of an
+      // uninitialised Supabase client, a `StateError` out of a closed drift
+      // connection -- escapes an `on Exception` clause into the async gap
+      // and leaves no feedback at all. Same reasoning as `reset_flow.dart`.
+      //
+      // The copy's "nothing was changed" is accurate: the service does the
+      // RPC first, so a throw before it means nothing local moved, and the
+      // only way to throw after it is a dead local database, which is
+      // already a broken-app state rather than a failed leave.
+      if (context.mounted) {
+        showAppSnackbar(context, message: l10n.householdLeaveError);
+      }
+      return;
+    }
+    if (result.alsoDeleteLocalData) {
+      // The documented `resetAppData` caller responsibility: this device's
+      // settings row was just deleted out from under an already-running
+      // watch (see `ResetDataTile` and `MembershipRevokedNotice`, which
+      // both do exactly this).
+      ref.invalidate(settingsProvider);
     }
   }
 }
