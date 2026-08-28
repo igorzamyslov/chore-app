@@ -977,17 +977,21 @@
   "@memberEditColorLabel": {
     "description": "Section label above the member edit sheet's color swatch picker."
   },
-  "memberEditDeleteBlockedClaimed": "This profile is linked to an account, so it can't be removed here.",
-  "@memberEditDeleteBlockedClaimed": {
-    "description": "T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed)."
-  },
   "memberEditDeleteBlockedLastMember": "A household needs at least one member, so this one can't be removed.",
   "@memberEditDeleteBlockedLastMember": {
     "description": "T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member."
   },
+  "memberEditDeleteBlockedSelf": "This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.",
+  "@memberEditDeleteBlockedSelf": {
+    "description": "Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10."
+  },
+  "memberEditDeleteBlockedOffline": "This profile is used on someone else's phone. Sign in and connect to the online household to remove it.",
+  "@memberEditDeleteBlockedOffline": {
+    "description": "Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2)."
+  },
   "memberDeleteDialogTitle": "Delete {memberName}?",
   "@memberDeleteDialogTitle": {
-    "description": "Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).",
+    "description": "Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is actually removable (see _DeleteGate in member_edit_sheet.dart). Unchanged between the unclaimed and claimed cases; only the body differs.",
     "placeholders": {
       "memberName": {
         "type": "String",
@@ -997,7 +1001,27 @@
   },
   "memberDeleteDialogBody": "This removes {memberName} from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to {memberName} open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.",
   "@memberDeleteDialogBody": {
-    "description": "Body of the member delete-confirmation dialog, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior).",
+    "description": "Body of the member delete-confirmation dialog for an UNCLAIMED member, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior). A claimed member gets memberRemoveDialogBodyClaimed instead.",
+    "placeholders": {
+      "memberName": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "memberRemoveDialogBodyClaimed": "{memberName} uses this household on their own phone. Removing them stops that phone from syncing — it keeps everything it already has, as its own local copy. Their profile and history stay here with the household: rotation chores drop them from the turn order, chores fixed to them open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.",
+  "@memberRemoveDialogBodyClaimed": {
+    "description": "Body of the member-removal confirm dialog for a CLAIMED member (spec docs/specs/household-lifecycle.md §3.2). Used instead of memberDeleteDialogBody; adds what happens on the removed person's own phone, which is the only consequence the person tapping Delete cannot see from here.",
+    "placeholders": {
+      "memberName": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "memberRemoveError": "Couldn't remove {memberName}. This needs a connection to the online household — nothing was changed. Try again.",
+  "@memberRemoveError": {
+    "description": "Inline error shown in the member edit sheet when the remove_member call failed (spec docs/specs/household-lifecycle.md §3.2). The one action in this app whose failure is surfaced rather than swallowed into a silent retry, deliberately overriding docs/specs/sync-backend.md §8.3: it needs the network, it changed nothing, and the person the user tried to remove is still in the household.",
     "placeholders": {
       "memberName": {
         "type": "String",
@@ -1226,6 +1250,31 @@
   "settingsAccountDisconnectConfirmAction": "Disconnect",
   "@settingsAccountDisconnectConfirmAction": {
     "description": "Confirm button of the A1.2 disconnect confirmation dialog."
+  },
+  "settingsAccountLeave": "Leave the household",
+  "@settingsAccountLeave": {
+    "description": "Account-section row that leaves the online household (spec docs/specs/household-lifecycle.md §3.3, F9). Sits beside Disconnect, which is a different, purely local action. memberEditDeleteBlockedSelf quotes this exact label, so changing it means changing that string too."
+  },
+  "householdLeaveConfirmTitle": "Leave {householdName}?",
+  "@householdLeaveConfirmTitle": {
+    "description": "Title of the leave-household confirm sheet.",
+    "placeholders": { "householdName": { "type": "String" } }
+  },
+  "householdLeaveConfirmBody": "Your profile stays with the household, so the others keep seeing you and everything you've done. This phone stops syncing. You can come back later with a new invite code.",
+  "@householdLeaveConfirmBody": {
+    "description": "Body of the leave-household confirm when other claimed members remain (spec §3.4)."
+  },
+  "householdLeaveConfirmBodyLastMember": "You're the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
+  "@householdLeaveConfirmBodyLastMember": {
+    "description": "Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked."
+  },
+  "householdLeaveConfirmAction": "Leave",
+  "@householdLeaveConfirmAction": {
+    "description": "Confirm button of the leave-household sheet."
+  },
+  "householdLeaveError": "Couldn't leave the household. This needs a connection — nothing was changed. Try again.",
+  "@householdLeaveError": {
+    "description": "Snackbar shown when the leave_household call failed. States plainly that nothing changed, so the retry is an ordinary retry rather than a repair."
   },
   "settingsAccountSendError": "Couldn't send the sign-in link. Please try again.",
   "@settingsAccountSendError": {

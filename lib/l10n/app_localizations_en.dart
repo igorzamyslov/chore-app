@@ -765,12 +765,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memberEditColorLabel => 'Color';
 
   @override
-  String get memberEditDeleteBlockedClaimed =>
-      'This profile is linked to an account, so it can\'t be removed here.';
-
-  @override
   String get memberEditDeleteBlockedLastMember =>
       'A household needs at least one member, so this one can\'t be removed.';
+
+  @override
+  String get memberEditDeleteBlockedSelf =>
+      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.';
+
+  @override
+  String get memberEditDeleteBlockedOffline =>
+      'This profile is used on someone else\'s phone. Sign in and connect to the online household to remove it.';
 
   @override
   String memberDeleteDialogTitle(String memberName) {
@@ -780,6 +784,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String memberDeleteDialogBody(String memberName) {
     return 'This removes $memberName from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to $memberName open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.';
+  }
+
+  @override
+  String memberRemoveDialogBodyClaimed(String memberName) {
+    return '$memberName uses this household on their own phone. Removing them stops that phone from syncing — it keeps everything it already has, as its own local copy. Their profile and history stay here with the household: rotation chores drop them from the turn order, chores fixed to them open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.';
+  }
+
+  @override
+  String memberRemoveError(String memberName) {
+    return 'Couldn\'t remove $memberName. This needs a connection to the online household — nothing was changed. Try again.';
   }
 
   @override
@@ -938,6 +952,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountDisconnectConfirmAction => 'Disconnect';
+
+  @override
+  String get settingsAccountLeave => 'Leave the household';
+
+  @override
+  String householdLeaveConfirmTitle(String householdName) {
+    return 'Leave $householdName?';
+  }
+
+  @override
+  String get householdLeaveConfirmBody =>
+      'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.';
+
+  @override
+  String get householdLeaveConfirmBodyLastMember =>
+      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+
+  @override
+  String get householdLeaveConfirmAction => 'Leave';
+
+  @override
+  String get householdLeaveError =>
+      'Couldn\'t leave the household. This needs a connection — nothing was changed. Try again.';
 
   @override
   String get settingsAccountSendError =>
