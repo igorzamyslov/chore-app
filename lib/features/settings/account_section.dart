@@ -591,7 +591,7 @@ class _LeaveRow extends ConsumerWidget {
     // and 0 means the count has not loaded (or this device's own claim has
     // not arrived yet), where over-warning about a cascade is much cheaper
     // than silently taking a household down.
-    final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    final lastClaimed = ref.read(claimedMemberCountProvider) > 1;
     final result = await showExitConfirmSheet(
       context,
       title: l10n.householdLeaveConfirmTitle(householdName ?? ''),
