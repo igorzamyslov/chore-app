@@ -106,12 +106,12 @@ Future<void> applyDoneAction({
 /// function already had two callers "that cannot share a controller"; a third,
 /// in another isolate, is what it is for. Re-deriving here would be a defect.
 ///
-/// ## Two concurrency hazards, both recorded rather than fixed
+/// ## One concurrency hazard, recorded rather than fixed
 ///
 /// **`applyDigestPlans`' serialization does not cross isolates.** Its
-/// `_applyTail` chain is per-instance, so the scheduler this function is given
-/// (constructed inside the background isolate) and the main isolate's own can
-/// interleave writes to the same `digestHorizonSlots` ids. It is
+/// `_digestWriteTail` chain is per-instance, so the scheduler this function is
+/// given (constructed inside the background isolate) and the main isolate's own
+/// can interleave writes to the same `digestHorizonSlots` ids. It is
 /// self-correcting whenever it can happen at all: interleaving requires the app
 /// to be alive, and an alive app receives the handler's ping AFTER the
 /// completion is written, so the main isolate's last apply always runs on
@@ -120,15 +120,14 @@ Future<void> applyDoneAction({
 /// app is dead there is no second writer at all. **Do not add a cross-isolate
 /// lock.**
 ///
-/// **`cancelDigest()` is unserialized against `applyDigestPlans`** (see
-/// `docs/handover-2026-08-14-planning.md` §4). Previously academic; with this
-/// second process-level writer it becomes reachable in principle — a wipe
-/// (`reset_flow.dart`) racing a notification action. The consequence is bounded
-/// (a reset that leaves one armed slot, fixed by the next recompute) and the
-/// window is a user physically confirming a destructive wipe while also tapping
-/// a notification. Flagged, not fixed here: fixing it means serializing
-/// `cancelDigest` onto `_applyTail`, which belongs with whoever owns
-/// `NotificationScheduler` next.
+/// The second hazard this comment used to record — **`cancelDigest()`
+/// unserialized against `applyDigestPlans`** — is **FIXED** (backlog G-12,
+/// 2026-08-28, `docs/plans/2026-08-28-g12-cancel-digest-serialization.md`).
+/// `cancelDigest` now rides the same `_digestWriteTail` queue, so a wipe
+/// (`reset_flow.dart`) racing this function can no longer leave slots the apply
+/// re-armed after the cancel cleared them. That fix is deliberately
+/// **within one isolate only**; it does nothing about the hazard above and must
+/// not be extended to.
 Future<void> rewriteDigestHorizon({
   required AppDatabase database,
   required NotificationScheduler scheduler,
