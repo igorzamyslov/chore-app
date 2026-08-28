@@ -23,7 +23,9 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:chore_app/features/settings/last_synced_line.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
@@ -72,11 +74,23 @@ void main() {
       await openSettingsTab(tester);
       expect(find.text('Last synced 10 minutes ago'), findsOneWidget);
 
+      // The State OBJECT, deliberately: identity is what distinguishes "the
+      // live element refreshed itself" from "something rebuilt or remounted
+      // the subtree and it happened to render fresh text". Findability would
+      // not distinguish them at all.
+      final lineState = tester.state<State<LastSyncedLine>>(
+        find.byType(LastSyncedLine),
+      );
+
       // 15 more minutes pass. Nothing else at all happens: no row is
       // written, no provider is invalidated, no widget is pumped afresh.
       minutesBandTime = DateTime(2026, 7, 24, 9, 15);
       await tester.pump(const Duration(minutes: 1));
 
+      expect(
+        tester.state<State<LastSyncedLine>>(find.byType(LastSyncedLine)),
+        same(lineState),
+      );
       expect(find.text('Last synced 25 minutes ago'), findsOneWidget);
       expect(find.text('Last synced 10 minutes ago'), findsNothing);
     },
