@@ -101,16 +101,41 @@ jobs:
           retention-days: 14
 
   ios:
-    # DECISION 2026-08-28 (backlog A-6): stays off automatic PR runs, and the
-    # reason is the flake below, NOT the cost. Cost is real (macOS ≈ 10x
-    # Linux, and this job takes ~17-20 min) and was the original reason for
-    # the gate, but it is no longer the blocking one.
+    # DECISION 2026-08-28 (backlog A-6): stays off automatic PR runs. The
+    # deciding factor is cost against DEMONSTRATED value, with the flake
+    # below as a quantified secondary — not the other way round. Numbers
+    # first, because A-6 was scoped on an overestimate:
     #
-    # WHAT THE FLAKE ACTUALLY IS. Run 31800958022 (625ea72) is the only red
-    # `ios` run in the 30 most recent runs of this workflow on main; 2 of 14
-    # flows failed on `welcome.create is visible`. The backlog originally
-    # recorded that as the app not being in fresh-install state — a
-    # clearState/state-isolation bug. Its Maestro debug artifact says
+    # THE FLAKE IS RARER THAN A-6 IMPLIED. Full history of this job on main:
+    # 61 runs, 10 red — but 9 of those 10 fall on 2026-07-31/08-01, i.e. CI
+    # bring-up (see the NOTE at the top of this file) and the cold-start
+    # hardening that produced convention 8 in e2e/README.md. Since the last
+    # of those, ONE red in 32 runs: ≈3% of runs, ≈0.4% of flows (2 bad flows
+    # in ~448). Widening the trigger would therefore make about 1 PR run in
+    # 32 falsely red, not 1 in 6. That is ordinary flaky-test territory and
+    # is NOT on its own a reason to keep the gate.
+    #
+    # WHAT DECIDES IT IS VALUE PER MACOS MINUTE. In all 61 runs this job has
+    # never once gone red for an iOS-specific code regression: every red is
+    # bring-up or the flake below. Zero confirmed catches. Meanwhile a macOS
+    # runner is ≈10x Linux, this job takes ~17-20 min, and PR pushes here
+    # come in bursts (wave4/shopping-gestures produced four PR runs inside an
+    # hour). Paying that on every push for a job with no catch record is bad
+    # value; paying it on demand for the PR that actually touches iOS-
+    # sensitive surfaces — gestures, platform channels, AppDelegate — buys
+    # the same protection where the risk actually is. Hence the
+    # workflow_dispatch trigger in `on:` above.
+    #
+    # FLIP THIS DECISION the first time `ios` catches a genuine iOS-only
+    # regression on main, or if the dispatch path stops being used: at that
+    # point the job has a catch record, and paying 10x on every PR starts
+    # being worth it.
+    #
+    # WHAT THE FLAKE ACTUALLY IS, because A-6 recorded the wrong cause and
+    # the right one matters to whoever fixes it. Run 31800958022 (625ea72),
+    # the one post-hardening red: 2 of 14 flows failed on `welcome.create is
+    # visible`. A-6 recorded that as the app not being in fresh-install state
+    # — a clearState/state-isolation bug. Its Maestro debug artifact says
     # otherwise, on three counts:
     #   - The failure-step accessibility hierarchy holds the status bar and
     #     an app window titled "Famdo" and NOTHING inside it: no welcome
@@ -123,21 +148,17 @@ jobs:
     #   - It is not a hang or a crash. XCTest runs in-process and logged the
     #     app's main thread answering ("MT responded in time"), snapshotting
     #     cleanly in 0.01s — with zero Flutter nodes in the tree.
-    # So the Flutter view permanently fails to present on a fresh install,
-    # roughly 3% of flows / 17% of runs. Root cause unknown.
+    # So the Flutter view permanently fails to present on a fresh install.
+    # Root cause unknown, and it is NOT fixed here: it did not reproduce on
+    # wave-4 code, there is no local reproduction, and the remedies that fit
+    # a bimodal shape (a Maestro `retry`, a CLI --retry-on-failure) cannot be
+    # A/B'd against the 2.7.0 pin without a simulator run — unverified
+    # Maestro changes being exactly what that pin exists to prevent (see the
+    # Install Maestro step).
     #
-    # WHY THAT BLOCKS PRs. Widening the trigger without a fix makes ~1 PR run
-    # in 6 red for a reason unrelated to the PR — strictly worse than the
-    # status quo, because a red that means nothing trains people to ignore
-    # reds that mean something. No fix is available yet: the flake did not
-    # reproduce on wave-4 code, there is no local reproduction, and the
-    # remedies that fit a bimodal shape (a Maestro `retry`, a CLI
-    # --retry-on-failure) cannot be A/B'd against the 2.7.0 pin without a
-    # simulator run — and unverified Maestro changes are exactly what that pin
-    # exists to prevent (see the Install Maestro step). A `paths:` filter
-    # would not help either: nearly every PR here touches lib/**, which is
-    # iOS-relevant, so "PRs touching iOS-relevant paths" is in practice
-    # "all PRs".
+    # AND NOTE A `paths:` FILTER WOULD NOT HELP the cost side anyway: nearly
+    # every PR here touches lib/**, which is iOS-relevant, so "PRs touching
+    # iOS-relevant paths" is in practice "all PRs".
     #
     # WHY iOS clearState IS HARSHER THAN ANDROID'S, which is probably where a
     # root cause lives: the simulator log shows Maestro implementing
@@ -154,10 +175,10 @@ jobs:
     # waits forever. A job-level `if` skip like this one is not that — it
     # still produces a skipped check run.
     #
-    # WIDEN THIS when a run of the full suite on a macOS runner comes back
-    # green enough times to put the per-flow blank-frame rate near zero, or
-    # when the flows can retry a launch that presents nothing. Until then the
-    # pre-merge path is the manual `workflow_dispatch` in `on:` above.
+    # WIDEN THIS on either of the triggers named above — a genuine iOS-only
+    # regression that reached main, or the dispatch path falling out of use.
+    # The flake is not the gate any more; it is a ~3%-of-runs tax you would
+    # be accepting, and worth accepting once the job has a catch record.
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:

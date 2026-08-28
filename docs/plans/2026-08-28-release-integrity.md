@@ -182,9 +182,16 @@ the 30 most recent `e2e.yml` runs on `main`):
   Android `clearState` clears app data and leaves the app installed. So the
   `ios` job's warm-up launch is mostly discarded by the first flow, and the
   iOS job takes a cold start 14 times where Android takes one.
-- **Rate.** One red run in the six `main` runs where `ios` actually ran
-  (2/70 flows ≈ 3 % per flow, ≈ 17 % per run). Four consecutive `ios`
-  successes on `main` since.
+- **Rate — and a correction to my own first figure.** An early six-run sample
+  gave ≈17 % of runs, and that number is wrong; the `ios` job runs on *every*
+  push to `main`, so the denominator is the whole history. Full history: **61
+  runs, 10 red**, but **9 of the 10 fall on 2026-07-31/08-01** — CI bring-up
+  (the workflow header's own "expect first-run adjustments") plus the
+  cold-start hardening that produced `e2e/README.md` convention 8. Since the
+  last of those: **1 red in 32 runs ≈ 3 % of runs, ≈ 0.4 % of flows** (2 bad
+  flows in ~448).
+- **Zero confirmed catches.** Across all 61 runs, no red has ever been an
+  iOS-specific code regression. Every one is bring-up or this flake.
 
 Conclusion: a real, **unfixed and not-understood** iOS startup flake in which
 the Flutter view permanently fails to present on a fresh install. The nearest
@@ -201,21 +208,35 @@ stanza, which neither failing flow has.
 
 ## Task 3 — settle A-6
 
-**Decision: (b) — keep the `main`-only gate, re-justified on the flake rather
-than on cost, plus a `workflow_dispatch` escape hatch so iOS can be verified
-on a branch, pre-merge, on demand.**
+**Decision: (b) — keep the `main`-only gate, plus a `workflow_dispatch`
+escape hatch so iOS can be verified on a branch, pre-merge, on demand.**
 
-Why not (a). Widening to PRs means ~17 % of PR runs go red for a reason
-unrelated to the PR, on a 17-20 minute macOS job, with no fix available: the
-flake did not reproduce on wave-4 code, there is no local reproduction, and
-the executing agent cannot run Maestro or a simulator to build one. Every
-in-flow remedy that fits the bimodal shape — a Maestro `retry`, a
-`--retry-on-failure` CLI flag — is unverifiable here, and Maestro is pinned
-at 2.7.0 precisely because unverified Maestro changes have burned this repo
-before. Cost is real (macOS ≈ 10× Linux, the original recorded reason for the
-gate) but it is not the blocker; the flake is. A path filter would not help
-either: nearly every PR here touches `lib/**`, which is iOS-relevant, so
-"PRs touching iOS-relevant paths" is in practice "all PRs".
+Why not (a), and note that the reason is **not** the one the brief and my own
+first draft assumed. At ~3 % of runs the flake would cost about one falsely
+red PR run in 32 — ordinary flaky-test territory, and not on its own enough
+to keep iOS off PRs. What decides it is **value per macOS minute**: in 61
+runs this job has never gone red for an iOS-specific code regression, so it
+has *no catch record*, while a macOS runner is ≈10× Linux, the job takes
+17-20 minutes, and PR pushes here arrive in bursts
+(`wave4/shopping-gestures` produced four PR runs inside an hour). Paying that
+on every push for a job that has never caught anything is poor value; paying
+it on demand for the PR that actually touches iOS-sensitive surfaces
+(gestures, platform channels, `AppDelegate`) buys the same protection where
+the risk is. A path filter would not rescue the cost side either: nearly
+every PR here touches `lib/**`, which is iOS-relevant, so "PRs touching
+iOS-relevant paths" is in practice "all PRs".
+
+The flake is also not *fixed* here, and cannot be: it did not reproduce on
+wave-4 code, there is no local reproduction, and the executing agent cannot
+run Maestro or a simulator to build one. Every in-flow remedy that fits the
+bimodal shape — a Maestro `retry`, a `--retry-on-failure` CLI flag — is
+unverifiable here, and Maestro is pinned at 2.7.0 precisely because
+unverified Maestro changes have burned this repo before.
+
+**Two conditions flip this decision**, both recorded in the workflow: the
+first time `ios` catches a genuine iOS-only regression on `main`, or the
+dispatch path falling out of use. Either means the 10× is worth paying
+automatically.
 
 What (b) buys that today's gate does not: `workflow_dispatch` gives exactly
 the thing A-6 actually complains about — pre-merge iOS verification with
