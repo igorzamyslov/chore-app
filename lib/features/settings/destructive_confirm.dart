@@ -1,22 +1,19 @@
-/// The shared two-step confirmation used by every irreversible action in
-/// Settings (spec `docs/specs/polish-round-1.md` B2).
+/// The shared confirmation every irreversible action in Settings goes
+/// through (spec `docs/specs/polish-round-1.md` B2).
 ///
-/// Two chained dialogs, not one: the first states what will be lost and is
-/// state-aware where that matters, the second is a bare "last chance". A
-/// cancel at either step is a no-op — the caller has not started its work
-/// yet when [confirmTwoStepDestructiveAction] returns `false`, so there is
-/// nothing to undo.
+/// Two entry points, ONE dialog builder — which is the point of this file.
+/// [confirmDestructiveAction] shows a single confirmation;
+/// [confirmTwoStepDestructiveAction] chains two of them, the first stating
+/// what will be lost (state-aware where that matters) and the second a bare
+/// "last chance". A cancel at any step is a no-op: the caller has not
+/// started its work yet when either returns `false`, so there is nothing to
+/// undo.
 ///
 /// This lives in its own file rather than inside `reset_flow.dart` because
-/// it is deliberately action-agnostic: adding another two-step destructive
-/// action means composing a [DestructiveConfirmStep] pair, NOT copying a
-/// dialog builder.
-///
-/// Two callers, one dialog builder. [confirmTwoStepDestructiveAction] is
-/// the chain 'Reset app data' uses; [confirmDestructiveAction] is the single
-/// dialog behind it, and both go through the same [AlertDialog] code — which
-/// is the point of this file. Adding another destructive action means
-/// composing steps, never copying a dialog.
+/// it is deliberately action-agnostic: adding another destructive action
+/// means composing [DestructiveConfirmStep]s, NEVER copying a dialog
+/// builder. Copying one is not merely duplication — it silently drops
+/// `scrollable: true`, and the comment inside says what that costs.
 ///
 /// Why there is a one-step entry point at all, since
 /// `docs/specs/household-lifecycle.md` §3.3 gives all three household exits

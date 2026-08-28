@@ -95,9 +95,8 @@ class AccountSectionBody extends ConsumerWidget {
           const _AdoptRow(),
           const _JoinRow(),
           // Last in the section, below everything else: the most
-          // destructive row here. Offered while UNLINKED too -- an account
-          // can exist with no household link, and erasure must not require
-          // linking first (F11).
+          // destructive row here. Present in this UNLINKED branch too --
+          // see [_DeleteAccountRow] for why.
           const _DeleteAccountRow(),
         ],
       );
