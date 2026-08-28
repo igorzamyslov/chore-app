@@ -371,7 +371,14 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
       if (mounted) {
         setState(() {
           _removing = false;
-          _removalError = l10n.memberRemoveError(existing.name);
+          // TEMP INVERSION A, reverted by the next commit: the catch still
+          // runs, but records nothing -- the "swallowed silently" failure
+          // mode, which is distinct from the uncaught crash the TDD red
+          // already covered.
+          _removalError = null;
+          if (l10n.memberRemoveError(existing.name).isEmpty) {
+            return;
+          }
         });
       }
       return;
