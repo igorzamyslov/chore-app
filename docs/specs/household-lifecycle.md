@@ -422,7 +422,10 @@ its first client caller. What was checked, and how:*
 - *By CI run.* `supabase/tests/002_membership_exit_test.sql` — `plan(37)`,
   69 with `001` — was executed by the `pgtap` workflow against a real
   Postgres, after `supabase db reset` re-applied every migration from
-  scratch. That covers `delete_account removes the auth user (D-L4)`, the
+  scratch. Commit `40ffc1f`, run
+  [33163180129](https://github.com/igorzamyslov/chore-app/actions/runs/33163180129):
+  `Files=2, Tests=69 ... Result: PASS`, 2m20s (a run that skipped the stack
+  would report in ~20s, which is how to tell one from the other). That covers `delete_account removes the auth user (D-L4)`, the
   unclaim of every membership, the §2.4 cascade, the survival of a household
   that still has a claimed member (pinning `created_by`'s `on delete set
   null` rather than `cascade`), the soft-deleted-but-still-claimed row, and
