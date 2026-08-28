@@ -166,7 +166,10 @@ DateTime? _nextChange({
 }) {
   final elapsed = now.difference(lastPulledAt);
   if (elapsed.inHours < 1) {
-    return lastPulledAt.add(Duration(minutes: elapsed.inMinutes + 1));
+    // TEMPORARY INVERSION, reverted in the very next commit: proves the
+    // ticker test reds at the TEST step rather than at analyze. Every code
+    // path stays reachable, so nothing becomes an unused element.
+    return null;
   }
   if (elapsed.inHours < 24) {
     return lastPulledAt.add(Duration(hours: elapsed.inHours + 1));
