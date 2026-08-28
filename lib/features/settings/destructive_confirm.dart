@@ -107,6 +107,7 @@ Future<bool> _showStep(
         // phone. Same class of bug Task 12 fixed in `exit_confirm_sheet.dart`
         // and Task 16 in `member_delete_dialog.dart`; guarded by
         // `test/features/settings/destructive_confirm_test.dart`.
+        scrollable: false,
         title: Text(step.title),
         content: Text(step.body),
         actions: [
