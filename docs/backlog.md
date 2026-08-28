@@ -298,6 +298,8 @@ distribution question below.
 
 ## G. Product features
 
+*Ownership note (2026-08-18): the product features below — G-2, G-4, G-5, G-7, G-8, and F-2/F-3 above — are **Igor's to design**. They were parked here as "needs a design conversation", which was right for most of them and wrong for G-5, whose only real open question is which icons and colours to add. Once a design exists for any of them, it goes through the normal spec -> plan -> execute pipeline; until then no plan should be written speculatively.*
+
 | ID | Title | Notes | Effort |
 | --- | --- | --- | --- |
 | **G-1** | Stats — "who actually does the chores" (F19) | **SHIPPED** as `docs/specs/stats.md` (Settings → Chore history). D2 step 2 closed with it: the stronger "its history is kept — you'll find it under Settings › Chore history" delete copy is restored and now true. Landed the `(status, closed_on)` index as schema **v11**, not v10 — see the execution hazard below, which v10 (`settings.membershipRevoked`) had already claimed | L |
@@ -319,7 +321,7 @@ distribution question below.
 
 | ID | Title | State | Effort |
 | --- | --- | --- | --- |
-| **H-1** | F-Droid / IzzyOnDroid submission (F21) | `fastlane/metadata/` is written, app id and name are real. Awaiting a go-ahead, not code | S |
+| **H-1** | F-Droid / IzzyOnDroid submission (F21) | `fastlane/metadata/` is written, app id and name are real. **Deferred by decision (Igor, 2026-08-18): dogfood first, submit later.** Not a lack of readiness — the project's best findings have all come from Igor living with a build (`2026-08-01`/`2026-08-07-field-feedback.md`), so more of that input is worth more right now than a wider audience. Revisit after a real usage stretch on v0.7.x | S |
 | **H-2** | Tip-jar IAP (F22) | A Ko-fi/PayPal donate row shipped instead. **See the distribution question below** — `DESIGN.md` §5 records that linking out to Ko-fi/PayPal from inside the app is forbidden by both stores' policies, so the current row is fine for F-Droid/GitHub and is a policy violation the day the app enters a store | L |
 
 ---
