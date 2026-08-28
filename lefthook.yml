@@ -16,7 +16,22 @@ pre-commit:
       glob: "*.dart"
       # Formats staged files in place and re-stages them; fails the commit
       # only if formatting produced changes that couldn't be auto-applied.
-      run: dart format --set-exit-if-changed {staged_files}
+      #
+      # `check_formatter_config.sh &&` is a GUARD, and it has to run *before*
+      # the format, never after: in a fresh `git worktree` there is no
+      # `.dart_tool/`, so `dart format` cannot resolve the `package:` include
+      # in analysis_options.yaml, warns on stderr only, still exits 0, and
+      # falls back to `trailing_commas: automate` — stripping trailing commas
+      # and rejoining multi-line calls in everything it touches. Because
+      # `preserve` is stable on `automate`'s output, `--set-exit-if-changed`
+      # then PASSES on that churn, so no after-the-fact check (this job's own,
+      # or ci.yml's) can catch it. See the script and backlog A-7.
+      #
+      # Prefixed into this job's own command rather than added as an earlier
+      # job on purpose: `&&` cannot run out of order and cannot be skipped,
+      # whereas a separate job would depend on lefthook's ordering and
+      # fail-fast semantics.
+      run: tool/check_formatter_config.sh && dart format --set-exit-if-changed {staged_files}
       stage_fixed: true
 
     - name: analyze
