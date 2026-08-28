@@ -62,8 +62,10 @@ jobs:
         # build — simulator, emulator, or E2E — can ever reproduce it.
         # Assert on the actual artifact, the only thing users install.
         #
-        # DUMP TO A FILE, NEVER `aapt2 | grep -q` (all three checks below
-        # follow this; changed 2026-08-28). Actions runs every `run` block
+        # DUMP TO A FILE, NEVER `aapt2 | grep -q` (this step and the two
+        # after it all follow this; changed 2026-08-28, and each does its own
+        # dump so no one of them depends on another surviving future edits).
+        # Actions runs every `run` block
         # under `bash -e -o pipefail`. `grep -q` exits the instant it
         # matches, aapt2 then takes SIGPIPE and returns 141, and `pipefail`
         # promotes that to the pipeline's status -- so a SUCCESSFUL match
@@ -95,6 +97,7 @@ jobs:
         # manifest does. Same "assert on the shipped artifact, not a debug
         # build" rule as the INTERNET check above -- this is invisible in
         # every emulator and E2E run.
+        #
         # Dumped to a file rather than piped -- see the INTERNET check above
         # for why `aapt2 | grep -q` is a false-failure hazard under pipefail.
         run: |
