@@ -404,6 +404,46 @@ independently valuable and add no user-facing features — they close the
 unknown thing here, which is why it is the first task rather than a late
 discovery.
 
+### 5.1 Slice 1 verification record
+
+*Verified 2026-08-11 (commit `f184f4a`, reachable from `main`): the
+`auth.users` delete works from a `postgres`-owned `SECURITY DEFINER` RPC.
+D-L4 holds and the edge-function fallback is NOT needed — see Appendix A of
+`docs/plans/2026-08-08-household-lifecycle-slices-4-6.md`, which retains the
+analysis without implementing it. Three FKs referenced `auth.users`: the two
+`created_by` ones were relaxed per §2.7 (set null / cascade), and the third,
+`members.user_id`, is cleared by the unclaim §2.2 already required — it
+cannot be relaxed, because `is_household_member()` reads it and an
+`on delete set null` there would be an RLS change rather than a cleanup.*
+
+*Re-confirmed 2026-08-28 during slice 6 (F11), which gave `delete_account()`
+its first client caller. What was checked, and how:*
+
+- *By CI run.* `supabase/tests/002_membership_exit_test.sql` — `plan(37)`,
+  69 with `001` — was executed by the `pgtap` workflow against a real
+  Postgres, after `supabase db reset` re-applied every migration from
+  scratch. That covers `delete_account removes the auth user (D-L4)`, the
+  unclaim of every membership, the §2.4 cascade, the survival of a household
+  that still has a claimed member (pinning `created_by`'s `on delete set
+  null` rather than `cascade`), the soft-deleted-but-still-claimed row, and
+  the grant matrix on the three internal helpers. The assertions are
+  non-vacuous: the auth-row ones read `count(*)::int` rather than the
+  `is(<no such row>, null)` shape that passes for free.
+- *By reading only.* That `delete_account()` is owned by `postgres` is
+  implicit in the migration being applied by the migration runner — there is
+  no explicit `alter function ... owner to postgres`, so it holds by
+  convention rather than by assertion. It is what makes the `auth.users`
+  delete legal, and a deployment that applied migrations as a non-superuser
+  role would break it silently.
+- *NOT verified.* The manual live smoke of §7.7's method in
+  `sync-backend.md` (five exit scenarios across two devices and the app
+  itself) has not been performed. It is the real gate for everything
+  server-touching, since E2E stays offline (§4), and it remains **OPEN** for
+  all three exits of slices 4–6.
+
+*No SQL behaviour changed in slices 4–6; the only edit to `supabase/` was two
+stale assertion totals in a comment (`54/54` → `69/69`).*
+
 ## 6. Non-goals
 
 - No role-based enforcement. D1 stands; `members.role` stays vestigial.
