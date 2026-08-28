@@ -101,7 +101,7 @@ class HouseholdExitService {
       // that wipe down with it, which is the one outcome this flow may
       // never produce. Same reasoning as `reset_flow.dart`'s `_signOut`.
     }
-    if (!alsoDeleteLocalData) {
+    if (alsoDeleteLocalData) {
       await resetAppData(database);
     }
   }
