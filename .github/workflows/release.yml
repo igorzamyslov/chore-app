@@ -61,10 +61,28 @@ jobs:
         # that permission only in the debug/profile manifests, so no debug
         # build — simulator, emulator, or E2E — can ever reproduce it.
         # Assert on the actual artifact, the only thing users install.
+        #
+        # DUMP TO A FILE, NEVER `aapt2 | grep -q` (all three checks below
+        # follow this; changed 2026-08-28). Actions runs every `run` block
+        # under `bash -e -o pipefail`. `grep -q` exits the instant it
+        # matches, aapt2 then takes SIGPIPE and returns 141, and `pipefail`
+        # promotes that to the pipeline's status -- so a SUCCESSFUL match
+        # reports failure and the `||` branch fires with a message accusing
+        # the APK of the exact thing it just proved. Demonstrated locally:
+        # the same grep against the same content returns 0 from a file and
+        # 141 through a pipe once the dump exceeds the 64KB pipe buffer.
+        # It has never fired here only because this manifest's dump is a few
+        # KB, so aapt2 finishes writing before grep exits -- i.e. these gates
+        # were one plugin's worth of manifest growth away from failing every
+        # release, at tag time, for a reason having nothing to do with the
+        # thing being asserted. Redirecting first also separates "aapt2
+        # itself broke" (caught by `-e` on the dump line) from "the assertion
+        # failed", which the pipe form conflated.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump permissions build/app/outputs/flutter-apk/app-release.apk \
-            | grep -q "android.permission.INTERNET" \
+            > "$RUNNER_TEMP/release-permissions.txt"
+          grep -q "android.permission.INTERNET" "$RUNNER_TEMP/release-permissions.txt" \
             || { echo "::error::Release APK lacks INTERNET permission — sync would fail silently on every device"; exit 1; }
       - name: Verify release APK has auto-backup disabled
         # Decision D-B1 (docs/backlog.md; implementation plan
@@ -77,10 +95,13 @@ jobs:
         # manifest does. Same "assert on the shipped artifact, not a debug
         # build" rule as the INTERNET check above -- this is invisible in
         # every emulator and E2E run.
+        # Dumped to a file rather than piped -- see the INTERNET check above
+        # for why `aapt2 | grep -q` is a false-failure hazard under pipefail.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
-            | grep -qE "allowBackup\(0x[0-9a-f]+\)=false" \
+            > "$RUNNER_TEMP/release-manifest.txt"
+          grep -qE "allowBackup\(0x[0-9a-f]+\)=false" "$RUNNER_TEMP/release-manifest.txt" \
             || { echo "::error::Release APK does not have allowBackup=false — Android would auto-backup a live SQLite file and the auth session onto other devices"; exit 1; }
       - name: Verify release APK can dispatch notification actions
         # F-1's digest "Done" action (spec docs/specs/notifications.md N2,
@@ -121,10 +142,14 @@ jobs:
         # deliberately NOT asserted here -- their compiled lines have not
         # been sampled, and an unverified pattern in this step is worse than
         # no pattern at all.
+        # Dumped to a file rather than piped -- see the INTERNET check above
+        # for why `aapt2 | grep -q` is a false-failure hazard under pipefail.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
-            | grep -qE 'name\(0x[0-9a-f]+\)="com\.dexterous\.flutterlocalnotifications\.ActionBroadcastReceiver"' \
+            > "$RUNNER_TEMP/release-manifest.txt"
+          grep -qE 'name\(0x[0-9a-f]+\)="com\.dexterous\.flutterlocalnotifications\.ActionBroadcastReceiver"' \
+            "$RUNNER_TEMP/release-manifest.txt" \
             || { echo "::error::Release APK does not declare ActionBroadcastReceiver — tapping Done on a digest notification would silently do nothing"; exit 1; }
       - name: Rename artifact
         run: |

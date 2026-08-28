@@ -117,10 +117,42 @@ receivers fail equally invisibly, but their compiled lines have not been
 sampled, and shipping unverified greps into a fail-closed release gate is the
 exact thing this plan's constraints forbid. Recorded as a follow-up instead.
 
-- [ ] Add the step.
-- [ ] Update the manifest comment block above the receiver so the two places
+- [x] Add the step.
+- [x] Update the manifest comment block above the receiver so the two places
   agree: the assertion now exists; drop "Not added here … raised in the PR
   instead", which becomes false the moment this lands.
+
+### Task 1b — the idiom being copied is broken (found while verifying Task 1)
+
+Not planned; found by running the committed step body under Actions' actual
+shell (`bash -e -o pipefail`) against a stub `aapt2`. **`aapt2 … | grep -q …`
+produces a FALSE FAILURE whenever the dump exceeds the 64 KB pipe buffer:**
+`grep -q` exits on first match, `aapt2` takes SIGPIPE and returns 141, and
+`pipefail` promotes 141 to the pipeline's status — so the `||` branch fires
+and prints an error accusing the APK of exactly the thing it just proved.
+
+Measured, on identical content, capability present:
+
+| shape | small dump (today) | > 64 KB dump |
+| --- | --- | --- |
+| `origin/main`'s INTERNET check (piped) | exit 0 | **exit 1** |
+| `origin/main`'s allowBackup check (piped) | exit 0 | **exit 1** |
+| all three after the fix (dump to file) | exit 0 | exit 0 |
+
+and all three still exit 1, with their annotation, when the capability is
+absent. So these gates were roughly one plugin's worth of manifest growth
+away from failing **every release, at tag time**, for a reason unrelated to
+what they assert — the worst possible time and the most misleading possible
+message.
+
+- [x] Redirect the dump to `$RUNNER_TEMP` and grep the file, in **all three**
+  steps. Patterns and error messages are byte-identical; only the plumbing
+  changes. This is inside a file the plan already touches, and leaving two
+  known landmines beside a freshly-fixed third would be indefensible.
+- [x] Keep the three steps self-contained (each does its own dump) rather
+  than consolidating to one dump plus three greps: for a release gate,
+  a step you can read in isolation and know exactly what it proves is worth
+  more than removing a duplicated `ls`.
 
 ---
 
