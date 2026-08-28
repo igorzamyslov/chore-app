@@ -773,6 +773,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'A household needs at least one member, so this one can\'t be removed.';
 
   @override
+  String get memberEditDeleteBlockedSelf =>
+      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.';
+
+  @override
+  String get memberEditDeleteBlockedOffline =>
+      'This profile is used on someone else\'s phone. Sign in and connect to the online household to remove it.';
+
+  @override
   String memberDeleteDialogTitle(String memberName) {
     return 'Delete $memberName?';
   }

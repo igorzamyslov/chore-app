@@ -979,11 +979,19 @@
   },
   "memberEditDeleteBlockedClaimed": "This profile is linked to an account, so it can't be removed here.",
   "@memberEditDeleteBlockedClaimed": {
-    "description": "T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed)."
+    "description": "RETIRED BY THE NEXT COMMIT -- kept only so this deliberately-red commit still compiles (member_edit_sheet.dart is its last caller until the implementation lands). T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId)."
   },
   "memberEditDeleteBlockedLastMember": "A household needs at least one member, so this one can't be removed.",
   "@memberEditDeleteBlockedLastMember": {
     "description": "T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member."
+  },
+  "memberEditDeleteBlockedSelf": "This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.",
+  "@memberEditDeleteBlockedSelf": {
+    "description": "Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10."
+  },
+  "memberEditDeleteBlockedOffline": "This profile is used on someone else's phone. Sign in and connect to the online household to remove it.",
+  "@memberEditDeleteBlockedOffline": {
+    "description": "Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2)."
   },
   "memberDeleteDialogTitle": "Delete {memberName}?",
   "@memberDeleteDialogTitle": {

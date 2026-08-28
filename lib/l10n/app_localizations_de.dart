@@ -779,6 +779,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.';
 
   @override
+  String get memberEditDeleteBlockedSelf =>
+      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.';
+
+  @override
+  String get memberEditDeleteBlockedOffline =>
+      'Dieses Profil wird auf dem Gerät einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.';
+
+  @override
   String memberDeleteDialogTitle(String memberName) {
     return '$memberName löschen?';
   }

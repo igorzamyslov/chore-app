@@ -1146,7 +1146,7 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get memberEditColorLabel;
 
-  /// T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed).
+  /// RETIRED BY THE NEXT COMMIT -- kept only so this deliberately-red commit still compiles (member_edit_sheet.dart is its last caller until the implementation lands). T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId).
   ///
   /// In en, this message translates to:
   /// **'This profile is linked to an account, so it can\'t be removed here.'**
@@ -1157,6 +1157,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A household needs at least one member, so this one can\'t be removed.'**
   String get memberEditDeleteBlockedLastMember;
+
+  /// Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.'**
+  String get memberEditDeleteBlockedSelf;
+
+  /// Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This profile is used on someone else\'s phone. Sign in and connect to the online household to remove it.'**
+  String get memberEditDeleteBlockedOffline;
 
   /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).
   ///

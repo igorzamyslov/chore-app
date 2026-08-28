@@ -212,6 +212,8 @@
   "memberEditColorLabel": "Farbe",
   "memberEditDeleteBlockedClaimed": "Dieses Profil ist mit einem Konto verknüpft und kann hier nicht entfernt werden.",
   "memberEditDeleteBlockedLastMember": "Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.",
+  "memberEditDeleteBlockedSelf": "Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.",
+  "memberEditDeleteBlockedOffline": "Dieses Profil wird auf dem Gerät einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.",
   "memberDeleteDialogTitle": "{memberName} löschen?",
   "memberDeleteDialogBody": "Damit entfernst du {memberName} aus dem Haushalt. Bei Aufgaben im Wechsel fällt {memberName} aus der Reihenfolge — wenn zu wenige Personen übrig bleiben, wird die Aufgabe auf eine feste Person oder \"jeden\" umgestellt. Aufgaben, die fest {memberName} zugewiesen sind, stehen danach allen offen, und alles, was {memberName} gerade zugewiesen ist, wird nicht mehr zugewiesen. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.",
   "householdRenameTitle": "Haushalt umbenennen",
