@@ -1,5 +1,6 @@
-# E2E flows via Maestro. Android runs on every push (Linux + KVM);
-# iOS runs on main only (macOS runners cost ~10x Linux).
+# E2E flows via Maestro. Android runs on every push and every PR (Linux +
+# KVM); iOS runs on main, or on any branch on demand via the Actions "Run
+# workflow" button. See the `ios` job's comment for why it is not on PRs.
 #
 # NOTE: authored before the repo had a remote — expect first-run
 # adjustments (runner image names, KVM availability) when CI goes live.
@@ -9,6 +10,21 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual trigger (added 2026-08-28, backlog A-6). This is the pre-merge
+  # iOS path: dispatch this workflow on a feature branch and the `ios` job
+  # below runs on it, with attribution, BEFORE the merge — which is the
+  # thing A-6 actually asks for. Wave 4's D-2/D-3 swipe gesture was exactly
+  # the PR that needed it and reached main unverified on iOS instead.
+  # Deliberately a manual trigger rather than a wider automatic one: see the
+  # `ios` job's comment for the cost-versus-catch-record argument, and for the
+  # two conditions that should turn it into an automatic one.
+  # CAVEAT, so nobody hunts for a missing button: GitHub only offers
+  # workflow_dispatch for a workflow that exists on the DEFAULT branch. This
+  # trigger is therefore inert until it lands on `main`, and cannot be
+  # exercised from the PR that introduces it — after which any branch can be
+  # picked as the run target. A dispatched run also runs `android` (there is
+  # no per-job trigger), which is the cheap half and worth having anyway.
+  workflow_dispatch:
 
 jobs:
   android:
@@ -86,7 +102,90 @@ jobs:
           retention-days: 14
 
   ios:
-    if: github.ref == 'refs/heads/main'
+    # DECISION 2026-08-28 (backlog A-6): stays off automatic PR runs. The
+    # deciding factor is cost against DEMONSTRATED value, with the flake
+    # below as a quantified secondary — not the other way round. Numbers
+    # first, because A-6 was scoped on an overestimate:
+    #
+    # THE FLAKE IS RARER THAN A-6 IMPLIED. Full history of this job on main:
+    # 61 runs, 10 red — but 9 of those 10 fall on 2026-07-31/08-01, i.e. CI
+    # bring-up (see the NOTE at the top of this file) and the cold-start
+    # hardening that produced convention 8 in e2e/README.md. Since the last
+    # of those, ONE red in 32 runs: ≈3% of runs, ≈0.4% of flows (2 bad flows
+    # in ~448). Widening the trigger would therefore make about 1 PR run in
+    # 32 falsely red, not 1 in 6. That is ordinary flaky-test territory and
+    # is NOT on its own a reason to keep the gate.
+    #
+    # WHAT DECIDES IT IS VALUE PER MACOS MINUTE. In all 61 runs this job has
+    # never once gone red for an iOS-specific code regression: every red is
+    # bring-up or the flake below. Zero confirmed catches. Meanwhile a macOS
+    # runner is ≈10x Linux, this job takes 16-27 min (measured across recent
+    # main runs), and PR pushes here come in bursts (wave4/shopping-gestures
+    # produced four PR runs inside an hour).
+    # Paying that on every push for a job with no catch record is bad
+    # value; paying it on demand for the PR that actually touches iOS-
+    # sensitive surfaces — gestures, platform channels, AppDelegate — buys
+    # the same protection where the risk actually is. Hence the
+    # workflow_dispatch trigger in `on:` above.
+    #
+    # FLIP THIS DECISION the first time `ios` catches a genuine iOS-only
+    # regression on main, or if the dispatch path stops being used: at that
+    # point the job has a catch record, and paying 10x on every PR starts
+    # being worth it.
+    #
+    # WHAT THE FLAKE ACTUALLY IS, because A-6 recorded the wrong cause and
+    # the right one matters to whoever fixes it. Run 31800958022 (625ea72),
+    # the one post-hardening red: 2 of 14 flows failed on `welcome.create is
+    # visible`. A-6 recorded that as the app not being in fresh-install state
+    # — a clearState/state-isolation bug. Its Maestro debug artifact says
+    # otherwise, on three counts:
+    #   - The failure-step accessibility hierarchy holds the status bar and
+    #     an app window titled "Famdo" and NOTHING inside it: no welcome
+    #     gate, and no tab shell either. A leaked household would have shown
+    #     the shell. The screenshot is a blank white frame.
+    #   - It is not a slow runner. Across that run's 14 flows the wait for
+    #     `welcome.create` was 4.8-9.0s in all 12 passes and a full 60s in
+    #     both failures. Bimodal: about seven seconds, or never. A bigger
+    #     timeout buys nothing.
+    #   - It is not a hang or a crash. XCTest runs in-process and logged the
+    #     app's main thread answering ("MT responded in time"), snapshotting
+    #     cleanly in 0.01s — with zero Flutter nodes in the tree.
+    # So the Flutter view permanently fails to present on a fresh install.
+    # Root cause unknown, and it is NOT fixed here: it did not reproduce on
+    # wave-4 code, there is no local reproduction, and the remedies that fit
+    # a bimodal shape (a Maestro `retry`, a CLI --retry-on-failure) cannot be
+    # A/B'd against the 2.7.0 pin without a simulator run — unverified
+    # Maestro changes being exactly what that pin exists to prevent (see the
+    # Install Maestro step).
+    #
+    # AND NOTE A `paths:` FILTER WOULD NOT HELP the cost side anyway: nearly
+    # every PR here touches lib/**, which is iOS-relevant, so "PRs touching
+    # iOS-relevant paths" is in practice "all PRs".
+    #
+    # WHY iOS clearState IS HARSHER THAN ANDROID'S, which is probably where a
+    # root cause lives: the simulator log shows Maestro implementing
+    # `clearState: true` on iOS as uninstall + reinstall — a brand-new bundle
+    # container and a genuinely cold start for every one of the 14 flows,
+    # which also discards most of the warm-up launch below. On Android
+    # clearState clears app data and leaves the app installed.
+    #
+    # REQUIRED-CHECK INTERACTION, so nobody re-derives it: main's only
+    # required status check today is `pgtap`. `ios` must not be made required
+    # until the trigger is widened AND the flake is fixed. Note the shape
+    # that deadlocks: a workflow-level `paths:` filter means the workflow
+    # never runs, so no `ios` check run is ever created and a required check
+    # waits forever. A job-level `if` skip like this one is not that — it
+    # still produces a skipped check run. db.yml's header records the same
+    # trap from the other side: `pgtap` IS required, so it carries no
+    # `paths:` filter and instead always runs and decides internally whether
+    # to pay for the stack. That is the pattern to copy if `ios` ever needs
+    # to be both required and conditional.
+    #
+    # WIDEN THIS on either of the triggers named above — a genuine iOS-only
+    # regression that reached main, or the dispatch path falling out of use.
+    # The flake is not the gate any more; it is a ~3%-of-runs tax you would
+    # be accepting, and worth accepting once the job has a catch record.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
