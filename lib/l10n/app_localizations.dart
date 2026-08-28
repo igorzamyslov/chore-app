@@ -1146,29 +1146,47 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get memberEditColorLabel;
 
-  /// T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed).
-  ///
-  /// In en, this message translates to:
-  /// **'This profile is linked to an account, so it can\'t be removed here.'**
-  String get memberEditDeleteBlockedClaimed;
-
   /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
   ///
   /// In en, this message translates to:
   /// **'A household needs at least one member, so this one can\'t be removed.'**
   String get memberEditDeleteBlockedLastMember;
 
-  /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).
+  /// Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.'**
+  String get memberEditDeleteBlockedSelf;
+
+  /// Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This profile is used on someone else\'s phone. Sign in and connect to the online household to remove it.'**
+  String get memberEditDeleteBlockedOffline;
+
+  /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is actually removable (see _DeleteGate in member_edit_sheet.dart). Unchanged between the unclaimed and claimed cases; only the body differs.
   ///
   /// In en, this message translates to:
   /// **'Delete {memberName}?'**
   String memberDeleteDialogTitle(String memberName);
 
-  /// Body of the member delete-confirmation dialog, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior).
+  /// Body of the member delete-confirmation dialog for an UNCLAIMED member, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior). A claimed member gets memberRemoveDialogBodyClaimed instead.
   ///
   /// In en, this message translates to:
   /// **'This removes {memberName} from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to {memberName} open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.'**
   String memberDeleteDialogBody(String memberName);
+
+  /// Body of the member-removal confirm dialog for a CLAIMED member (spec docs/specs/household-lifecycle.md §3.2). Used instead of memberDeleteDialogBody; adds what happens on the removed person's own phone, which is the only consequence the person tapping Delete cannot see from here.
+  ///
+  /// In en, this message translates to:
+  /// **'{memberName} uses this household on their own phone. Removing them stops that phone from syncing — it keeps everything it already has, as its own local copy. Their profile and history stay here with the household: rotation chores drop them from the turn order, chores fixed to them open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.'**
+  String memberRemoveDialogBodyClaimed(String memberName);
+
+  /// Inline error shown in the member edit sheet when the remove_member call failed (spec docs/specs/household-lifecycle.md §3.2). The one action in this app whose failure is surfaced rather than swallowed into a silent retry, deliberately overriding docs/specs/sync-backend.md §8.3: it needs the network, it changed nothing, and the person the user tried to remove is still in the household.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t remove {memberName}. This needs a connection to the online household — nothing was changed. Try again.'**
+  String memberRemoveError(String memberName);
 
   /// Title of the household-rename bottom sheet (spec docs/feedback/2026-08-01-ux-audit.md A2), opened from the Members screen's household-name row.
   ///

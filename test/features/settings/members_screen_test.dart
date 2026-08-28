@@ -38,6 +38,40 @@ void main() {
     )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();
   }
 
+  /// Seeds a second member already claimed by [userId], so the edit sheet
+  /// under test is looking at somebody else's claimed profile.
+  ///
+  /// Writes `members.userId` directly: `user_id` is server-owned (only the
+  /// `create_household`/`claim_member`/`join_as_new_member` RPCs set it) and
+  /// no local flow can produce a claim in a widget test.
+  Future<Member> claimedMember(
+    AppDatabase database, {
+    required String name,
+    required String userId,
+  }) async {
+    final householdId = await currentHouseholdId(database);
+    final member = await HouseholdRepository(
+      database,
+    ).addMember(householdId, name: name, color: 0xFF8C7BC9);
+    await (database.update(
+      database.members,
+    )..where((tbl) => tbl.id.equals(member.id))).write(
+      MembersCompanion(userId: Value(userId)),
+    );
+    return member;
+  }
+
+  /// Marks this device linked to its bootstrap household, which together
+  /// with a signed-in [FakeAuthGateway] is what
+  /// `memberIdentityModeProvider` calls `pinned` -- the state the
+  /// `remove_member` RPC needs.
+  Future<void> linkThisDevice(AppDatabase database) async {
+    await SettingsRepository(database).setSyncLinked(
+      householdId: await currentHouseholdId(database),
+      linkedAt: DateTime.utc(2026),
+    );
+  }
+
   testChoreApp(
     'bootstrap-only state: Settings -> Members shows the household-name row '
     'plus exactly one member row, "Me"',
@@ -401,9 +435,9 @@ void main() {
   );
 
   testChoreApp(
-    'member delete action (spec A1) is hidden, not disabled, for a '
-    'claimed member -- T1.7: a visible explanation names the actual '
-    'reason in its place',
+    'member delete action is hidden, not disabled, for a claimed member '
+    'while this device is signed out and unlinked -- T1.7: a visible '
+    'explanation names the actual reason in its place',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -413,8 +447,7 @@ void main() {
         database,
       ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
       // Claim 'Me' directly (no local claim flow exists offline) so the
-      // "claimed members are undeletable" guard is exercised even though
-      // two members now exist.
+      // claimed-target gate is exercised even though two members now exist.
       await (database.update(
         database.members,
       )..where((tbl) => tbl.id.equals(me.id))).write(
@@ -431,10 +464,16 @@ void main() {
         find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
         findsOneWidget,
       );
+      // Claim state alone no longer blocks removal (spec
+      // `docs/specs/household-lifecycle.md` §3.2, F10) -- this test used to
+      // assert the retired `memberEditDeleteBlockedClaimed` copy ("linked to
+      // an account, so it can't be removed here"), which is now false. What
+      // still blocks HERE is that this device is signed out AND unlinked, so
+      // the `remove_member` RPC cannot be made at all.
       expect(
         find.text(
-          "This profile is linked to an account, so it can't be removed "
-          'here.',
+          "This profile is used on someone else's phone. Sign in and connect "
+          'to the online household to remove it.',
         ),
         findsOneWidget,
       );
@@ -585,6 +624,224 @@ void main() {
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();
       expect(find.text('by Me'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // Claimed-member removal (spec `docs/specs/household-lifecycle.md` §3.2,
+  // F10). Claim state alone no longer hides Delete: a claimed profile is
+  // removable via the `remove_member` RPC by ANY member (D-L2 -- there is
+  // no role gate). What still blocks is the last active member, the
+  // caller's own claimed row, and a claimed target this device cannot
+  // reach the server for.
+  // ---------------------------------------------------------------------
+
+  testChoreApp(
+    'claimed target, linked and signed in: Delete is shown (spec '
+    'docs/specs/household-lifecycle.md §3.2, D-L2 -- no role gate)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(FakeHouseholdGateway()),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('members.edit.deleteBlockedReason'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'own claimed row: Delete stays hidden and the reason points at Leave '
+    '(mirrors the server rejecting self-removal, §2.2)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(FakeHouseholdGateway()),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+      // A second member, so the last-member gate (which outranks this one)
+      // is not what hides Delete here.
+      await claimedMember(database, name: 'Anna', userId: 'anna-auth');
+      await (database.update(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).write(
+        const MembersCompanion(userId: Value('me')),
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+      expect(find.textContaining('your own profile'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'claimed target while signed in but NOT linked: Delete hidden, and the '
+    'reason explains the connection requirement rather than a permission',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(FakeHouseholdGateway()),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      // Deliberately NO linkThisDevice: signed in is not enough, the
+      // household must also be linked. Without this case a gate that
+      // checked only "signed in" would stay green.
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier('members.edit.delete'), findsNothing);
+      expect(find.textContaining('Sign in and connect'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  // Declared out here, not inside the callbacks, so the `overrides` list and
+  // the assertions below see the same gateway instance.
+  final gatewayForRemoval = FakeHouseholdGateway();
+  final failingGateway = FakeHouseholdGateway()
+    ..removeMemberError = Exception('offline');
+
+  testChoreApp(
+    'removing a claimed member: the confirm names the consequence for their '
+    'phone, and confirming calls remove_member then cleans up locally',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(gatewayForRemoval),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('members.edit.delete'));
+      await tester.pumpAndSettle();
+
+      // The claimed body, not the unclaimed one: the effect on the removed
+      // person's own phone is the one consequence the person tapping Delete
+      // cannot see from here.
+      expect(find.textContaining('their own phone'), findsOneWidget);
+
+      await tester.tap(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(gatewayForRemoval.removeMemberCalls, [anna.id]);
+      expect(find.text('Anna'), findsNothing);
+      final removed = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(anna.id))).getSingle();
+      expect(removed.deletedAt, isNotNull);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a failed removal is shown inline and changes nothing (spec '
+    'docs/specs/household-lifecycle.md §3.2)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'me', email: 'me@x.y'),
+        ),
+      ),
+      householdGatewayProvider.overrideWithValue(failingGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final anna = await claimedMember(
+        database,
+        name: 'Anna',
+        userId: 'anna-auth',
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${anna.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('members.edit.delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('members.edit.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      // The sheet stays open, says why, and Anna is still a member. This is
+      // the ONE failure this app surfaces rather than swallowing into a
+      // silent retry (deliberately overriding docs/specs/sync-backend.md
+      // §8.3): it needed the network, it changed nothing, and the person
+      // the user tried to remove is still here.
+      expect(
+        find.bySemanticsIdentifier('members.remove.error'),
+        findsOneWidget,
+      );
+      expect(find.textContaining("Couldn't remove Anna"), findsOneWidget);
+      final after = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(anna.id))).getSingle();
+      expect(after.deletedAt, isNull);
 
       handle.dispose();
     },
