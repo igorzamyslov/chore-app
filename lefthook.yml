@@ -46,14 +46,22 @@ pre-commit:
 
     - name: test
       # Both SUPABASE_* defines explicitly empty: `supabaseConfigured`
-      # (lib/app/supabase_config.dart) must be false for the whole suite,
-      # since `AppShell`'s `IndexedStack` builds the Settings tab's Account
-      # section (lib/features/settings/account_section.dart) for every
-      # single widget test regardless of which tab it navigates to — with
-      # Supabase "configured" but never `Supabase.initialize()`d (as in
-      # every test), `authGatewayProvider`'s default branch would construct
-      # a live `SupabaseAuthGateway` against an uninitialized client and
-      # crash the entire suite the moment it's watched.
+      # (lib/app/supabase_config.dart) must be false for the whole suite.
+      # With Supabase "configured" but never `Supabase.initialize()`d (as in
+      # every test), `authGatewayProvider`'s default branch would construct a
+      # live `SupabaseAuthGateway` against an uninitialized client and crash
+      # the moment it is watched — and it is watched by the Settings tab's
+      # Account section (lib/features/settings/account_section.dart), i.e. by
+      # every widget test that opens the Settings tab and every E2E flow that
+      # reaches it.
+      #
+      # This used to say the shell's `IndexedStack` builds that section for
+      # every single widget test regardless of which tab it navigates to. Not
+      # true since D-1 (wave 3): `AppShell` is now a `PageView` whose
+      # `allowImplicitScrolling` is deliberately false, so its viewport cache
+      # extent is zero and only the VISIBLE page is built at all. Corrected
+      # while executing backlog A-2b, whose design turns on exactly this. The
+      # defines are still required, just for a smaller set of tests.
       run: env -u GIT_DIR -u GIT_INDEX_FILE flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
 
     - name: pubspec-lock-in-sync
