@@ -65,21 +65,32 @@ jobs:
         # DUMP TO A FILE, NEVER `aapt2 | grep -q` (this step and the two
         # after it all follow this; changed 2026-08-28, and each does its own
         # dump so no one of them depends on another surviving future edits).
-        # Actions runs every `run` block
-        # under `bash -e -o pipefail`. `grep -q` exits the instant it
-        # matches, aapt2 then takes SIGPIPE and returns 141, and `pipefail`
-        # promotes that to the pipeline's status -- so a SUCCESSFUL match
-        # reports failure and the `||` branch fires with a message accusing
-        # the APK of the exact thing it just proved. Demonstrated locally:
-        # the same grep against the same content returns 0 from a file and
-        # 141 through a pipe once the dump exceeds the 64KB pipe buffer.
-        # It has never fired here only because this manifest's dump is a few
-        # KB, so aapt2 finishes writing before grep exits -- i.e. these gates
-        # were one plugin's worth of manifest growth away from failing every
-        # release, at tag time, for a reason having nothing to do with the
-        # thing being asserted. Redirecting first also separates "aapt2
-        # itself broke" (caught by `-e` on the dump line) from "the assertion
-        # failed", which the pipe form conflated.
+        #
+        # `grep -q` exits the instant it matches, so aapt2 takes SIGPIPE and
+        # returns 141. With `pipefail` set, that becomes the pipeline's
+        # status -- so a SUCCESSFUL match reports failure and the `||` branch
+        # fires with a message accusing the APK of the exact thing it just
+        # proved. Verified both ways locally: with `pipefail` set, the same
+        # grep over the same content exits 0 reading a file and 1 through a
+        # pipe, once the producer writes past the 64KB pipe buffer.
+        #
+        # BE PRECISE ABOUT WHY THIS IS NOT ALREADY BROKEN, because the
+        # obvious reading is wrong in both directions. `pipefail` is NOT in
+        # effect here: a bare `run:` gets GitHub's default `bash -e {0}`, and
+        # pipefail arrives only with an explicit `shell: bash` or a
+        # `defaults.run.shell: bash` -- neither of which any workflow in this
+        # repo sets. So the piped form worked, and would have kept working.
+        # It is a LATENT trap, not a live bug: adding `shell: bash` is a
+        # commonly recommended hardening, and the day someone does it this
+        # gate starts failing every release, at tag time, blaming the
+        # artifact for something it just demonstrated. The second condition
+        # is a dump larger than 64KB, which this manifest (~13KB) is not yet.
+        # Two independent latches, both plausible, and the failure lands on
+        # whoever is trying to ship. Removed rather than documented.
+        #
+        # Redirecting first also separates "aapt2 itself broke" (caught by
+        # `-e` on the dump line) from "the assertion failed", which the pipe
+        # form conflated into one exit status.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump permissions build/app/outputs/flutter-apk/app-release.apk \
@@ -99,7 +110,7 @@ jobs:
         # every emulator and E2E run.
         #
         # Dumped to a file rather than piped -- see the INTERNET check above
-        # for why `aapt2 | grep -q` is a false-failure hazard under pipefail.
+        # for why `aapt2 | grep -q` is a latent false-failure hazard.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
@@ -146,7 +157,7 @@ jobs:
         # been sampled, and an unverified pattern in this step is worse than
         # no pattern at all.
         # Dumped to a file rather than piped -- see the INTERNET check above
-        # for why `aapt2 | grep -q` is a false-failure hazard under pipefail.
+        # for why `aapt2 | grep -q` is a latent false-failure hazard.
         run: |
           AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)"
           "$AAPT" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml \
