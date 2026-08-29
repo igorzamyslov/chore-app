@@ -470,7 +470,6 @@ class _SentenceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final trailingIcon = trailing;
 
     return Material(
       color: Colors.transparent,
@@ -496,7 +495,7 @@ class _SentenceChip extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Flexible(child: child),
-                  if (trailingIcon != null) trailingIcon,
+                  ?trailing,
                 ],
               ),
             ),

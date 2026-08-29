@@ -189,7 +189,9 @@ class RepeatControls extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.event_upcoming, size: 18, color: colorScheme.primary),
+              // The plan named `Icons.event_upcoming`, which does not exist in
+              // Flutter 3.44.8's Icons class.
+              Icon(Icons.event, size: 18, color: colorScheme.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
