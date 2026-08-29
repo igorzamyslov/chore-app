@@ -218,6 +218,15 @@ void main() {
       isTrue,
       reason: 'two glyphs must stay inside the avatar at the default radius',
     );
+    // PROBE (temporary): force a failure that reports the measured advance
+    // and the resolved font family, to settle whether widget tests here draw
+    // Inter or the Ahem-style FlutterTest font.
+    expect(
+      'width=${textRect.width} height=${textRect.height} '
+          'fontSize=${tester.widget<Text>(find.text('WM')).style!.fontSize} '
+          'family=${tester.widget<Text>(find.text('WM')).style!.fontFamily}',
+      'PROBE',
+    );
     expect(
       tester.widget<Text>(find.text('WM')).style!.fontSize,
       greaterThanOrEqualTo(11),
