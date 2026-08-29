@@ -275,7 +275,7 @@ jobs:
           path: ~/.maestro/tests/
           retention-days: 14
 
-      # ── A-6 blank-frame amplifier (dispatch-only) ─────────────────────
+      # ---- A-6 blank-frame amplifier (dispatch-only) ------------------
       # WHY THIS EXISTS. The flake is ~0.4% per flow, so waiting for a
       # natural reproduction is hopeless and every recorded observation of
       # it comes from a single expired artifact. This step repeats the
@@ -297,6 +297,37 @@ jobs:
       #
       # It never fails the job. The output IS the result, and a red run
       # here would only obscure how many cycles were actually collected.
+      - name: Fingerprint this runner (A-6)
+        # ON EVERY AMPLIFIER RUN, PASS OR FAIL, and that is the point. The
+        # flake's history clumps -- 9 of 10 reds inside 2 of 61 runs -- which
+        # is the shape of a per-runner or per-boot condition rather than an
+        # independent per-launch one. A condition like that can only ever be
+        # found by CORRELATING reproductions against the machines that
+        # produced them, and nothing can be correlated that was not recorded
+        # on the clean runs too. A reproduction carrying no fingerprint is
+        # worth a fraction of one that does.
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        run: |
+          set -u
+          OUT="$RUNNER_TEMP/a6-amplifier"
+          mkdir -p "$OUT"
+          {
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "sha=${{ github.sha }}"
+            echo "ImageOS=${ImageOS:-unknown}"
+            echo "ImageVersion=${ImageVersion:-unknown}"
+            echo "runner_arch=${RUNNER_ARCH:-unknown}"
+            echo "hw_ncpu=$(sysctl -n hw.ncpu)"
+            echo "hw_memsize=$(sysctl -n hw.memsize)"
+            echo "cpu_brand=$(sysctl -n machdep.cpu.brand_string)"
+            echo "--- sw_vers ---"; sw_vers
+            echo "--- xcodebuild ---"; xcodebuild -version
+            echo "--- booted device ---"
+            xcrun simctl list devices booted
+            echo "--- runtimes ---"
+            xcrun simctl list runtimes
+          } | tee "$OUT/runner-fingerprint.txt"
       - name: Amplify the blank-frame flake (A-6)
         if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
         env:
@@ -307,42 +338,61 @@ jobs:
           MAESTRO="$HOME/.maestro/bin/maestro"
           OUT="$RUNNER_TEMP/a6-amplifier"
           mkdir -p "$OUT"
-
-          # ONE continuous stream for the whole step, not one per cycle:
-          # os_log's stream takes a moment to attach, which a per-cycle
-          # stream would race against the very launch it exists to capture.
-          # Per-cycle correlation comes from the timestamps in results.csv.
-          xcrun simctl spawn booted log stream --level=debug --style=syslog \
-            --predicate 'process == "Runner"' > "$OUT/runner.log" 2>&1 &
-          RUNNER_LOG_PID=$!
-          xcrun simctl spawn booted log stream --style=syslog \
-            --predicate 'process == "SpringBoard" OR process == "backboardd"' \
-            > "$OUT/springboard.log" 2>&1 &
-          SYSTEM_LOG_PID=$!
+          DEVICE_ID=$(xcrun simctl list devices booted \
+            | grep -oE "[0-9A-F-]{36}" | head -1)
+          echo "device=$DEVICE_ID" >> "$OUT/runner-fingerprint.txt"
 
           # MUST equal the probe flow's `repeat.times`. The probe repeats
-          # internally so that Maestro's ~25s of JVM start, driver install
-          # and teardown is paid once per batch instead of once per cycle --
-          # measured at better than 2x more launches per runner-minute. Only
-          # the outer loop count is derived from it; the cycles actually
-          # executed are COUNTED from the device log below, so a mismatch
-          # here understates or overstates the loop, never the result.
+          # internally so Maestro's ~25s of JVM start, driver install and
+          # teardown is paid once per batch instead of once per cycle.
+          # 25 is also deliberately close to the real job's 14 flows, which
+          # makes a batch a rough REPLICA of one `ios` run: one boot, one
+          # warm-up launch, then a couple of dozen cold starts.
           BATCH=25
           batches=$(( (CYCLES + BATCH - 1) / BATCH ))
 
-          echo "batch,started_utc,seconds,launches,result,verdict,png_bytes" \
+          # A FRESH BOOT PER BATCH, which is the experiment's real subject.
+          # If the condition is per-boot rather than per-runner, cycles 26+
+          # on one boot measure almost nothing, and this is what separates
+          # the two: reproductions spread across the boots of many runners
+          # means per-boot; reproductions concentrated in every boot of a
+          # few runners means per-runner. Same shutdown/boot/install/warm-up
+          # sequence as the `Boot simulator` step, so a batch reproduces the
+          # real job's starting conditions rather than an artificial one.
+          reboot_simulator() {
+            xcrun simctl shutdown "$DEVICE_ID" >/dev/null 2>&1 || true
+            xcrun simctl boot "$DEVICE_ID"
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+            xcrun simctl install booted build/ios/iphonesimulator/Runner.app
+            xcrun simctl launch booted "$APP_ID" >/dev/null 2>&1 || true
+            sleep 20
+            xcrun simctl terminate booted "$APP_ID" >/dev/null 2>&1 || true
+          }
+
+          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png_bytes" \
             > "$OUT/results.csv"
           failures=0
           launched=0
           for i in $(seq 1 "$batches"); do
             started=$(date -u +%H:%M:%S)
+            boot_start=$SECONDS
+            reboot_simulator
+            boot_s=$((SECONDS - boot_start))
+
+            # Streams are per batch because a shutdown kills them. They are
+            # started BEFORE Maestro and given a moment to attach, so the
+            # batch's first launch is captured like every other one.
+            xcrun simctl spawn booted log stream --level=debug \
+              --style=syslog --predicate 'process == "Runner"' \
+              > "$OUT/batch-$i.runner.log" 2>&1 &
+            runner_log_pid=$!
+            xcrun simctl spawn booted log stream --style=syslog \
+              --predicate 'process == "SpringBoard"' \
+              > "$OUT/batch-$i.system.log" 2>&1 &
+            system_log_pid=$!
+            sleep 3
+
             start=$SECONDS
-            # Byte offset into the continuous stream, so this batch can be
-            # sliced out of it exactly. Also the only reliable way to scope
-            # the VM-service URL below to the FAILING launch: every cycle
-            # prints one, and the newest line in the whole file may belong
-            # to an earlier cycle's now-dead process.
-            log_mark=$(wc -c < "$OUT/runner.log")
             png_bytes=0
             if "$MAESTRO" test --env APP_ID="$APP_ID" \
                  e2e/amplify/blank_frame_probe.yaml \
@@ -376,24 +426,21 @@ jobs:
                 "$OUT/batch-$i.maestro-debug" 2>/dev/null || true
 
               # THE PAYLOAD. A debug build starts the Dart VM service and
-              # prints its URL (auth token included) to os_log, which the
+              # prints its URL, auth token included, to os_log, which the
               # stream above has already captured; a simulator shares the
               # host's loopback, so the runner can talk to it directly --
-              # this is the same channel `flutter attach` uses. The VM
-              # service answers JSON-RPC over plain HTTP GET, so `getStack`
-              # for every isolate gives the exact Dart frames the hung
-              # launch is sitting on, main isolate AND drift's background
-              # database isolate. That distinguishes "awaiting a
-              # path_provider channel reply that never came" from "awaiting
-              # a drift isolate handshake that never completed" from "not
-              # awaiting anything, so the hang is below Dart" -- none of
+              # the same channel `flutter attach` uses. The VM service
+              # answers JSON-RPC over plain HTTP GET, so `getStack` for
+              # every isolate names the Dart frames the hung launch sits
+              # on, main isolate AND drift's background database isolate.
+              # That separates "awaiting a path_provider channel reply that
+              # never came" from "awaiting drift's isolate handshake" from
+              # "awaiting nothing, so the hang is below Dart" -- none of
               # which a screenshot or a hierarchy can tell apart.
               sleep 3   # let os_log flush the tail of this launch
-              tail -c "+$((log_mark + 1))" "$OUT/runner.log" \
-                > "$OUT/batch-$i.launch.log"
               vm_url=$(grep -o \
                 'The Dart VM service is listening on http://[^ ]*' \
-                "$OUT/batch-$i.launch.log" | tail -1 \
+                "$OUT/batch-$i.runner.log" | tail -1 \
                 | sed 's|.*listening on ||')
               if [ -n "$vm_url" ]; then
                 echo "VM service: $vm_url" > "$OUT/batch-$i.vm.txt"
@@ -418,21 +465,18 @@ jobs:
               # expensive and the VM service's plain-HTTP RPC is the one
               # instrument above that could simply have been removed
               # upstream. A simulator app is an ordinary host process, so
-              # `sample` gives native backtraces for every thread -- the
-              # platform thread, the Flutter UI (Dart) thread, the raster
-              # thread and drift's isolate worker -- with no cooperation
-              # from Dart at all. It is also the only instrument that still
-              # says something if the hang turns out to be below Dart.
-              # tail, not head: a batch holds up to 25 launches and the
-              # one still on screen is the LAST. `head` would sample a pid
-              # that died 24 cycles ago, or worse, one the system has
-              # since reused.
+              # `sample` gives native backtraces for every thread with no
+              # cooperation from Dart -- and it is the only instrument that
+              # still reports if Dart never started at all.
+              #
+              # tail, not head: a batch holds up to 25 launches and the one
+              # still on screen is the LAST. `head` would sample a pid that
+              # exited 24 cycles ago, or a recycled one.
               app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
-                "$OUT/batch-$i.launch.log" | tail -1 \
-                | tr -dc '0-9')
+                "$OUT/batch-$i.runner.log" | tail -1 | tr -dc '0-9')
               if [ -n "$app_pid" ]; then
-                /usr/bin/sample "$app_pid" 3 -file "$OUT/batch-$i.sample.txt" \
-                  > /dev/null 2>&1 || true
+                /usr/bin/sample "$app_pid" 3 \
+                  -file "$OUT/batch-$i.sample.txt" > /dev/null 2>&1 || true
               fi
 
               if grep -q 'app\.loading' "$OUT/batch-$i.hierarchy.json"; then
@@ -444,23 +488,24 @@ jobs:
               fi
               echo "::warning::A-6 batch $i reproduced the flake: $verdict"
             fi
-            elapsed=$((SECONDS - start))
+            run_s=$((SECONDS - start))
+
+            kill "$runner_log_pid" "$system_log_pid" 2>/dev/null || true
             # The AUTHORITATIVE cycle count: every launch of a debug build
             # prints exactly one VM-service line, so counting them in this
-            # batch's slice of the device log reports the launches that
-            # really happened -- including the partial batch a reproduction
-            # cuts short, which the arithmetic would otherwise round up.
-            sleep 2
-            n=$(tail -c "+$((log_mark + 1))" "$OUT/runner.log" \
-              | grep -c 'Dart VM service is listening' || true)
+            # batch's own log reports the launches that really happened --
+            # including the partial batch a reproduction cuts short, which
+            # the arithmetic would otherwise round up.
+            n=$(grep -c 'Dart VM service is listening' \
+              "$OUT/batch-$i.runner.log" || true)
             launched=$((launched + n))
-            echo "$i,$started,$elapsed,$n,$result,$verdict,$png_bytes" \
+            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes" \
               >> "$OUT/results.csv"
-            echo "batch $i: $result, $n launches in ${elapsed}s ($verdict)"
+            echo "batch $i: $result, $n launches in ${run_s}s ($verdict)"
           done
 
-          kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
           echo "=== A-6: $failures reproductions, $launched cold launches ==="
+          cat "$OUT/runner-fingerprint.txt"
           cat "$OUT/results.csv"
       - name: Upload A-6 amplifier artifacts
         if: always() && fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
