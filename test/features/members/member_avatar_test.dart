@@ -235,6 +235,41 @@ void main() {
     // back exactly its constraint (21.0), so `lessThan` catches a wrap that
     // `lessThanOrEqualTo` would wave through. In Inter SemiBold two uppercase
     // glyphs at 11px measure about 15px against 21px of room.
+    // PROBE (temporary): measure UNCONSTRAINED text, which is the only way
+    // to tell whether FontLoader actually took effect.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: appLightTheme,
+        home: Scaffold(
+          body: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'WM',
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'WM',
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final explicit = tester.getSize(find.text('WM').first).width;
+    final inherited = tester.getSize(find.text('WM').last).width;
+    expect(
+      'explicitInter=$explicit inheritedDefault=$inherited',
+      'PROBE',
+    );
+
     await _pump(tester, appLightTheme, name: 'Wm', color: stored);
     expect(tester.takeException(), isNull);
     final textRect = tester.getRect(find.text('WM'));
