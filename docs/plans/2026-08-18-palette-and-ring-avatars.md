@@ -78,13 +78,29 @@ below:**
   to a `find.descendant(... matching: find.byType(MemberAvatar))`.
 - Task 3's "two letters fit inside the smallest avatar" assertion compares the
   glyph width against the ring's *inner* diameter using arithmetic derived from
-  Inter (≈1.35 em for two uppercase glyphs). **Widget tests do not load Inter**
-  — this repo has no `flutter_test_config.dart`, so text falls back to the
-  `FlutterTest` font, where every glyph is a full em. `"WM"` at the 11px floor is
-  therefore 22px wide against a 21px inner diameter, and the assertion as
-  written fails on a correct implementation. Rewritten as a rect-containment
-  check against the avatar's own box, which is the property that actually
-  matters and does not depend on the font's advance width.
+  Inter (~1.35 em for two uppercase glyphs). **That property cannot be asserted
+  in a widget test in this repo at all**, which took three CI measurements to
+  establish and is recorded here so nobody re-derives it:
+  - There is no `flutter_test_config.dart` anywhere and nothing calls
+    `FontLoader`, so `flutter test` draws the Ahem-style `FlutterTest` font.
+    **Measured: `'WM'` at 11px/w600 is 21.87px — 1.99 em per glyph.** The same
+    21.87 comes back whether the family is inherited from the theme or set
+    explicitly to `'Inter'`.
+  - Adding a `FontLoader('Inter')` over the bundled TTFs in `setUpAll` did
+    **not** change that number. The fonts are declared under pubspec `fonts:`
+    rather than `assets:`, so `rootBundle.load` hands the loader nothing usable
+    and it silently no-ops — no exception, no effect.
+  - So in the test font `'WM'` wants 21.87px inside a 21px ring, wraps, and the
+    paragraph reports its own constraint (21.0). A containment check against
+    that box therefore passes regardless of the avatar's geometry (**vacuous**),
+    and a strict inner-diameter check fails on correct code (**false**).
+  The test now asserts only what is font-independent — the 24px box, the ring
+  width, the 11px floor, the text-scale cap, and that nothing throws — and says
+  so in a comment at the top of the file. The plan's *arithmetic* stands and the
+  production code is correct: Inter really does fit ~15px of glyphs in 21px of
+  room. It is the *measurement* that this harness cannot perform, so glyph fit
+  stays a visual-QA gate (`design-language.md`, definition of visual done).
+  Backlogged as **G-14**.
 
 ---
 

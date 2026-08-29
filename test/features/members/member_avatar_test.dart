@@ -74,6 +74,34 @@ bool _hasLoneSurrogate(String value) {
 }
 
 void main() {
+  // NOTE ON FONTS, measured in CI rather than assumed -- it decides what
+  // this file can honestly assert.
+  //
+  // Widget tests here draw the Ahem-style `FlutterTest` font, not the
+  // bundled Inter: there is no `flutter_test_config.dart` anywhere in the
+  // repo and nothing calls `FontLoader`. Measured: 'WM' at 11px/w600 comes
+  // back **21.87px**, i.e. 1.99 em per glyph -- the SDK's "square whose size
+  // equals the font size". The same 21.87 is returned whether the family is
+  // inherited from the theme or set explicitly to 'Inter', and adding a
+  // `FontLoader('Inter')` over the bundled TTFs in `setUpAll` did NOT change
+  // it (the fonts are declared under pubspec `fonts:` rather than `assets:`,
+  // so `rootBundle.load` gives the loader nothing usable and it silently
+  // no-ops).
+  //
+  // Consequence, stated plainly rather than papered over: **whether two
+  // glyphs physically fit inside the ring cannot be asserted here.** In the
+  // test font 'WM' wants 21.87px inside a 21px ring, so it wraps and the
+  // paragraph reports its constraint (21.0) -- which makes a containment
+  // check pass no matter what the avatar's geometry is, and a strict
+  // inner-diameter check fail on correct code. Both are worthless.
+  //
+  // So this file asserts only what is font-independent: the box size, the
+  // ring width, the 11px font floor, the text-scale cap, and that nothing
+  // throws. Real glyph fit is a visual-QA gate (`docs/specs/design-
+  // language.md`, definition of visual done: light + dark at text scale 1.0
+  // and 2.0 on a Pixel-class emulator), and the arithmetic behind radius 12
+  // is recorded in the plan's R2.
+
   const stored = 0xFFD98E73; // renders 0xFFB96A4C light / 0xFFF0AF95 dark
 
   testWidgets('is a ring on the neutral surface, not a filled circle', (
@@ -196,28 +224,18 @@ void main() {
     expect((_decoration(tester).border! as Border).top.width, 1.5);
   });
 
-  testWidgets('two letters fit inside the smallest avatar without overflow', (
+  testWidgets('the smallest avatar renders two letters without throwing', (
     tester,
   ) async {
-    // R2: the default radius is 12 (a 24px box) precisely so two glyphs fit
-    // with margin. 'WM' is about the widest two-letter pair in the alphabet.
-    //
-    // Containment is measured against the avatar's own box, not the ring's
-    // inner diameter: widget tests never load Inter (this repo has no
-    // flutter_test_config.dart), so text falls back to the `FlutterTest`
-    // font, where every glyph is a FULL em -- 22px for 'WM' at the 11px
-    // floor, against Inter's ~15px. The font-independent property that
-    // matters is that the glyphs never escape the widget.
+    // R2 sized the default radius at 12 (a 24px box) so two glyphs fit with
+    // margin -- ~15px of Inter inside 21px of room. That margin is NOT
+    // asserted here; see the note at the top of this file for why it cannot
+    // be. What IS asserted is font-independent: the widest two-letter pair
+    // lays out without an exception, the box is the size R2 specified, and
+    // the glyphs never drop below the legibility floor.
     await _pump(tester, appLightTheme, name: 'Wm', color: stored);
     expect(tester.takeException(), isNull);
-    final textRect = tester.getRect(find.text('WM'));
-    final avatarRect = tester.getRect(find.byType(MemberAvatar));
-    expect(
-      avatarRect.contains(textRect.topLeft) &&
-          avatarRect.contains(textRect.bottomRight),
-      isTrue,
-      reason: 'two glyphs must stay inside the avatar at the default radius',
-    );
+    expect(tester.getSize(find.byType(MemberAvatar)), const Size(24, 24));
     expect(
       tester.widget<Text>(find.text('WM')).style!.fontSize,
       greaterThanOrEqualTo(11),
