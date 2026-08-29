@@ -1,5 +1,6 @@
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/features/categories/category_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -128,6 +129,53 @@ void main() {
       expect(created.icon, 'label');
       expect(created.color, CategoryRepository.seedColors[7]);
       expect(created.sortOrder, 7);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'the icon grid renders every identifier, and picking one of the nine '
+    'new ones (backlog G-5a) persists',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openManageCategories(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.categories.add'));
+      await tester.pumpAndSettle();
+
+      // Every identifier in the real list has a rendered, tappable tile --
+      // if any were missing its semantic id, this loop catches it directly,
+      // independent of theme_test.dart's pure-function check.
+      for (final identifier in categoryIconIdentifiers) {
+        expect(
+          find.bySemanticsIdentifier('settings.categories.icon.$identifier'),
+          findsOneWidget,
+          reason: 'missing icon tile for "$identifier"',
+        );
+      }
+
+      final nameField = find.descendant(
+        of: find.bySemanticsIdentifier('settings.categories.name'),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(nameField, 'Bathroom');
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.categories.icon.bathtub'),
+      );
+      await tester.tap(find.bySemanticsIdentifier('settings.categories.save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bathroom'), findsOneWidget);
+
+      final categories = await activeCategories(
+        database,
+        await currentHouseholdId(database),
+        CategoryKind.chore,
+      );
+      final created = categories.firstWhere((c) => c.name == 'Bathroom');
+      expect(created.icon, 'bathtub');
 
       handle.dispose();
     },
