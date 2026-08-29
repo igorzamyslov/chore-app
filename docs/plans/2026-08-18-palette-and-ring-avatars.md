@@ -79,12 +79,20 @@ below:**
 - Task 3's "two letters fit inside the smallest avatar" assertion compares the
   glyph width against the ring's *inner* diameter using arithmetic derived from
   Inter (≈1.35 em for two uppercase glyphs). **Widget tests do not load Inter**
-  — this repo has no `flutter_test_config.dart`, so text falls back to the
-  `FlutterTest` font, where every glyph is a full em. `"WM"` at the 11px floor is
-  therefore 22px wide against a 21px inner diameter, and the assertion as
-  written fails on a correct implementation. Rewritten as a rect-containment
-  check against the avatar's own box, which is the property that actually
-  matters and does not depend on the font's advance width.
+  — this repo has no `flutter_test_config.dart` and calls no `FontLoader`, so
+  text falls back to the `FlutterTest` font, where every glyph is a full em.
+  `"WM"` at the 11px floor therefore wants 22px inside a 21px ring and **wraps**;
+  the paragraph comes back exactly 21.0 wide (its own constraint), measured in
+  CI. **Corrected again 2026-08-29 after that measurement:** the plan's
+  arithmetic was RIGHT — the assertion was simply unmeasurable, not wrong. The
+  first fix here weakened it to rect containment against the avatar's box, which
+  a constraint-clamped paragraph satisfies trivially and which therefore could
+  never fail. The real fix is to load the font the app ships: a `setUpAll` with
+  `FontLoader('Inter')` over `Inter-Regular.ttf` and `Inter-SemiBold.ttf`, after
+  which the original inner-diameter comparison is both meaningful and true
+  (~15px of glyphs in 21px of room). Asserted with `lessThan`, not
+  `lessThanOrEqualTo`, precisely so a wrap — which returns the constraint
+  exactly — still fails.
 
 ---
 
