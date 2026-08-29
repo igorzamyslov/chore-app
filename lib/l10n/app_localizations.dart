@@ -828,25 +828,25 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 month after last done} other{{count} months after last done}}'**
   String choreFormAnchorCompletionSubtitleMonth(int count);
 
-  /// Monthly repeat chip label for 'day of month' mode; {ordinalDay} is the already locale-formatted ordinal day (e.g. '15th').
+  /// Retired 2026-08-29 (G-2): the monthly-mode options name the MODE now (see choreFormMonthlyModeDayOfMonth) because the concrete day lives in the repeat sentence's own chip; naming it in both places would be two things to keep in step. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the {ordinalDay}'**
   String monthlyDayOfMonthLabel(String ordinalDay);
 
-  /// Monthly repeat chip label for 'nth weekday of month' mode, e.g. 'On the 3rd Tuesday'. {ordinal} is already locale-formatted (e.g. '3rd'); {weekday} comes from intl's date formatting (e.g. 'Tuesday'), never hardcoded.
+  /// Retired 2026-08-29 (G-2): replaced by choreFormMonthlyModeWeekday, which names the mode rather than the derived ordinal and weekday -- those are now chips in the repeat sentence. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the {ordinal} {weekday}'**
   String monthlyNthWeekdayLabel(String ordinal, String weekday);
 
-  /// Monthly repeat chip label for the last occurrence of a weekday in the month, e.g. 'On the last Tuesday'. {weekday} comes from intl's date formatting, never hardcoded.
+  /// Retired 2026-08-29 (G-2): replaced by choreFormMonthlyModeWeekday, which names the mode rather than the derived weekday -- that is now a chip in the repeat sentence. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the last {weekday}'**
   String monthlyLastWeekdayLabel(String weekday);
 
-  /// Caption shown under the monthly pattern selector (and the weekly weekday chips when none are picked), pointing at the start date as the actual lever controlling the derived day/weekday.
+  /// Retired 2026-08-29 (G-2, docs/plans/2026-08-18-repeat-form-sentence.md): nothing in the repeat pattern derives from the start date any more. The weekly weekday set is always non-empty and the monthly day / ordinal / weekday are picked directly in the repeat sentence, so this caption would now be a lie. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'Follows the start date — change the start date to change the day.'**
