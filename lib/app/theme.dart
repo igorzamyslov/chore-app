@@ -476,12 +476,7 @@ IconData categoryIcon(String identifier) {
     case 'shopping_bag':
       return Icons.shopping_bag;
     case 'bathtub':
-      // INVERSION (temporary, reverted in the next commit): duplicates the
-      // 'home' mapping, to prove the invariant test's seen.add() assertion
-      // actually fires. Edited inside the body rather than by deleting the
-      // case, because deleting it would trip unused_element at analyze --
-      // and an analyze failure is not a valid red: the tests never ran.
-      return Icons.home;
+      return Icons.bathtub;
     case 'delete':
       // The "bins" category's trash-can glyph -- shares its identifier
       // name with the app's actual delete actions elsewhere, which is a
