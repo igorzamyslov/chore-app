@@ -405,8 +405,12 @@ jobs:
               # thread and drift's isolate worker -- with no cooperation
               # from Dart at all. It is also the only instrument that still
               # says something if the hang turns out to be below Dart.
+              # tail, not head: a batch holds up to 25 launches and the
+              # one still on screen is the LAST. `head` would sample a pid
+              # that died 24 cycles ago, or worse, one the system has
+              # since reused.
               app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
-                "$OUT/batch-$i.launch.log" | head -1 \
+                "$OUT/batch-$i.launch.log" | tail -1 \
                 | tr -dc '0-9')
               if [ -n "$app_pid" ]; then
                 /usr/bin/sample "$app_pid" 3 -file "$OUT/batch-$i.sample.txt" \
