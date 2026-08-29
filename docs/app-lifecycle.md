@@ -80,7 +80,22 @@ Covered by the existing specs/tests; lifecycle-relevant leftovers:
   release APK in `.github/workflows/release.yml` so it can't silently
   regress. iOS still backs up `Documents/` (where the database also
   lives) to iCloud by default; excluding it is tracked separately as
-  `docs/backlog.md` A-3b, deliberately out of scope for this fix. (b)
+  `docs/backlog.md` A-3b, deliberately out of scope for this fix.
+  **A-3b closed 2026-08-28** (`docs/plans/2026-08-28-a3b-ios-backup-exclusion.md`):
+  `ios/Runner/AppDelegate.swift` now sets `isExcludedFromBackup`
+  (`NSURLIsExcludedFromBackupKey`) on the app's `Documents` directory and
+  on the database's file names at every launch, best-effort. Two
+  consequences worth carrying forward. (i) `Documents/` as a whole is
+  excluded, matching what `allowBackup="false"` does on Android; a
+  future user-facing document placed there would silently get no backup.
+  (ii) Unlike the Android half, **nothing can assert this** — no
+  pull-request job compiles Swift and `release.yml` inspects an APK, so
+  there is no iOS equivalent of the `allowBackup` assertion. The only
+  automated guard is a name-mirror test
+  (`test/data/db/ios_backup_exclusion_test.dart`). The Supabase refresh
+  token is in `NSUserDefaults`, not the database, so it still restores;
+  that is benign, since the household link and pull cursor are in the
+  database. (b)
   shipped as the "Export data" settings row and is tracked further as
   `docs/backlog.md` G-3 (restore from a backup file).
 - Occurrence history grows unbounded — a non-issue at family scale for

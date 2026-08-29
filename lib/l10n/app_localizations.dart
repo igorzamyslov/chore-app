@@ -1146,29 +1146,47 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get memberEditColorLabel;
 
-  /// T1.7: shown in place of the vanished Delete button when the member being edited is claimed (has a userId) -- worded as an accident prevented, not a permission (spec D1: the household is flat, this isn't about who's allowed).
-  ///
-  /// In en, this message translates to:
-  /// **'This profile is linked to an account, so it can\'t be removed here.'**
-  String get memberEditDeleteBlockedClaimed;
-
   /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
   ///
   /// In en, this message translates to:
   /// **'A household needs at least one member, so this one can\'t be removed.'**
   String get memberEditDeleteBlockedLastMember;
 
-  /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is deletable (unclaimed, not the last active member).
+  /// Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.'**
+  String get memberEditDeleteBlockedSelf;
+
+  /// Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'This profile is used on someone else\'s phone. Sign in and connect to the online household to remove it.'**
+  String get memberEditDeleteBlockedOffline;
+
+  /// Title of the member delete-confirmation dialog (spec docs/feedback/2026-08-01-ux-audit.md A1), opened from the member edit sheet's delete action -- shown only when the member is actually removable (see _DeleteGate in member_edit_sheet.dart). Unchanged between the unclaimed and claimed cases; only the body differs.
   ///
   /// In en, this message translates to:
   /// **'Delete {memberName}?'**
   String memberDeleteDialogTitle(String memberName);
 
-  /// Body of the member delete-confirmation dialog, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior).
+  /// Body of the member delete-confirmation dialog for an UNCLAIMED member, stating the referential consequences plainly per spec docs/feedback/2026-08-01-ux-audit.md A1 (MemberService.deleteMember's exact behavior). A claimed member gets memberRemoveDialogBodyClaimed instead.
   ///
   /// In en, this message translates to:
   /// **'This removes {memberName} from the household. Rotation chores drop them from the turn order — converting to a fixed assignee or \"anyone\" if too few people are left. Chores fixed to {memberName} open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.'**
   String memberDeleteDialogBody(String memberName);
+
+  /// Body of the member-removal confirm dialog for a CLAIMED member (spec docs/specs/household-lifecycle.md §3.2). Used instead of memberDeleteDialogBody; adds what happens on the removed person's own phone, which is the only consequence the person tapping Delete cannot see from here.
+  ///
+  /// In en, this message translates to:
+  /// **'{memberName} uses this household on their own phone. Removing them stops that phone from syncing — it keeps everything it already has, as its own local copy. Their profile and history stay here with the household: rotation chores drop them from the turn order, chores fixed to them open up to anyone, and anything currently assigned to them becomes unassigned. Past history — who completed what — stays unchanged.'**
+  String memberRemoveDialogBodyClaimed(String memberName);
+
+  /// Inline error shown in the member edit sheet when the remove_member call failed (spec docs/specs/household-lifecycle.md §3.2). The one action in this app whose failure is surfaced rather than swallowed into a silent retry, deliberately overriding docs/specs/sync-backend.md §8.3: it needs the network, it changed nothing, and the person the user tried to remove is still in the household.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t remove {memberName}. This needs a connection to the online household — nothing was changed. Try again.'**
+  String memberRemoveError(String memberName);
 
   /// Title of the household-rename bottom sheet (spec docs/feedback/2026-08-01-ux-audit.md A2), opened from the Members screen's household-name row.
   ///
@@ -1415,6 +1433,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disconnect'**
   String get settingsAccountDisconnectConfirmAction;
+
+  /// Account-section row that leaves the online household (spec docs/specs/household-lifecycle.md §3.3, F9). Sits beside Disconnect, which is a different, purely local action. memberEditDeleteBlockedSelf quotes this exact label, so changing it means changing that string too.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the household'**
+  String get settingsAccountLeave;
+
+  /// Title of the leave-household confirm sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave {householdName}?'**
+  String householdLeaveConfirmTitle(String householdName);
+
+  /// Body of the leave-household confirm when other claimed members remain (spec §3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.'**
+  String get householdLeaveConfirmBody;
+
+  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  String get householdLeaveConfirmBodyLastMember;
+
+  /// Confirm button of the leave-household sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get householdLeaveConfirmAction;
+
+  /// Snackbar shown when the leave_household call failed. States plainly that nothing changed, so the retry is an ordinary retry rather than a repair.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t leave the household. This needs a connection — nothing was changed. Try again.'**
+  String get householdLeaveError;
+
+  /// Account-section row that permanently deletes the signed-in account (spec docs/specs/household-lifecycle.md §2.2, F11). Shown whenever signed in, linked or not: an account can exist with no household link, and GDPR erasure must not require linking first.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get settingsAccountDeleteAccount;
+
+  /// Title of the delete-account confirm sheet -- the FIRST of D-L6's two gates, and the one carrying D-L3's keep-or-delete-this-phone checkbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account?'**
+  String get accountDeleteConfirmTitle;
+
+  /// Body of the delete-account exit sheet when claimed members remain in the household(s). The export pointer deliberately lives on the FINAL dialog instead (D-L6/D-L7), where it is the last thing read before the point of no return.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account and your email address are deleted from the server. This can\'t be undone. Your profile stays with each household you\'re part of, so the others keep their history — you\'re just no longer linked to it.'**
+  String get accountDeleteConfirmBody;
+
+  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  String get accountDeleteConfirmBodyLastMember;
+
+  /// Confirm button of the delete-account sheet. Confirming here opens the final confirmation (D-L6); it does not start the deletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get accountDeleteConfirmAction;
+
+  /// Title of delete-account's FINAL confirmation (decision D-L6), shown after the shared exit sheet -- the last gate before an irreversible erasure. Same AlertDialog grammar as settingsResetConfirm2*, because both go through the one shared builder in destructive_confirm.dart.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account now?'**
+  String get accountDeleteFinalTitle;
+
+  /// Body of the final delete-account confirmation when the sheet's 'also delete this phone's copy' box was left UNCHECKED (the D-L3 default). Names the exact outcome the user just configured, which is the whole reason this dialog comes after the sheet rather than before it. 'Export data' is settingsExportEntry's exact label, under settingsDataSectionTitle -- the pointer has to be followable (D-L7).
+  ///
+  /// In en, this message translates to:
+  /// **'Your account and your email address are erased from the server. That can\'t be undone. This phone keeps everything it has, as its own local copy. To keep a copy of your data somewhere else first, use Export data under Settings → Data.'**
+  String get accountDeleteFinalBodyKeepPhone;
+
+  /// Body of the final delete-account confirmation when the sheet's checkbox WAS ticked. Deliberately reads differently from accountDeleteFinalBodyKeepPhone -- the point of confirming after the choice is that the two cases are distinguishable. 'Neither can be undone' is unique to this string and is what the widget test selects on.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account and your email address are erased from the server, and this phone\'s copy — members, chores and shopping list — is deleted too, so the app starts fresh. Neither can be undone. To keep a copy of your data first, use Export data under Settings → Data.'**
+  String get accountDeleteFinalBodyDeletePhone;
+
+  /// Destructive action of the final delete-account confirmation; the next thing that happens is the RPC.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get accountDeleteFinalAction;
+
+  /// Snackbar shown when account deletion failed. 'Try again' is literal: the RPC runs before anything local moves, so a failure leaves the account and the device exactly as they were.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete your account. This needs a connection — nothing was changed. Try again.'**
+  String get accountDeleteError;
 
   /// Snackbar shown when sending the magic-link email fails.
   ///

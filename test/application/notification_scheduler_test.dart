@@ -8,18 +8,37 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_digest_notification_plugin.dart';
 
-/// A [FakeDigestNotificationPlugin] that pauses the very FIRST
-/// [zonedSchedule] call it ever receives -- across ANY caller -- until
-/// [release] is called, then behaves normally forever after.
+/// Which kind of plugin call [_GatedPlugin] and [_ThrowingOncePlugin] act
+/// on.
 ///
-/// Used only by the FIX 2 serialization test below, to force two
-/// concurrent [NotificationScheduler.applyDigestPlans] calls to actually
-/// overlap in time, deterministically: a fake with uniform latency would
-/// make both calls proceed in lockstep and prove nothing about ordering.
-/// Mirrors `_PausingPlugin` in `test/app/digest_reschedule_test.dart`,
-/// gated on call order rather than notification id since both callers'
-/// plans use the same ids.
+/// `applyDigestPlans` and `cancelDigest` ride one shared write queue
+/// (backlog G-12), so the interleaving tests below have to be able to pause
+/// either side of it.
+enum _DigestCall {
+  /// A `zonedSchedule` call, i.e. `applyDigestPlans` arming a slot.
+  schedule,
+
+  /// A `cancel` call, i.e. `cancelDigest` (or an apply's null slot)
+  /// clearing one.
+  cancel,
+}
+
+/// A [FakeDigestNotificationPlugin] that pauses the very FIRST call of
+/// [target]'s kind it ever receives -- across ANY caller -- until [release]
+/// is called, then behaves normally forever after.
+///
+/// Used only by the serialization tests below, to force two concurrent
+/// digest writes to actually overlap in time, deterministically: a fake
+/// with uniform latency would make both calls proceed in lockstep and
+/// prove nothing about ordering. Mirrors `_PausingPlugin` in
+/// `test/app/digest_reschedule_test.dart`, gated on call order rather than
+/// notification id since both callers' plans use the same ids.
 class _GatedPlugin extends FakeDigestNotificationPlugin {
+  _GatedPlugin({this.target = _DigestCall.schedule});
+
+  /// Which kind of call gets paused.
+  final _DigestCall target;
+
   final Completer<void> _gate = Completer<void>();
   bool _hasPaused = false;
 
@@ -28,6 +47,14 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     if (!_gate.isCompleted) {
       _gate.complete();
     }
+  }
+
+  Future<void> _pauseIfFirst(_DigestCall kind) async {
+    if (target != kind || _hasPaused) {
+      return;
+    }
+    _hasPaused = true;
+    await _gate.future;
   }
 
   @override
@@ -41,9 +68,62 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     String? payload,
     bool actionable = false,
   }) async {
-    if (!_hasPaused) {
-      _hasPaused = true;
-      await _gate.future;
+    await _pauseIfFirst(_DigestCall.schedule);
+    await super.zonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      fireAt: fireAt,
+      channelName: channelName,
+      channelDescription: channelDescription,
+      payload: payload,
+      actionable: actionable,
+    );
+  }
+
+  @override
+  Future<void> cancel(int id) async {
+    await _pauseIfFirst(_DigestCall.cancel);
+    await super.cancel(id);
+  }
+}
+
+/// A [FakeDigestNotificationPlugin] whose FIRST call of [target]'s kind
+/// throws, then behaves normally forever after.
+///
+/// Used by the error-isolation guards below (backlog G-12): a failed digest
+/// write must surface to the caller that made THAT call, and must not
+/// permanently jam the shared write queue for everything after it.
+class _ThrowingOncePlugin extends FakeDigestNotificationPlugin {
+  _ThrowingOncePlugin({required this.target});
+
+  /// Which kind of call throws, once.
+  final _DigestCall target;
+
+  bool _hasThrown = false;
+
+  bool _shouldThrow(_DigestCall kind) {
+    if (target != kind || _hasThrown) {
+      return false;
+    }
+    _hasThrown = true;
+    return true;
+  }
+
+  @override
+  Future<void> zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime fireAt,
+    required String channelName,
+    required String channelDescription,
+    String? payload,
+    bool actionable = false,
+  }) async {
+    if (_shouldThrow(_DigestCall.schedule)) {
+      // Stands in for the platform channel failing mid-horizon.
+      throw StateError('zonedSchedule failed');
     }
     await super.zonedSchedule(
       id: id,
@@ -55,6 +135,15 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
       payload: payload,
       actionable: actionable,
     );
+  }
+
+  @override
+  Future<void> cancel(int id) async {
+    if (_shouldThrow(_DigestCall.cancel)) {
+      // Stands in for the platform channel failing mid-horizon.
+      throw StateError('cancel failed');
+    }
+    await super.cancel(id);
   }
 }
 
@@ -549,4 +638,157 @@ void main() {
       expect(plugin.requestPermissionCallCount, 0);
     });
   });
+
+  group(
+    'cancelDigest is serialized against applyDigestPlans (backlog G-12)',
+    () {
+      List<DigestPlan?> fullHorizon(int count) => [
+        for (var k = 0; k < digestHorizonSlots; k++)
+          DigestPlan(
+            fireAt: DateTime(2026, 7, 24 + k, 8),
+            dueTodayCount: count,
+            overdueCount: 0,
+          ),
+      ];
+
+      test(
+        'a cancel issued during an in-flight apply runs AFTER it, so a wipe '
+        'cannot be left with slots the apply re-armed behind its back',
+        () async {
+          final gatedPlugin = _GatedPlugin();
+          final gatedScheduler = NotificationScheduler(
+            plugin: gatedPlugin,
+            localeResolver: () => const Locale('en'),
+          );
+
+          // The apply (e.g. the controller's recompute, or the notification
+          // action isolate's rewrite) starts first and blocks on the gate
+          // BEFORE writing slot 0.
+          final apply = gatedScheduler.applyDigestPlans(fullHorizon(1));
+          await Future<void>.delayed(Duration.zero);
+
+          // The wipe's cancel arrives while the apply is paused mid-loop.
+          final cancel = gatedScheduler.cancelDigest();
+          await Future<void>.delayed(Duration.zero);
+
+          // Nothing gates `cancel`, so if the cancel could run
+          // concurrently it would already have looped over the whole
+          // horizon by now. Serialized, it has not issued a single call.
+          expect(
+            gatedPlugin.cancelCallCount,
+            0,
+            reason:
+                'the cancel must wait behind the in-flight apply, not run '
+                'concurrently with it',
+          );
+
+          gatedPlugin.release();
+          await apply;
+          await cancel;
+
+          // The real defect: unserialized, the apply resumes after the
+          // cancel has already cleared every id and re-arms all of them,
+          // leaving a wiped app with a full armed horizon.
+          expect(
+            gatedPlugin.pending,
+            isEmpty,
+            reason: 'the cancel is the later caller, so nothing may stay armed',
+          );
+        },
+      );
+
+      test(
+        'an apply issued during an in-flight cancel runs AFTER it, so a '
+        'legitimate post-wipe recompute still ends up armed',
+        () async {
+          final gatedPlugin = _GatedPlugin(target: _DigestCall.cancel);
+          final gatedScheduler = NotificationScheduler(
+            plugin: gatedPlugin,
+            localeResolver: () => const Locale('en'),
+          );
+
+          // The cancel starts first and blocks on the gate BEFORE clearing
+          // its first id.
+          final cancel = gatedScheduler.cancelDigest();
+          await Future<void>.delayed(Duration.zero);
+
+          // A recompute arrives while the cancel is paused mid-loop.
+          final apply = gatedScheduler.applyDigestPlans(fullHorizon(1));
+          await Future<void>.delayed(Duration.zero);
+
+          // Nothing gates `zonedSchedule`, so an unserialized apply would
+          // already have written its whole horizon by now.
+          expect(
+            gatedPlugin.scheduledCalls,
+            isEmpty,
+            reason:
+                'the apply must wait behind the in-flight cancel, not run '
+                'concurrently with it',
+          );
+
+          gatedPlugin.release();
+          await cancel;
+          await apply;
+
+          // The apply is the later caller and therefore the last word: its
+          // horizon must survive. Unserialized, the cancel's trailing ids
+          // land after the apply wrote them and silence the digest.
+          expect(
+            gatedPlugin.pending.keys,
+            unorderedEquals(digestNotificationIds),
+            reason: 'the apply is the later caller, so its horizon must stand',
+          );
+        },
+      );
+
+      test(
+        'a failed cancel surfaces to ITS caller and does not jam the queue '
+        'for the next write',
+        () async {
+          final failingPlugin = _ThrowingOncePlugin(
+            target: _DigestCall.cancel,
+          );
+          final failingScheduler = NotificationScheduler(
+            plugin: failingPlugin,
+            localeResolver: () => const Locale('en'),
+          );
+
+          // Property 1: the error reaches the caller that made THAT call.
+          await expectLater(failingScheduler.cancelDigest(), throwsStateError);
+
+          // Property 2: the shared tail was never left completing with an
+          // error, so everything queued after it still runs. Getting this
+          // wrong is silent and permanent -- the digest would simply stop
+          // being rewritten for the rest of the process.
+          await failingScheduler.applyDigestPlans(fullHorizon(1));
+          expect(
+            failingPlugin.pending.keys,
+            unorderedEquals(digestNotificationIds),
+          );
+        },
+      );
+
+      test(
+        'a failed apply surfaces to ITS caller and does not jam the queue '
+        'for a following cancel',
+        () async {
+          final failingPlugin = _ThrowingOncePlugin(
+            target: _DigestCall.schedule,
+          );
+          final failingScheduler = NotificationScheduler(
+            plugin: failingPlugin,
+            localeResolver: () => const Locale('en'),
+          );
+
+          await expectLater(
+            failingScheduler.applyDigestPlans(fullHorizon(1)),
+            throwsStateError,
+          );
+
+          await failingScheduler.cancelDigest();
+          expect(failingPlugin.cancelCallCount, digestHorizonSlots);
+        },
+      );
+    },
+  );
 }

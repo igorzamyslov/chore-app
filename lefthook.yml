@@ -16,7 +16,22 @@ pre-commit:
       glob: "*.dart"
       # Formats staged files in place and re-stages them; fails the commit
       # only if formatting produced changes that couldn't be auto-applied.
-      run: dart format --set-exit-if-changed {staged_files}
+      #
+      # `check_formatter_config.sh &&` is a GUARD, and it has to run *before*
+      # the format, never after: in a fresh `git worktree` there is no
+      # `.dart_tool/`, so `dart format` cannot resolve the `package:` include
+      # in analysis_options.yaml, warns on stderr only, still exits 0, and
+      # falls back to `trailing_commas: automate` — stripping trailing commas
+      # and rejoining multi-line calls in everything it touches. Because
+      # `preserve` is stable on `automate`'s output, `--set-exit-if-changed`
+      # then PASSES on that churn, so no after-the-fact check (this job's own,
+      # or ci.yml's) can catch it. See the script and backlog A-7.
+      #
+      # Prefixed into this job's own command rather than added as an earlier
+      # job on purpose: `&&` cannot run out of order and cannot be skipped,
+      # whereas a separate job would depend on lefthook's ordering and
+      # fail-fast semantics.
+      run: tool/check_formatter_config.sh && dart format --set-exit-if-changed {staged_files}
       stage_fixed: true
 
     - name: analyze
@@ -31,14 +46,22 @@ pre-commit:
 
     - name: test
       # Both SUPABASE_* defines explicitly empty: `supabaseConfigured`
-      # (lib/app/supabase_config.dart) must be false for the whole suite,
-      # since `AppShell`'s `IndexedStack` builds the Settings tab's Account
-      # section (lib/features/settings/account_section.dart) for every
-      # single widget test regardless of which tab it navigates to — with
-      # Supabase "configured" but never `Supabase.initialize()`d (as in
-      # every test), `authGatewayProvider`'s default branch would construct
-      # a live `SupabaseAuthGateway` against an uninitialized client and
-      # crash the entire suite the moment it's watched.
+      # (lib/app/supabase_config.dart) must be false for the whole suite.
+      # With Supabase "configured" but never `Supabase.initialize()`d (as in
+      # every test), `authGatewayProvider`'s default branch would construct a
+      # live `SupabaseAuthGateway` against an uninitialized client and crash
+      # the moment it is watched — and it is watched by the Settings tab's
+      # Account section (lib/features/settings/account_section.dart), i.e. by
+      # every widget test that opens the Settings tab and every E2E flow that
+      # reaches it.
+      #
+      # This used to say the shell's `IndexedStack` builds that section for
+      # every single widget test regardless of which tab it navigates to. Not
+      # true since D-1 (wave 3): `AppShell` is now a `PageView` whose
+      # `allowImplicitScrolling` is deliberately false, so its viewport cache
+      # extent is zero and only the VISIBLE page is built at all. Corrected
+      # while executing backlog A-2b, whose design turns on exactly this. The
+      # defines are still required, just for a smaller set of tests.
       run: env -u GIT_DIR -u GIT_INDEX_FILE flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
 
     - name: pubspec-lock-in-sync

@@ -771,12 +771,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get memberEditColorLabel => 'Farbe';
 
   @override
-  String get memberEditDeleteBlockedClaimed =>
-      'Dieses Profil ist mit einem Konto verknüpft und kann hier nicht entfernt werden.';
-
-  @override
   String get memberEditDeleteBlockedLastMember =>
       'Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.';
+
+  @override
+  String get memberEditDeleteBlockedSelf =>
+      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.';
+
+  @override
+  String get memberEditDeleteBlockedOffline =>
+      'Dieses Profil wird auf dem Gerät einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.';
 
   @override
   String memberDeleteDialogTitle(String memberName) {
@@ -786,6 +790,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String memberDeleteDialogBody(String memberName) {
     return 'Damit entfernst du $memberName aus dem Haushalt. Bei Aufgaben im Wechsel fällt $memberName aus der Reihenfolge — wenn zu wenige Personen übrig bleiben, wird die Aufgabe auf eine feste Person oder \"jeden\" umgestellt. Aufgaben, die fest $memberName zugewiesen sind, stehen danach allen offen, und alles, was $memberName gerade zugewiesen ist, wird nicht mehr zugewiesen. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.';
+  }
+
+  @override
+  String memberRemoveDialogBodyClaimed(String memberName) {
+    return '$memberName nutzt diesen Haushalt auf einem eigenen Gerät. Wenn du die Person entfernst, synchronisiert dieses Gerät nicht mehr — es behält alles, was es schon hat, als eigene lokale Kopie. Profil und Verlauf bleiben hier im Haushalt: In Wechsel-Aufgaben fällt die Person aus der Reihenfolge, fest zugewiesene Aufgaben stehen wieder allen offen, und alles, was ihr gerade zugewiesen ist, wird frei. Der bisherige Verlauf — wer was erledigt hat — bleibt unverändert.';
+  }
+
+  @override
+  String memberRemoveError(String memberName) {
+    return '$memberName konnte nicht entfernt werden. Dafür braucht die App eine Verbindung zum Online-Haushalt — es wurde nichts geändert. Versuch es noch mal.';
   }
 
   @override
@@ -945,6 +959,64 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountDisconnectConfirmAction => 'Trennen';
+
+  @override
+  String get settingsAccountLeave => 'Haushalt verlassen';
+
+  @override
+  String householdLeaveConfirmTitle(String householdName) {
+    return '$householdName verlassen?';
+  }
+
+  @override
+  String get householdLeaveConfirmBody =>
+      'Dein Profil bleibt im Haushalt, die anderen sehen dich und alles, was du erledigt hast, weiterhin. Dieses Gerät synchronisiert nicht mehr. Du kannst später mit einem neuen Einladungscode zurückkommen.';
+
+  @override
+  String get householdLeaveConfirmBodyLastMember =>
+      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+
+  @override
+  String get householdLeaveConfirmAction => 'Verlassen';
+
+  @override
+  String get householdLeaveError =>
+      'Der Haushalt konnte nicht verlassen werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.';
+
+  @override
+  String get settingsAccountDeleteAccount => 'Mein Konto löschen';
+
+  @override
+  String get accountDeleteConfirmTitle => 'Konto löschen?';
+
+  @override
+  String get accountDeleteConfirmBody =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Dein Profil bleibt in jedem Haushalt, zu dem du gehörst, die anderen behalten also ihren Verlauf — du bist nur nicht mehr damit verknüpft.';
+
+  @override
+  String get accountDeleteConfirmBodyLastMember =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+
+  @override
+  String get accountDeleteConfirmAction => 'Konto löschen';
+
+  @override
+  String get accountDeleteFinalTitle => 'Konto jetzt löschen?';
+
+  @override
+  String get accountDeleteFinalBodyKeepPhone =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Dieses Gerät behält alles, was es hat, als eigene lokale Kopie. Wenn du vorher woanders eine Kopie deiner Daten sichern willst, nutze „Daten exportieren“ unter Einstellungen → Daten.';
+
+  @override
+  String get accountDeleteFinalBodyDeletePhone =>
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht, und die Kopie auf diesem Gerät — Mitglieder, Aufgaben und Einkaufsliste — wird ebenfalls gelöscht, die App startet neu. Beides lässt sich nicht rückgängig machen. Wenn du vorher eine Kopie deiner Daten willst, nutze „Daten exportieren“ unter Einstellungen → Daten.';
+
+  @override
+  String get accountDeleteFinalAction => 'Konto löschen';
+
+  @override
+  String get accountDeleteError =>
+      'Dein Konto konnte nicht gelöscht werden. Dafür braucht die App eine Verbindung — es wurde nichts geändert. Versuch es noch mal.';
 
   @override
   String get settingsAccountSendError =>

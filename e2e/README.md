@@ -114,6 +114,16 @@ Three rules:
    or joined, so a fresh install always lands on the welcome gate first.
    A warm relaunch (no `clearState`) still targets `shell.tab.chores`,
    since the household created earlier in the same flow already exists.
+   **A white first frame is no longer proof of the slow-start case this
+   rule fixes.** There is a second, distinct iOS mode (backlog A-6,
+   diagnosed 2026-08-28 from run `31800958022`) where the frame stays
+   blank for the whole 60s and the accessibility tree holds the app
+   window with zero Flutter nodes in it — no welcome gate *and no shell*.
+   Tell them apart by the wait duration, which each flow's
+   `commands.json` records: the slow-start case lands in seconds
+   (4.8–9.0s across that run's 12 passing flows) while the blank-frame
+   case burns the full timeout. Only the first is a headroom problem;
+   more headroom does nothing for the second.
 2. **Every flow clears the welcome gate right after that settle.**
    `e2e/common/onboard_fresh.yaml` taps `welcome.create`, types the
    name "Me", and confirms — every flow prepends

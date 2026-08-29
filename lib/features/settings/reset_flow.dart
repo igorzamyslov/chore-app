@@ -139,6 +139,17 @@ Future<void> confirmAndResetAppData(
 /// platform implementation is registered. An `on Exception` clause lets
 /// exactly that escape and takes the wipe down with it, which is the one
 /// outcome this flow may never produce.
+///
+/// Since backlog G-12 this may WAIT: `cancelDigest()` rides the scheduler's
+/// serialized digest-write queue, so if a recompute or the notification
+/// action's horizon rewrite is mid-loop, the cancel queues behind it. That
+/// is the point — without it the apply could re-arm slots this cancel had
+/// already cleared, leaving a wiped app still notifying. The wait does not
+/// weaken the "never block the wipe" promise beyond what was already true:
+/// `cancelDigest()` has always awaited `ensureInitialized()`, i.e. a
+/// `plugin.initialize()` platform call, so this path already depended on
+/// the plugin's calls returning, and the [Object] guard below was always
+/// about a throw rather than a hang.
 Future<void> _cancelDigest(WidgetRef ref) async {
   try {
     await ref.read(notificationSchedulerProvider).cancelDigest();
