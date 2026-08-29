@@ -275,8 +275,7 @@ PlainDate _monthCandidate(
   // a client predating the field compute the same series as this one, as
   // long as the writer kept `startDate.day == monthlyDayOfMonth` (see that
   // field's alignment contract).
-  // INVERSION (c): ignore the explicit field, as an old client would.
-  final requestedDay = startDate.day;
+  final requestedDay = rule.monthlyDayOfMonth ?? startDate.day;
   final targetDay = requestedDay == -1 || requestedDay > maxDay
       ? maxDay
       : requestedDay;

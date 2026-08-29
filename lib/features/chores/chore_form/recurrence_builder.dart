@@ -141,8 +141,8 @@ PlainDate alignStartDateToMonthlyDay(PlainDate startDate, int dayOfMonth) {
   }
   var year = startDate.year;
   var month = startDate.month;
-  // INVERSION (a): move backwards instead of forwards.
-  if (startDate.day < dayOfMonth) {
+  // Already past that day this month, so the nearest one is next month.
+  if (startDate.day > dayOfMonth) {
     (year, month) = _nextMonth(year, month);
   }
   // ...and skip any month too short to contain it at all: the 31st simply

@@ -484,10 +484,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         // in the model -- it means "derive from the start date" -- but
         // that derivation is exactly the hidden dependency G3 stage 2
         // removes, so the form no longer lets the user reach it.
-        // INVERSION (b): invert the guard's condition -- the LAST day now
-        // deselects and a non-last one does not. `&& false` was dead code
-        // and failed at analyze, where the tests never run.
-        if (updated.isNotEmpty) {
+        if (updated.isEmpty) {
           return;
         }
       } else {
