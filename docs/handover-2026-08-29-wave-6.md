@@ -33,7 +33,7 @@ Final state vs `main`: **59 files, +5897/-696.**
 | **G-5b** | `CategoryRepository.palette` is twelve colours. Both pickers draw them as theme-rendered rings, six across. **Additive, not a replacement:** `palette = [...seedColors, 4 new]`, so indices 0–7 still address exactly the colours they always did and every indexed `members.edit.color.N` / `settings.categories.color.N` id keeps its meaning. No stored value is rewritten. |
 | **G-4** | The member avatar is two-letter initials on the neutral surface inside a ring in the member's `categoryTone`, from the 24px chore tile to the 66px edit-sheet preview, scaling with text scale to a 1.6× cap. Member colours are unique per household — a colour another active member holds is drawn inert and badged with their initials. **Photo avatars were never scoped** and did not ship; that would be a synced blob and its own ticket. No column was added to `members`. |
 | **G-2** | The repeat block is one readable sentence with inline controls, plus a live preview of the next three dates. `Recurrence.monthlyDayOfMonth` was added so "the 20th of each month" is expressible at all — **in the recurrence JSON, not a drift column**, which is why the schema stayed at v12. `-1` encodes "last day", reusing `monthlyOrdinal`'s existing convention rather than a `32` that a naive 1..31 range check would wave through. |
-| **A-6** | See §6 — reported separately, and honestly. |
+| **A-6** | **Root cause NOT found**, and wave 5's recorded cause **retracted as never-established**. A dispatch-only amplifier and the `app.loading` id landed; no fix, no retry, no widened timeout. See §6a. |
 
 ### The G-2 cross-version contract, because it is the load-bearing part
 
@@ -280,7 +280,7 @@ second half.
 
 ## 6. What is open
 
-- **A-6 itself.** Reported in §6a below.
+- **A-6 itself.** See §6a.
 - **The colour separation.** The twelve-colour palette contains two purples,
   `#6B57B0` and `#7A5AA8`, at ΔE 7.8 — well above the ~2.3 JND, so defensible,
   and the canvas colour was kept deliberately rather than substituted (R1's
@@ -319,3 +319,73 @@ branches, and four scratch branches the palette stream created
 a conflicting PR** — so the stream had to route its inversion evidence through
 side branches. They hold run evidence cited in this wave's reports; delete them
 once `main` takes the merge.
+
+### §6a — A-6 in full
+
+**Root cause: NOT FOUND.** That is the reportable result, and it is worth more
+than a third guess.
+
+**What was established instead: the recorded cause was never established.**
+"The Flutter view permanently fails to present on a fresh install" is one
+*reading* of run `31800958022`'s artifact, not a finding. A white frame over an
+empty accessibility tree is produced **identically** by three unrelated
+failures:
+
+1. iOS's white `LaunchScreen.storyboard` — the engine never presented.
+2. `ChoreApp`'s `_LoadingScaffold` — the engine **did** present and the
+   household gate never resolved. It emitted no accessibility node at all, so
+   it photographed and dumped exactly like (1).
+3. An XCTest driver gone blind to an app Maestro had just uninstalled and
+   reinstalled — which also explains the responsive main thread and the 0.01s
+   empty snapshot.
+
+**Only (2) would be our bug, and (2) is now ruled out by evidence** for every
+launch measured: `app.loading` makes a hung startup name itself, and it never
+appeared. A reproduction's Dart VM also showed the drift isolate alive and
+named after an opened `chore_app.sqlite`.
+
+(1) and (3) are both the platform's and nothing separates them. **This row has
+now carried a wrong cause once and an unestablished one once. Do not write a
+third without evidence that discriminates.**
+
+**The measurement.** 1,400 cold launches across **56 fresh simulator boots**
+(14 dispatched runs) at the **suite-faithful 60s threshold** → **0
+reproductions**. Against the historical ~0.45%/launch that is **p≈0.002**; the
+95% upper bound on the per-launch rate is **0.21%**, less than half the
+historical figure. Every run carried a negative control that forced a failure
+on a *healthy, fully rendered* app and refused to measure unless it produced a
+hierarchy, an out-of-driver screenshot, Dart VM stacks and a native `sample` —
+so the zero is a real zero, not a broken instrument reporting silence. Healthy
+baseline: 31 nodes, ~190KB frame.
+
+**Material limit on that number.** Every one of the 56 boots drew an identical
+fingerprint: `macos26/20260728.0273.1`, Xcode 26.6, iPhone 17 Pro, iOS 26.2,
+3-core Apple M1 (Virtual), 7GB. It bounds the rate on **today's image only** and
+says nothing about the image August's reds were drawn on. **"Does not reproduce
+on today's CI" is not "fixed."** Nothing was fixed; the environment moved.
+
+**Two dead ends, named so nobody re-derives them:**
+
+- **A 20s probe is not a cheaper 60s probe.** Measured from `launchApp` it
+  swallows process startup, and it manufactured three failures that are not
+  this flake: one whose launch took **12.4s** to reach the Dart VM against a
+  **0.8s** median, and two that had rendered by ~launch+40s and would have
+  **passed** the suite's 60s gate. Two of those were reported up as
+  reproductions and then retracted. The generalisable defect: **the
+  justification and the measurement had different origins** — the threshold was
+  defended on the wait being bimodal *after the app is up*, while the clock
+  started before it. Measure at 60s or measure nothing.
+- **`XCTAS Error: … kAXError value -25218` is a red herring.** It appears in
+  **56 of one run's 100 launches, including passing ones**, and is absent from
+  one of the two failures it would have explained. It would have been the third
+  wrong recorded cause.
+
+**What landed:** a dispatch-only amplifier in `e2e.yml` (inert on push and PR),
+its negative control, and `semantic('app.loading')`. **No fix, no retry, no
+widened timeout** — none is justified without a cause. The build cache is gated
+to amplifier dispatches only, with a comment saying why it must never be
+generalised: a verification run exists to test the code *at that ref*, and
+handing it a cached binary defeats the purpose of the run.
+
+**`ios` still must not become a required check** until the flake is understood
+and the trigger widened.
