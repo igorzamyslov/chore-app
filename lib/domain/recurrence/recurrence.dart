@@ -30,8 +30,9 @@ enum RecurrenceAnchor {
 
 /// How a month-unit [Recurrence] picks its target day within the month.
 enum MonthlyMode {
-  /// Target day = the start date's day of month, clamped to the target
-  /// month's length.
+  /// Target day = [Recurrence.monthlyDayOfMonth], clamped to the target
+  /// month's length; or, when that is null, the start date's day of month,
+  /// clamped the same way.
   dayOfMonth,
 
   /// The [Recurrence.monthlyOrdinal]-th [Recurrence.monthlyWeekday] of the
@@ -58,6 +59,7 @@ class Recurrence {
     this.monthlyMode = MonthlyMode.dayOfMonth,
     this.monthlyOrdinal,
     this.monthlyWeekday,
+    this.monthlyDayOfMonth,
   });
 
   /// Creates a recurrence rule, throwing [ArgumentError] if the fields form
@@ -76,6 +78,11 @@ class Recurrence {
   /// - [monthlyMode] is [MonthlyMode.nthWeekday] when [anchor] is
   ///   [RecurrenceAnchor.completion] (nth-weekday pinning only makes sense
   ///   for a fixed calendar series).
+  /// - [monthlyDayOfMonth] is set when [unit] is not [RecurrenceUnit.month],
+  ///   when [monthlyMode] is not [MonthlyMode.dayOfMonth], or when [anchor]
+  ///   is [RecurrenceAnchor.completion] -- the engine reads it in none of
+  ///   those cases, so a value there would silently do nothing.
+  /// - [monthlyDayOfMonth] is set and is neither `-1` nor in 1..31.
   factory Recurrence.validated({
     required int interval,
     required RecurrenceUnit unit,
@@ -84,6 +91,7 @@ class Recurrence {
     MonthlyMode monthlyMode = MonthlyMode.dayOfMonth,
     int? monthlyOrdinal,
     int? monthlyWeekday,
+    int? monthlyDayOfMonth,
   }) {
     if (interval < 1) {
       throw ArgumentError.value(interval, 'interval', 'Must be >= 1');
@@ -144,6 +152,41 @@ class Recurrence {
         );
       }
     }
+    if (monthlyDayOfMonth != null) {
+      if (unit != RecurrenceUnit.month) {
+        throw ArgumentError.value(
+          monthlyDayOfMonth,
+          'monthlyDayOfMonth',
+          'Only valid when unit == month',
+        );
+      }
+      if (monthlyMode != MonthlyMode.dayOfMonth) {
+        throw ArgumentError.value(
+          monthlyDayOfMonth,
+          'monthlyDayOfMonth',
+          'Only valid when monthlyMode == dayOfMonth',
+        );
+      }
+      // The completion branch of the engine is
+      // `completedOn.addMonths(interval)` and reads no monthly field at
+      // all, so a day here would be a value that silently does nothing --
+      // a trap for the next reader rather than a feature.
+      if (anchor == RecurrenceAnchor.completion) {
+        throw ArgumentError.value(
+          monthlyDayOfMonth,
+          'monthlyDayOfMonth',
+          'Only valid with a schedule anchor',
+        );
+      }
+      if (monthlyDayOfMonth != -1 &&
+          (monthlyDayOfMonth < 1 || monthlyDayOfMonth > 31)) {
+        throw ArgumentError.value(
+          monthlyDayOfMonth,
+          'monthlyDayOfMonth',
+          'Must be in 1..31, or -1 for the last day of the month',
+        );
+      }
+    }
     return Recurrence(
       interval: interval,
       unit: unit,
@@ -152,6 +195,7 @@ class Recurrence {
       monthlyMode: monthlyMode,
       monthlyOrdinal: monthlyOrdinal,
       monthlyWeekday: monthlyWeekday,
+      monthlyDayOfMonth: monthlyDayOfMonth,
     );
   }
 
@@ -184,16 +228,19 @@ class Recurrence {
     );
   }
 
-  /// Creates a month-unit rule targeting the start date's day of month
-  /// (clamped to each target month's length).
+  /// Creates a month-unit rule targeting [monthlyDayOfMonth] (clamped to
+  /// each target month's length), or -- when that is omitted -- the start
+  /// date's day of month, clamped the same way.
   factory Recurrence.monthlyOnDay({
     int interval = 1,
     RecurrenceAnchor anchor = RecurrenceAnchor.schedule,
+    int? monthlyDayOfMonth,
   }) {
     return Recurrence.validated(
       interval: interval,
       unit: RecurrenceUnit.month,
       anchor: anchor,
+      monthlyDayOfMonth: monthlyDayOfMonth,
     );
   }
 
@@ -258,6 +305,18 @@ class Recurrence {
     if (monthlyWeekdayRaw is! int?) {
       throw FormatException('"monthly_weekday" must be an int or null', json);
     }
+    // Added by G-2, after rules were already in the wild: a map written by
+    // any earlier client simply has no such key, and a missing key reads as
+    // null here -- which is exactly the documented "derive the day from the
+    // chore's start date" default those rules already meant. Same `is! int?`
+    // shape as the two fields above.
+    final monthlyDayOfMonthRaw = json['monthly_day_of_month'];
+    if (monthlyDayOfMonthRaw is! int?) {
+      throw FormatException(
+        '"monthly_day_of_month" must be an int or null',
+        json,
+      );
+    }
 
     return Recurrence.validated(
       interval: intervalRaw,
@@ -267,6 +326,7 @@ class Recurrence {
       monthlyMode: monthlyMode,
       monthlyOrdinal: monthlyOrdinalRaw,
       monthlyWeekday: monthlyWeekdayRaw,
+      monthlyDayOfMonth: monthlyDayOfMonthRaw,
     );
   }
 
@@ -311,6 +371,50 @@ class Recurrence {
   /// [MonthlyMode.nthWeekday] only: the ISO weekday (1..7) to target.
   final int? monthlyWeekday;
 
+  /// [MonthlyMode.dayOfMonth] with a [RecurrenceAnchor.schedule] anchor
+  /// only: the day of the month to target, 1..31, or `-1` for "the last day
+  /// of the month" (the same `-1` = "last" convention [monthlyOrdinal]
+  /// uses -- one class, one encoding for "last"; `32` would be a
+  /// valid-looking day number that a naive 1..31 range check would let
+  /// through).
+  ///
+  /// `null` means "derive the day from the chore's start date", which is
+  /// what every rule persisted before this field existed means, and remains
+  /// the behaviour for those rows forever. A day past the target month's
+  /// length is clamped, so `31` lands on Feb 28 (Feb 29 in a leap year).
+  ///
+  /// **Alignment contract -- callers must keep `startDate.day` equal to this
+  /// field** (G-2 OPD-1, `docs/plans/2026-08-18-repeat-form-sentence.md`
+  /// Analysis §2a; the chore form is the only caller that sets it, and it
+  /// maintains this from both the day picker and the start-date picker).
+  /// The reason is cross-version convergence, and it is exact: this rule is
+  /// serialized as JSON into an opaque `TEXT` column and synced verbatim, so
+  /// a household member on a client predating this field decodes the row
+  /// with the unknown key ignored and evaluates the derived branch,
+  /// `min(startDate.day, daysInMonth)`. This field's branch is
+  /// `min(monthlyDayOfMonth, daysInMonth)`. Those are the SAME expression
+  /// whenever `startDate.day == monthlyDayOfMonth`, so the two devices
+  /// compute a byte-identical series for the whole infinite series --
+  /// divergence is zero, not merely bounded, for every day in 1..31.
+  ///
+  /// This field is **authoritative**; `startDate.day` is a redundant mirror
+  /// maintained only for those older clients, and the engine never reads
+  /// `startDate.day` while this is non-null. `Recurrence` cannot enforce the
+  /// contract, because it never sees the start date -- it is an invariant
+  /// the form maintains, which is why it is documented here rather than
+  /// checked in [Recurrence.validated].
+  ///
+  /// **`-1` is the one value with no exact `startDate` mirror.** Since
+  /// `daysInMonth <= 31` always, `min(31, daysInMonth) == daysInMonth`, so a
+  /// start date on a 31st would converge exactly -- but the 31st only exists
+  /// in 31-day months, and forcing the start date into one would delete the
+  /// earlier occurrences from the series. So "last day" keeps a residual: at
+  /// most **3 days**, always with the older client **early**, never late, so
+  /// nothing is silently missed. It is zero when the start date happens to
+  /// sit in a 31-day month, at most 1 day for a 30-day month, at most 3 for
+  /// February, and it disappears permanently the moment that device updates.
+  final int? monthlyDayOfMonth;
+
   /// Serializes this rule to a JSON-compatible map with snake_case keys.
   /// Enums are serialized as their `name` (e.g. `RecurrenceUnit.week` ->
   /// `"week"`).
@@ -323,10 +427,11 @@ class Recurrence {
       'monthly_mode': monthlyMode.name,
       'monthly_ordinal': monthlyOrdinal,
       'monthly_weekday': monthlyWeekday,
+      'monthly_day_of_month': monthlyDayOfMonth,
     };
   }
 
-  /// Value equality over all seven fields, with [weekdays] compared as an
+  /// Value equality over all eight fields, with [weekdays] compared as an
   /// unordered set (backlog E-4).
   ///
   /// Without this, a rule round-tripped through [toJson] and
@@ -350,6 +455,7 @@ class Recurrence {
         other.monthlyMode == monthlyMode &&
         other.monthlyOrdinal == monthlyOrdinal &&
         other.monthlyWeekday == monthlyWeekday &&
+        other.monthlyDayOfMonth == monthlyDayOfMonth &&
         _weekdaysEqual(other.weekdays, weekdays);
   }
 
@@ -373,6 +479,7 @@ class Recurrence {
       monthlyMode,
       monthlyOrdinal,
       monthlyWeekday,
+      monthlyDayOfMonth,
       weekdaysHash,
     );
   }
