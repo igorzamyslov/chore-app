@@ -82,6 +82,25 @@ Recurrence buildRecurrence({
   }
 }
 
+/// The interval to *render* with, for the raw text currently in the chore
+/// form's interval field.
+///
+/// Always >= 1. `validateInterval` is what actually blocks save, but the
+/// repeat block re-renders on every keystroke and has to show something
+/// sensible in the meantime -- including while the field is empty or holds
+/// a `0` the user is halfway through replacing.
+///
+/// The clamp is not cosmetic. Before G-2 this reading only pluralized a
+/// noun, so a zero was harmless; the preview line now feeds it to the
+/// recurrence engine, whose week and month branches divide by the interval.
+/// `int.tryParse(text) ?? 1` alone covers an unparseable field but not a
+/// parseable `0`, which reached `weeksDiff ~/ interval` and crashed the
+/// form under the user as they typed.
+int displayInterval(String raw) {
+  final parsed = int.tryParse(raw.trim());
+  return parsed == null || parsed < 1 ? 1 : parsed;
+}
+
 /// Moves [startDate] to the nearest date **on or after** it whose day of
 /// month is [dayOfMonth], or -- for the `-1` "last day" sentinel -- to the
 /// last day of [startDate]'s own month.

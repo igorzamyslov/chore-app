@@ -8,6 +8,7 @@
 /// than fails, taking the whole suite with it.
 library;
 
+import 'package:chore_app/features/chores/chore_form/repeat_sentence.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../test_utils/pump_app.dart';
@@ -138,12 +139,18 @@ void main() {
 
       // 'Repeat every {interval} {unit}' -- the two literal words, split on
       // whitespace so the Wrap can reflow them, with the holes between.
-      expect(find.text('Repeat'), findsOneWidget);
-      expect(find.text('every'), findsOneWidget);
+      // Scoped to the sentence: the repeat TOGGLE's own label is also the
+      // word 'Repeat', so an unscoped finder matches two widgets.
+      Finder wordInSentence(String word) => find.descendant(
+        of: find.byType(RepeatSentence),
+        matching: find.text(word),
+      );
+      expect(wordInSentence('Repeat'), findsOneWidget);
+      expect(wordInSentence('every'), findsOneWidget);
 
       // In document order: the words come before both holes.
-      final repeatAt = tester.getTopLeft(find.text('Repeat')).dx;
-      final everyAt = tester.getTopLeft(find.text('every')).dx;
+      final repeatAt = tester.getTopLeft(wordInSentence('Repeat')).dx;
+      final everyAt = tester.getTopLeft(wordInSentence('every')).dx;
       final intervalAt = tester
           .getTopLeft(find.bySemanticsIdentifier('chore_form.repeat.interval'))
           .dx;

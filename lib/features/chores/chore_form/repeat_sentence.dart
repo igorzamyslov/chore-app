@@ -120,10 +120,10 @@ class RepeatSentence extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final localeName = Localizations.localeOf(context).toString();
-    // Best-effort parse for display only: the unit noun has to pluralize as
-    // the user types, and an empty or invalid field must still render
-    // *something* here. `intervalError` is what actually blocks save.
-    final interval = int.tryParse(intervalController.text.trim()) ?? 1;
+    // Only pluralizes the unit noun here, but it comes from the same helper
+    // the preview uses so the two readings of a half-typed field can never
+    // disagree. See `displayInterval`.
+    final interval = displayInterval(intervalController.text);
 
     final holes = <String, Widget>{
       _holeInterval: _IntervalHole(

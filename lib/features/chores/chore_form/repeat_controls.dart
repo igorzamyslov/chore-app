@@ -5,6 +5,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/features/chores/chore_form/monthly_mode_row.dart';
+import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_section.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_sentence.dart';
 import 'package:chore_app/features/chores/chore_form/weekday_chips.dart';
@@ -113,10 +114,10 @@ class RepeatControls extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final localeName = Localizations.localeOf(context).toString();
-    // Best-effort parse for display only; `intervalError` is what actually
-    // blocks save, and an empty field still has to render a sensible
-    // preview rather than the line disappearing under the user.
-    final interval = int.tryParse(intervalController.text.trim()) ?? 1;
+    // Clamped to >= 1: `intervalError` is what actually blocks save, but
+    // this value reaches the recurrence engine through the preview, and the
+    // engine divides by it. See `displayInterval`.
+    final interval = displayInterval(intervalController.text);
     final isMonthlyPattern =
         unit == RecurrenceUnit.month && anchor == RecurrenceAnchor.schedule;
     final isWeekdayPattern =
