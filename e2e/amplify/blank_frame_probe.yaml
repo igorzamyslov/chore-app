@@ -1,0 +1,55 @@
+# A-6 amplifier probe: the MINIMAL failing cycle of the iOS blank-frame
+# flake, and nothing else.
+#
+# `launchApp: clearState: true` is the whole experiment. On iOS Maestro
+# implements it as uninstall + reinstall, so every invocation of this file is
+# a brand-new bundle container and a genuinely cold first launch -- exactly
+# the 14-times-per-run condition under which the real suite flakes. The wait
+# below is the assertion the flake fails on, verbatim from the suite.
+#
+# DELIBERATELY NOT UNDER e2e/flows/. That directory's config.yaml globs
+# `**`, so a probe placed there would join the real suite on every push.
+# This file is only ever run by name, by e2e.yml's dispatch-only amplifier
+# step (workflow input `ios_blank_frame_cycles`).
+#
+# TIMEOUT: 60s, matching the suite EXACTLY. It was 20s, on the reasoning
+# that the wait is bimodal (4.8-9.0s in every passing flow, the full
+# timeout in every failing one) so a tighter threshold separates the two
+# just as well and makes a failing cycle cheaper. Run 33266354426 proved
+# that reasoning wrong, and the correction matters more than the saving.
+# Its one failure launched an app whose Dart VM took 12.4s to come up
+# against a median of 0.8s; add the gate's own 4.8-9.0s and it lands past
+# 20s while being nothing but a slow start -- exactly the case convention
+# 8's 60s headroom exists to absorb. A probe measuring at 20s therefore
+# manufactures failures the real suite would never see, and every one of
+# them would be misfiled as this flake. Matching the suite removes the
+# confound entirely; a failing cycle costing 60s instead of 20s is
+# irrelevant at a ~0.5% failure rate.
+#
+# BATCHED, and the batch size is load-bearing. Each `maestro test`
+# invocation spends ~25s on JVM start, installing and launching its XCTest
+# driver, and teardown, against ~20s for the cycle itself -- so one
+# invocation per cycle would spend more than half the budget on Maestro
+# rather than on launches. Repeating inside a single invocation amortises
+# that away. 25 is a compromise: large enough that the fixed cost is ~5% of
+# the batch, small enough that a batch aborted by a reproduction (Maestro
+# stops the flow at the first failed assertion) forfeits few cycles. The
+# number is mirrored in e2e.yml's amplifier step, which needs it to size
+# its outer loop; that step counts the launches that ACTUALLY happened out
+# of the device log rather than trusting the arithmetic.
+#
+# VERIFIED to be a real fresh install every iteration, not just the first:
+# run 33263011187's device log holds 10 distinct
+# `Bundle/Application/<uuid>` AND 10 distinct
+# `Containers/Data/Application/<uuid>` paths for its 10 cycles.
+appId: ${APP_ID}
+---
+- repeat:
+    times: 25
+    commands:
+      - launchApp:
+          clearState: true
+      - extendedWaitUntil:
+          visible:
+            id: "welcome.create"
+          timeout: 60000

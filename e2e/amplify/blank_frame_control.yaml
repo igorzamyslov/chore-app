@@ -1,0 +1,37 @@
+# A-6 NEGATIVE CONTROL. Runs once at the start of every amplifier run,
+# before any measurement, and is EXPECTED TO FAIL.
+#
+# WHY IT EXISTS. "0 reproductions in N launches" is worth nothing unless
+# the instrument could have reported one. An amplifier whose capture path
+# is silently broken produces exactly the same clean run log as an
+# amplifier that found nothing, and the difference is invisible until
+# someone acts on the wrong conclusion.
+#
+# WHAT IT PROVES, by failing on a healthy app that is fully on screen:
+#   1. A failing assertion really does trigger the capture path at all.
+#   2. The hierarchy dump contains real Flutter semantic ids when the app
+#      IS rendering -- which is what makes an EMPTY hierarchy in a genuine
+#      reproduction mean something rather than being the normal output.
+#   3. The out-of-driver screenshot is a rendered screen, calibrating the
+#      png_bytes triage signal against a known-good frame.
+#   4. The Dart VM service is reachable from the runner and `getStack`
+#      answers.
+#   5. `sample` can attach to the app process.
+#
+# It must fail with verdict FLUTTER_TREE_PRESENT_SELECTOR_MISSED. Any
+# other verdict means either the instrument is broken or the control
+# itself hit the flake, and the step says so loudly instead of quietly
+# measuring nothing.
+appId: ${APP_ID}
+---
+# Reach a known-good state first: the app is up and the gate is rendered.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "welcome.create"
+    timeout: 60000
+# Now fail on purpose, with that healthy screen still in front of us. The
+# id is deliberately one no widget can ever carry.
+- assertVisible:
+    id: "a6.control.id_that_cannot_exist"

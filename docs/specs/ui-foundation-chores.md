@@ -50,6 +50,18 @@ Widget semantic(String id, {required Widget child});
 Convention `<screen>.<element>[.<qualifier>]`, kebab-free, dot-separated.
 EVERY interactive widget gets one. IDs used in this spec are normative:
 
+- App root: `app.loading` (the startup scaffold shown while
+  `householdGateProvider`/`bootstrapProvider` load), `app.bootstrap_error`
+  and its two actions, listed under **main.dart** below.
+  `app.loading` is a DIAGNOSTIC id, not a selector: nothing taps it and no
+  flow waits on it. It exists because without it that scaffold emits no
+  accessibility node whatsoever (`Scaffold` contributes none, and
+  `CircularProgressIndicator` wraps itself in a `Semantics` whose label and
+  value are both null, which is dropped), so a startup stuck there is
+  indistinguishable in a hierarchy dump from one where the Flutter view
+  never presented at all and iOS is still showing the equally white
+  `LaunchScreen.storyboard` — the ambiguity that made backlog A-6's
+  blank-frame flake undiagnosable from CI artifacts.
 - Shell: `shell.tab.chores`, `shell.tab.shopping`, `shell.tab.settings`
 - Chores list: `chores.add`, `chores.filter.member`, `chores.filter.category`,
   `chores.occurrence.<choreId>` (tile), `chores.occurrence.<choreId>.complete`,
@@ -94,7 +106,9 @@ identifier maps to its own distinct, non-default `IconData`.
 
 ### main.dart
 `ProviderScope` → `ChoreApp`. While `bootstrapProvider` loads: blank
-scaffold with a centered `CircularProgressIndicator`; on error: a centered
+scaffold with a centered `CircularProgressIndicator`, carrying
+`semantic('app.loading')` so the state is identifiable from outside the
+process (see the Semantic IDs list above for why); on error: a centered
 plain-language headline, the raw exception as a de-emphasized detail line
 `semantic('app.bootstrap_error')`, and two actions —
 `semantic('app.bootstrap_error.retry')`, which re-invalidates whichever of

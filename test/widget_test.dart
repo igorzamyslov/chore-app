@@ -32,11 +32,23 @@ void main() {
         ),
       );
 
+      final handle = tester.ensureSemantics();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // Backlog A-6: the loading state must be IDENTIFIABLE from outside the
+      // process, not merely visible. Both of the app's white startup screens
+      // -- iOS's LaunchScreen.storyboard and this scaffold -- photograph
+      // identically, so a screenshot cannot tell whether Dart ever reached
+      // `runApp`. And without an id this scaffold contributes ZERO
+      // accessibility nodes (`Scaffold` makes none, and
+      // `CircularProgressIndicator` wraps itself in a `Semantics` whose
+      // label and value are both null, which is dropped), so an E2E
+      // hierarchy dump of a hung startup is empty either way. This id is the
+      // discriminator between "the engine never presented" and "the engine
+      // presented and the household gate never resolved".
+      expect(find.bySemanticsIdentifier('app.loading'), findsOneWidget);
 
       await tester.pumpAndSettle();
 
-      final handle = tester.ensureSemantics();
       expect(find.bySemanticsIdentifier('welcome.create'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
       handle.dispose();

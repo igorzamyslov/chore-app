@@ -119,15 +119,32 @@ Three rules:
    A warm relaunch (no `clearState`) still targets `shell.tab.chores`,
    since the household created earlier in the same flow already exists.
    **A white first frame is no longer proof of the slow-start case this
-   rule fixes.** There is a second, distinct iOS mode (backlog A-6,
-   diagnosed 2026-08-28 from run `31800958022`) where the frame stays
-   blank for the whole 60s and the accessibility tree holds the app
-   window with zero Flutter nodes in it — no welcome gate *and no shell*.
-   Tell them apart by the wait duration, which each flow's
+   rule fixes.** There is a second iOS mode (backlog A-6, OBSERVED —
+   not diagnosed — 2026-08-28 in run `31800958022`) where the frame
+   stays blank for the whole 60s and the accessibility tree holds the
+   app window with zero Flutter nodes in it: no welcome gate *and no
+   shell*. Tell them apart by the wait duration, which each flow's
    `commands.json` records: the slow-start case lands in seconds
    (4.8–9.0s across that run's 12 passing flows) while the blank-frame
    case burns the full timeout. Only the first is a headroom problem;
    more headroom does nothing for the second.
+
+   **Its cause is still unknown, and the reading recorded in wave 5 —
+   "the Flutter view permanently fails to present" — was never
+   established.** An empty tree behind a white frame fits an engine that
+   never presented, a startup stuck in `app.loading`, and an XCTest
+   driver blind to a just-reinstalled app equally well. Wave 6 built a
+   dispatch-only amplifier for exactly this question (`e2e.yml`'s
+   `ios_blank_frame_cycles` input, probe in `e2e/amplify/`): it repeats
+   the minimal cycle with a fresh boot per batch and, on failure,
+   captures a screenshot taken outside the driver, Maestro's own
+   failure-instant debug directory, Dart VM stacks for every isolate and
+   a native `sample`. Each run first proves the capture path fires by
+   forcing a failure on a healthy app. **Use it before theorising** —
+   and note two things it already settled: measure at 60s, never at a
+   "cheaper" 20s (that conflates slow startup with this mode), and the
+   `kAXError -25218` "Error getting main window" line is a red herring
+   that shows up in passing launches too.
 2. **Every flow clears the welcome gate right after that settle.**
    `e2e/common/onboard_fresh.yaml` taps `welcome.create`, types the
    name "Me", and confirms — every flow prepends
