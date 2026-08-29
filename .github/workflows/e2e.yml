@@ -31,11 +31,11 @@ on:
         # run; anything higher REPLACES the flow suite with N repetitions of
         # the minimal failing cycle and skips `android` entirely -- see the
         # amplifier step in the `ios` job for the full rationale. A choice
-        # rather than free text on purpose: the value is interpolated into a
-        # `seq` in a shell script.
-        # Multiples of the probe's batch size (25); anything else is
-        # rounded UP to one, and the step reports the launches it actually
-        # got rather than the number asked for.
+        # rather than free text on purpose: the value is interpolated into
+        # arithmetic in a shell script. The options are multiples of the
+        # probe's batch size (25); anything else would be rounded UP to
+        # one, and the step reports the launches it actually got rather
+        # than the number asked for either way.
         description: "A-6: blank-frame amplifier cycles (0 = normal run)"
         type: choice
         default: "0"
@@ -312,7 +312,7 @@ jobs:
           BATCH=25
           batches=$(( (CYCLES + BATCH - 1) / BATCH ))
 
-          echo "batch,started_utc,seconds,launches,result,verdict" \
+          echo "batch,started_utc,seconds,launches,result,verdict,png_bytes" \
             > "$OUT/results.csv"
           failures=0
           launched=0
@@ -325,6 +325,7 @@ jobs:
             # prints one, and the newest line in the whole file may belong
             # to an earlier cycle's now-dead process.
             log_mark=$(wc -c < "$OUT/runner.log")
+            png_bytes=0
             if "$MAESTRO" test --env APP_ID="$APP_ID" \
                  e2e/amplify/blank_frame_probe.yaml \
                  > "$OUT/batch-$i.maestro.log" 2>&1; then
@@ -337,7 +338,22 @@ jobs:
               # the hierarchy that has so far only ever been seen once.
               "$MAESTRO" hierarchy > "$OUT/batch-$i.hierarchy.json" 2>&1 \
                 || true
+              # Taken with simctl, NOT through the driver, and that is the
+              # point. It tests a hypothesis none of the recorded evidence
+              # could: that the app is fine and XCTest has gone blind to
+              # it. Every fact on record -- a window titled "Famdo" with
+              # nothing inside, a main thread that answers, a snapshot in
+              # 0.01s with zero nodes -- fits a driver that lost its
+              # accessibility view of an app Maestro had just uninstalled
+              # and reinstalled, exactly as well as it fits an app that
+              # never presented. A screenshot taken outside the driver
+              # settles it: welcome screen here plus an empty hierarchy
+              # means the app was never the problem.
               xcrun simctl io booted screenshot "$OUT/batch-$i.png" || true
+              # Triage signal for that comparison without leaving the run
+              # log: a solid white frame is a few tens of KB, a rendered
+              # welcome screen several times that.
+              png_bytes=$(wc -c < "$OUT/batch-$i.png" 2>/dev/null || echo 0)
               cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
                 "$OUT/batch-$i.maestro-debug" 2>/dev/null || true
 
@@ -416,7 +432,7 @@ jobs:
             n=$(tail -c "+$((log_mark + 1))" "$OUT/runner.log" \
               | grep -c 'Dart VM service is listening' || true)
             launched=$((launched + n))
-            echo "$i,$started,$elapsed,$n,$result,$verdict" \
+            echo "$i,$started,$elapsed,$n,$result,$verdict,$png_bytes" \
               >> "$OUT/results.csv"
             echo "batch $i: $result, $n launches in ${elapsed}s ($verdict)"
           done
