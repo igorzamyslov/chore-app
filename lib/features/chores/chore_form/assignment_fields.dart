@@ -114,7 +114,7 @@ class AssignmentFields extends StatelessWidget {
                     // picked; the chip's own selected styling already
                     // conveys the state without it.
                     showCheckmark: false,
-                    avatar: MemberAvatar(member: member, radius: 12),
+                    avatar: MemberAvatar(member: member),
                     label: Text(member.name),
                     selected: selectedMemberIds.contains(member.id),
                     onSelected: (_) => onMemberTap(member.id),
@@ -230,7 +230,7 @@ class _RotationAssigneeControls extends StatelessWidget {
               semantic(
                 'chore_form.assignee.${member.id}',
                 child: FilterChip(
-                  avatar: MemberAvatar(member: member, radius: 12),
+                  avatar: MemberAvatar(member: member),
                   label: Text(member.name),
                   onSelected: (_) => onMemberTap(member.id),
                 ),
@@ -285,7 +285,7 @@ class _RotationRow extends StatelessWidget {
                 ),
               ),
             ),
-            MemberAvatar(member: member, radius: 12),
+            MemberAvatar(member: member),
             const SizedBox(width: 8),
             Expanded(
               child: Text(l10n.choreFormAssigneeOrderLabel(order, member.name)),

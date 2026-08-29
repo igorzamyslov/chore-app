@@ -527,8 +527,8 @@ const double _unknownToneDarkMinLightness = 0.70;
 ///
 /// The twelve `CategoryRepository.palette` entries resolve through the
 /// hand-picked table above; any other stored value (a future picker, an
-/// imported archive) falls back to an HSL lightness clamp -- light theme: at most
-/// [_unknownToneLightMaxLightness]; dark theme: at least
+/// imported archive) falls back to an HSL lightness clamp -- light theme:
+/// at most [_unknownToneLightMaxLightness]; dark theme: at least
 /// [_unknownToneDarkMinLightness] -- preserving hue and saturation so an
 /// unknown color degrades gracefully instead of becoming unreadable.
 ///
