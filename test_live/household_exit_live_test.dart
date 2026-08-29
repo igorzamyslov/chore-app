@@ -35,9 +35,12 @@
 /// do exactly that to real data.
 library;
 
+import 'dart:io';
+
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 /// Local stack URL. Defaults to the CLI's own default so a developer who ran
 /// `supabase start` needs no arguments.
@@ -62,6 +65,31 @@ late final SupabaseClient _admin;
 
 int _uniqueSuffix = 0;
 
+/// In-memory PKCE store.
+///
+/// `Supabase.initialize` substitutes a `shared_preferences`-backed one when
+/// `pkceAsyncStorage` is null — INDEPENDENTLY of `localStorage`, so overriding
+/// only the latter still reaches a platform channel that does not exist in a
+/// test binding, and initialize dies with `MissingPluginException(... getAll on
+/// channel plugins.flutter.io/shared_preferences)`. Supplying both keeps this
+/// suite free of platform channels entirely.
+class _MemoryAsyncStorage extends GotrueAsyncStorage {
+  final Map<String, String> _items = {};
+
+  @override
+  Future<String?> getItem({required String key}) async => _items[key];
+
+  @override
+  Future<void> setItem({required String key, required String value}) async {
+    _items[key] = value;
+  }
+
+  @override
+  Future<void> removeItem({required String key}) async {
+    _items.remove(key);
+  }
+}
+
 /// Creates a confirmed account and returns (email, password).
 Future<({String email, String password})> _createUser() async {
   _uniqueSuffix++;
@@ -83,7 +111,11 @@ Future<({String email, String password})> _createUser() async {
 /// reads `Supabase.instance.client`, so this is how a "device" is switched.
 Future<String> _signInAs(({String email, String password}) user) async {
   final client = Supabase.instance.client;
-  await client.auth.signOut();
+  // Only when there IS one: signing out without a session is an error, and
+  // the first _signInAs of the run has none.
+  if (client.auth.currentSession != null) {
+    await client.auth.signOut();
+  }
   final response = await client.auth.signInWithPassword(
     email: user.email,
     password: user.password,
@@ -122,8 +154,10 @@ typedef _Household = ({String householdId, String memberId});
 /// Creates a household owned by the currently signed-in user.
 Future<_Household> _createHousehold(HouseholdGateway gateway) async {
   _uniqueSuffix++;
-  final householdId = 'hh-${DateTime.now().microsecondsSinceEpoch}';
-  final memberId = 'm-owner-${DateTime.now().microsecondsSinceEpoch}';
+  // Real UUIDs: households.id and members.id are uuid columns, and the
+  // app itself generates them with `const Uuid().v4()`.
+  final householdId = const Uuid().v4();
+  final memberId = const Uuid().v4();
   await gateway.createHousehold(
     householdId: householdId,
     name: 'Smoke household',
@@ -158,14 +192,26 @@ void main() {
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
+    // THE TRAP THAT MAKES A LIVE TEST SILENTLY IMPOSSIBLE, and the reason
+    // this is the first line after the binding: TestWidgetsFlutterBinding
+    // installs an HttpOverrides that answers EVERY request with an empty
+    // 400 and never opens a socket. The symptom is an
+    // `AuthUnknownException(Received an empty response with status code
+    // 400)` from whatever happens to call out first, which reads exactly
+    // like a real server rejection -- the server log is empty, because
+    // nothing ever arrived. Restoring the default lets these tests reach
+    // the loopback stack. Only ever do this in `test_live/`; the hermetic
+    // suite under `test/` depends on that mock.
+    HttpOverrides.global = null;
     await Supabase.initialize(
       url: _url,
       publishableKey: _anonKey,
       // EmptyLocalStorage: no shared_preferences platform channel, and no
       // session leaking between tests. detectSessionInUri off: there is no
       // deep-link observer to run in a test binding.
-      authOptions: const FlutterAuthClientOptions(
-        localStorage: EmptyLocalStorage(),
+      authOptions: FlutterAuthClientOptions(
+        localStorage: const EmptyLocalStorage(),
+        pkceAsyncStorage: _MemoryAsyncStorage(),
         detectSessionInUri: false,
       ),
     );
@@ -189,8 +235,7 @@ void main() {
         final code = await gateway.createInvite(household.householdId);
 
         final otherUserId = await _signInAs(other);
-        final joinedMemberId =
-            'm-joined-${DateTime.now().microsecondsSinceEpoch}';
+        final joinedMemberId = const Uuid().v4();
         await gateway.joinAsNewMember(
           code: code,
           memberId: joinedMemberId,
@@ -225,9 +270,26 @@ void main() {
       // The UI hides this (_DeleteGate.ownClaimedRow) and points at Leave.
       // The server is the backstop, and this proves the backstop is real
       // rather than assumed by the UI.
+      //
+      // NOT `throwsA(isA<Object>())`: that passes for the wrong reason.
+      // Verified by inverting the gateway to name a parameter the function
+      // does not have -- the call still threw, so a bare "it threw" would
+      // have stayed green while remove_member was entirely unreachable.
+      // The error must be the server REFUSING the operation (a raised
+      // exception from the function body), not PostgREST failing to find
+      // the function at all.
       await expectLater(
         gateway.removeMember(household.memberId),
-        throwsA(isA<Object>()),
+        throwsA(
+          isA<PostgrestException>().having(
+            (e) => '${e.code} ${e.message}',
+            'not a routing failure',
+            allOf(
+              isNot(contains('PGRST202')),
+              isNot(contains('schema cache')),
+            ),
+          ),
+        ),
       );
       expect((await _memberRow(household.memberId))!['user_id'], isNotNull);
     });
@@ -246,8 +308,7 @@ void main() {
         final code = await gateway.createInvite(household.householdId);
 
         await _signInAs(other);
-        final joinedMemberId =
-            'm-leaver-${DateTime.now().microsecondsSinceEpoch}';
+        final joinedMemberId = const Uuid().v4();
         await gateway.joinAsNewMember(
           code: code,
           memberId: joinedMemberId,
@@ -343,8 +404,7 @@ void main() {
         final code = await gateway.createInvite(household.householdId);
 
         final leaverUserId = await _signInAs(leaver);
-        final joinedMemberId =
-            'm-deleter-${DateTime.now().microsecondsSinceEpoch}';
+        final joinedMemberId = const Uuid().v4();
         await gateway.joinAsNewMember(
           code: code,
           memberId: joinedMemberId,

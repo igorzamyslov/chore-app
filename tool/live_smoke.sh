@@ -57,6 +57,27 @@ if [ -z "$API_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$SERVICE_ROLE_KEY" ]; then
   exit 1
 fi
 
+# HARNESS-ONLY GRANTS, on this throwaway local database and nowhere else.
+#
+# The schema grants SELECT to `authenticated` only (see
+# supabase/migrations/20260731120000_initial_schema.sql) -- `service_role` is
+# deliberately given nothing, which is good and is NOT changed here. But the
+# suite's assertions need GROUND TRUTH: "the row is gone" and "RLS is hiding
+# the row from me" are indistinguishable if you can only read as the acting
+# user, and asserting the weaker of the two is how a test passes while the
+# feature is broken. So the harness reads as service_role.
+#
+# This runs against the local container only, is never in a migration, and
+# cannot reach production -- the suite refuses any non-loopback host anyway.
+# It does not widen what `authenticated` can do, which is what the RLS tests
+# and the gateway under test actually exercise.
+echo "live_smoke: granting harness read access on the local stack"
+docker exec supabase_db_chore-app psql -U postgres -d postgres -q -c "
+  grant usage on schema public to service_role;
+  grant select on public.households to service_role;
+  grant select on public.members to service_role;
+" >/dev/null
+
 echo "live_smoke: running test_live/ against $API_URL"
 
 # `env -u GIT_DIR -u GIT_INDEX_FILE`: git sets these for hook subprocesses and
