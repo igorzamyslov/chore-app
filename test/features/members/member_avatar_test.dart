@@ -120,8 +120,10 @@ void main() {
     // 66px sheet preview (design: 3px ring).
     await _pump(tester, appLightTheme, name: 'Mia', color: stored, radius: 33);
     expect((_decoration(tester).border! as Border).top.width, 3);
-    // 24px chore tile: thinner, so the two letters still have room.
-    await _pump(tester, appLightTheme, name: 'Mia', color: stored, radius: 12);
+    // 24px chore tile (radius 12, the default): thinner, so the two letters
+    // still have room. Left implicit because `--fatal-infos` rejects
+    // `radius: 12` as redundant against the helper's own default.
+    await _pump(tester, appLightTheme, name: 'Mia', color: stored);
     expect((_decoration(tester).border! as Border).top.width, 1.5);
   });
 

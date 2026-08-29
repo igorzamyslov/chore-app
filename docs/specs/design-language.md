@@ -56,6 +56,21 @@ that spec for the current binding rule.*
   strikethrough.
 - Contrast: stick to onSurface/onSurfaceVariant roles (M3 guarantees
   ratios); never place text on category colors directly.
+- **Member identity color is a ring, never a fill** (spec `theme-v2.md`
+  §1.3, G-4) — the same "accent, not background" rule category color
+  already follows. Because color is never the only carrier, the ring is
+  always accompanied by **two-letter** initials, which are the sole
+  differentiator for a color-blind viewer; that is why the chore-tile
+  avatar is sized to fit two glyphs rather than one. It matters more since
+  the palette widened to twelve: its closest pair (`#6B57B0` purple and
+  `#7A5AA8` violet) sits at CIELAB ΔE 7.8, against 25.8 for the original
+  eight. The disabled swatch in the member color picker likewise carries
+  its state with the owner's initials, not with color alone.
+- **No palette color may equal a semantic role color.** `primary` means
+  "interactive / selected" and `error` means "wrong", so an identity drawn
+  in either would be read as a state. This is why palette slot 9 is plum
+  `#9A3D80` and not the design canvas's `#1E7A6E`, which is byte-for-byte
+  `_lightPrimary`.
 
 ## Interaction rules (the common-UX-rules contract)
 

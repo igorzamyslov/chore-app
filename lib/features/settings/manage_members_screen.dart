@@ -141,7 +141,8 @@ class _MemberRow extends StatelessWidget {
     return semantic(
       'members.row.${member.id}',
       child: ListTile(
-        leading: MemberAvatar(member: member, radius: 16),
+        // 42px, the design canvas's members-row avatar (G-4).
+        leading: MemberAvatar(member: member, radius: 21),
         title: Text(member.name),
         onTap: onTap,
       ),

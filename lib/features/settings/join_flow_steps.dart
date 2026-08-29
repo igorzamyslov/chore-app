@@ -54,19 +54,14 @@ String joinCodeErrorMessage(AppLocalizations l10n, Object error) {
 }
 
 /// [MemberAvatar] takes a full [Member]; the chooser step only has a
-/// [ClaimableMember] (id/name/color). [MemberAvatar] only ever reads
-/// `name`/`color`, so this fills every other field with an inert
-/// placeholder purely to satisfy [Member]'s constructor.
-Member memberForAvatar(ClaimableMember member) => Member(
-  id: member.memberId,
-  householdId: '',
-  name: member.name,
-  color: member.color,
-  role: MemberRole.member,
-  createdAt: '',
-  updatedAt: '',
-  syncDirty: false,
-);
+/// [ClaimableMember] (id/name/color). Delegates to [previewMember], the
+/// shared placeholder builder, rather than repeating its field list.
+///
+/// `ClaimableMember.memberId` is dropped rather than carried into
+/// `Member.id`: [MemberAvatar] only ever reads `name`/`color`, so nothing
+/// read it.
+Member memberForAvatar(ClaimableMember member) =>
+    previewMember(name: member.name, color: member.color);
 
 /// The invite-code entry step (ids `settings.account.join.code`/
 /// `settings.account.join.continue`).
