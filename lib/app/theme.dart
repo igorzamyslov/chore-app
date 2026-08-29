@@ -508,7 +508,6 @@ const Map<int, _ToneRender> _categoryTones = {
   // [_unknownToneLightMaxLightness], so without this row the fallback would
   // silently return Color(0xFF993D80) -- a different colour that looks right
   // in a diff.
-  0xFF9A3D80: (light: Color(0xFF9A3D80), dark: Color(0xFFD9A0C9)), // plum
   0xFF96562F: (light: Color(0xFF96562F), dark: Color(0xFFDFB49A)), // rust
   0xFF7A5AA8: (light: Color(0xFF7A5AA8), dark: Color(0xFFB9A8D1)), // violet
   0xFF4C6B45: (light: Color(0xFF4C6B45), dark: Color(0xFFB4CBAE)), // moss
