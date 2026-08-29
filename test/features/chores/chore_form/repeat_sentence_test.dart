@@ -8,7 +8,6 @@
 /// than fails, taking the whole suite with it.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../test_utils/pump_app.dart';
