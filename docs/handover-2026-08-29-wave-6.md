@@ -201,6 +201,34 @@ The transferable rule: **a test whose two sides can collapse into each other is
 not a guard.** Check by inverting the thing it claims to protect, and check the
 inversion breaks *the test you think it breaks*.
 
+### A third vacuous gate, caught only because a claim was double-checked
+
+The palette stream rewrote a plan-authored assertion that could not have
+passed, then reported to me that its replacement was font-independent and
+correct. Asked to confirm the underlying font claim, it measured instead of
+re-reading — and found **its own replacement was vacuous**.
+
+Widget tests here draw the Ahem-style `FlutterTest` font, not the bundled
+Inter: no `flutter_test_config.dart` exists and nothing calls `FontLoader`.
+Measured in CI, `'WM'` at 11px/w600 is **21.87px** — 1.99 em per glyph — against
+Inter's ~15px. Inside the avatar the text is constrained to the 21px inner
+diameter, so it wraps and the paragraph reports *its own constraint* (21.0).
+Rect containment against that box therefore passes **whatever the avatar's
+geometry is**.
+
+Loading the real Inter does not rescue it: the faces are declared under pubspec
+`fonts:` rather than `assets:`, so `rootBundle.load` hands `FontLoader` nothing
+usable and it **silently no-ops** — no exception, no effect. So glyph fit is
+simply not assertable in a widget test here; containment is vacuous and a
+strict inner-diameter check is false on correct code. The file now asserts only
+font-independent properties and says why, with the measured numbers. Recorded
+as backlog **G-14**.
+
+The production code was never wrong — only the measurement was impossible. The
+lesson is the same one §5 keeps repeating from a new angle: **the fix for a
+vacuous assertion can itself be vacuous**, and the only way anyone found out
+was by measuring a claim that had already been reported as verified.
+
 ### An empty accessibility tree was ambiguous, and now is not
 
 The app's `_LoadingScaffold` emitted **zero** accessibility nodes — `Scaffold`
