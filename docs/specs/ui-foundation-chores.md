@@ -71,12 +71,22 @@ EVERY interactive widget gets one. IDs used in this spec are normative:
 Material 3, `ColorScheme.fromSeed(seedColor: Color(0xFF26A69A))`, light +
 dark themes (`themeMode: ThemeMode.system`). Category icons render via
 `Icons`-by-name lookup: a `categoryIcon(String identifier)` function mapping
-the Material Symbols identifiers used in seeds (cleaning_services, skillet,
-local_laundry_service, yard, pets, build, directions_car, nutrition, egg,
-set_meal, bakery_dining, ac_unit, local_cafe, home, shopping_bag) to
-`IconData` constants, falling back to `Icons.label_outlined` for unknown
-ids. Icons are always drawn in the category's color at regular weight — the
-"flat, not colorful-emoji" decision.
+`categoryIconIdentifiers` (`lib/features/categories/category_icons.dart`) —
+the seven chore-seed and eight shopping-seed identifiers (cleaning_services,
+skillet, local_laundry_service, yard, pets, build, directions_car,
+nutrition, egg, set_meal, bakery_dining, ac_unit, local_cafe, home,
+shopping_bag) plus nine picker-only additions with no seeded category
+(bathtub, delete, potted_plant, child_care, pedal_bike, description,
+celebration, thermostat, fitness_center; backlog G-5a) — to `IconData`
+constants, falling back to `Icons.label_outlined` for unknown ids. Icons
+are always drawn in the category's color at regular weight — the "flat,
+not colorful-emoji" decision.
+
+The two structures are independent, and an identifier listed in
+`categoryIconIdentifiers` without a `categoryIcon` case fails silently —
+the tile renders, with the fallback glyph, so several such identifiers all
+render alike. `test/app/theme_test.dart` pins the invariant: every
+identifier maps to its own distinct, non-default `IconData`.
 
 ### main.dart
 `ProviderScope` → `ChoreApp`. While `bootstrapProvider` loads: blank
