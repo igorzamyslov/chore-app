@@ -23,9 +23,14 @@ const String _holeUnit = '﷑';
 const String _holeMonthlyDayOrOrdinal = '﷒';
 const String _holeMonthlyWeekday = '﷓';
 
-/// Splits a rendered sentence into literal runs and sentinels, keeping the
-/// sentinels (the capture group) as elements of the result.
-final RegExp _sentinelPattern = RegExp('([﷐-﷓])');
+/// Matches any one of the four hole sentinels in a rendered sentence.
+///
+/// Walked with `allMatches` rather than handed to `String.split`. Dart's
+/// `split` **discards** the delimiter, capture group or not — unlike
+/// JavaScript's, which returns captured groups as elements — so splitting
+/// would silently drop every hole and leave the user a sentence with no
+/// controls in it.
+final RegExp _sentinelPattern = RegExp('[﷐-﷓]');
 
 /// The chore form's repeat rule as one sentence whose blanks are tap
 /// targets, e.g. "Repeat every **2** **weeks** on".
@@ -234,24 +239,32 @@ class RepeatSentence extends StatelessWidget {
   List<Widget> _compose(String sentence, Map<String, Widget> holes) {
     final children = <Widget>[];
     final placed = <String>{};
-    for (final part in sentence.split(_sentinelPattern)) {
-      final hole = holes[part];
-      if (hole != null) {
-        assert(
-          placed.add(part),
-          'The repeat sentence placed the same hole twice; a translation '
-          'must use each placeholder exactly once.',
-        );
-        children.add(hole);
-        continue;
-      }
+
+    void addWords(String run) {
       // Whitespace only, so punctuation stays attached to its word.
-      for (final word in part.split(RegExp(r'\s+'))) {
+      for (final word in run.split(RegExp(r'\s+'))) {
         if (word.isNotEmpty) {
           children.add(Text(word));
         }
       }
     }
+
+    var cursor = 0;
+    for (final match in _sentinelPattern.allMatches(sentence)) {
+      addWords(sentence.substring(cursor, match.start));
+      final sentinel = match.group(0)!;
+      final hole = holes[sentinel];
+      if (hole != null) {
+        assert(
+          placed.add(sentinel),
+          'The repeat sentence placed the same hole twice; a translation '
+          'must use each placeholder exactly once.',
+        );
+        children.add(hole);
+      }
+      cursor = match.end;
+    }
+    addWords(sentence.substring(cursor));
     assert(
       placed.length == holes.length,
       'The repeat sentence is missing ${holes.length - placed.length} of its '
