@@ -1,0 +1,28 @@
+# A-6 amplifier probe: the MINIMAL failing cycle of the iOS blank-frame
+# flake, and nothing else.
+#
+# `launchApp: clearState: true` is the whole experiment. On iOS Maestro
+# implements it as uninstall + reinstall, so every invocation of this file is
+# a brand-new bundle container and a genuinely cold first launch -- exactly
+# the 14-times-per-run condition under which the real suite flakes. The wait
+# below is the assertion the flake fails on, verbatim from the suite.
+#
+# DELIBERATELY NOT UNDER e2e/flows/. That directory's config.yaml globs
+# `**`, so a probe placed there would join the real suite on every push.
+# This file is only ever run by name, by e2e.yml's dispatch-only amplifier
+# step (workflow input `ios_blank_frame_cycles`).
+#
+# TIMEOUT: 20s, not the suite's 60s. Established evidence (backlog A-6, run
+# 31800958022) is that this wait is bimodal -- 4.8-9.0s in every passing
+# flow, the full timeout in every failing one. Nothing has ever been
+# observed to land between. 20s is therefore >2x the slowest observed pass
+# and still an unambiguous separator, and it keeps a failing cycle cheap
+# enough to run dozens of times in one macOS job.
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "welcome.create"
+    timeout: 20000

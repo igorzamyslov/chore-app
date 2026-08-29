@@ -25,9 +25,27 @@ on:
   # picked as the run target. A dispatched run also runs `android` (there is
   # no per-job trigger), which is the cheap half and worth having anyway.
   workflow_dispatch:
+    inputs:
+      ios_blank_frame_cycles:
+        # Backlog A-6 amplifier. Leave at 0 for an ordinary verification
+        # run; anything higher REPLACES the flow suite with N repetitions of
+        # the minimal failing cycle and skips `android` entirely -- see the
+        # amplifier step in the `ios` job for the full rationale. A choice
+        # rather than free text on purpose: the value is interpolated into a
+        # `seq` in a shell script.
+        description: "A-6: blank-frame amplifier cycles (0 = normal run)"
+        type: choice
+        default: "0"
+        options: ["0", "10", "30", "60", "100"]
 
 jobs:
   android:
+    # Skipped for an A-6 amplifier dispatch: that dispatch exists to buy iOS
+    # launch cycles, and a 15-minute Android suite alongside it only adds an
+    # unrelated red/green to read past. `inputs` is an empty context on
+    # push/pull_request, so `inputs.ios_blank_frame_cycles` is null there and
+    # the `|| '0'` fallback is what keeps this `0 == 0` rather than an error.
+    if: fromJSON(inputs.ios_blank_frame_cycles || '0') == 0
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -222,6 +240,9 @@ jobs:
         # PINNED — see the Android job's install step for the full story.
         run: curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=2.7.0 bash
       - name: Run flows on simulator
+        # Skipped when the A-6 amplifier is asked for: the two want the same
+        # simulator and the amplifier wants all of the job's minutes.
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') == 0
         run: |
           $HOME/.maestro/bin/maestro test \
             --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
@@ -232,3 +253,94 @@ jobs:
           name: maestro-debug-ios
           path: ~/.maestro/tests/
           retention-days: 14
+
+      # ── A-6 blank-frame amplifier (dispatch-only) ─────────────────────
+      # WHY THIS EXISTS. The flake is ~0.4% per flow, so waiting for a
+      # natural reproduction is hopeless and every recorded observation of
+      # it comes from a single expired artifact. This step repeats the
+      # MINIMAL failing cycle -- Maestro `clearState`, which on iOS is
+      # uninstall + reinstall + a genuinely cold launch, then the suite's
+      # own `welcome.create` wait -- dozens of times in one job, capturing
+      # the device log of every launch rather than only the fact of a
+      # failure. macOS minutes are free on this public repo, so the
+      # brute-force is affordable and several dispatches can run at once.
+      #
+      # WHAT EACH FAILING CYCLE ANSWERS. `verdict` in results.csv resolves
+      # the ambiguity that has blocked this diagnosis: a blank white frame
+      # with an empty accessibility tree is produced identically by iOS's
+      # white LaunchScreen.storyboard (the Flutter view never presented --
+      # a platform problem) and by `ChoreApp`'s `_LoadingScaffold` (the
+      # view presented and `householdGateProvider` never resolved -- our
+      # bug). The `app.loading` id added in lib/app/app.dart makes the
+      # second case name itself in the hierarchy dump.
+      #
+      # It never fails the job. The output IS the result, and a red run
+      # here would only obscure how many cycles were actually collected.
+      - name: Amplify the blank-frame flake (A-6)
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        env:
+          CYCLES: ${{ inputs.ios_blank_frame_cycles }}
+          APP_ID: io.github.igorzamyslov.famdo
+        run: |
+          set -u
+          MAESTRO="$HOME/.maestro/bin/maestro"
+          OUT="$RUNNER_TEMP/a6-amplifier"
+          mkdir -p "$OUT"
+
+          # ONE continuous stream for the whole step, not one per cycle:
+          # os_log's stream takes a moment to attach, which a per-cycle
+          # stream would race against the very launch it exists to capture.
+          # Per-cycle correlation comes from the timestamps in results.csv.
+          xcrun simctl spawn booted log stream --level=debug --style=syslog \
+            --predicate 'process == "Runner"' > "$OUT/runner.log" 2>&1 &
+          RUNNER_LOG_PID=$!
+          xcrun simctl spawn booted log stream --style=syslog \
+            --predicate 'process == "SpringBoard" OR process == "backboardd"' \
+            > "$OUT/springboard.log" 2>&1 &
+          SYSTEM_LOG_PID=$!
+
+          echo "cycle,started_utc,seconds,result,verdict" > "$OUT/results.csv"
+          failures=0
+          for i in $(seq 1 "$CYCLES"); do
+            started=$(date -u +%H:%M:%S)
+            start=$SECONDS
+            if "$MAESTRO" test --env APP_ID="$APP_ID" \
+                 e2e/amplify/blank_frame_probe.yaml \
+                 > "$OUT/cycle-$i.maestro.log" 2>&1; then
+              result=pass
+              verdict=-
+            else
+              result=FAIL
+              failures=$((failures + 1))
+              # Maestro leaves the app in its failed state, so this dumps
+              # the hierarchy that has so far only ever been seen once.
+              "$MAESTRO" hierarchy > "$OUT/cycle-$i.hierarchy.json" 2>&1 \
+                || true
+              xcrun simctl io booted screenshot "$OUT/cycle-$i.png" || true
+              cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
+                "$OUT/cycle-$i.maestro-debug" 2>/dev/null || true
+              if grep -q 'app\.loading' "$OUT/cycle-$i.hierarchy.json"; then
+                verdict=DART_RAN_GATE_NEVER_RESOLVED
+              elif grep -q 'welcome\.' "$OUT/cycle-$i.hierarchy.json"; then
+                verdict=FLUTTER_TREE_PRESENT_SELECTOR_MISSED
+              else
+                verdict=NO_FLUTTER_NODES_AT_ALL
+              fi
+              echo "::warning::A-6 cycle $i reproduced the flake: $verdict"
+            fi
+            elapsed=$((SECONDS - start))
+            echo "$i,$started,$elapsed,$result,$verdict" >> "$OUT/results.csv"
+            echo "cycle $i: $result in ${elapsed}s ($verdict)"
+          done
+
+          kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+          echo "=== A-6 amplifier: $failures of $CYCLES cycles reproduced ==="
+          cat "$OUT/results.csv"
+      - name: Upload A-6 amplifier artifacts
+        if: always() && fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: a6-amplifier-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/a6-amplifier
+          retention-days: 14
+          if-no-files-found: warn
