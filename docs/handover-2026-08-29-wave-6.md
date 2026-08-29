@@ -21,7 +21,7 @@ Nothing was released and `main` is untouched. Everything is on
 during this wave — re-checked before each merge, because it moved mid-flight
 under wave 5.
 
-Final state vs `main`: **59 files, +5897/-696.**
+Final state vs `main`: **64 files, +6954/-712.**
 
 ---
 
@@ -86,10 +86,12 @@ always was. That identity is the whole mechanism; do not "tidy" it.
 ## 3. Verification status — read this before trusting §2
 
 **Proven by CI on the reviewed SHA**, not predicted: every row above.
-`integration/wave-6` at **`90bfd35`** — `checks` pass (4m15s) with **1132 tests
-passing**, `android` pass (17m20s) with **14/14 Maestro flows**, `pgtap` pass,
-`ios` skipping by the workflow's own condition. (The same four were green one
-merge earlier at `195e1e8`, before the avatar-test follow-up landed.) Each stream was also green on
+`integration/wave-6` at **`a88302f`**, the complete wave — `checks` pass
+(4m39s) with **1132 tests passing**, `android` pass (16m2s) with **14/14
+Maestro flows**, `pgtap` pass, `ios` skipping by the workflow's own condition.
+Every merge was re-verified on the accumulated tree rather than trusting the
+stream's green; the same four were green at `195e1e8` and `90bfd35` at earlier
+points in the wave. Each stream was also green on
 its own branch before merge, and every merge was re-verified on the accumulated
 tree rather than trusting the stream's green — an earlier green is a different
 tree.
