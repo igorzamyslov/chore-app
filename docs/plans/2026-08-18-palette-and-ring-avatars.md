@@ -78,21 +78,29 @@ below:**
   to a `find.descendant(... matching: find.byType(MemberAvatar))`.
 - Task 3's "two letters fit inside the smallest avatar" assertion compares the
   glyph width against the ring's *inner* diameter using arithmetic derived from
-  Inter (≈1.35 em for two uppercase glyphs). **Widget tests do not load Inter**
-  — this repo has no `flutter_test_config.dart` and calls no `FontLoader`, so
-  text falls back to the `FlutterTest` font, where every glyph is a full em.
-  `"WM"` at the 11px floor therefore wants 22px inside a 21px ring and **wraps**;
-  the paragraph comes back exactly 21.0 wide (its own constraint), measured in
-  CI. **Corrected again 2026-08-29 after that measurement:** the plan's
-  arithmetic was RIGHT — the assertion was simply unmeasurable, not wrong. The
-  first fix here weakened it to rect containment against the avatar's box, which
-  a constraint-clamped paragraph satisfies trivially and which therefore could
-  never fail. The real fix is to load the font the app ships: a `setUpAll` with
-  `FontLoader('Inter')` over `Inter-Regular.ttf` and `Inter-SemiBold.ttf`, after
-  which the original inner-diameter comparison is both meaningful and true
-  (~15px of glyphs in 21px of room). Asserted with `lessThan`, not
-  `lessThanOrEqualTo`, precisely so a wrap — which returns the constraint
-  exactly — still fails.
+  Inter (~1.35 em for two uppercase glyphs). **That property cannot be asserted
+  in a widget test in this repo at all**, which took three CI measurements to
+  establish and is recorded here so nobody re-derives it:
+  - There is no `flutter_test_config.dart` anywhere and nothing calls
+    `FontLoader`, so `flutter test` draws the Ahem-style `FlutterTest` font.
+    **Measured: `'WM'` at 11px/w600 is 21.87px — 1.99 em per glyph.** The same
+    21.87 comes back whether the family is inherited from the theme or set
+    explicitly to `'Inter'`.
+  - Adding a `FontLoader('Inter')` over the bundled TTFs in `setUpAll` did
+    **not** change that number. The fonts are declared under pubspec `fonts:`
+    rather than `assets:`, so `rootBundle.load` hands the loader nothing usable
+    and it silently no-ops — no exception, no effect.
+  - So in the test font `'WM'` wants 21.87px inside a 21px ring, wraps, and the
+    paragraph reports its own constraint (21.0). A containment check against
+    that box therefore passes regardless of the avatar's geometry (**vacuous**),
+    and a strict inner-diameter check fails on correct code (**false**).
+  The test now asserts only what is font-independent — the 24px box, the ring
+  width, the 11px floor, the text-scale cap, and that nothing throws — and says
+  so in a comment at the top of the file. The plan's *arithmetic* stands and the
+  production code is correct: Inter really does fit ~15px of glyphs in 21px of
+  room. It is the *measurement* that this harness cannot perform, so glyph fit
+  stays a visual-QA gate (`design-language.md`, definition of visual done).
+  Backlogged as **G-14**.
 
 ---
 

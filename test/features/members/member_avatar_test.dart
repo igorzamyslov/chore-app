@@ -7,7 +7,6 @@ library;
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _pump(
@@ -75,32 +74,33 @@ bool _hasLoneSurrogate(String value) {
 }
 
 void main() {
-  // Widget tests do NOT load an app's fonts: with no `flutter_test_config.dart`
-  // anywhere in this repo and no FontLoader call, `flutter test` draws every
-  // string in the Ahem-style `FlutterTest` font, whose every glyph is a full
-  // em wide (SDK: "a font that covers ASCII characters and gives them all the
-  // appearance of a square whose size equals the font size").
+  // NOTE ON FONTS, measured in CI rather than assumed -- it decides what
+  // this file can honestly assert.
   //
-  // That is not a detail here, it is the difference between a real assertion
-  // and a vacuous one. Measured in CI: under the test font, 'WM' at the 11px
-  // floor wants 22px inside a 21px ring and WRAPS, so the paragraph comes back
-  // exactly 21.0 wide -- its own constraint -- and any "does it fit" check
-  // against that box passes trivially, whatever the avatar's real geometry.
+  // Widget tests here draw the Ahem-style `FlutterTest` font, not the
+  // bundled Inter: there is no `flutter_test_config.dart` anywhere in the
+  // repo and nothing calls `FontLoader`. Measured: 'WM' at 11px/w600 comes
+  // back **21.87px**, i.e. 1.99 em per glyph -- the SDK's "square whose size
+  // equals the font size". The same 21.87 is returned whether the family is
+  // inherited from the theme or set explicitly to 'Inter', and adding a
+  // `FontLoader('Inter')` over the bundled TTFs in `setUpAll` did NOT change
+  // it (the fonts are declared under pubspec `fonts:` rather than `assets:`,
+  // so `rootBundle.load` gives the loader nothing usable and it silently
+  // no-ops).
   //
-  // So load the font the app actually ships. The fit assertion below then
-  // measures Inter SemiBold, the face `MemberAvatar` draws with, and can
-  // genuinely fail if the avatar shrinks or the initials grow.
-  setUpAll(() async {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    final loader = FontLoader('Inter');
-    for (final asset in const [
-      'assets/fonts/Inter-Regular.ttf',
-      'assets/fonts/Inter-SemiBold.ttf',
-    ]) {
-      loader.addFont(rootBundle.load(asset));
-    }
-    await loader.load();
-  });
+  // Consequence, stated plainly rather than papered over: **whether two
+  // glyphs physically fit inside the ring cannot be asserted here.** In the
+  // test font 'WM' wants 21.87px inside a 21px ring, so it wraps and the
+  // paragraph reports its constraint (21.0) -- which makes a containment
+  // check pass no matter what the avatar's geometry is, and a strict
+  // inner-diameter check fail on correct code. Both are worthless.
+  //
+  // So this file asserts only what is font-independent: the box size, the
+  // ring width, the 11px font floor, the text-scale cap, and that nothing
+  // throws. Real glyph fit is a visual-QA gate (`docs/specs/design-
+  // language.md`, definition of visual done: light + dark at text scale 1.0
+  // and 2.0 on a Pixel-class emulator), and the arithmetic behind radius 12
+  // is recorded in the plan's R2.
 
   const stored = 0xFFD98E73; // renders 0xFFB96A4C light / 0xFFF0AF95 dark
 
@@ -224,29 +224,18 @@ void main() {
     expect((_decoration(tester).border! as Border).top.width, 1.5);
   });
 
-  testWidgets('two letters fit inside the smallest avatar without overflow', (
+  testWidgets('the smallest avatar renders two letters without throwing', (
     tester,
   ) async {
-    // R2: the default radius is 12 (a 24px box) precisely so two glyphs fit
-    // with margin. 'WM' is about the widest two-letter pair in the alphabet.
-    //
-    // Asserted STRICTLY less than the ring's inner diameter, which is what
-    // makes this non-vacuous: a paragraph that does not fit wraps and comes
-    // back exactly its constraint (21.0), so `lessThan` catches a wrap that
-    // `lessThanOrEqualTo` would wave through. In Inter SemiBold two uppercase
-    // glyphs at 11px measure about 15px against 21px of room.
+    // R2 sized the default radius at 12 (a 24px box) so two glyphs fit with
+    // margin -- ~15px of Inter inside 21px of room. That margin is NOT
+    // asserted here; see the note at the top of this file for why it cannot
+    // be. What IS asserted is font-independent: the widest two-letter pair
+    // lays out without an exception, the box is the size R2 specified, and
+    // the glyphs never drop below the legibility floor.
     await _pump(tester, appLightTheme, name: 'Wm', color: stored);
     expect(tester.takeException(), isNull);
-    final textRect = tester.getRect(find.text('WM'));
-    final ringWidth = (_decoration(tester).border! as Border).top.width;
-    final inner = 24 - 2 * ringWidth;
-    expect(
-      textRect.width,
-      lessThan(inner),
-      reason:
-          'two glyphs must fit inside the ring on ONE line at the default '
-          'radius; a width equal to $inner means the text wrapped',
-    );
+    expect(tester.getSize(find.byType(MemberAvatar)), const Size(24, 24));
     expect(
       tester.widget<Text>(find.text('WM')).style!.fontSize,
       greaterThanOrEqualTo(11),
