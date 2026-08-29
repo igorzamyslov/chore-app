@@ -18,11 +18,31 @@
 # observed to land between. 20s is therefore >2x the slowest observed pass
 # and still an unambiguous separator, and it keeps a failing cycle cheap
 # enough to run dozens of times in one macOS job.
+#
+# BATCHED, and the batch size is load-bearing. Each `maestro test`
+# invocation spends ~25s on JVM start, installing and launching its XCTest
+# driver, and teardown, against ~20s for the cycle itself -- so one
+# invocation per cycle would spend more than half the budget on Maestro
+# rather than on launches. Repeating inside a single invocation amortises
+# that away. 25 is a compromise: large enough that the fixed cost is ~5% of
+# the batch, small enough that a batch aborted by a reproduction (Maestro
+# stops the flow at the first failed assertion) forfeits few cycles. The
+# number is mirrored in e2e.yml's amplifier step, which needs it to size
+# its outer loop; that step counts the launches that ACTUALLY happened out
+# of the device log rather than trusting the arithmetic.
+#
+# VERIFIED to be a real fresh install every iteration, not just the first:
+# run 33263011187's device log holds 10 distinct
+# `Bundle/Application/<uuid>` AND 10 distinct
+# `Containers/Data/Application/<uuid>` paths for its 10 cycles.
 appId: ${APP_ID}
 ---
-- launchApp:
-    clearState: true
-- extendedWaitUntil:
-    visible:
-      id: "welcome.create"
-    timeout: 20000
+- repeat:
+    times: 25
+    commands:
+      - launchApp:
+          clearState: true
+      - extendedWaitUntil:
+          visible:
+            id: "welcome.create"
+          timeout: 20000
