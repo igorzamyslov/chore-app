@@ -240,10 +240,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: appLightTheme,
-        home: Scaffold(
+        home: const Scaffold(
           body: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Text(
                 'WM',
                 textScaler: TextScaler.noScaling,
