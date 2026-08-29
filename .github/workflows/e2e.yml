@@ -304,6 +304,12 @@ jobs:
           for i in $(seq 1 "$CYCLES"); do
             started=$(date -u +%H:%M:%S)
             start=$SECONDS
+            # Byte offset into the continuous stream, so a failing cycle can
+            # be sliced out of it exactly. Also the only reliable way to
+            # scope the VM-service URL below to THIS launch: every cycle
+            # prints one, and the newest line in the whole file may still
+            # belong to the previous cycle's now-dead process.
+            log_mark=$(wc -c < "$OUT/runner.log")
             if "$MAESTRO" test --env APP_ID="$APP_ID" \
                  e2e/amplify/blank_frame_probe.yaml \
                  > "$OUT/cycle-$i.maestro.log" 2>&1; then
@@ -319,6 +325,63 @@ jobs:
               xcrun simctl io booted screenshot "$OUT/cycle-$i.png" || true
               cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
                 "$OUT/cycle-$i.maestro-debug" 2>/dev/null || true
+
+              # THE PAYLOAD. A debug build starts the Dart VM service and
+              # prints its URL (auth token included) to os_log, which the
+              # stream above has already captured; a simulator shares the
+              # host's loopback, so the runner can talk to it directly --
+              # this is the same channel `flutter attach` uses. The VM
+              # service answers JSON-RPC over plain HTTP GET, so `getStack`
+              # for every isolate gives the exact Dart frames the hung
+              # launch is sitting on, main isolate AND drift's background
+              # database isolate. That distinguishes "awaiting a
+              # path_provider channel reply that never came" from "awaiting
+              # a drift isolate handshake that never completed" from "not
+              # awaiting anything, so the hang is below Dart" -- none of
+              # which a screenshot or a hierarchy can tell apart.
+              sleep 3   # let os_log flush the tail of this launch
+              tail -c "+$((log_mark + 1))" "$OUT/runner.log" \
+                > "$OUT/cycle-$i.launch.log"
+              vm_url=$(grep -o \
+                'The Dart VM service is listening on http://[^ ]*' \
+                "$OUT/cycle-$i.launch.log" | tail -1 \
+                | sed 's|.*listening on ||')
+              if [ -n "$vm_url" ]; then
+                echo "VM service: $vm_url" > "$OUT/cycle-$i.vm.txt"
+                curl -sS --max-time 20 "${vm_url}getVM" \
+                  >> "$OUT/cycle-$i.vm.txt" 2>&1 || true
+                for iso in $(grep -oE 'isolates.?/[0-9]+' \
+                    "$OUT/cycle-$i.vm.txt" | tr -d '\\' | sort -u); do
+                  {
+                    echo ""
+                    echo "=== getStack $iso ==="
+                    curl -sS --max-time 20 \
+                      "${vm_url}getStack?isolateId=$iso" 2>&1 || true
+                  } >> "$OUT/cycle-$i.vm.txt"
+                done
+              else
+                printf '%s\n' \
+                  'no VM service URL for this launch: Dart never got there' \
+                  > "$OUT/cycle-$i.vm.txt"
+              fi
+
+              # Belt and braces, because a reproduction is rare and
+              # expensive and the VM service's plain-HTTP RPC is the one
+              # instrument above that could simply have been removed
+              # upstream. A simulator app is an ordinary host process, so
+              # `sample` gives native backtraces for every thread -- the
+              # platform thread, the Flutter UI (Dart) thread, the raster
+              # thread and drift's isolate worker -- with no cooperation
+              # from Dart at all. It is also the only instrument that still
+              # says something if the hang turns out to be below Dart.
+              app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
+                "$OUT/cycle-$i.launch.log" | head -1 \
+                | tr -dc '0-9')
+              if [ -n "$app_pid" ]; then
+                /usr/bin/sample "$app_pid" 3 -file "$OUT/cycle-$i.sample.txt" \
+                  > /dev/null 2>&1 || true
+              fi
+
               if grep -q 'app\.loading' "$OUT/cycle-$i.hierarchy.json"; then
                 verdict=DART_RAN_GATE_NEVER_RESOLVED
               elif grep -q 'welcome\.' "$OUT/cycle-$i.hierarchy.json"; then
