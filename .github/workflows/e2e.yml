@@ -171,13 +171,55 @@ jobs:
     #   - It is not a hang or a crash. XCTest runs in-process and logged the
     #     app's main thread answering ("MT responded in time"), snapshotting
     #     cleanly in 0.01s — with zero Flutter nodes in the tree.
-    # So the Flutter view permanently fails to present on a fresh install.
-    # Root cause unknown, and it is NOT fixed here: it did not reproduce on
-    # wave-4 code, there is no local reproduction, and the remedies that fit
-    # a bimodal shape (a Maestro `retry`, a CLI --retry-on-failure) cannot be
-    # A/B'd against the 2.7.0 pin without a simulator run — unverified
-    # Maestro changes being exactly what that pin exists to prevent (see the
-    # Install Maestro step).
+    # Wave 5 concluded from those three facts that "the Flutter view
+    # permanently fails to present on a fresh install". THAT WAS NEVER
+    # ESTABLISHED — it is one reading of the artifact, and wave 6 (A-6)
+    # found the evidence does not distinguish it from at least two others.
+    # This row has now recorded a wrong cause once and an unestablished one
+    # once; do not add a third by reasoning from the same artifact.
+    #
+    # WHY THE THREE FACTS DO NOT SETTLE IT. A blank white frame with an
+    # empty accessibility tree is produced identically by (a) iOS's white
+    # LaunchScreen.storyboard, i.e. the Flutter view never presented; (b)
+    # ChoreApp's `_LoadingScaffold`, i.e. the view DID present and the
+    # household gate never resolved — that scaffold emitted no
+    # accessibility node at all until `app.loading` was added in wave 6,
+    # so it photographed and dumped exactly like (a); and (c) an XCTest
+    # driver that went blind to an app Maestro had just uninstalled and
+    # reinstalled, which also explains a responsive main thread and a
+    # 0.01s snapshot. Only (b) would be our bug.
+    #
+    # WHAT WAVE 6 ACTUALLY MEASURED, with the amplifier below. At the
+    # suite's own 60s threshold: 1400 cold launches across 56 fresh
+    # simulator boots (14 dispatched runs), ZERO reproductions. Against
+    # the historical ~0.45%/launch that is p~0.002, and it bounds the
+    # per-launch rate at 0.21% (95%). It bounds it ON THIS IMAGE ONLY --
+    # every boot drew macos26/20260728.0273.1, Xcode 26.6, iPhone 17 Pro,
+    # iOS 26.2 -- and says nothing about the image August's reds came
+    # from. "Does not reproduce on today's CI" is NOT "fixed"; nothing
+    # was fixed, the environment moved. Every run carried a
+    # negative control that forced a failure on a healthy app and proved
+    # the capture path fires, so that count is not a broken instrument
+    # reporting silence.
+    #
+    # TWO TRAPS THAT COST WAVE 6 TIME, recorded so they cost nobody else:
+    #   - A 20s probe is NOT a cheaper 60s probe. Measured from launchApp
+    #     it swallows process startup, and a launch that took 12.4s to
+    #     reach the Dart VM (against a 0.8s median) failed on arithmetic
+    #     alone. Two further 20s failures had rendered by ~launch+40s and
+    #     would have PASSED the suite's 60s gate, so they were not this
+    #     flake either. Measure at 60s or measure nothing.
+    #   - `XCTAS Error: ... Error getting main window Unknown kAXError
+    #     value -25218` looks exactly like the smoking gun and IS NOT ONE.
+    #     It appears in 56 of one run's 100 launches INCLUDING PASSING
+    #     ones, and is absent from one of the two failures it would have
+    #     explained. Already ruled out; do not re-derive it.
+    #
+    # STILL NOT FIXED, and nothing here claims otherwise. The remedies
+    # that fit a bimodal shape (a Maestro `retry`, a CLI
+    # --retry-on-failure) cannot be A/B'd against the 2.7.0 pin without a
+    # simulator run — unverified Maestro changes being exactly what that
+    # pin exists to prevent (see the Install Maestro step).
     #
     # AND NOTE A `paths:` FILTER WOULD NOT HELP the cost side anyway: nearly
     # every PR here touches lib/**, which is iOS-relevant, so "PRs touching
