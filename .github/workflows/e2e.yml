@@ -224,9 +224,12 @@ jobs:
           flutter-version: 3.44.8
           channel: stable
           cache: true
-      # AMPLIFIER RUNS ONLY (backlog A-6), so an ordinary verification run
-      # still builds from scratch exactly as before and this cannot hand it
-      # a stale binary. The amplifier wants many INDEPENDENT runners far
+      # AMPLIFIER RUNS ONLY (backlog A-6). DO NOT GENERALISE THIS CACHE TO
+      # THE NORMAL PATH -- it looks like an obvious speed-up for every run
+      # and it is not one. An ordinary verification run exists to test the
+      # code AT THAT REF, and handing it a cached binary defeats the thing
+      # the run is for. The amplifier is the only caller for which the
+      # binary is a fixed input rather than the subject. The amplifier wants many INDEPENDENT runners far
       # more than it wants many cycles on one -- the flake's own history is
       # 9 of 10 reds inside 2 of 61 runs, which is what a per-runner or
       # per-simulator condition looks like, and under that shape a 25-cycle
@@ -344,21 +347,22 @@ jobs:
 
           # MUST equal the probe flow's `repeat.times`. The probe repeats
           # internally so Maestro's ~25s of JVM start, driver install and
-          # teardown is paid once per batch instead of once per cycle.
-          # 25 is also deliberately close to the real job's 14 flows, which
+          # teardown is paid once per batch instead of once per cycle. 25
+          # is also deliberately close to the real job's 14 flows, which
           # makes a batch a rough REPLICA of one `ios` run: one boot, one
           # warm-up launch, then a couple of dozen cold starts.
           BATCH=25
           batches=$(( (CYCLES + BATCH - 1) / BATCH ))
 
-          # A FRESH BOOT PER BATCH, which is the experiment's real subject.
-          # If the condition is per-boot rather than per-runner, cycles 26+
-          # on one boot measure almost nothing, and this is what separates
-          # the two: reproductions spread across the boots of many runners
-          # means per-boot; reproductions concentrated in every boot of a
-          # few runners means per-runner. Same shutdown/boot/install/warm-up
-          # sequence as the `Boot simulator` step, so a batch reproduces the
-          # real job's starting conditions rather than an artificial one.
+          # A FRESH BOOT PER BATCH, which is the experiment's real
+          # subject. If the condition is per-boot rather than per-runner,
+          # cycles 26+ on one boot measure almost nothing, and this is
+          # what separates the two: reproductions spread across the boots
+          # of many runners means per-boot; reproductions concentrated in
+          # every boot of a few runners means per-runner. Same
+          # shutdown/boot/install/warm-up sequence as the `Boot simulator`
+          # step, so a batch reproduces the real job's starting conditions
+          # rather than an artificial one.
           reboot_simulator() {
             xcrun simctl shutdown "$DEVICE_ID" >/dev/null 2>&1 || true
             xcrun simctl boot "$DEVICE_ID"
@@ -369,7 +373,157 @@ jobs:
             xcrun simctl terminate booted "$APP_ID" >/dev/null 2>&1 || true
           }
 
-          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png_bytes" \
+          start_logs() {
+            xcrun simctl spawn booted log stream --level=debug \
+              --style=syslog --predicate 'process == "Runner"' \
+              > "$OUT/$1.runner.log" 2>&1 &
+            RUNNER_LOG_PID=$!
+            xcrun simctl spawn booted log stream --style=syslog \
+              --predicate 'process == "SpringBoard"' \
+              > "$OUT/$1.system.log" 2>&1 &
+            SYSTEM_LOG_PID=$!
+            sleep 3
+          }
+
+          # Everything worth having about a failed launch, in one place so
+          # the negative control below exercises the SAME code the
+          # measurement loop depends on. A control that proved out a
+          # separate copy would prove nothing about this one.
+          capture_failure() {
+            label="$1"
+            # Maestro leaves the app in its failed state.
+            "$MAESTRO" hierarchy > "$OUT/$label.hierarchy.json" 2>&1 || true
+            # Taken with simctl, NOT through the driver, and that is the
+            # point. It tests a hypothesis none of the recorded evidence
+            # could: that the app is fine and XCTest has gone blind to it.
+            # Every fact on record -- a window titled "Famdo" holding
+            # nothing, a main thread that answers, a snapshot in 0.01s
+            # with zero nodes -- fits a driver that lost its accessibility
+            # view of an app Maestro had just uninstalled and reinstalled,
+            # exactly as well as it fits an app that never presented. A
+            # screenshot from outside the driver settles it: a welcome
+            # screen here next to an empty hierarchy means the app was
+            # never the problem.
+            xcrun simctl io booted screenshot "$OUT/$label.png" || true
+            CAPTURED_PNG=$(wc -c < "$OUT/$label.png" 2>/dev/null || echo 0)
+
+            # THE PAYLOAD. A debug build starts the Dart VM service and
+            # prints its URL, auth token included, to os_log, which the
+            # stream has already captured; a simulator shares the host's
+            # loopback, so the runner can reach it exactly as `flutter
+            # attach` does. The service answers JSON-RPC over plain HTTP
+            # GET, so `getStack` for every isolate names the Dart frames
+            # the hung launch sits on -- main isolate AND drift's
+            # background database isolate. That separates "awaiting a
+            # path_provider reply that never came" from "awaiting drift's
+            # isolate handshake" from "awaiting nothing, so the hang is
+            # below Dart", which no screenshot or hierarchy can.
+            sleep 3
+            vm_url=$(grep -o \
+              'The Dart VM service is listening on http://[^ ]*' \
+              "$OUT/$label.runner.log" | tail -1 \
+              | sed 's|.*listening on ||')
+            if [ -n "$vm_url" ]; then
+              echo "VM service: $vm_url" > "$OUT/$label.vm.txt"
+              curl -sS --max-time 20 "${vm_url}getVM" \
+                >> "$OUT/$label.vm.txt" 2>&1 || true
+              for iso in $(grep -oE 'isolates.?/[0-9]+' \
+                  "$OUT/$label.vm.txt" | tr -d '\\' | sort -u); do
+                {
+                  echo ""
+                  echo "=== getStack $iso ==="
+                  curl -sS --max-time 20 \
+                    "${vm_url}getStack?isolateId=$iso" 2>&1 || true
+                } >> "$OUT/$label.vm.txt"
+              done
+            else
+              echo 'no VM service URL: Dart never got there' \
+                > "$OUT/$label.vm.txt"
+            fi
+
+            # Belt and braces, because a reproduction is rare and
+            # expensive and the VM service's plain-HTTP RPC is the one
+            # instrument above that could simply have been withdrawn
+            # upstream. A simulator app is an ordinary host process, so
+            # `sample` gives native backtraces for every thread with no
+            # cooperation from Dart -- and it is the only instrument that
+            # still reports anything if Dart never started at all.
+            #
+            # tail, not head: a batch holds up to 25 launches and the one
+            # still on screen is the LAST. `head` would sample a pid that
+            # exited 24 cycles ago, or a recycled one.
+            app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
+              "$OUT/$label.runner.log" | tail -1 | tr -dc '0-9')
+            if [ -n "$app_pid" ]; then
+              /usr/bin/sample "$app_pid" 3 \
+                -file "$OUT/$label.sample.txt" > /dev/null 2>&1 || true
+            fi
+
+            cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
+              "$OUT/$label.maestro-debug" 2>/dev/null || true
+
+            CAPTURED_LAUNCHES=$(grep -c 'Dart VM service is listening' \
+              "$OUT/$label.runner.log" || true)
+            if [ "$CAPTURED_LAUNCHES" -eq 0 ]; then
+              CAPTURED_VERDICT=HARNESS_NO_LAUNCH
+            elif grep -q 'app\.loading' "$OUT/$label.hierarchy.json"; then
+              CAPTURED_VERDICT=DART_RAN_GATE_NEVER_RESOLVED
+            elif grep -q 'welcome\.' "$OUT/$label.hierarchy.json"; then
+              CAPTURED_VERDICT=FLUTTER_TREE_PRESENT_SELECTOR_MISSED
+            else
+              CAPTURED_VERDICT=NO_FLUTTER_NODES_AT_ALL
+            fi
+          }
+
+          # ---- NEGATIVE CONTROL, before any measurement -----------------
+          # "0 reproductions in N launches" is worthless if the instrument
+          # could not have reported one, and a broken capture path leaves
+          # a run log identical to a clean one. So force a failure on a
+          # HEALTHY, fully rendered app and require the capture to fire.
+          # This is also the calibration for reading a real reproduction:
+          # it establishes what the hierarchy, the screenshot size and the
+          # VM stacks look like when the app is definitely fine.
+          echo "=== A-6 negative control ==="
+          reboot_simulator
+          start_logs control
+          if "$MAESTRO" test --env APP_ID="$APP_ID" \
+               e2e/amplify/blank_frame_control.yaml \
+               > "$OUT/control.maestro.log" 2>&1; then
+            kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+            echo "::error::A-6 control PASSED an impossible assertion."
+            echo "The probe cannot detect a failure; N would be meaningless."
+            exit 1
+          fi
+          capture_failure control
+          kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+          control_ok=yes
+          for f in control.hierarchy.json control.png control.vm.txt \
+              control.sample.txt; do
+            if [ ! -s "$OUT/$f" ]; then
+              echo "::error::A-6 control produced no $f"
+              control_ok=no
+            fi
+          done
+          grep -q 'getStack' "$OUT/control.vm.txt" \
+            || { echo "::error::A-6 control got no Dart stack"; \
+                 control_ok=no; }
+          if [ "$CAPTURED_VERDICT" != "FLUTTER_TREE_PRESENT_SELECTOR_MISSED" ]
+          then
+            echo "::error::A-6 control verdict was $CAPTURED_VERDICT, not"
+            echo "FLUTTER_TREE_PRESENT_SELECTOR_MISSED: either the"
+            echo "instrument is wrong or the control itself hit the flake."
+            control_ok=no
+          fi
+          echo "control: verdict=$CAPTURED_VERDICT png=$CAPTURED_PNG bytes"
+          echo "control: launches=$CAPTURED_LAUNCHES ok=$control_ok"
+          if [ "$control_ok" != "yes" ]; then
+            echo "::error::A-6 negative control failed; not measuring."
+            exit 1
+          fi
+          control_png=$CAPTURED_PNG
+
+          # ---- MEASUREMENT ---------------------------------------------
+          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png" \
             > "$OUT/results.csv"
           failures=0
           launched=0
@@ -378,19 +532,18 @@ jobs:
             boot_start=$SECONDS
             reboot_simulator
             boot_s=$((SECONDS - boot_start))
-
-            # Streams are per batch because a shutdown kills them. They are
-            # started BEFORE Maestro and given a moment to attach, so the
-            # batch's first launch is captured like every other one.
-            xcrun simctl spawn booted log stream --level=debug \
-              --style=syslog --predicate 'process == "Runner"' \
-              > "$OUT/batch-$i.runner.log" 2>&1 &
-            runner_log_pid=$!
-            xcrun simctl spawn booted log stream --style=syslog \
-              --predicate 'process == "SpringBoard"' \
-              > "$OUT/batch-$i.system.log" 2>&1 &
-            system_log_pid=$!
-            sleep 3
+            # HARNESS GUARD, not a nicety. There is no `set -e` here (the
+            # loop must survive a failing batch), so a simulator that
+            # failed to come back would leave every later batch failing
+            # for want of a device -- and those would be logged as
+            # NO_FLUTTER_NODES_AT_ALL, indistinguishable at a glance from
+            # the thing being hunted. Fabricating reproductions is the
+            # worst failure this step could have, so it stops instead.
+            if ! xcrun simctl list devices booted | grep -q "$DEVICE_ID"; then
+              echo "::error::A-6 simulator did not return after batch $i"
+              break
+            fi
+            start_logs "batch-$i"
 
             start=$SECONDS
             png_bytes=0
@@ -400,97 +553,21 @@ jobs:
               result=pass
               verdict=-
             else
-              result=FAIL
-              failures=$((failures + 1))
-              # Maestro leaves the app in its failed state, so this dumps
-              # the hierarchy that has so far only ever been seen once.
-              "$MAESTRO" hierarchy > "$OUT/batch-$i.hierarchy.json" 2>&1 \
-                || true
-              # Taken with simctl, NOT through the driver, and that is the
-              # point. It tests a hypothesis none of the recorded evidence
-              # could: that the app is fine and XCTest has gone blind to
-              # it. Every fact on record -- a window titled "Famdo" with
-              # nothing inside, a main thread that answers, a snapshot in
-              # 0.01s with zero nodes -- fits a driver that lost its
-              # accessibility view of an app Maestro had just uninstalled
-              # and reinstalled, exactly as well as it fits an app that
-              # never presented. A screenshot taken outside the driver
-              # settles it: welcome screen here plus an empty hierarchy
-              # means the app was never the problem.
-              xcrun simctl io booted screenshot "$OUT/batch-$i.png" || true
-              # Triage signal for that comparison without leaving the run
-              # log: a solid white frame is a few tens of KB, a rendered
-              # welcome screen several times that.
-              png_bytes=$(wc -c < "$OUT/batch-$i.png" 2>/dev/null || echo 0)
-              cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
-                "$OUT/batch-$i.maestro-debug" 2>/dev/null || true
-
-              # THE PAYLOAD. A debug build starts the Dart VM service and
-              # prints its URL, auth token included, to os_log, which the
-              # stream above has already captured; a simulator shares the
-              # host's loopback, so the runner can talk to it directly --
-              # the same channel `flutter attach` uses. The VM service
-              # answers JSON-RPC over plain HTTP GET, so `getStack` for
-              # every isolate names the Dart frames the hung launch sits
-              # on, main isolate AND drift's background database isolate.
-              # That separates "awaiting a path_provider channel reply that
-              # never came" from "awaiting drift's isolate handshake" from
-              # "awaiting nothing, so the hang is below Dart" -- none of
-              # which a screenshot or a hierarchy can tell apart.
-              sleep 3   # let os_log flush the tail of this launch
-              vm_url=$(grep -o \
-                'The Dart VM service is listening on http://[^ ]*' \
-                "$OUT/batch-$i.runner.log" | tail -1 \
-                | sed 's|.*listening on ||')
-              if [ -n "$vm_url" ]; then
-                echo "VM service: $vm_url" > "$OUT/batch-$i.vm.txt"
-                curl -sS --max-time 20 "${vm_url}getVM" \
-                  >> "$OUT/batch-$i.vm.txt" 2>&1 || true
-                for iso in $(grep -oE 'isolates.?/[0-9]+' \
-                    "$OUT/batch-$i.vm.txt" | tr -d '\\' | sort -u); do
-                  {
-                    echo ""
-                    echo "=== getStack $iso ==="
-                    curl -sS --max-time 20 \
-                      "${vm_url}getStack?isolateId=$iso" 2>&1 || true
-                  } >> "$OUT/batch-$i.vm.txt"
-                done
+              capture_failure "batch-$i"
+              verdict=$CAPTURED_VERDICT
+              png_bytes=$CAPTURED_PNG
+              if [ "$verdict" = "HARNESS_NO_LAUNCH" ]; then
+                echo "::error::A-6 batch $i never launched; not counted"
+                result=harness
               else
-                printf '%s\n' \
-                  'no VM service URL for this launch: Dart never got there' \
-                  > "$OUT/batch-$i.vm.txt"
+                result=FAIL
+                failures=$((failures + 1))
+                echo "::warning::A-6 batch $i reproduced: $verdict"
               fi
-
-              # Belt and braces, because a reproduction is rare and
-              # expensive and the VM service's plain-HTTP RPC is the one
-              # instrument above that could simply have been removed
-              # upstream. A simulator app is an ordinary host process, so
-              # `sample` gives native backtraces for every thread with no
-              # cooperation from Dart -- and it is the only instrument that
-              # still reports if Dart never started at all.
-              #
-              # tail, not head: a batch holds up to 25 launches and the one
-              # still on screen is the LAST. `head` would sample a pid that
-              # exited 24 cycles ago, or a recycled one.
-              app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
-                "$OUT/batch-$i.runner.log" | tail -1 | tr -dc '0-9')
-              if [ -n "$app_pid" ]; then
-                /usr/bin/sample "$app_pid" 3 \
-                  -file "$OUT/batch-$i.sample.txt" > /dev/null 2>&1 || true
-              fi
-
-              if grep -q 'app\.loading' "$OUT/batch-$i.hierarchy.json"; then
-                verdict=DART_RAN_GATE_NEVER_RESOLVED
-              elif grep -q 'welcome\.' "$OUT/batch-$i.hierarchy.json"; then
-                verdict=FLUTTER_TREE_PRESENT_SELECTOR_MISSED
-              else
-                verdict=NO_FLUTTER_NODES_AT_ALL
-              fi
-              echo "::warning::A-6 batch $i reproduced the flake: $verdict"
             fi
             run_s=$((SECONDS - start))
+            kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
 
-            kill "$runner_log_pid" "$system_log_pid" 2>/dev/null || true
             # The AUTHORITATIVE cycle count: every launch of a debug build
             # prints exactly one VM-service line, so counting them in this
             # batch's own log reports the launches that really happened --
@@ -504,7 +581,8 @@ jobs:
             echo "batch $i: $result, $n launches in ${run_s}s ($verdict)"
           done
 
-          echo "=== A-6: $failures reproductions, $launched cold launches ==="
+          echo "=== A-6: $failures reproductions, $launched cold launches"
+          echo "=== control png was $control_png bytes (healthy frame)"
           cat "$OUT/runner-fingerprint.txt"
           cat "$OUT/results.csv"
       - name: Upload A-6 amplifier artifacts
