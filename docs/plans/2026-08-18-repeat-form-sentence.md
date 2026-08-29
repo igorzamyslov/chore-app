@@ -42,6 +42,122 @@ the markup disagree, the markup is the specification.
 
 ---
 
+## Refresh pass — 2026-08-29, wave 6 (`integration/wave-6` @ `66666f0`)
+
+*This plan was written 2026-08-18, before wave 5 landed. Every file it names
+was re-read as it now stands. `git diff 0bee683..66666f0` touches **only**
+`lib/l10n/*` and three unrelated specs inside this plan's blast radius, so
+most code claims survived verbatim — including the two load-bearing ones
+(`_monthCandidate`'s `min(startDate.day, daysInMonth)` is still
+`recurrence_engine.dart:263-265`, and `validated`'s completion-anchor throw is
+still there, at `recurrence.dart:126-131`, not the `124-126` the Product
+decisions preamble cites). `schemaVersion` is still **12** and the backlog's
+"next migration is v13" note is still true, so the no-migration carry-forward
+holds.*
+
+**What was stale or wrong, and what it now says. Numbered corrections are
+applied in place below.**
+
+1. **`test/features/chores/chore_form/repeat_section_test.dart` does not
+   appear anywhere in this plan.** It exists, and it pumps `AnchorRow`
+   *directly* (a bare `MaterialApp` pump — legal, it has no `ProviderScope`
+   and no database, so the hang hazard in the Global Constraints does not
+   apply) and asserts the six exact anchor-card strings. It is therefore the
+   real regression gate on Task 1's "zero behaviour change" extraction, and
+   Task 4 changes `AnchorRow`'s constructor, so it must be updated there.
+   Added to the reference-test list and to Tasks 1/4/6.
+2. **Task 7's "`chore_form_recurrence_test.dart` — its id-based assertions
+   survive" is false for one case.** That file asserts *"Month unit,
+   completion anchor: monthly mode hides again"*. See correction 4: the
+   monthly-mode row still hides under a completion anchor, so this assertion
+   in fact survives unchanged — but only because correction 4 refuses Task 6's
+   layout bullet. Stated here so nobody "fixes" the test to match the bullet.
+3. **The same file's "weekday selection and anchor persist" case breaks on the
+   min-one-weekday seed.** `today` there is Friday 2026-07-24, so the form now
+   opens with `{Friday}` pre-selected; tapping Tue and Thu yields
+   `{2, 4, 5}`, not the `{2, 4}` it asserts. Task 7 now names this and
+   deselects Friday (which doubles as coverage that a non-last day *can* be
+   deselected).
+4. **REFUSED — Task 6's layout bullet "(month only) the monthly-mode row"
+   drops the `anchor == RecurrenceAnchor.schedule` condition the form has
+   today.** `nextAfterCompletion`'s month branch is
+   `completedOn.addMonths(interval)`: it reads neither `monthlyMode` nor
+   `monthlyDayOfMonth`. Surfacing a monthly-mode row and a day-of-month hole
+   under a completion anchor puts two controls on screen that change nothing —
+   the exact "control that does not apply" this redesign exists to delete. The
+   condition stays. The two rules compose cleanly and OPD-2 is unaffected:
+   *(month, completion)* → no mode row, no day hole, sentence falls back to the
+   plain `choreFormSentenceDay` shape; *(month, schedule, nthWeekday)* → no
+   completion card, per OPD-2.
+5. **REFUSED — Task 6's "prefer the 31st of a 31-day month" for `D == -1`,
+   because its stated justification is false.** The bullet reasons that at
+   `interval == 1` "every month is an occurrence so the choice of start month
+   does not change the schedule". `_monthOccurrences` filters
+   `candidate.isOnOrAfter(startDate)`, so moving the start date into a *later*
+   month deletes every earlier month from the series and moves `firstDueDate`
+   by up to 31 days. It buys zero cross-version divergence for mixed-version
+   households by silently delaying the chore for **every** household,
+   single-version ones included — trading a ≤3-day, always-early,
+   self-healing divergence for a permanent, month-scale one. `D == -1` aligns
+   to the last day of the start date's **own** month, full stop, and accepts
+   the residual Analysis §2a already bounds and documents.
+6. **GAP — the alignment invariant was only ever maintained in one
+   direction.** Task 6 aligns `_startDate` when the *day hole* changes, and
+   says nothing about the user then moving the start date with
+   `StartDateField`, which sits in the same form. That breaks
+   `startDate.day == monthlyDayOfMonth` and reopens exactly the divergence
+   OPD-1's obligation exists to close — and reopens it *worse*: the gap is
+   then up to 30 days and can fall in **either** direction, so the old client
+   can be **late**, which the whole "always early, nothing is silently missed"
+   safety argument depends on. Closed: the start-date callback re-establishes
+   the invariant on the same frame — `_monthlyDayOfMonth = picked.day` for a
+   concrete day (the date the user just picked wins, and the sentence's chip
+   follows it), or, when the day hole is "last day" (`-1`), the start date
+   snaps forward to that month's last day. One helper, called from both
+   callbacks.
+7. **Analysis §2a's "Moving the start date by up to ~30 days" understates the
+   move.** Aligning forward to day `D` from a start date early in a short month
+   can move it up to **58** days (`D = 31` from 1 Feb lands on 31 Mar, since
+   February has no 31st). Corrected in place.
+8. **Task 8's flow list is complete but its grep is not the whole story.**
+   `e2e/README.md` convention 5 also names `chore_form.repeat.unit.day` in
+   prose, as the documented reason flows tap it. It is not executable, so it
+   cannot red the `android` job, but leaving it describing a segmented control
+   that no longer exists is how the next flow author writes a broken flow.
+   Task 8 updates it.
+9. **`theme_and_scale_test.dart` never turns the repeat toggle on.** It opens
+   the form and asserts `chore_form.save` exists. As written it cannot see the
+   sentence at all, so Task 7's "the release gate the `Wrap` approach was
+   chosen to protect" is *vacuous* against this file today. Task 7 now extends
+   it to toggle repeat on and walk all three units at scale 2.0.
+10. **File-path drift.** `MonthlyModeRow` is in its own
+    `lib/features/chores/chore_form/monthly_mode_row.dart`, not in
+    `repeat_section.dart` as Task 6's bullet grouping implies; and the form
+    screen is `lib/features/chores/chore_form_screen.dart`, *not* under
+    `chore_form/`. `IntervalField` and `UnitRow` **are** in
+    `repeat_section.dart`, as Task 6 says.
+11. **Sentinels are written as `﷐`…`﷓` escapes, not as literal
+    noncharacters.** Analysis §4 spells them as raw glyphs. A literal
+    noncharacter in Dart source is invisible in every editor and diff, survives
+    no copy-paste reliably, and is the single easiest thing for a later
+    "cleanup" to mangle undetectably. Same code points, readable source.
+12. **`monthlyDayOfMonth` gets a fourth validation rule Task 3 did not list:
+    it must be `null` when `anchor == completion`.** The engine's completion
+    branch never reads it, so a non-null value there is a field that silently
+    does nothing — a trap, not a feature. Cannot break a persisted row: rules
+    written before this field have no key and decode to `null`.
+
+**Verified and left alone:** Analysis §1's repo-wide grep (still returns
+nothing; `chore_paused_section.dart` and `chore_occurrence_tile.dart` still do
+not import `recurrence.dart`); `PlainDate.addMonths` clamps rather than
+rolling over, which is what makes the §2a convergence identity actually hold
+across the whole series; `DateFormat.MMMEd` at `chore_occurrence_tile.dart:40`;
+`ChoreWithDetails` carrying the whole `Chore` for Task 10; and the three
+Maestro flows tapping `chore_form.repeat.unit.day` immediately after the
+toggle, exactly as Task 8 describes.
+
+---
+
 ## Global Constraints
 
 - **Do not edit `docs/backlog.md` or anything under `docs/feedback/`.** Other
@@ -73,6 +189,13 @@ the markup disagree, the markup is the specification.
     `PopScope` dirty guard.
   - `test/features/chores/theme_and_scale_test.dart` — text-scale-2.0 and
     dark-theme smoke, the release gate this plan is most likely to break.
+    **Note it does not turn the repeat toggle on today** (refresh correction
+    9), so it does not currently see the sentence at all; Task 7 extends it.
+  - `test/features/chores/chore_form/repeat_section_test.dart` — pumps
+    `AnchorRow` on its own and asserts the six exact anchor-card strings.
+    **This is the real regression gate on Task 1's extraction** (refresh
+    correction 1). It is a bare `MaterialApp` pump with no `ProviderScope`
+    and no database, so the hang hazard above does not apply to it.
 - `semantic()` is `Widget semantic(String id, {required Widget child})` —
   **NAMED** child. Positional will not compile.
 - **All user-visible strings via gen_l10n.** `lib/l10n/app_en.arb` is the
@@ -251,10 +374,23 @@ whole objection to (b).
 the start date can drop or add the first occurrence. Task 6 therefore aligns
 *forward*: it picks the nearest date **on or after** the current start date
 whose day is `D`, so the first occurrence never lands in the past. Moving the
-start date by up to ~30 days also shifts the whole month series for
-`interval > 1`, which is a real change to what the user asked for — but it is
-the change they asked for, rendered honestly in a field they can see and
-override.
+start date by up to **58** days (refresh correction 7 — `D = 31` from 1 Feb
+lands on 31 Mar, since February has no 31st; the naive bound of ~30 days is
+wrong for `D` in 29..31) also shifts the whole month series for `interval > 1`,
+which is a real change to what the user asked for — but it is the change they
+asked for, rendered honestly in a field they can see and override.
+
+**The invariant has two directions, not one** (refresh correction 6). The
+start date is also directly editable, in the same form, *below* the sentence.
+If only the day hole maintained the alignment, a user who picked "the 20th"
+and then moved the start date to the 5th would persist
+`monthlyDayOfMonth: 20` against `startDate.day: 5` — divergence back up to 30
+days, and now in **either** direction, so the old client can be *late*. That
+destroys the "always early, nothing is silently missed" property the whole
+mitigation rests on. So the start-date callback re-establishes the invariant
+too: for a concrete `D`, the date the user just picked wins and
+`_monthlyDayOfMonth` follows it; for `D == -1`, the start date snaps forward
+to the last day of the month they picked.
 
 **The residual: "last day" (`D == -1`) alone.** This is the one token with no
 exact `startDate` expression, and the reason is precisely the clamp: since
@@ -404,7 +540,10 @@ English word order into the widget tree.
 **Sentinel mechanics (be precise here — this is where a from-memory
 implementation would introduce a defect).** Use four distinct **Unicode
 noncharacters** — `U+FDD0`, `U+FDD1`, `U+FDD2`, `U+FDD3`, written in Dart as
-`'﷐'` etc. — one per hole *position*, so a split can tell *which* hole it
+the escapes `'﷐'` etc., **never as literal glyphs** (refresh correction
+11: a literal noncharacter is invisible in every editor and diff and is the
+easiest thing in this file for a later cleanup to mangle undetectably) — one
+per hole *position*, so a split can tell *which* hole it
 found rather than relying on order. These code points are permanently reserved
 as noncharacters and can never legitimately appear in translated copy, which
 neither the private-use area nor the interlinear-annotation block (`U+FFF9`…)
@@ -430,8 +569,12 @@ the prototype's `32`:
   index; it is not a proposed wire format.
 
 Validation to add in `Recurrence.validated`: `monthlyDayOfMonth` must be `null`
-or in `1..31` or exactly `-1`; and it must be `null` unless
-`unit == month && monthlyMode == dayOfMonth`. `null` keeps today's meaning —
+or in `1..31` or exactly `-1`; it must be `null` unless
+`unit == month && monthlyMode == dayOfMonth`; and (refresh correction 12) it
+must be `null` when `anchor == completion`, because `nextAfterCompletion`'s
+month branch is `completedOn.addMonths(interval)` and never reads it — a
+non-null value there is a field that silently does nothing. `null` keeps
+today's meaning —
 derive from `startDate.day` — which is what every existing persisted rule
 means.
 
@@ -655,7 +798,10 @@ E2E gate go red.*
       `PlainDate startDate` — pick one and document it; the fields are more
       convenient for the form, which holds them loose).
 - [ ] `AnchorRow` now calls it. **No ARB key changes, no copy changes, no
-      widget changes.**
+      widget changes.** `test/features/chores/chore_form/repeat_section_test.dart`
+      (refresh correction 1) pumps `AnchorRow` directly and asserts all six
+      exact strings — it must stay green **unedited** through this task; it is
+      the real proof the extraction changed nothing.
 - [ ] Doc comment must state that this is the single formatter for recurrence
       prose in the app, name its callers, and say why a second one is a
       regression.
@@ -740,8 +886,10 @@ missing from `app_de.arb` fails generation — that is the guard.
       `fromJson` (`is! int?` check, exactly like `monthly_ordinal`), `==`, and
       `hashCode`.
 - [ ] `validated` throws `ArgumentError` when: it is non-null and
-      `unit != month`; it is non-null and `monthlyMode != dayOfMonth`; or it is
-      not `null`, not `-1`, and not in `1..31`.
+      `unit != month`; it is non-null and `monthlyMode != dayOfMonth`; it is
+      non-null and `anchor == completion` (refresh correction 12 — the
+      completion branch never reads it); or it is not `null`, not `-1`, and
+      not in `1..31`.
 - [ ] In `recurrence_engine.dart`, `_monthCandidate`'s `dayOfMonth` branch:
       `null` → today's `startDate.day` behaviour, byte for byte; `-1` →
       `PlainDate.daysInMonth(year, month)`; `1..31` → clamp to
@@ -749,7 +897,10 @@ missing from `app_de.arb` fails generation — that is the guard.
       bullet.
 - [ ] `nextAfterCompletion`'s month branch is `completedOn.addMonths(interval)`
       and stays exactly as it is — `addMonths` already clamps. Say so in the
-      doc so a reader does not expect the new field to apply there.
+      doc so a reader does not expect the new field to apply there. Per
+      refresh correction 12 the field cannot even be set on a
+      completion-anchored rule, so the doc states a rule `validated` enforces
+      rather than a caller convention.
 - [ ] `lib/domain/` stays **`dart:core`-only** — add no imports.
 - [ ] **Document the alignment contract on the field itself** (OPD-1 obligation,
       Analysis §2a): callers are expected to keep `startDate.day` equal to
@@ -807,6 +958,11 @@ two rules differ in that field before comparing their series.
       `localizedOrdinal(day, localeName)`), and an nth-weekday ordinal that
       reads from the rule's own `monthlyOrdinal`/`monthlyWeekday` rather than
       re-deriving them from `startDate` via `nthWeekdayOrdinalOf`.
+- [ ] That last change alters `AnchorRow`'s inputs, so
+      `test/features/chores/chore_form/repeat_section_test.dart` (refresh
+      correction 1) must be updated **here**, in this task — it passes
+      `startDate:` and relies on the derivation. Pass the explicit
+      day/ordinal/weekday instead and keep every asserted string identical.
 
 **RED:** extend `test/features/chores/recurrence_sentence_test.dart` with, at
 minimum: (1) **the multi-weekday reading** — `interval: 2`, `weekdays: {2, 5}`,
@@ -885,7 +1041,12 @@ lands; if you cannot make (1)–(3) fail first, you are testing the old form.
 invisible to the user.
 
 - [ ] `lib/features/chores/chore_form/repeat_controls.dart` becomes, top to
-      bottom: `RepeatSentence` → (week only) `WeekdayChips` → (month only) the
+      bottom: `RepeatSentence` → (week only) `WeekdayChips` → (month **and
+      schedule anchor** only — refresh correction 4 **refuses** this bullet's
+      original "(month only)"; `nextAfterCompletion`'s month branch reads
+      neither `monthlyMode` nor `monthlyDayOfMonth`, so showing either control
+      under a completion anchor puts a dead control on screen, which is the
+      exact thing this redesign deletes) the
       monthly-mode row → a 1px `Divider` hairline → a
       `choreFormCountingFromLabel` section header (11sp, uppercase,
       `onSurfaceVariant`, letter-spacing 0.7, per the design markup) →
@@ -957,18 +1118,35 @@ invisible to the user.
       `_startDate` whose day is `D`, and `setState` so the Start date field
       visibly updates in the same frame. Never move it backwards —
       `firstDueDate` must not land in the past.
-- [ ] For `D == -1` ("last day"), align `_startDate` to the last day of its own
-      month; prefer the 31st of a 31-day month when the start date may sit in
-      one **without shifting the month series** (i.e. `interval == 1`, where
-      every month is an occurrence so the choice of start month does not change
-      the schedule). Otherwise accept the ≤3-day, always-early residual from
-      Analysis §2a. Comment the branch with that reasoning — a later reader
-      will otherwise "tidy" the 31-day preference away.
+- [ ] For `D == -1` ("last day"), align `_startDate` to the last day of its
+      **own** month, full stop. **Refresh correction 5 REFUSES** this bullet's
+      original "prefer the 31st of a 31-day month … (i.e. `interval == 1`,
+      where every month is an occurrence so the choice of start month does not
+      change the schedule)": that justification is false. `_monthOccurrences`
+      filters `candidate.isOnOrAfter(startDate)`, so moving the start date into
+      a later month deletes every earlier month from the series and moves
+      `firstDueDate` by up to 31 days. It would buy zero divergence for
+      mixed-version households by silently delaying the chore for **every**
+      household. Accept the ≤3-day, always-early residual Analysis §2a already
+      bounds. Comment the branch with *this* reasoning.
+- [ ] **The invariant's other direction** (refresh correction 6, Analysis
+      §2a): `StartDateField` sits in the same form and can break
+      `startDate.day == monthlyDayOfMonth` right after the day hole
+      established it — and that divergence is unbounded to 30 days and can go
+      **either** way, so the old client can be *late*, which the whole safety
+      argument denies. So `StartDateField`'s callback re-establishes the
+      invariant on the same frame, for `unit == month && monthlyMode ==
+      dayOfMonth && anchor == schedule` only: with a concrete `D`, the date the
+      user just picked wins and `_monthlyDayOfMonth = picked.day`; with
+      `D == -1`, `_startDate` snaps forward to the last day of the month they
+      picked. Put both the day-hole rule and this one behind **one** helper so
+      they cannot drift.
 - [ ] Because alignment writes `_startDate`, it must be reflected in
       `_isDirty` (it already is — `_startDate != _initialStartDate` is checked
       today) and must **not** run during `_loadExisting` seeding, or opening an
       existing chore would move its start date and mark the form dirty on
-      arrival. Align only in response to an actual user tap on the day hole.
+      arrival. Align only in response to an actual user tap on the day hole or
+      the start-date picker.
 - [ ] **Do not touch** the `PopScope`, `canPop: !_isDirty`,
       `onPopInvokedWithResult`, or the `bottomNavigationBar` +
       `MediaQuery.viewInsetsOf` padding on `chore_form.save`. All three are
@@ -984,12 +1162,22 @@ subject, and they must **not** be silenced by editing them inside this task.
 
 ### Task 7 — Update and extend the widget tests
 
-- [ ] `chore_form_recurrence_test.dart` — its id-based assertions survive; its
+- [ ] `chore_form_recurrence_test.dart` — its id-based assertions survive
+      (including *"Month unit, completion anchor: monthly mode hides again"*,
+      which survives **because** refresh correction 4 keeps the
+      `anchor == schedule` condition — do not "fix" it away); its
       unit taps become two-step (open `chore_form.repeat.unit`, then tap
       `chore_form.repeat.unit.<x>`). Add a case: **saving with an explicitly
       picked monthly day** produces a `Recurrence` with that
       `monthlyDayOfMonth`, asserted by reading the row back through the
       repository — the file's existing pattern.
+- [ ] `chore_form_recurrence_test.dart`'s **"weekday selection and anchor
+      persist"** case breaks on the min-one-weekday seed (refresh correction
+      3): `today` is Friday 2026-07-24, so the form now opens with `{Friday}`
+      already selected and tapping Tue + Thu yields `{2, 4, 5}`. Deselect
+      Friday after picking the other two and keep the `{2, 4}` assertion —
+      which doubles as coverage that a **non-last** day can still be
+      deselected, the other half of the min-one rule.
 - [ ] `chore_form_repeat_copy_test.dart` — rewrite around the sentence. The
       unit-pluralization assertion is still exactly right and must survive:
       typing `2` into the interval field re-renders the unit chip as "Months"
@@ -1027,8 +1215,13 @@ subject, and they must **not** be silenced by editing them inside this task.
       from Analysis §3b.
 - [ ] New: **the last weekday cannot be deselected.** Select exactly one day,
       tap it, assert it is still selected.
-- [ ] `theme_and_scale_test.dart` — confirm the form still renders at
-      `textScaleFactor` 2.0 and in `ThemeMode.dark` with no overflow. This is
+- [ ] `theme_and_scale_test.dart` — **it does not turn the repeat toggle on
+      today** (refresh correction 9), so as it stands it never renders the
+      sentence and this "gate" is vacuous for everything in this plan. Extend
+      it: at scale 2.0, open the form, toggle repeat **on**, and walk all
+      three units (the month unit is the widest sentence), asserting
+      `tester.takeException()` is null after each. Then confirm the form still
+      renders in `ThemeMode.dark` with no overflow. This is
       the release gate the `Wrap` approach was chosen to protect; if it fails,
       the sentence's `Wrap` or the chip's `BoxConstraints` is wrong — do not
       "fix" it by shrinking the tap targets below 36px.
@@ -1049,7 +1242,14 @@ fails with the dialog appearing.
       naming this plan and saying the unit is now a menu, not a segment.
 - [ ] Grep the whole `e2e/` tree once more for `chore_form.repeat` before
       declaring this done — three flows is what exists at `0bee683`, not a
-      guarantee about the tree you are working in.
+      guarantee about the tree you are working in. (Re-grepped at `66666f0`:
+      still exactly those three flows.)
+- [ ] `e2e/README.md` convention 5 also names `chore_form.repeat.unit.day`, in
+      prose, as the documented reason flows tap it (refresh correction 8). It
+      is not executable so it cannot red the `android` job, but leaving it
+      describing a segmented control that no longer exists is how the next
+      flow author writes a broken flow. Update it to say the unit is a menu
+      and both taps are needed.
 - [ ] Do **not** run Maestro locally. Per the project's standing note, the E2E
       gate is GitHub CI; local emulator runs on this machine are noise. Push
       and let CI answer.
