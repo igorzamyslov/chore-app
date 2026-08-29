@@ -25,4 +25,13 @@ const List<String> categoryIconIdentifiers = [
   'local_cafe',
   'home',
   'shopping_bag',
+  'bathtub',
+  'delete',
+  'potted_plant',
+  'child_care',
+  'pedal_bike',
+  'description',
+  'celebration',
+  'thermostat',
+  'fitness_center',
 ];
