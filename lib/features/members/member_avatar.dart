@@ -51,7 +51,7 @@ String memberInitials(String name) {
   if (trimmed.isEmpty) {
     return '?';
   }
-  final head = trimmed.length < 2 ? trimmed : trimmed.substring(0, 2);
+  final head = trimmed.substring(0, 1);
   return head.trim().toUpperCase();
 }
 
