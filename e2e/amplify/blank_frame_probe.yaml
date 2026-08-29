@@ -12,12 +12,19 @@
 # This file is only ever run by name, by e2e.yml's dispatch-only amplifier
 # step (workflow input `ios_blank_frame_cycles`).
 #
-# TIMEOUT: 20s, not the suite's 60s. Established evidence (backlog A-6, run
-# 31800958022) is that this wait is bimodal -- 4.8-9.0s in every passing
-# flow, the full timeout in every failing one. Nothing has ever been
-# observed to land between. 20s is therefore >2x the slowest observed pass
-# and still an unambiguous separator, and it keeps a failing cycle cheap
-# enough to run dozens of times in one macOS job.
+# TIMEOUT: 60s, matching the suite EXACTLY. It was 20s, on the reasoning
+# that the wait is bimodal (4.8-9.0s in every passing flow, the full
+# timeout in every failing one) so a tighter threshold separates the two
+# just as well and makes a failing cycle cheaper. Run 33266354426 proved
+# that reasoning wrong, and the correction matters more than the saving.
+# Its one failure launched an app whose Dart VM took 12.4s to come up
+# against a median of 0.8s; add the gate's own 4.8-9.0s and it lands past
+# 20s while being nothing but a slow start -- exactly the case convention
+# 8's 60s headroom exists to absorb. A probe measuring at 20s therefore
+# manufactures failures the real suite would never see, and every one of
+# them would be misfiled as this flake. Matching the suite removes the
+# confound entirely; a failing cycle costing 60s instead of 20s is
+# irrelevant at a ~0.5% failure rate.
 #
 # BATCHED, and the batch size is load-bearing. Each `maestro test`
 # invocation spends ~25s on JVM start, installing and launching its XCTest
@@ -45,4 +52,4 @@ appId: ${APP_ID}
       - extendedWaitUntil:
           visible:
             id: "welcome.create"
-          timeout: 20000
+          timeout: 60000

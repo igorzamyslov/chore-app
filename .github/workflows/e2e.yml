@@ -391,8 +391,16 @@ jobs:
           # separate copy would prove nothing about this one.
           capture_failure() {
             label="$1"
-            # Maestro leaves the app in its failed state.
-            "$MAESTRO" hierarchy > "$OUT/$label.hierarchy.json" 2>&1 || true
+            # ORDER IS EVIDENCE. Everything that OBSERVES the failed state
+            # runs before anything that DISTURBS it, most-perishable
+            # first, and the hierarchy dump goes last because it starts a
+            # whole new Maestro/XCTest session -- ~20s, and an
+            # intervention in its own right. Getting this backwards cost
+            # run 33266354426 the one artifact that mattered: its
+            # screenshot was taken after the dump, so it could not say
+            # whether the screen was rendered AT the failure or only
+            # recovered by the time anyone looked.
+            #
             # Taken with simctl, NOT through the driver, and that is the
             # point. It tests a hypothesis none of the recorded evidence
             # could: that the app is fine and XCTest has gone blind to it.
@@ -406,6 +414,38 @@ jobs:
             # never the problem.
             xcrun simctl io booted screenshot "$OUT/$label.png" || true
             CAPTURED_PNG=$(wc -c < "$OUT/$label.png" 2>/dev/null || echo 0)
+
+            # Maestro's OWN debug directory: the screenshot and hierarchy
+            # it captured at the failure INSTANT, strictly better evidence
+            # than anything gathered afterwards. Its path is read from the
+            # flow's output rather than guessed with `ls -dt`, which is
+            # what run 33266354426 did and why it archived the wrong
+            # directory -- by then `maestro hierarchy` had created a newer
+            # one, so `ls -dt | head -1` faithfully copied the diagnostic
+            # session instead of the failure it was meant to preserve.
+            debug_dir=$(grep -oE '/[^ ]*/\.maestro/tests/[0-9_-]+' \
+              "$OUT/$label.maestro.log" | tail -1)
+            if [ -n "$debug_dir" ] && [ -d "$debug_dir" ]; then
+              cp -R "$debug_dir" "$OUT/$label.maestro-debug" \
+                2>/dev/null || true
+            fi
+
+            # Startup cost of the launch that failed -- the line between
+            # the two different failures this probe can produce. A genuine
+            # blank frame follows a NORMAL start: 0.71s and 0.79s in run
+            # 33263066546's two reproductions, against that run's 0.8s
+            # median over 100 launches. A slow start that merely ran out
+            # of clock looks nothing like it: 12.4s in run 33266354426.
+            # Recorded on every failure so the two are never conflated.
+            last_start=$(grep -oE '^[^ ]+ [0-9:.]+\+0000 .*Runner\[' \
+              "$OUT/$label.runner.log" | tail -1 | awk '{print $2}')
+            last_vm=$(grep 'Dart VM service is listening' \
+              "$OUT/$label.runner.log" | tail -1 | awk '{print $2}')
+            CAPTURED_VMDELTA=$(awk -v a="${last_start:-}" \
+              -v b="${last_vm:-}" 'BEGIN { if (a == "" || b == "") \
+              { print "NA"; exit } split(a, x, ":"); split(b, y, ":"); \
+              printf "%.2f", (y[1]*3600 + y[2]*60 + y[3]) \
+              - (x[1]*3600 + x[2]*60 + x[3]) }')
 
             # THE PAYLOAD. A debug build starts the Dart VM service and
             # prints its URL, auth token included, to os_log, which the
@@ -459,8 +499,10 @@ jobs:
                 -file "$OUT/$label.sample.txt" > /dev/null 2>&1 || true
             fi
 
-            cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
-              "$OUT/$label.maestro-debug" 2>/dev/null || true
+            # Deliberately LAST: a new Maestro session, ~20s, and an
+            # intervention in its own right. Maestro leaves the app in its
+            # failed state, so everything above observed that state first.
+            "$MAESTRO" hierarchy > "$OUT/$label.hierarchy.json" 2>&1 || true
 
             # NODE COUNT, not just "were there ids". A reproduction that
             # can say "0 nodes where a healthy app on this same runner had
@@ -547,7 +589,7 @@ jobs:
           control_ids=$CAPTURED_IDS
 
           # ---- MEASUREMENT ---------------------------------------------
-          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png,nodes,ids" \
+          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png,nodes,ids,vm_delta_s" \
             > "$OUT/results.csv"
           failures=0
           launched=0
@@ -573,6 +615,7 @@ jobs:
             png_bytes=0
             nodes=-
             ids=-
+            vmd=-
             if "$MAESTRO" test --env APP_ID="$APP_ID" \
                  e2e/amplify/blank_frame_probe.yaml \
                  > "$OUT/batch-$i.maestro.log" 2>&1; then
@@ -584,6 +627,7 @@ jobs:
               png_bytes=$CAPTURED_PNG
               nodes=$CAPTURED_NODES
               ids=$CAPTURED_IDS
+              vmd=$CAPTURED_VMDELTA
               if [ "$verdict" = "HARNESS_NO_LAUNCH" ]; then
                 echo "::error::A-6 batch $i never launched; not counted"
                 result=harness
@@ -591,6 +635,8 @@ jobs:
                 result=FAIL
                 failures=$((failures + 1))
                 echo "::warning::A-6 batch $i reproduced: $verdict"
+                echo "::warning::A-6 batch $i failing launch reached the"
+                echo "::warning::Dart VM in ${vmd}s (normal is under ~1.6s)"
               fi
             fi
             run_s=$((SECONDS - start))
@@ -604,7 +650,7 @@ jobs:
             n=$(grep -c 'Dart VM service is listening' \
               "$OUT/batch-$i.runner.log" || true)
             launched=$((launched + n))
-            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes,$nodes,$ids" \
+            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes,$nodes,$ids,$vmd" \
               >> "$OUT/results.csv"
             echo "batch $i: $result, $n launches in ${run_s}s ($verdict)"
           done

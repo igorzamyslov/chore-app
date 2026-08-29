@@ -30,7 +30,7 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible:
       id: "welcome.create"
-    timeout: 20000
+    timeout: 60000
 # Now fail on purpose, with that healthy screen still in front of us. The
 # id is deliberately one no widget can ever carry.
 - assertVisible:
