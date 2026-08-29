@@ -5,8 +5,8 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/features/chores/chore_form/labelled_field_card.dart';
-import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_radio_card.dart';
+import 'package:chore_app/features/chores/recurrence_sentence.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -198,55 +198,19 @@ class AnchorRow extends StatelessWidget {
   }
 
   String _subtitle(BuildContext context, RecurrenceAnchor anchor) {
-    final l10n = AppLocalizations.of(context);
-    if (anchor == RecurrenceAnchor.completion) {
-      switch (unit) {
-        case RecurrenceUnit.day:
-          return l10n.choreFormAnchorCompletionSubtitleDay(interval);
-        case RecurrenceUnit.week:
-          return l10n.choreFormAnchorCompletionSubtitleWeek(interval);
-        case RecurrenceUnit.month:
-          return l10n.choreFormAnchorCompletionSubtitleMonth(interval);
-      }
-    }
-    return _scheduleSubtitle(context);
-  }
-
-  /// Names the actual configured fixed-schedule interval (spec
-  /// `docs/specs/theme-v2.md` §4.4 item 4), replacing the old generic
-  /// "e.g. every Tuesday" example.
-  String _scheduleSubtitle(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final localeName = Localizations.localeOf(context).toString();
-    switch (unit) {
-      case RecurrenceUnit.day:
-        return l10n.choreFormAnchorScheduleSubtitleDay(interval);
-      case RecurrenceUnit.week:
-        final effective = weekdays.isEmpty ? {startDate.weekday} : weekdays;
-        final names = (effective.toList()..sort())
-            .map((weekday) => weekdayName(weekday, localeName))
-            .join(', ');
-        return l10n.choreFormAnchorScheduleSubtitleWeek(interval, names);
-      case RecurrenceUnit.month:
-        if (monthlyMode == MonthlyMode.dayOfMonth) {
-          final ordinalDay = localizedOrdinal(startDate.day, localeName);
-          return l10n.choreFormAnchorScheduleSubtitleMonthDayOfMonth(
-            interval,
-            ordinalDay,
-          );
-        }
-        final ordinal = nthWeekdayOrdinalOf(startDate);
-        final weekday = weekdayName(startDate.weekday, localeName);
-        return ordinal == -1
-            ? l10n.choreFormAnchorScheduleSubtitleMonthLastWeekday(
-                interval,
-                weekday,
-              )
-            : l10n.choreFormAnchorScheduleSubtitleMonthNthWeekday(
-                interval,
-                localizedOrdinal(ordinal, localeName),
-                weekday,
-              );
-    }
+    // One formatter for every piece of recurrence prose in the app -- see
+    // `recurrenceSentence`'s doc comment for why a second one is a
+    // regression. Note this is the CARD's own anchor, not [value]: both
+    // cards render their own reading so the user can compare them.
+    return recurrenceSentence(
+      AppLocalizations.of(context),
+      Localizations.localeOf(context).toString(),
+      interval: interval,
+      unit: unit,
+      anchor: anchor,
+      weekdays: weekdays,
+      monthlyMode: monthlyMode,
+      startDate: startDate,
+    );
   }
 }
