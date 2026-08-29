@@ -55,6 +55,13 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   RecurrenceAnchor _anchor = RecurrenceAnchor.schedule;
   Set<int> _weekdays = {};
   MonthlyMode _monthlyMode = MonthlyMode.dayOfMonth;
+  // Seeded from the start date on open and directly editable thereafter
+  // (G-2 / field feedback G3 stage 2): before this wave the monthly day,
+  // ordinal and weekday were all read off the start date at save time, with
+  // nothing on screen saying so.
+  late int _monthlyDayOfMonth;
+  late int _monthlyOrdinal;
+  late int _monthlyWeekday;
   late PlainDate _startDate;
   AssignmentMode _assignmentMode = AssignmentMode.anyone;
   List<String> _selectedMemberIds = [];
@@ -77,6 +84,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   late RecurrenceAnchor _initialAnchor;
   late Set<int> _initialWeekdays;
   late MonthlyMode _initialMonthlyMode;
+  late int _initialMonthlyDayOfMonth;
+  late int _initialMonthlyOrdinal;
+  late int _initialMonthlyWeekday;
   late String _initialInterval;
   late PlainDate _initialStartDate;
   late AssignmentMode _initialAssignmentMode;
@@ -103,6 +113,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         (_unit != _initialUnit ||
             _anchor != _initialAnchor ||
             _monthlyMode != _initialMonthlyMode ||
+            _monthlyDayOfMonth != _initialMonthlyDayOfMonth ||
+            _monthlyOrdinal != _initialMonthlyOrdinal ||
+            _monthlyWeekday != _initialMonthlyWeekday ||
             _intervalController.text != _initialInterval ||
             !setEquals(_weekdays, _initialWeekdays))) {
       return true;
@@ -119,6 +132,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     _initialAnchor = _anchor;
     _initialWeekdays = Set.of(_weekdays);
     _initialMonthlyMode = _monthlyMode;
+    _initialMonthlyDayOfMonth = _monthlyDayOfMonth;
+    _initialMonthlyOrdinal = _monthlyOrdinal;
+    _initialMonthlyWeekday = _monthlyWeekday;
     _initialInterval = _intervalController.text;
     _initialStartDate = _startDate;
     _initialAssignmentMode = _assignmentMode;
@@ -132,6 +148,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     // form opens. A day rollover moves the picker's range reference (see
     // `today` in build) but must never move a date the user is looking at.
     _startDate = ref.read(todayProvider);
+    _seedPatternFromStartDate();
     // RepeatControls reads the interval's live text (to pluralize the unit
     // label and the after-last-completion subtitle, field feedback
     // G3 stage 1); typing into the field doesn't otherwise trigger a
@@ -194,16 +211,31 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       _startDate = chore.startDate;
       _assignmentMode = chore.assignmentMode;
       _selectedMemberIds = List.of(details.assigneeMemberIds);
+      // Seed from the start date first, then let anything the stored rule
+      // states explicitly override it. A rule persisted before G-2 carries
+      // none of these, and for those the seed reproduces exactly what the
+      // engine was deriving anyway -- so the form now SHOWS the pattern
+      // that was always in effect, rather than changing it.
+      _seedPatternFromStartDate();
       if (recurrence != null) {
         _repeatEnabled = true;
         _unit = recurrence.unit;
         _anchor = recurrence.anchor;
-        _weekdays = Set.of(recurrence.weekdays);
+        if (recurrence.weekdays.isNotEmpty) {
+          _weekdays = Set.of(recurrence.weekdays);
+        }
         _monthlyMode = recurrence.monthlyMode;
+        _monthlyDayOfMonth = recurrence.monthlyDayOfMonth ?? _monthlyDayOfMonth;
+        _monthlyOrdinal = recurrence.monthlyOrdinal ?? _monthlyOrdinal;
+        _monthlyWeekday = recurrence.monthlyWeekday ?? _monthlyWeekday;
         _intervalController.text = recurrence.interval.toString();
       }
       _loading = false;
     });
+    // C4: every seed above must land BEFORE the snapshot, or opening an
+    // existing chore whose stored rule has an empty weekday set would make
+    // the form dirty on arrival and a plain back-tap would raise the
+    // discard dialog.
     _captureInitialSnapshot();
   }
 
@@ -308,16 +340,25 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
                 weekdays: _weekdays,
                 onWeekdayToggle: _toggleWeekday,
                 monthlyMode: _monthlyMode,
-                onMonthlyModeChanged: (value) {
-                  setState(() => _monthlyMode = value);
+                onMonthlyModeChanged: _onMonthlyModeChanged,
+                monthlyDayOfMonth: _monthlyDayOfMonth,
+                onMonthlyDayOfMonthChanged: _onMonthlyDayOfMonthChanged,
+                monthlyOrdinal: _monthlyOrdinal,
+                onMonthlyOrdinalChanged: (value) {
+                  setState(() => _monthlyOrdinal = value);
+                },
+                monthlyWeekday: _monthlyWeekday,
+                onMonthlyWeekdayChanged: (value) {
+                  setState(() => _monthlyWeekday = value);
                 },
                 startDate: _startDate,
+                today: today,
               ),
             const SizedBox(height: 16),
             StartDateField(
               value: _startDate,
               today: today,
-              onChanged: (value) => setState(() => _startDate = value),
+              onChanged: _onStartDateChanged,
             ),
             const SizedBox(height: 16),
             AssignmentFields(
@@ -377,11 +418,29 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     }
   }
 
+  /// Fills every directly-editable pattern field from [_startDate].
+  ///
+  /// This reproduces exactly what the engine used to derive silently, so
+  /// seeding never changes a chore's schedule -- it only makes the pattern
+  /// visible and editable. Must run before [_captureInitialSnapshot].
+  void _seedPatternFromStartDate() {
+    _weekdays = {_startDate.weekday};
+    _monthlyDayOfMonth = _startDate.day;
+    _monthlyOrdinal = nthWeekdayOrdinalOf(_startDate);
+    _monthlyWeekday = _startDate.weekday;
+  }
+
   void _onUnitChanged(RecurrenceUnit unit) {
     setState(() {
       _unit = unit;
       if (unit != RecurrenceUnit.month) {
         _monthlyMode = MonthlyMode.dayOfMonth;
+      }
+      // A week rule with no day picked would put the hidden start-date
+      // dependency straight back; this can only fire if some future path
+      // manages to empty the set.
+      if (unit == RecurrenceUnit.week && _weekdays.isEmpty) {
+        _weekdays = {_startDate.weekday};
       }
     });
   }
@@ -390,7 +449,29 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     setState(() {
       _anchor = anchor;
       if (anchor == RecurrenceAnchor.completion) {
+        // The belt to _onMonthlyModeChanged's braces: the completion card
+        // is not even offered in nthWeekday mode (OPD-2), so this should be
+        // unreachable, but Recurrence.validated throws on the pair and the
+        // cost of being sure is one line.
         _monthlyMode = MonthlyMode.dayOfMonth;
+      }
+    });
+  }
+
+  /// OPD-2's converse move: a user already on the completion anchor who
+  /// switches to weekday mode still has their anchor changed, because an
+  /// nth-weekday pattern is a position in the calendar with nothing for a
+  /// completion date to count from.
+  ///
+  /// It announces itself on the same frame rather than reverting silently:
+  /// the 'Counting from' section collapses to the one card AND grows the
+  /// line explaining why, in the section whose contents changed. No
+  /// snackbar, no dialog.
+  void _onMonthlyModeChanged(MonthlyMode mode) {
+    setState(() {
+      _monthlyMode = mode;
+      if (mode == MonthlyMode.nthWeekday) {
+        _anchor = RecurrenceAnchor.schedule;
       }
     });
   }
@@ -398,10 +479,59 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   void _toggleWeekday(int weekday) {
     setState(() {
       final updated = Set.of(_weekdays);
-      if (!updated.remove(weekday)) {
+      if (updated.remove(weekday)) {
+        // A week rule needs at least one day. An empty set is still legal
+        // in the model -- it means "derive from the start date" -- but
+        // that derivation is exactly the hidden dependency G3 stage 2
+        // removes, so the form no longer lets the user reach it.
+        if (updated.isEmpty) {
+          return;
+        }
+      } else {
         updated.add(weekday);
       }
       _weekdays = updated;
+    });
+  }
+
+  /// OPD-1 alignment. Picking a day of the month also moves the start date
+  /// onto that day, forwards, so a household member on a client predating
+  /// [Recurrence.monthlyDayOfMonth] computes an identical series -- see
+  /// that field's alignment contract and
+  /// [alignStartDateToMonthlyDay]. The move is visible in the Start date
+  /// field in this same form, on this same frame.
+  void _onMonthlyDayOfMonthChanged(int day) {
+    setState(() {
+      _monthlyDayOfMonth = day;
+      _startDate = alignStartDateToMonthlyDay(_startDate, day);
+    });
+  }
+
+  /// The other direction of the same invariant, and the one it is easiest
+  /// to forget: the start date is editable here too, so without this a user
+  /// could pick the 20th and then move the start date to the 5th, saving a
+  /// rule whose mirror disagrees with it. That is not just the old
+  /// divergence returning -- the gap could then fall either way, so the
+  /// older client could be LATE rather than early, which is the property
+  /// the whole mitigation rests on.
+  ///
+  /// The date the user just picked wins and the day chip follows it; only
+  /// the 'last day' sentinel, which has no numbered mirror, snaps the date
+  /// instead.
+  void _onStartDateChanged(PlainDate value) {
+    setState(() {
+      _startDate = value;
+      if (!_repeatEnabled ||
+          _unit != RecurrenceUnit.month ||
+          _anchor != RecurrenceAnchor.schedule ||
+          _monthlyMode != MonthlyMode.dayOfMonth) {
+        return;
+      }
+      if (_monthlyDayOfMonth == -1) {
+        _startDate = alignStartDateToMonthlyDay(value, -1);
+      } else {
+        _monthlyDayOfMonth = value.day;
+      }
     });
   }
 
@@ -478,7 +608,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             anchor: _anchor,
             weekdays: _weekdays,
             monthlyMode: _monthlyMode,
-            startDate: _startDate,
+            monthlyDayOfMonth: _monthlyDayOfMonth,
+            monthlyOrdinal: _monthlyOrdinal,
+            monthlyWeekday: _monthlyWeekday,
           )
         : null;
     final notes = _notesController.text.trim();

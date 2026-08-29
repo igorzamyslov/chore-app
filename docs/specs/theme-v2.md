@@ -330,12 +330,54 @@ requires).
 - Fields become **filled cards with a permanently visible uppercase
   label** above the value (`primaryOutline` border when focused,
   `outlineVariant` otherwise). No floating labels.
-- Interval unit and assignment mode become **segmented controls** on a
-  `surfaceContainerHigh` track (selected = `surfaceContainerLow` +
-  `primary` ink).
+- Assignment mode is a **segmented control** on a `surfaceContainerHigh`
+  track (selected = `surfaceContainerLow` + `primary` ink).
 - Weekdays become a row of circular toggles (selected = `primary` fill).
-- The anchor choice becomes **two explanatory radio cards** naming the
-  actual interval (selected = `primaryContainer` + `primaryOutline`).
+- **The repeat block is one fill-in-the-blank sentence** (amended
+  2026-08-29 by G-2, `docs/plans/2026-08-18-repeat-form-sentence.md`; the
+  layout itself is specified in `ui-foundation-chores.md`). Every hole
+  shares one chip container — `primaryContainer` fill,
+  `primaryOutline` border, radius 11, `BoxConstraints(minWidth: 40,
+  minHeight: 40)`, `Icons.unfold_more` at 16 on the holes that open a menu
+  — laid out in a `Wrap` of one `Text` per literal word. `minHeight` is a
+  **floor, not a fixed height**: the chip grows with the text and the
+  `Wrap` reflows around it, which is how the sentence survives text scale
+  2.0 (§5). If it ever overflows, the fix is the constraint, never a tap
+  target below 40px.
+- The anchor choice is **explanatory radio cards** naming the actual
+  configured rule (selected = `primaryContainer` + `primaryOutline`),
+  below a 1px `outlineVariant` hairline under an uppercase
+  `onSurfaceVariant` 'Counting from' header at `labelSmall` with
+  letter-spacing 0.7.
+
+**§0 exception, recorded (2026-08-29, G-2).** §0 says no `semantic(...)`
+id may be removed, renamed, **or moved to a different widget**. This wave
+moves three: `chore_form.repeat.unit.<day|week|month>` were the labels of
+three `ButtonSegment`s and are now entries in the menu the new
+`chore_form.repeat.unit` chip opens. Nothing was removed or renamed — all
+three ids still exist and still select the same unit — but they are on a
+different widget and, unlike a segment, they do not exist until the menu is
+opened.
+
+The exception is taken under §0's own final clause: *"When the design
+implies a behavior change (not just a look), it is out of scope for the
+theme waves and belongs in its own spec."* G-2 is that spec, and this is a
+behaviour change, not a restyle — the whole point is that controls which do
+not apply cease to exist.
+
+The obligation §0 exists to protect was met in the same commit: the three
+Maestro flows that tap `chore_form.repeat.unit.day` directly
+(`e2e/flows/settings/chore_history.yaml`,
+`e2e/flows/chores/skip_undo_journey.yaml`,
+`e2e/flows/chores/recurring_complete_advances.yaml`) each gained a
+`chore_form.repeat.unit` tap before it, and `e2e/README.md` convention 5
+was updated to say so. `chore_form.repeat.interval` also moved widget — from
+a `LabelledFieldCard` into the sentence — but it is still a `TextField`
+reached by descendant, so no flow or test path changed.
+
+`chore_form.repeat.anchor.completion` is a related but different case: it is
+not moved, it is conditionally **absent** (monthly weekday mode only), which
+§0 does not speak to and which the "does not exist" rule above requires.
 - Rotation mode shows selected members as a reorderable list with an
   order label per row ("1. Anna", "2. Ben") instead of chips, and
   not-yet-selected members as a chip row below it (spec

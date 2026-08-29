@@ -64,10 +64,14 @@ class Recurrence {
   final RecurrenceAnchor anchor;
   final Set<int> weekdays;        // week unit only. ISO 1..7. Empty set =
                                   // "derive from startDate.weekday".
-  final MonthlyMode monthlyMode;  // month unit only. Default: dayOfMonth
-                                  // (target day = startDate.day, clamped).
+  final MonthlyMode monthlyMode;  // month unit only. Default: dayOfMonth.
   final int? monthlyOrdinal;      // nthWeekday mode: 1..4, or -1 = "last"
   final int? monthlyWeekday;      // nthWeekday mode: ISO 1..7
+  final int? monthlyDayOfMonth;   // dayOfMonth mode + schedule anchor only:
+                                  // 1..31, or -1 = "the last day of the
+                                  // month". null = derive from
+                                  // startDate.day (clamped), which is what
+                                  // every rule persisted before G-2 means.
 }
 ```
 
@@ -86,6 +90,14 @@ custom enum duplicating what the SDK has.
 - `monthlyMode == nthWeekday` when `unit != month`
 - `monthlyMode == nthWeekday` when `anchor == completion` (nth-weekday pinning
   only makes sense for fixed series)
+- `monthlyDayOfMonth` set when `unit != month`, when
+  `monthlyMode != dayOfMonth`, or when `anchor == completion` — the engine
+  reads it in none of those cases, so a value there would silently do
+  nothing
+- `monthlyDayOfMonth` set and neither `-1` nor in 1..31. `-1` is the same
+  "last" sentinel `monthlyOrdinal` uses: one class, one encoding. `32` was
+  rejected as an alternative because it is a valid-looking day number that a
+  naive 1..31 range check would wave through into the database
 
 **Convenience factories** (all delegate to `validated`):
 
@@ -93,16 +105,85 @@ custom enum duplicating what the SDK has.
 Recurrence.everyNDays(int n, {RecurrenceAnchor anchor = .schedule});
 Recurrence.weekly({int interval = 1, Set<int> weekdays = const {},
                    RecurrenceAnchor anchor = .schedule});
-Recurrence.monthlyOnDay({int interval = 1, RecurrenceAnchor anchor = .schedule});
+Recurrence.monthlyOnDay({int interval = 1, RecurrenceAnchor anchor = .schedule,
+                        int? monthlyDayOfMonth});
 Recurrence.monthlyOnNthWeekday(int ordinal, int weekday, {int interval = 1});
 ```
 
 **JSON**: `toJson()` / `Recurrence.fromJson(Map<String, Object?>)` with
 snake_case keys (`interval`, `unit`, `anchor`, `weekdays`, `monthly_mode`,
-`monthly_ordinal`, `monthly_weekday`); enums serialized as their `name`.
+`monthly_ordinal`, `monthly_weekday`, `monthly_day_of_month`); enums
+serialized as their `name`.
 `fromJson` throws `FormatException` on unknown enum values / wrong types, and
 routes through `validated` (bad combos → `ArgumentError`). Round-trip must be
 lossless. Hand-written, no codegen.
+
+### 2.1 The `monthlyDayOfMonth` alignment invariant (G-2, 2026-08-29)
+
+`monthly_day_of_month` was added to a JSON shape that was already in the
+wild. `Chores.recurrence` is an opaque nullable `TEXT` column on both the
+drift and the Supabase side, so this needed **no migration and no
+schema-version bump** — but it does create a cross-device hazard, and the
+mitigation is part of the contract rather than a nicety.
+
+**The hazard.** A client writes `"monthly_day_of_month": 20` and syncs the
+row verbatim. A household member still on an older build decodes it,
+ignores the unknown key, and computes the due date from `startDate.day`
+instead. Two phones in one household then disagree about when a chore is
+due, with no error anywhere. Silent cross-device divergence is the failure
+class this project hunts hardest, so it does not get to stand as a noted
+cost.
+
+**The mitigation, and it is exact.** The old client's day-of-month branch
+is `min(startDate.day, daysInMonth)`. The new branch is
+`min(monthlyDayOfMonth, daysInMonth)`. These are the **same expression**
+whenever `startDate.day == monthlyDayOfMonth`. So the form keeps the start
+date aligned to the chosen day, and an un-updated device computes a
+**byte-identical series, forever**. Divergence is not bounded, it is zero,
+for every day in 1..31.
+
+- `monthlyDayOfMonth` is **authoritative**; `startDate.day` is a redundant
+  mirror kept solely for older clients, and the engine never reads
+  `startDate.day` while the field is non-null.
+- Alignment is maintained in **both directions** by the chore form: picking
+  a day moves the start date, and moving the start date re-derives the day.
+  Only maintaining the first would let a user save a rule whose mirror
+  disagrees — and that gap can fall either way, meaning the older client
+  could be *late*, which the safety argument below depends on not happening.
+- Alignment moves the start date **forwards only** — the nearest date on or
+  after the current one whose day matches — because `scheduleOccurrences`
+  filters to `isOnOrAfter(startDate)` and `firstDueDate` reads the first
+  element, so moving it backwards would put the first occurrence in the
+  past. The move can be large (picking the 31st on 1 February lands on 31
+  March), but it happens in a field the user is looking at and can override.
+- `Recurrence` cannot enforce any of this, because it never sees the start
+  date. It is an invariant the form maintains, documented on the field.
+
+**The residual: `-1` alone.** "Last day" is the one value with no exact
+`startDate` mirror. Since `daysInMonth <= 31` always,
+`min(31, daysInMonth) == daysInMonth`, so a start date on a **31st** would
+converge exactly — but the 31st only exists in 31-day months, and forcing
+the start date into one would delete every earlier occurrence from the
+series and delay the chore by up to 31 days, paid by every household
+including the single-version ones that had no divergence to fix. So the form
+does not do that: it aligns to the last day of the start date's **own**
+month and accepts the residual.
+
+| Start month's length | Aligned `startDate.day` | Old client computes | Divergence |
+| --- | --- | --- | --- |
+| 31 | 31 | last day, every month | **none** |
+| 30 | 30 | 30th, or 28th/29th in February | **≤ 1 day, old client early** |
+| 28/29 | 28 or 29 | 28th/29th | **≤ 3 days, old client early** |
+
+The residual is confined to "last day" rules, is at most **3 days**, and is
+**always in the safe direction** — the un-updated device shows the chore due
+*earlier*, never later, so nothing is silently missed. It converges
+permanently the moment that device updates, and it never occurs at all for a
+household on one version or for any non-"last day" rule.
+
+`test/domain/recurrence/recurrence_engine_test.dart`'s
+"cross-version convergence" group pins the identity above. If it goes red,
+the mitigation is broken and the sync hazard is live again.
 
 ## 3. Engine semantics
 

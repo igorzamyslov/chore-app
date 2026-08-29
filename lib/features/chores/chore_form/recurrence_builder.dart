@@ -16,17 +16,41 @@ import 'package:intl/intl.dart';
 /// chore simply passes `recurrence: null` to the service instead of calling
 /// this at all.
 ///
-/// For a month unit with [MonthlyMode.nthWeekday] (only reachable with a
-/// schedule anchor; see `docs/specs/ui-foundation-chores.md`), the ordinal
-/// and weekday are derived from [startDate] via [nthWeekdayOrdinalOf].
+/// Since G-2 every part of the pattern is passed in explicitly rather than
+/// derived from the start date: [monthlyDayOfMonth] (1..31, or `-1` for the
+/// last day), [monthlyOrdinal] (1..4, or `-1` for last) and
+/// [monthlyWeekday]. Removing that hidden derivation is the whole point of
+/// the ticket. The values that do not apply to the chosen shape are simply
+/// not read, and `monthlyDayOfMonth` is passed as `null` for a
+/// completion-anchored rule, where the engine ignores it and
+/// [Recurrence.validated] rejects it.
+///
+/// **This is the single funnel to a persisted rule**, which is why the
+/// OPD-2 invariant is asserted here: an nth-weekday pattern is a position in
+/// the calendar, so it only makes sense with a schedule anchor, and
+/// `Recurrence.validated` throws on the combination. The form makes that
+/// combination unreachable by removing the completion card in weekday mode;
+/// the assert is so a future refactor that reintroduces it fails in debug
+/// here, rather than as an `ArgumentError` thrown out of a save the user
+/// already tapped.
 Recurrence buildRecurrence({
   required int interval,
   required RecurrenceUnit unit,
   required RecurrenceAnchor anchor,
   required Set<int> weekdays,
   required MonthlyMode monthlyMode,
-  required PlainDate startDate,
+  required int monthlyDayOfMonth,
+  required int monthlyOrdinal,
+  required int monthlyWeekday,
 }) {
+  assert(
+    monthlyMode != MonthlyMode.nthWeekday ||
+        anchor == RecurrenceAnchor.schedule,
+    'OPD-2: an nth-weekday monthly pattern is a position in the calendar, '
+    'so there is nothing for a completion date to count from, and '
+    'Recurrence.validated throws on the pair. The form must not offer the '
+    'completion anchor while the monthly mode is nthWeekday.',
+  );
   switch (unit) {
     case RecurrenceUnit.day:
       return Recurrence.everyNDays(interval, anchor: anchor);
@@ -39,19 +63,108 @@ Recurrence buildRecurrence({
     case RecurrenceUnit.month:
       if (anchor == RecurrenceAnchor.schedule &&
           monthlyMode == MonthlyMode.nthWeekday) {
-        final ordinal = nthWeekdayOrdinalOf(startDate);
         return Recurrence.monthlyOnNthWeekday(
-          ordinal,
-          startDate.weekday,
+          monthlyOrdinal,
+          monthlyWeekday,
           interval: interval,
         );
       }
-      return Recurrence.monthlyOnDay(interval: interval, anchor: anchor);
+      return Recurrence.monthlyOnDay(
+        interval: interval,
+        anchor: anchor,
+        // `nextAfterCompletion` reads no monthly field, so a day on a
+        // completion-anchored rule would silently do nothing; `validated`
+        // rejects it for exactly that reason.
+        monthlyDayOfMonth: anchor == RecurrenceAnchor.schedule
+            ? monthlyDayOfMonth
+            : null,
+      );
   }
+}
+
+/// The interval to *render* with, for the raw text currently in the chore
+/// form's interval field.
+///
+/// Always >= 1. `validateInterval` is what actually blocks save, but the
+/// repeat block re-renders on every keystroke and has to show something
+/// sensible in the meantime -- including while the field is empty or holds
+/// a `0` the user is halfway through replacing.
+///
+/// The clamp is not cosmetic. Before G-2 this reading only pluralized a
+/// noun, so a zero was harmless; the preview line now feeds it to the
+/// recurrence engine, whose week and month branches divide by the interval.
+/// `int.tryParse(text) ?? 1` alone covers an unparseable field but not a
+/// parseable `0`, which reached `weeksDiff ~/ interval` and crashed the
+/// form under the user as they typed.
+int displayInterval(String raw) {
+  final parsed = int.tryParse(raw.trim());
+  return parsed == null || parsed < 1 ? 1 : parsed;
+}
+
+/// Moves [startDate] to the nearest date **on or after** it whose day of
+/// month is [dayOfMonth], or -- for the `-1` "last day" sentinel -- to the
+/// last day of [startDate]'s own month.
+///
+/// This is how the chore form maintains
+/// [Recurrence.monthlyDayOfMonth]'s alignment contract: keeping
+/// `startDate.day == monthlyDayOfMonth` makes a client predating that field
+/// compute an identical series, because its derived branch
+/// `min(startDate.day, daysInMonth)` is then the same expression as this
+/// one's `min(monthlyDayOfMonth, daysInMonth)`. See that field's doc.
+///
+/// **Forwards only.** `scheduleOccurrences` filters to
+/// `isOnOrAfter(startDate)` and `firstDueDate` reads the first element, so
+/// moving the start date backwards would put the first occurrence in the
+/// past. The move can be large -- picking the 31st on the 1st of February
+/// lands on 31 March, because February has no 31st -- but it is visible in
+/// the Start date field in the same form, on the same frame, and the user
+/// can override it.
+///
+/// For `-1` this stays inside the start date's **own** month and accepts
+/// the residual divergence documented on
+/// [Recurrence.monthlyDayOfMonth]: at most 3 days, always with the older
+/// client early. Jumping to a 31st in some later month would make an old
+/// client agree exactly, but only by deleting every occurrence before that
+/// month from the series and delaying the chore by up to 31 days -- paid by
+/// every household, including the single-version ones that had no
+/// divergence to fix.
+PlainDate alignStartDateToMonthlyDay(PlainDate startDate, int dayOfMonth) {
+  if (dayOfMonth == -1) {
+    return PlainDate(
+      startDate.year,
+      startDate.month,
+      PlainDate.daysInMonth(startDate.year, startDate.month),
+    );
+  }
+  if (startDate.day == dayOfMonth) {
+    return startDate;
+  }
+  var year = startDate.year;
+  var month = startDate.month;
+  // Already past that day this month, so the nearest one is next month.
+  if (startDate.day > dayOfMonth) {
+    (year, month) = _nextMonth(year, month);
+  }
+  // ...and skip any month too short to contain it at all: the 31st simply
+  // does not exist in February, so the nearest 31st after 1 Feb is in March.
+  while (PlainDate.daysInMonth(year, month) < dayOfMonth) {
+    (year, month) = _nextMonth(year, month);
+  }
+  return PlainDate(year, month, dayOfMonth);
+}
+
+(int, int) _nextMonth(int year, int month) {
+  return month == 12 ? (year + 1, 1) : (year, month + 1);
 }
 
 /// Which occurrence of its own weekday [date] is within its month: 1..4, or
 /// `-1` for the 5th (i.e. the last) occurrence.
+///
+/// Since G-2 this is a **seeding** helper, not part of the save path: the
+/// chore form calls it once to give the sentence's ordinal hole a sensible
+/// starting value, and to fill in the ordinal for an already-persisted rule
+/// that predates the explicit field. `buildRecurrence` no longer derives
+/// anything from the start date.
 ///
 /// Every month has at least 4 occurrences of every weekday, so only the 5th
 /// needs the `-1` ("last") encoding [Recurrence] uses.

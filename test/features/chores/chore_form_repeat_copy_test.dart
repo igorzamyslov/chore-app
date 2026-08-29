@@ -3,15 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 
-/// Widget-level tests for field feedback G3 stage 1 (copy-level repeat-form
-/// fixes, `docs/feedback/2026-08-01-field-feedback.md`):
-/// - the unit chip pluralizes with the current interval (it's the only
-///   place a unit noun renders next to the interval number, so it doubles
-///   as the "composed reading" the feedback is about);
-/// - the after-last-completion subtitle names the actual interval instead
-///   of a generic example;
-/// - a one-line hint appears whenever the monthly pattern (or an
-///   empty-selection weekly pattern) silently derives from the start date.
+/// Widget-level tests for the chore form's repeat copy.
+///
+/// Field feedback G3 stage 1 fixed the wording; G-2 (stage 2,
+/// `docs/plans/2026-08-18-repeat-form-sentence.md`) replaced the five
+/// separate controls with one fill-in-the-blank sentence. What survives from
+/// stage 1 and must keep working:
+/// - the unit chip pluralizes live with the interval the user types;
+/// - the after-last-completion card names the actual interval, not a
+///   generic example.
+///
+/// What stage 2 changes: nothing in the pattern derives silently from the
+/// start date any more, so the "Follows the start date" caption is retired
+/// and the sentence names the day directly.
 void main() {
   final today = DateTime(2026, 7, 24, 9);
 
@@ -20,28 +24,40 @@ void main() {
     matching: find.byType(TextField),
   );
 
+  Future<void> openRepeatForm(WidgetTester tester) async {
+    await tester.tap(find.bySemanticsIdentifier('chores.add'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> pickUnit(WidgetTester tester, String unit) async {
+    await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.unit'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.bySemanticsIdentifier('chore_form.repeat.unit.$unit'),
+    );
+    await tester.pumpAndSettle();
+  }
+
   testChoreApp(
-    'the unit chip reads singular at interval 1 and pluralizes at interval '
-    '2 ("2 Months")',
+    'the unit hole reads singular at interval 1 and pluralizes at interval '
+    '2 ("2 Months"), with no re-tap',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
 
-      await tester.tap(find.bySemanticsIdentifier('chores.add'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.unit.month'),
-      );
-      await tester.pumpAndSettle();
+      await openRepeatForm(tester);
+      await pickUnit(tester, 'month');
 
       // Default interval is 1: singular.
       expect(find.text('Month'), findsOneWidget);
       expect(find.text('Months'), findsNothing);
 
-      // Typing 2 into the interval field re-pluralizes the same chip live,
-      // with no need to re-tap the unit.
+      // Typing 2 into the interval hole re-pluralizes the unit hole beside
+      // it live. The two are separate widgets in one Wrap, so nothing but
+      // the shared rebuild connects them -- which is exactly what could
+      // silently stop working.
       await tester.enterText(intervalField(), '2');
       await tester.pumpAndSettle();
 
@@ -53,19 +69,13 @@ void main() {
   );
 
   testChoreApp(
-    'the after-last-completion subtitle names the actual current interval',
+    'the after-last-completion card names the actual current interval',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
 
-      await tester.tap(find.bySemanticsIdentifier('chores.add'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.unit.day'),
-      );
-      await tester.pumpAndSettle();
+      await openRepeatForm(tester);
+      await pickUnit(tester, 'day');
       await tester.enterText(intervalField(), '3');
       await tester.pumpAndSettle();
 
@@ -76,52 +86,85 @@ void main() {
   );
 
   testChoreApp(
-    'the pattern-follows-start-date hint shows for monthly and for weekly '
-    'with no weekday picked, not for plain daily',
+    'nothing in the pattern follows the start date any more: the caption is '
+    'gone and the sentence names the day itself',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
-      const hint =
+      const retiredHint =
           'Follows the start date — change the start date to change the '
           'day.';
 
-      await tester.tap(find.bySemanticsIdentifier('chores.add'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
-      await tester.pumpAndSettle();
+      await openRepeatForm(tester);
 
-      // Default unit is week with no weekday picked yet: derives from the
-      // start date, so the hint shows.
-      expect(find.text(hint), findsOneWidget);
+      // Week, the default. Stage 1 showed the caption here because an empty
+      // weekday set silently derived the day from the start date; stage 2
+      // seeds the start date's weekday into the chips instead, so the
+      // pattern is visible rather than hinted at.
+      expect(find.text(retiredHint), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('chore_form.repeat.weekday.5'),
+        findsOneWidget,
+      );
 
-      // Day unit: nothing derives from the start date, no hint.
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.unit.day'),
+      // Month. Stage 1 always showed the caption here, because the day was
+      // read off the start date and there was nowhere to see it.
+      await pickUnit(tester, 'month');
+      expect(find.text(retiredHint), findsNothing);
+      // The day is now a hole in the sentence, showing the concrete day.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('chore_form.repeat.monthly_day'),
+          matching: find.text('24th'),
+        ),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-      expect(find.text(hint), findsNothing);
 
-      // Month unit (schedule anchor, the default): always derives from the
-      // start date, hint shows.
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.unit.month'),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(hint), findsOneWidget);
+      handle.dispose();
+    },
+  );
 
-      // Back to week, then pick an explicit weekday: the pattern is now
-      // fully visible in the chips, so the hidden-dependency hint goes
-      // away.
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.unit.week'),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(hint), findsOneWidget);
-      await tester.tap(
-        find.bySemanticsIdentifier('chore_form.repeat.weekday.2'),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(hint), findsNothing);
+  testChoreApp(
+    'the monthly mode options name the MODE, not the derived day',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openRepeatForm(tester);
+      await pickUnit(tester, 'month');
+
+      expect(find.text('A day of the month'), findsOneWidget);
+      expect(find.text('A weekday'), findsOneWidget);
+      // The derived labels are retired: the concrete day lives in the
+      // sentence's own chip now, so naming it here too would be two places
+      // to keep in step.
+      expect(find.text('On the 24th'), findsNothing);
+      expect(find.text('On the 4th Friday'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'the anchor sits below a hairline under "Counting from"',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await openRepeatForm(tester);
+
+      expect(find.text('COUNTING FROM'), findsOneWidget);
+      final headerAt = tester.getTopLeft(find.text('COUNTING FROM')).dy;
+      final anchorAt = tester
+          .getTopLeft(
+            find.bySemanticsIdentifier('chore_form.repeat.anchor.schedule'),
+          )
+          .dy;
+      final sentenceAt = tester
+          .getTopLeft(find.bySemanticsIdentifier('chore_form.repeat.unit'))
+          .dy;
+      expect(sentenceAt, lessThan(headerAt));
+      expect(headerAt, lessThan(anchorAt));
 
       handle.dispose();
     },

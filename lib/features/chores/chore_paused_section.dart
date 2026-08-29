@@ -6,6 +6,7 @@ import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
+import 'package:chore_app/features/chores/recurrence_sentence.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -72,9 +73,17 @@ class _PausedRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final category = details.category;
+    // OPD-3: a paused row answers "what was this doing?", which is exactly
+    // what recurrence prose is for -- until G-2 it said only "Paused". The
+    // pending tiles deliberately do NOT get this: a tile answers "when is
+    // this due", already carries a due chip, and prose there would spend
+    // density on the most-opened screen for something the user did not come
+    // there for. Two surfaces is the right number, not three.
+    final chore = details.chore;
+    final recurrence = chore.recurrence;
 
     return ListTile(
-      title: Text(details.chore.title),
+      title: Text(chore.title),
       subtitle: DefaultTextStyle.merge(
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
@@ -85,6 +94,22 @@ class _PausedRow extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             if (category != null) CategoryBadge(category: category),
+            if (recurrence != null)
+              Text(
+                recurrenceSentence(
+                  l10n,
+                  Localizations.localeOf(context).toString(),
+                  interval: recurrence.interval,
+                  unit: recurrence.unit,
+                  anchor: recurrence.anchor,
+                  weekdays: recurrence.weekdays,
+                  monthlyMode: recurrence.monthlyMode,
+                  startDate: chore.startDate,
+                  monthlyDayOfMonth: recurrence.monthlyDayOfMonth,
+                  monthlyOrdinal: recurrence.monthlyOrdinal,
+                  monthlyWeekday: recurrence.monthlyWeekday,
+                ),
+              ),
             Text(l10n.choresPausedBadge),
           ],
         ),

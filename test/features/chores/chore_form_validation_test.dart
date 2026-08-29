@@ -114,4 +114,42 @@ void main() {
       handle.dispose();
     },
   );
+
+  // OPD-4's empty-state obligation, and the crash it turned out to hide.
+  // The repeat block re-renders on every keystroke, and since G-2 the
+  // preview line feeds the interval to the recurrence engine, whose week
+  // and month branches divide by it. `int.tryParse(text) ?? 1` covers an
+  // unparseable field but not a parseable 0, which reached
+  // `weeksDiff ~/ interval` and threw IntegerDivisionByZeroException while
+  // the user was still typing.
+  testChoreApp(
+    'an empty or zero interval keeps the repeat block rendering, preview '
+    'included, instead of crashing mid-keystroke',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.tap(find.bySemanticsIdentifier('chores.add'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
+      await tester.pumpAndSettle();
+
+      for (final raw in ['0', '', '-1', 'abc']) {
+        await tester.enterText(_fieldFor('chore_form.repeat.interval'), raw);
+        await tester.pumpAndSettle();
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'the repeat block threw on interval "$raw"',
+        );
+        expect(
+          find.bySemanticsIdentifier('chore_form.repeat.preview'),
+          findsOneWidget,
+          reason: 'the preview vanished on interval "$raw"',
+        );
+      }
+
+      handle.dispose();
+    },
+  );
 }

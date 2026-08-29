@@ -1,6 +1,7 @@
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
+import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_section.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,16 @@ void main() {
     required MonthlyMode monthlyMode,
     required PlainDate startDate,
     RecurrenceAnchor value = RecurrenceAnchor.schedule,
+    // G-2: the pattern is passed in explicitly now instead of being
+    // derived from the start date inside the card. These defaults are the
+    // values the form seeds from `startDate` on open, so the assertions
+    // below read exactly as they did before the change -- which is the
+    // point: this file is the regression gate proving the extraction and
+    // the explicit fields did not move a single string.
+    int? monthlyDayOfMonth,
+    int? monthlyOrdinal,
+    int? monthlyWeekday,
+    bool showCompletion = true,
   }) {
     return tester.pumpWidget(
       MaterialApp(
@@ -30,8 +41,12 @@ void main() {
             unit: unit,
             weekdays: weekdays,
             monthlyMode: monthlyMode,
+            monthlyDayOfMonth: monthlyDayOfMonth ?? startDate.day,
+            monthlyOrdinal: monthlyOrdinal ?? nthWeekdayOrdinalOf(startDate),
+            monthlyWeekday: monthlyWeekday ?? startDate.weekday,
             startDate: startDate,
             onChanged: (_) {},
+            showCompletion: showCompletion,
           ),
         ),
       ),
@@ -132,6 +147,58 @@ void main() {
       );
 
       expect(find.text('1 day after last done'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'an explicitly picked monthly day is named, not the start date day',
+    (tester) async {
+      // The start date is the 24th and the rule says the 20th. Before G-2
+      // this card had no way to say anything but "the 24th".
+      await pumpAnchorRow(
+        tester,
+        unit: RecurrenceUnit.month,
+        weekdays: const {},
+        monthlyMode: MonthlyMode.dayOfMonth,
+        startDate: PlainDate(2026, 7, 24),
+        monthlyDayOfMonth: 20,
+      );
+
+      expect(find.text('Every month on the 20th'), findsOneWidget);
+    },
+  );
+
+  testWidgets('the "last day" sentinel is named in words, not as a number', (
+    tester,
+  ) async {
+    await pumpAnchorRow(
+      tester,
+      unit: RecurrenceUnit.month,
+      weekdays: const {},
+      monthlyMode: MonthlyMode.dayOfMonth,
+      startDate: PlainDate(2026, 7, 24),
+      monthlyDayOfMonth: -1,
+    );
+
+    expect(find.text('Every month on the last day'), findsOneWidget);
+  });
+
+  // OPD-2. The card is absent rather than disabled -- this design has no
+  // disabled pattern -- so the user never makes a choice and loses it.
+  testWidgets(
+    'showCompletion false leaves only the fixed-schedule card',
+    (tester) async {
+      await pumpAnchorRow(
+        tester,
+        unit: RecurrenceUnit.month,
+        weekdays: const {},
+        monthlyMode: MonthlyMode.nthWeekday,
+        startDate: PlainDate(2026, 7, 24),
+        showCompletion: false,
+      );
+
+      expect(find.text('On fixed days'), findsOneWidget);
+      expect(find.text('After last completion'), findsNothing);
     },
   );
 }

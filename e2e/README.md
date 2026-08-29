@@ -21,8 +21,12 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    destination** (e.g. `chores.add` after saving the form) — a bare text
    assert can false-positive by matching a form field's own content.
 5. The app's smart defaults are part of the product: the repeat unit
-   defaults to weekly-on-today's-weekday. Flows that need daily must tap
-   `chore_form.repeat.unit.day` explicitly.
+   defaults to weekly-on-today's-weekday. Flows that need daily must pick
+   the unit explicitly, and since G-2 that is **two** taps: the repeat
+   rule is one fill-in-the-blank sentence whose unit is a menu hole, so
+   `chore_form.repeat.unit` opens the menu and
+   `chore_form.repeat.unit.day` chooses inside it. The three unit ids
+   themselves are unchanged.
 6. **Settle before touching a freshly-created row.** After saving, assert
    BOTH the destination element (convention 4) AND the new tile's own
    text before tapping anything on that tile. On slow CI simulators the
