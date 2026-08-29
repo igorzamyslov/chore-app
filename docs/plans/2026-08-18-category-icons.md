@@ -2,8 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Refresh pass, 2026-08-29 (wave 6).** This plan was written 2026-08-18,
+> before wave 5 landed. Every file it targets was re-read as it now stands and
+> the corrections are inline below, each marked **REFRESH**. Summary of what
+> was stale: the backlog row moved (309 → 319); the spec block is 73-79, not
+> 73-77; `color_swatch_picker.dart` lives at `lib/app/`, not
+> `lib/features/settings/`; `_pumpAndGetContext` now follows `main()` in
+> `theme_test.dart`, so the insertion point is `main()`'s closing brace and
+> not the file's last line; the seed lists span 38-57; `famdo_design.txt` is
+> not in this repository and could not be checked. Two instructions were
+> **REFUSED** outright (Task 1's "do not commit the red" and Task 2's
+> "confirmatory, not red-then-green") because wave 6 runs TDD through CI,
+> where the only way to observe a red is to push it. The rest of the plan's
+> line references (`theme.dart:435-438`, `:439`, `:469-471`,
+> `category_icons.dart:12`, `category_edit_sheet.dart:239-241`,
+> `tables.dart:184`, `pump_app.dart:135`, `category_edit_test.dart:57`,
+> `exit_confirm_sheet_test.dart:89`) were verified and still hold.
+
 **Goal:** Extend the category icon picker from 15 to 24 identifiers by adding
-the nine Material Symbols the design canvas picked (`famdo_design.txt` §1d):
+the nine Material Symbols the design canvas picked (`famdo_design.txt` §1d —
+**REFRESH:** this file is not in the repository and no committed document
+carries the §1d icon list; the repo's own `DESIGN.md` is the original domain
+design doc and says nothing about icons. The nine-icon selection is therefore
+taken as a decision already recorded in this plan, per the autonomy rules, and
+is implemented as written — but it could not be verified against its cited
+source, and neither could the "six across" note this plan's Design note 3
+reasons about. Both are flagged to the orchestrator):
 `bathtub` (bathroom), `delete` (bins), `potted_plant` (plants indoors),
 `child_care` (baby), `pedal_bike` (bike), `description` (admin),
 `celebration` (hosting), `thermostat` (heating), `fitness_center` (sport).
@@ -37,7 +61,9 @@ no drift, no l10n involved (icon identifiers are not user-visible strings).
 - Tests run as
   `flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= <file>`
   — omitting the defines fails six unrelated tests that then misread as
-  regressions from this change.
+  regressions from this change. **REFRESH:** under wave 6 this command is
+  run by **CI**, not from the worktree; the Flutter tool lock is global to
+  this machine and ~20 sibling worktrees serialize on it.
 - Strict lints (very_good_analysis, `--fatal-infos --fatal-warnings`);
   public members need doc comments.
 - Every interactive widget already has a stable id via `semantic()`
@@ -97,6 +123,13 @@ the tile size, `category_edit_sheet.dart:239-241` for the spacing) — a
 of how many total items it holds, so growing the list from 15 to 24 icons
 does not change how many fit per row; whatever was true before this plan is
 still true after.
+  - **REFRESH:** `PickerTile` (and therefore the 48×48 `SizedBox`) lives in
+    **`lib/app/color_swatch_picker.dart:45`** — a shared `lib/app/` widget,
+    not `lib/features/settings/color_swatch_picker.dart`. The line number and
+    the 48×48 size are both still correct, as are the sheet's 16px left/right
+    padding (`category_edit_sheet.dart:96`) and the `Wrap`'s 8dp
+    spacing/runSpacing (`:239-241`). The width arithmetic below therefore
+    still holds unchanged.
   - Per-row math: `n` tiles cost `n·48 + (n−1)·8` logical px. 6 tiles = 328px,
     7 tiles = 384px.
   - On the "Definition of visual done" reference devices
@@ -198,9 +231,12 @@ documented pattern for exactly this situation — not a new decision.
 - Modify: `test/features/settings/category_edit_test.dart` — new test:
   full 24-icon grid renders, a new icon is selectable and persists.
 - Modify: `docs/specs/ui-foundation-chores.md` — the spelled-out identifier
-  list in the Theme section (currently lines 73-77).
+  list in the Theme section (**REFRESH:** lines 73-79).
 - Modify: `docs/backlog.md` — G-5 row records the icons half as done and
-  points at this plan; the colour half stays explicitly open.
+  points at this plan; the colour half stays explicitly open (**REFRESH:**
+  line 319).
+- **REFRESH:** Modify: this plan file itself — the refresh pass's inline
+  corrections.
 
 ---
 
@@ -218,12 +254,36 @@ documented pattern for exactly this situation — not a new decision.
 - Produces: nothing new consumed by later tasks; Task 2's widget test reads
   the same two symbols, unchanged in shape.
 
-This task's steps are written as a genuine red-then-green sequence, but
-**steps 1-3 are verification-only and must not be committed on their own**
-— committing the list update without the switch cases would ship exactly
-the broken, duplicate-icon picker state the ticket warns about. Only the
-combined end state (test + identifiers + switch cases together) gets
-committed, in Step 6.
+**REFRESH — REFUSED: "steps 1-3 are verification-only and must not be
+committed on their own."** The plan's reasoning was that an intermediate
+commit holding the identifiers without the switch cases "would ship exactly
+the broken, duplicate-icon picker state the ticket warns about." That rests
+on a false premise: nothing ships from an intermediate commit on a draft
+feature branch. Nothing is released from `wave6/category-icons`; only the
+merged end state reaches `integration/wave-6`. Meanwhile wave 6 forbids
+running `flutter test` locally and mandates TDD *through CI* — write the
+failing test, **commit, push, and require CI to fail in the stated red
+mode**. Under that rule an uncommitted red is an unobserved red, i.e. no
+evidence at all, which is precisely the "vacuous assertion" the wave rules
+exist to prevent. The plan's own Step 3 says "Do not proceed to Step 4
+without seeing this failure" — obeying that sentence *requires* pushing it.
+
+The instruction is therefore refused and replaced with a four-commit
+sequence that produces the same end state and leaves a CI record of each
+step. Task 2's test is folded into the first commit so that it, too, gets a
+genuine red rather than the "confirmatory" pass Task 2 Step 3 settled for:
+
+| # | Commit contents | Expected CI |
+|---|---|---|
+| 1 | Both new tests only, no production change | **RED** — Task 2's widget test fails looking for the `bathtub` tile. The invariant test **passes**, which *is* the plan's Step 2 characterization: it proves the checker is sound against the current 15 before it is asked to catch anything |
+| 2 | Append the 9 identifiers, no switch cases | **RED** — the invariant test fails on `'bathtub'` at `isNot(Icons.label_outlined)`. Because `expect` throws on the first failure and `bathtub` is the 16th entry, reaching it re-proves all 15 existing identifiers passed *both* assertions on the way |
+| 3 | The 9 switch cases + doc comment | **GREEN** |
+| 4 | Inversion (pushed, observed, then reverted) | **RED** at the test step |
+
+**REFRESH — the local commands in Steps 2, 3 and 5 below are not run.**
+`flutter test` is on wave 6's local forbidden list (the Flutter tool lock is
+global to this machine and ~20 sibling worktrees serialize on it). Each
+"Run: `flutter test …`" instruction is read as "push and read the CI run".
 
 - [ ] **Step 1: Add the invariant test against the CURRENT (15-entry) list**
 
@@ -233,8 +293,10 @@ In `test/app/theme_test.dart`, add the import:
 import 'package:chore_app/features/categories/category_icons.dart';
 ```
 
-Add a new top-level group, after the existing `categoryTone` group (i.e.
-just before the file's closing `}` around line 227):
+Add a new top-level group, after the existing `categoryTone` group.
+**REFRESH:** the insertion point is `main()`'s closing brace, **line 227** —
+which is *not* the file's last line any more: a `_pumpAndGetContext` helper
+now follows at lines 229-249. Insert before line 227, not at end-of-file.
 
 ```dart
   group('categoryIcon <-> categoryIconIdentifiers invariant', () {
@@ -270,12 +332,13 @@ just before the file's closing `}` around line 227):
 
 - [ ] **Step 2: Run it against the current code (characterization, not RED)**
 
-Run:
-`flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/app/theme_test.dart`
-Expected: PASS, including the new test — this proves the checker is
-correct against the current 15-entry list before it's asked to catch
-anything, exactly like the reference precedent in
-`docs/plans/2026-08-08-rotation-reorder.md` Task 1.
+**REFRESH — run in CI, not locally, and bundled with Task 2's test.** Commit
+this test together with Task 2's widget test (Task 2 Step 2) and push. The
+CI run is the characterization: `theme_test.dart` passes — proving the
+checker is correct against the current 15-entry list before it is asked to
+catch anything, the same precedent as
+`docs/plans/2026-08-08-rotation-reorder.md` Task 1 — while
+`category_edit_test.dart` fails, which is Task 2's red.
 
 - [ ] **Step 3: Append the 9 identifiers ONLY, then confirm RED**
 
@@ -294,21 +357,22 @@ literal, immediately after `'shopping_bag',`:
   'fitness_center',
 ```
 
-Run:
-`flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/app/theme_test.dart`
+**REFRESH:** commit and push this on its own; read the result from CI.
 Expected: **FAIL** — the new test's first assertion
 (`isNot(Icons.label_outlined)`) fails on `'bathtub'` (the first new
 identifier with no switch case yet), reporting exactly the fallthrough
 this task exists to prevent. Do not proceed to Step 4 without seeing this
-failure; if it passes instead, the test in Step 1 is not actually checking
-what it claims to.
+failure in a CI run; if it passes instead, the test in Step 1 is not
+actually checking what it claims to.
 
 - [ ] **Step 4: Add the 9 switch cases and update the doc comment**
 
-In `lib/app/theme.dart`, replace the `default:` line and everything above
-it back to the `case 'shopping_bag':` line (currently lines 469-471) is
-unaffected — insert the 9 new cases immediately before the existing
-`default:` branch:
+In `lib/app/theme.dart`, insert the 9 new cases between the existing
+`case 'shopping_bag':` (line 469, unchanged) and the existing `default:`
+branch (line 471). **REFRESH:** both line numbers verified; the original
+sentence here was garbled mid-clause, and is rewritten. The block below
+shows `case 'shopping_bag':` and `default:` only as context anchors —
+neither is edited.
 
 ```dart
     case 'shopping_bag':
@@ -361,26 +425,41 @@ becomes:
 /// [Icons.eco], [Icons.local_florist]).
 ```
 
-- [ ] **Step 5: Run the test to verify GREEN**
+- [ ] **Step 5: Verify GREEN**
 
-Run:
-`flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/app/theme_test.dart`
-Expected: PASS, all tests including the invariant one — all 24 identifiers
-now map to 24 distinct, non-default icons.
+**REFRESH:** in CI, on the push of Step 4's commit. Expected: PASS — the
+whole suite, including the invariant test and Task 2's widget test. All 24
+identifiers now map to 24 distinct, non-default icons.
 
-- [ ] **Step 6: Format, analyze, commit as one change**
+- [ ] **Step 6: Format, analyze, commit**
 
-Run: `dart format lib/features/categories/category_icons.dart lib/app/theme.dart test/app/theme_test.dart`
-Run: `flutter analyze --fatal-infos --fatal-warnings lib/features/categories/category_icons.dart lib/app/theme.dart test/app/theme_test.dart`
-Expected: both clean.
+Run: `env -u GIT_DIR -u GIT_INDEX_FILE dart format lib/features/categories/category_icons.dart lib/app/theme.dart test/app/theme_test.dart`
+**REFRESH:** `flutter analyze` is on the local forbidden list — CI runs it.
+`dart format` is permitted, but only after `flutter pub get
+--enforce-lockfile` and a passing `tool/check_formatter_config.sh` (the
+wave-5 guard for the `trailing_commas: preserve` trap).
 
 ```bash
-git add lib/features/categories/category_icons.dart lib/app/theme.dart test/app/theme_test.dart
-git commit -m "feat: add nine category icons (backlog G-5a)"
+LEFTHOOK=0 git commit -m "Add nine category icons (backlog G-5a)"
 ```
 
-This is the commit that makes the nine new icons live: after it, the
-picker offers 24 working, distinct icons.
+**This is the commit that makes the nine new icons live** — the Step 4
+commit adding the switch cases. After it the picker offers 24 working,
+distinct icons. (The Step 3 commit adds the identifiers but is *not* the
+live point: without the switch cases all nine render the fallback glyph.)
+
+- [ ] **Step 7 (REFRESH, new): the inversion**
+
+Wave 6 requires inverting the implementation and observing the red at the
+*test* step. Inside `categoryIcon`, change `case 'bathtub':` to return
+`Icons.home` instead of `Icons.bathtub` — an edit **inside a method body**,
+so it does not trip `unused_element` at `analyze` (deleting the case would,
+and an analyze failure is not a valid red). This inversion is deliberately
+aimed at the invariant test's *second* assertion, the `seen.add(icon)`
+duplicate check: Step 3's red already proved the first assertion
+(`isNot(Icons.label_outlined)`) fires, so re-testing it would add nothing.
+Push as its own commit, observe the red, then revert it — the inversion
+does not stay on the branch.
 
 ---
 
@@ -465,28 +544,31 @@ Append a third `testChoreApp(...)` block to the file, after the existing
   );
 ```
 
-- [ ] **Step 3: Run it to verify it fails against pre-Task-1 code, then passes now**
+- [ ] **Step 3: Observe the red, then the green**
 
-Run:
-`flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/settings/category_edit_test.dart`
+**REFRESH — REFUSED: "this task is confirmatory, not red-then-green."** The
+plan reached that conclusion only from its own commit ordering (Task 1
+first), not from anything about the test. A test that has never been
+observed failing is exactly the vacuous assertion wave 6 forbids, and the
+plan's own parenthetical spells out the red that was available for free.
+So this test ships in Task 1's **first** commit, ahead of any production
+change, and is genuinely red-then-green.
 
-Expected on today's tree (Task 1 already landed): PASS immediately — this
-task is confirmatory, not red-then-green, since Task 1's commit already
-made the picker complete. (If run against a tree *without* Task 1, the
-first `expect` inside the `for` loop would fail at `identifier ==
-'bathtub'` with `findsOneWidget` returning `findsNothing`, since the tile
-wouldn't exist in `categoryIconIdentifiers` yet — that ordering is not
-exercised here because Task 1 is already committed first.)
+Note the precise red, so the CI log can be checked against it: with the
+15-entry list, the `for` loop over `categoryIconIdentifiers` iterates only
+the existing 15 and passes trivially — the failure lands one line further
+down, at `tester.tap(find.bySemanticsIdentifier(
+'settings.categories.icon.bathtub'))`, which finds nothing. The loop
+becomes load-bearing only once the list has 24 entries, where it guards
+against a tile losing its semantic id.
 
-- [ ] **Step 4: Format, analyze, commit**
+- [ ] **Step 4: Format, commit**
 
-Run: `dart format test/features/settings/category_edit_test.dart`
-Run: `flutter analyze --fatal-infos --fatal-warnings test/features/settings/category_edit_test.dart`
-Expected: both clean.
+Run: `env -u GIT_DIR -u GIT_INDEX_FILE dart format test/features/settings/category_edit_test.dart`
+**REFRESH:** `flutter analyze` runs in CI, not locally.
 
 ```bash
-git add test/features/settings/category_edit_test.dart
-git commit -m "test: cover the full 24-icon grid and a new-icon save round-trip"
+LEFTHOOK=0 git commit -m "Cover the full 24-icon grid and a new-icon save round-trip"
 ```
 
 ---
@@ -498,7 +580,8 @@ git commit -m "test: cover the full 24-icon grid and a new-icon save round-trip"
 
 - [ ] **Step 1: Update the Theme section**
 
-The line currently reading (around lines 73-77):
+The paragraph currently reading (**REFRESH:** lines **73-79**, not 73-77 —
+the quoted text below is unchanged and still matches byte-for-byte):
 
 ```
 `Icons`-by-name lookup: a `categoryIcon(String identifier)` function mapping
@@ -542,7 +625,8 @@ git commit -m "docs: record the nine G-5a icon identifiers in the theme spec"
 
 - [ ] **Step 1: Update the G-5 row**
 
-The row currently reading (line 309):
+The row currently reading (**REFRESH:** line **319**, not 309 — wave 5's
+backlog additions shifted it down ten lines; the row's text is unchanged):
 
 ```
 | **G-5** | More category icons and colours (F17) | User request, round 1. Icon set unchanged at 15 entries | S |
@@ -569,19 +653,24 @@ git commit -m "docs: record G-5a (category icons) done in the backlog"
 
 - [ ] **Step 1: Format the whole repo**
 
-Run: `dart format .`
+Run: `env -u GIT_DIR -u GIT_INDEX_FILE dart format .`
 Expected: no files needing changes beyond what earlier tasks already
-formatted (a clean diff).
+formatted (a clean diff). **REFRESH:** this is only safe after
+`flutter pub get --enforce-lockfile` and a passing
+`tool/check_formatter_config.sh`; without a resolved `.dart_tool/`,
+`dart format` cannot read `trailing_commas: preserve`, warns to stderr,
+exits 0, and silently reflows ~93 of 255 files.
 
 - [ ] **Step 2: Analyze**
 
-Run: `flutter analyze --fatal-infos --fatal-warnings`
+**REFRESH: CI only** — `flutter analyze` is on wave 6's local forbidden
+list. CI runs `flutter analyze --fatal-infos --fatal-warnings`.
 Expected: `No issues found!`
 
 - [ ] **Step 3: Full test suite**
 
-Run:
-`flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=`
+**REFRESH: CI only** — the CI job runs the suite with the mandatory
+`--dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=`.
 Expected: all tests PASS, including every file touched in Tasks 1 and 2.
 Running the full suite (not just the two touched files) matters here
 specifically because `categoryIcon`/`categoryIconIdentifiers` are consumed
@@ -593,6 +682,15 @@ resolves to — an additive change shouldn't affect them, and this step
 confirms that rather than assuming it.
 
 - [ ] **Step 4: Manual visual check (Definition of visual done)**
+
+**REFRESH — NOT PERFORMED by the wave-6 executor, and handed back to the
+orchestrator.** `flutter run`/`flutter build` and simulator/emulator work
+are all on wave 6's local forbidden list, so this step cannot be executed
+from an implementation worktree. It is not skipped, only deferred: the
+grid's per-row count is unchanged by this plan (Design note 3) and the
+fallback-glyph check is fully covered by the invariant test in Task 1, so
+what remains genuinely needing eyes is the sheet's height at text scale 2.0
+with a fourth grid row. Flagged for the wave's visual review pass.
 
 Per `docs/specs/design-language.md`'s "Definition of visual done": open the
 category edit sheet on a simulator/emulator at iPhone SE-class and

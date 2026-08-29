@@ -432,10 +432,17 @@ ThemeData _buildTheme({
 /// Icons are always looked up at regular weight and drawn by the caller in
 /// the category's own color — flat, not colorful-emoji.
 ///
-/// Two seed identifiers (`skillet`, `nutrition`) have no equivalent in
-/// Flutter's bundled Material Icons font (they only exist as Material
-/// Symbols, a separate icon set this app doesn't depend on); those map to
-/// the closest visual equivalent instead ([Icons.kitchen], [Icons.eco]).
+/// Three identifiers (`skillet`, `nutrition`, `potted_plant`) have no
+/// equivalent in Flutter's bundled Material Icons font (they only exist as
+/// Material Symbols, a separate icon set this app doesn't depend on); those
+/// map to the closest visual equivalent instead ([Icons.kitchen],
+/// [Icons.eco], [Icons.local_florist]).
+///
+/// Every case here must stay in step with `categoryIconIdentifiers`
+/// (`lib/features/categories/category_icons.dart`): an identifier offered by
+/// the picker but missing a case here falls through to the `default` branch
+/// and renders as a plausible-looking but duplicated tile. That invariant is
+/// pinned by a test — see `test/app/theme_test.dart`.
 IconData categoryIcon(String identifier) {
   switch (identifier) {
     case 'cleaning_services':
@@ -468,6 +475,31 @@ IconData categoryIcon(String identifier) {
       return Icons.home;
     case 'shopping_bag':
       return Icons.shopping_bag;
+    case 'bathtub':
+      return Icons.bathtub;
+    case 'delete':
+      // The "bins" category's trash-can glyph -- shares its identifier
+      // name with the app's actual delete actions elsewhere, which is a
+      // naming coincidence in Material's icon set, not a collision:
+      // IconData values carry no behavior, only a glyph.
+      return Icons.delete;
+    case 'potted_plant':
+      // No bundled-Flutter equivalent (Material Symbols only, same gap as
+      // skillet/nutrition above) -- local_florist is the closest visual
+      // match not already taken by 'yard' (outdoor garden).
+      return Icons.local_florist;
+    case 'child_care':
+      return Icons.child_care;
+    case 'pedal_bike':
+      return Icons.pedal_bike;
+    case 'description':
+      return Icons.description;
+    case 'celebration':
+      return Icons.celebration;
+    case 'thermostat':
+      return Icons.thermostat;
+    case 'fitness_center':
+      return Icons.fitness_center;
     default:
       return Icons.label_outlined;
   }

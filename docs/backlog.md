@@ -316,7 +316,7 @@ distribution question below.
 | **G-2** | Repeat-form structural redesign (F14) | G3 stage 2 — the wording was fixed, the structure was not | M |
 | **G-3** | Restore from a backup file (F12) | Export exists, import does not. Explicitly a non-goal of the P4 spec, so it stands alone | M |
 | **G-4** | Custom avatars — photo or colour-as-border (F15) | User request, round 1 | M |
-| **G-5** | More category icons and colours (F17) | User request, round 1. Icon set unchanged at 15 entries | S |
+| **G-5** | More category icons and colours (F17) | **Icons half DONE** (`docs/plans/2026-08-18-category-icons.md`, G-5a): the picker grew from 15 to 24 identifiers. **Colours half still open** — a palette replacement with a data migration, not a simple extension; tracked separately | S |
 | **G-6** | Finer-grained notifications — N2: per-chore reminders, evening re-reminder (F16) | Own spec; depends on A-1 landing first | L |
 | **G-7** | Search in long lists (F18) | Low value at family scale | M |
 | **G-8** | Multiple shopping lists (F20) | Schema is single-list today | XL |
