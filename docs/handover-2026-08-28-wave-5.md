@@ -79,15 +79,58 @@ re-checked green in their new file-based shape.
 
 **Proven against library source, not assumed:** A-2b's central premise. See §4.
 
+### 3a. The live-backend smoke (added after the wave, 2026-08-29)
+
+`test_live/household_exit_live_test.dart` drives the REAL
+`SupabaseHouseholdGateway` against a real stack. Seven assertions, all green
+locally and on a CI runner: F10 releases the claim while the profile and
+history survive; the server rejects self-removal; F9 with another claimed
+member leaves the household alive and the profile claimable; F9 as the LAST
+claimed member cascades the household AND invalidates a previously issued
+invite; F11's single RPC really does erase the `auth.users` row; F11 with
+somebody else claimed leaves the household intact; and the session OUTLIVES
+the deleted account, which is what makes slice 6's local sign-out
+load-bearing rather than cosmetic.
+
+**Three traps sat between the harness and a real request, each of which would
+have left a green suite that tested nothing.** Whoever writes the next live
+test will hit them:
+1. `TestWidgetsFlutterBinding` installs an `HttpOverrides` that answers EVERY
+   request with an empty 400 and never opens a socket. It surfaces as an
+   `AuthUnknownException` that reads exactly like a server rejection — and the
+   server log is empty, because nothing arrived. `HttpOverrides.global = null`
+   in `setUpAll`, and ONLY in `test_live/`.
+2. `Supabase.initialize` substitutes a `shared_preferences`-backed PKCE store
+   whenever `pkceAsyncStorage` is null, independently of `localStorage`. Pass
+   both or it reaches a platform channel a test binding does not have.
+3. `households.id`/`members.id` are uuid columns. Synthetic string ids are
+   rejected by Postgres, not by the app.
+
+**Proven non-vacuous**, not merely green: inverting the gateway to pass a
+parameter name the function does not have produces `PGRST202 — Could not find
+the function public.remove_member(p_wrong_name)`. That is exactly the
+client/server mismatch pgTAP cannot see (it never runs Dart) and the fake
+gateway cannot see (a fake agrees with whatever the code believes). The same
+inversion caught one of these tests passing for the WRONG reason — it accepted
+any throw, so an unreachable RPC satisfied it; it now requires the server to be
+refusing the operation rather than PostgREST failing to route it.
+
+**Harness note:** the schema grants SELECT to `authenticated` only and gives
+`service_role` nothing. That is correct and was NOT changed. `live_smoke.sh`
+grants the harness read access on the throwaway local container instead,
+because "the row is gone" and "RLS is hiding it from me" are indistinguishable
+when you can only read as the acting user — and asserting the weaker of the two
+is how a test passes while the feature is broken.
+
 **NOT verified, and structurally cannot be by CI:**
-- **The manual live smoke against the local Supabase stack is the real gate for
-  every server-touching path in C-2, and nobody has run it.** The plan's own
-  done criteria list five scenarios. `supabase` and `docker` are off the agent
-  allow list, and E2E stays permanently offline, so *no automated check in this
-  repo exercises `leave_household`, `remove_member` or `delete_account` against
-  a real server.* Every one of them merged CI-green and server-unverified. **This
-  is the largest single gap in the wave** and it is the same shape as F-1's
-  GATE 3: it needs a human.
+- ~~The manual live smoke~~ **— CLOSED, and automated.** This was the wave's
+  largest gap: nothing exercised the client's use of `leave_household`,
+  `remove_member` or `delete_account` against a real server. It is now
+  `test_live/` plus `tool/live_smoke.sh`, wired into `db.yml` after the SQL
+  suite. Verified on a clean runner: **69/69 pgTAP, then 7/7 live smoke**.
+  See §3a. What remains manual is only the UI half (does the sheet appear,
+  does the app land on the welcome screen), which the widget suite covers
+  in-process; the server round-trip is no longer taken on trust.
 - **`pgtap` green meant nothing on four of the five streams.** `db.yml` only
   stands the stack up when the diff touches `supabase/**` or `db.yml`. Those
   four were Dart/YAML-only, so `pgtap` reported a 4-to-8-second green **having

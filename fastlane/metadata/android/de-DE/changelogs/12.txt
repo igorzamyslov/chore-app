@@ -1,0 +1,5 @@
+Du kannst den Haushalt jetzt verlassen und dein Konto löschen — beides in den Einstellungen. Vorher erklärt dir die App genau, was passiert: Wenn du als Letzte oder Letzter gehst, verschwindet auch der gemeinsame Haushalt.
+
+Du kannst außerdem jemanden entfernen, der auf einem eigenen Gerät beigetreten ist. Profil und Verlauf bleiben im Haushalt.
+
+Die Zeile "Zuletzt synchronisiert" bleibt jetzt aktuell, statt zu veralten.

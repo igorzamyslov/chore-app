@@ -1,0 +1,5 @@
+You can now leave a household, and delete your account, from Settings. Both explain exactly what happens first — including that leaving as the last member takes the shared household with you.
+
+You can also remove someone who has joined on their own phone. Their profile and history stay with the household.
+
+The "Last synced" line in Settings now keeps itself up to date instead of going stale while you look at it.
