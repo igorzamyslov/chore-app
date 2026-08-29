@@ -22,8 +22,20 @@
 # steps if not — reporting success in ~20s of checkout instead of minutes of
 # Supabase stack. Only a genuine database change pays for the stack.
 #
-# This does mean a Dart-only change altering how the client reads an RPC does
-# not re-run these — the SQL contract is what is gated here, not its callers.
+# THAT GAP IS NOW CLOSED, and this is the second thing this job does. pgTAP
+# calls the functions from psql, so it proves the SQL contract but never runs a
+# line of Dart: a gateway that names the wrong RPC, passes a wrong parameter
+# name, or mis-reads a result was invisible to it. It was invisible to the
+# Flutter suite too, which drives `FakeHouseholdGateway` — a fake agrees with
+# whatever the code under test believes, so the two can be wrong together and
+# stay green — and to Maestro, which runs permanently signed-out. Wave 5
+# shipped remove-member, leave-household and delete-account with nothing
+# exercising the client's use of those RPCs at all.
+#
+# So after the SQL suite, this job also runs `test_live/` (via
+# tool/live_smoke.sh): the REAL SupabaseHouseholdGateway against this same
+# stack. The scope check below therefore also matches the Dart files that talk
+# to the server — a mismatch can be introduced from either side.
 name: DB
 
 on:
@@ -67,11 +79,15 @@ jobs:
             exit 0
           }
           echo "changed files:"; echo "$changed"
-          if echo "$changed" | grep -qE '^(supabase/|\.github/workflows/db\.yml$)'; then
+          # Both sides of the contract, because either can break it: the SQL
+          # itself, and the Dart that calls it. `household_gateway.dart` is
+          # every RPC call site; `household_exit_service.dart` is the ordering
+          # around them; `test_live/` and the runner are the smoke itself.
+          if echo "$changed" | grep -qE '^(supabase/|test_live/|tool/live_smoke\.sh$|lib/application/household_gateway\.dart$|lib/application/household_exit_service\.dart$|\.github/workflows/db\.yml$)'; then
             echo "database-relevant changes found — running the suite"
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "no supabase/** or db.yml changes — skipping the stack"
+            echo "nothing touching the database contract — skipping the stack"
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -85,9 +101,9 @@ jobs:
         with:
           version: 2.114.0
 
-      # No flutter-action anywhere in this job, deliberately: pgTAP needs
-      # Postgres, not the Flutter SDK, and installing it would only add
-      # minutes.
+      # pgTAP itself needs Postgres, not the Flutter SDK. The Flutter setup
+      # further down is for the live smoke only, and sits after the SQL suite
+      # so an SQL failure is reported without ever paying for the SDK.
       - name: Start the local Supabase stack
         if: steps.scope.outputs.run == 'true'
         run: supabase start
@@ -114,6 +130,33 @@ jobs:
       - name: Run pgTAP suite
         if: steps.scope.outputs.run == 'true'
         run: supabase test db
+
+      # Flutter IS needed now, for the live smoke below — but only on the
+      # expensive path, so a skipped run still costs ~20s of checkout. Pinned
+      # to match ci.yml and e2e.yml for the same reason they are.
+      - uses: subosito/flutter-action@v2
+        if: steps.scope.outputs.run == 'true'
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+      - name: Install Dart dependencies
+        if: steps.scope.outputs.run == 'true'
+        run: flutter pub get --enforce-lockfile
+
+      # The half pgTAP cannot reach: the real Dart gateway against this same
+      # stack. Runs AFTER `supabase test db`, so a failure here is
+      # unambiguously the client's use of the contract rather than the
+      # contract itself — the SQL has already been proven green above.
+      #
+      # The suite refuses to run against any non-loopback host, which matters
+      # because lib/app/supabase_config.dart defaults to the PRODUCTION
+      # project when no --dart-define is passed, and these tests create and
+      # delete accounts. tool/live_smoke.sh reads the keys from
+      # `supabase status`; nothing is hardcoded.
+      - name: Run the live-backend smoke (test_live/)
+        if: steps.scope.outputs.run == 'true'
+        run: tool/live_smoke.sh
 
       # Postgres logs are the only way to diagnose a CI-only failure here:
       # pg_prove reports which assertion failed, but a migration or function
