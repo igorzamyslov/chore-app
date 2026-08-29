@@ -403,8 +403,8 @@ void main() {
           startDate: monday,
           today: monday,
         ),
-        'Alle 2 Wochen am Dienstag, Freitag. '
-        'Als Nächstes Di., 4. Aug., dann Fr., 7. Aug. und Di., 18. Aug..',
+        'Alle 2 Wochen am Dienstag, Freitag '
+        '— als Nächstes Di., 4. Aug., dann Fr., 7. Aug. und Di., 18. Aug.',
       );
     });
 
@@ -436,7 +436,7 @@ void main() {
           today: PlainDate(2026, 1, 31),
         ),
         'Jeden Monat am 31. '
-        'Als Nächstes Sa., 31. Jan., dann Sa., 28. Feb. und Di., 31. März.',
+        '— als Nächstes Sa., 31. Jan., dann Sa., 28. Feb. und Di., 31. März',
       );
     });
 

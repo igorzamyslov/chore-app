@@ -157,7 +157,7 @@
   "choreFormMonthlyModeWeekday": "Ein Wochentag",
   "choreFormCountingFromLabel": "Gezählt ab",
   "choreFormCountingFromWeekdayOnly": "Ein Wochentagsmuster ist eine Position im Kalender — es gibt also nichts, wovon ein Erledigungsdatum aus zählen könnte.",
-  "choreFormPreviewNextThree": "{pattern}. Als Nächstes {first}, dann {second} und {third}.",
+  "choreFormPreviewNextThree": "{pattern} — als Nächstes {first}, dann {second} und {third}",
   "choreFormPreviewCompletionRolledForward": "{base}, weitergeschoben auf den nächsten {weekdays}.",
   "choreFormPreviewCompletionDependsOnDay": "{base} — das nächste Fälligkeitsdatum hängt vom Tag ab, an dem du sie erledigst.",
   "choreFormSentenceIntervalA11y": "Wiederholungsintervall",

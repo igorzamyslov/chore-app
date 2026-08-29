@@ -792,7 +792,7 @@
   },
   "choreFormPreviewNextThree": "{pattern}. Next {first}, then {second} and {third}.",
   "@choreFormPreviewNextThree": {
-    "description": "The chore form's always-visible preview line for a fixed-schedule rule (G-2). {pattern} receives an already-localized whole clause from recurrenceSentence; {first}/{second}/{third} are the next three real due dates, locale-formatted via intl. Three dates rather than one because 'every 2 weeks on Tue and Fri' is ambiguous in prose and unambiguous in dates.",
+    "description": "The chore form's always-visible preview line for a fixed-schedule rule (G-2). {pattern} receives an already-localized whole clause from recurrenceSentence; {first}/{second}/{third} are the next three real due dates, locale-formatted via intl. Three dates rather than one because 'every 2 weeks on Tue and Fri' is ambiguous in prose and unambiguous in dates. NOTE for translators: the German version deliberately adds NO sentence periods of its own and separates with an em dash instead. German ordinals end in a period ('31.') and intl abbreviates most German months with one ('Aug.'), so a frame that punctuates around the holes renders '31..' and 'Aug...'. Do not 'fix' the German back to periods.",
     "placeholders": {
       "pattern": { "type": "String" },
       "first": { "type": "String" },

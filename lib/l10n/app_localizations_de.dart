@@ -649,7 +649,7 @@ class AppLocalizationsDe extends AppLocalizations {
     String second,
     String third,
   ) {
-    return '$pattern. Als Nächstes $first, dann $second und $third.';
+    return '$pattern — als Nächstes $first, dann $second und $third';
   }
 
   @override
