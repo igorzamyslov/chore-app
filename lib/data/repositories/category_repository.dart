@@ -35,6 +35,37 @@ class CategoryRepository {
     0xFFA9A9A9, // muted gray
   ];
 
+  /// The twelve colors a user can pick for a category or a member (design
+  /// canvas frames 1b/1d; spec `docs/specs/theme-v2.md` §1.3).
+  ///
+  /// The first eight ARE [seedColors], in order and by construction, so the
+  /// indexed `members.edit.color.N` / `settings.categories.color.N` semantic
+  /// ids keep addressing exactly the colors they addressed before this list
+  /// existed. The four appended values are new.
+  ///
+  /// Kept separate from [seedColors] because the two answer different
+  /// questions: [seedColors] is "what color does the Nth seeded default
+  /// category get", a contract the seeding loop below depends on; this is
+  /// "what may the user choose". Widening the picker must not silently
+  /// re-color anybody's seeded categories.
+  ///
+  /// Every entry is a STORED ARGB value and is never rewritten (spec §1.3 --
+  /// `members`/`categories` are synced tables, so a rewrite would replicate
+  /// to every device). `categoryTone` maps each to its per-theme render at
+  /// draw time.
+  static const List<int> palette = [
+    ...seedColors,
+    // Plum, NOT the design canvas's `#1E7A6E`. That hex is byte-for-byte
+    // `_lightPrimary`, the accent that means "interactive / selected"
+    // everywhere in this UI, so a member ring drawn in it would read as a
+    // selection state rather than as an identity. Substituted deliberately;
+    // see `docs/plans/2026-08-18-palette-and-ring-avatars.md` R1.
+    0xFF9A3D80, // plum
+    0xFF96562F, // rust
+    0xFF7A5AA8, // violet
+    0xFF4C6B45, // moss
+  ];
+
   static const List<_CategorySeed> _choreSeeds = [
     (name: 'Cleaning', icon: 'cleaning_services'),
     (name: 'Kitchen', icon: 'skillet'),

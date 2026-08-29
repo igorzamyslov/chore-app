@@ -128,7 +128,7 @@ class StatsShareCard extends StatelessWidget {
                       child: Row(
                         children: [
                           if (share.member case final Member member)
-                            MemberAvatar(member: member, radius: 12)
+                            MemberAvatar(member: member)
                           else
                             Icon(
                               Icons.help_outline,

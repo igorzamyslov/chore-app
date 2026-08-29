@@ -771,6 +771,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get memberEditColorLabel => 'Farbe';
 
   @override
+  String get memberEditColorUniqueHint =>
+      'Deine Farbe zeigt dich bei jeder Aufgabe, in der Zusammenfassung und im Verlauf. Zwei Personen können nicht dieselbe nehmen.';
+
+  @override
+  String memberEditColorTakenBy(String memberName) {
+    return 'Schon von $memberName belegt';
+  }
+
+  @override
   String get memberEditDeleteBlockedLastMember =>
       'Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.';
 

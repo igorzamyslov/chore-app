@@ -20,6 +20,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/features/settings/member_delete_dialog.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -29,9 +30,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// omitted) or editing an existing [member] (rename/recolor).
 ///
 /// A new member defaults to the first of
-/// [CategoryRepository.seedColors] — the same fixed palette the category
+/// [CategoryRepository.palette] — the same fixed palette the category
 /// edit sheet uses — not already used by another current member (wrapping
-/// back to the first color if every seed color is taken).
+/// back to the first color if every palette color is taken).
+///
+/// Member colors are unique per household (G-4): a color another active
+/// member holds is drawn inert and badged with that member's initials. See
+/// `_takenColors` for why that rule relaxes rather than blocks once the
+/// roster outgrows the palette.
 Future<void> showMemberEditSheet(BuildContext context, {Member? member}) {
   return showModalBottomSheet<void>(
     context: context,
@@ -116,8 +122,13 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
 
   bool get _canSave => _nameController.text.trim().isNotEmpty;
 
+  /// The household's active roster, WATCHED so both the taken-color map
+  /// and the preview avatar rebuild when somebody else's color changes.
+  ///
+  /// `_firstFreeColor` cannot use this: it runs from `initState`, where
+  /// `ref.watch` is illegal, so it reads the same provider directly.
   List<Member> get _currentMembers =>
-      ref.read(membersProvider).value ?? const <Member>[];
+      ref.watch(membersProvider).value ?? const <Member>[];
 
   /// Whether the delete action should be shown at all, and if not, why
   /// (spec: HIDDEN, never disabled).
@@ -186,12 +197,47 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
   }
 
   int _firstFreeColor() {
-    final usedColors = _currentMembers.map((m) => m.color).toSet();
-    const seedColors = CategoryRepository.seedColors;
-    return seedColors.firstWhere(
+    // `ref.read`, not `_currentMembers`: this is called from `initState`,
+    // where `ref.watch` is illegal.
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final usedColors = members.map((m) => m.color).toSet();
+    const palette = CategoryRepository.palette;
+    return palette.firstWhere(
       (color) => !usedColors.contains(color),
-      orElse: () => seedColors[_currentMembers.length % seedColors.length],
+      orElse: () => palette[members.length % palette.length],
     );
+  }
+
+  /// The palette colors held by OTHER active members, mapped to their
+  /// owner's badge (G-4: member colors are unique per household).
+  ///
+  /// The member being edited is excluded, so their own current color stays
+  /// selectable. If every palette color is already held, this returns an
+  /// EMPTY map: with twelve colors a thirteenth member has nothing free,
+  /// and relaxing the rule is strictly better than refusing to add a person
+  /// over a color. Uniqueness is UI guidance and never a database
+  /// constraint -- under sync two devices can claim the same color
+  /// concurrently, and the loser's save must not fail.
+  Map<int, TakenSwatch> _takenColors(AppLocalizations l10n) {
+    final editingId = widget.member?.id;
+    final owners = <int, Member>{};
+    for (final member in _currentMembers) {
+      if (member.id != editingId) {
+        owners.putIfAbsent(member.color, () => member);
+      }
+    }
+    if (owners.length >= CategoryRepository.palette.length) {
+      return const {};
+    }
+    return {
+      for (final entry in owners.entries)
+        entry.key: TakenSwatch(
+          // The SHARED rule from member_avatar.dart, not a local copy: a
+          // badged swatch must read as exactly that member's avatar.
+          initials: memberInitials(entry.value.name),
+          semanticsLabel: l10n.memberEditColorTakenBy(entry.value.name),
+        ),
+    };
   }
 
   @override
@@ -222,13 +268,62 @@ class _MemberEditSheetState extends ConsumerState<_MemberEditSheet> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(l10n.memberEditColorLabel, style: theme.textTheme.labelLarge),
+          // The live preview replaces the standalone color label: it shows
+          // the picked ring and the typed initials together, which is the
+          // thing the swatch grid below is actually choosing. The name
+          // field's existing `_onNameChanged` listener already calls
+          // `setState`, so the initials update as the user types.
+          semantic(
+            'members.edit.avatar',
+            child: Row(
+              children: [
+                MemberAvatar(
+                  member: previewMember(
+                    name: _nameController.text,
+                    color: _color,
+                  ),
+                  radius: 33,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    l10n.memberEditColorLabel,
+                    style: theme.textTheme.labelLarge,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           ColorSwatchPicker(
-            colors: CategoryRepository.seedColors,
+            colors: CategoryRepository.palette,
             selected: _color,
             onSelected: (value) => setState(() => _color = value),
             semanticIdPrefix: 'members.edit.color',
+            taken: _takenColors(l10n),
+          ),
+          const SizedBox(height: 12),
+          semantic(
+            'members.edit.colorHint',
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    l10n.memberEditColorUniqueHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           // T1.7: a member the sheet cannot remove gets no Delete button

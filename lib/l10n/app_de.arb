@@ -210,6 +210,8 @@
   "memberEditEditTitle": "Mitglied bearbeiten",
   "memberEditNameLabel": "Name",
   "memberEditColorLabel": "Farbe",
+  "memberEditColorUniqueHint": "Deine Farbe zeigt dich bei jeder Aufgabe, in der Zusammenfassung und im Verlauf. Zwei Personen können nicht dieselbe nehmen.",
+  "memberEditColorTakenBy": "Schon von {memberName} belegt",
   "memberEditDeleteBlockedLastMember": "Ein Haushalt braucht mindestens ein Mitglied, deshalb kann dieses nicht entfernt werden.",
   "memberEditDeleteBlockedSelf": "Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.",
   "memberEditDeleteBlockedOffline": "Dieses Profil wird auf dem Gerät einer anderen Person benutzt. Melde dich an und verbinde dich mit dem Online-Haushalt, um es zu entfernen.",

@@ -1146,6 +1146,18 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get memberEditColorLabel;
 
+  /// G-4: explanatory line under the member edit sheet's color picker, saying what the color is for and that member colors are unique per household. Shown for every member, whether adding or editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your color is how you show up on every chore, in the digest and in Chore history. Two people can\'t take the same one.'**
+  String get memberEditColorUniqueHint;
+
+  /// G-4: screen-reader label for a color swatch another household member already holds, so it is disabled. The swatch itself shows that member's initials.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken by {memberName}'**
+  String memberEditColorTakenBy(String memberName);
+
   /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
   ///
   /// In en, this message translates to:

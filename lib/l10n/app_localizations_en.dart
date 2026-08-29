@@ -765,6 +765,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memberEditColorLabel => 'Color';
 
   @override
+  String get memberEditColorUniqueHint =>
+      'Your color is how you show up on every chore, in the digest and in Chore history. Two people can\'t take the same one.';
+
+  @override
+  String memberEditColorTakenBy(String memberName) {
+    return 'Taken by $memberName';
+  }
+
+  @override
   String get memberEditDeleteBlockedLastMember =>
       'A household needs at least one member, so this one can\'t be removed.';
 

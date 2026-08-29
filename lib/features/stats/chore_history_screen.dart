@@ -84,7 +84,7 @@ class ChoreHistoryScreen extends ConsumerWidget {
                   child: Row(
                     children: [
                       if (completion.completedByMember case final member?)
-                        MemberAvatar(member: member, radius: 12)
+                        MemberAvatar(member: member)
                       else
                         Icon(
                           Icons.help_outline,

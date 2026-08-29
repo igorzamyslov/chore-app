@@ -50,9 +50,29 @@ superseded; see that spec for the current behavior.
   same row pattern as the existing categories entry.
   Semantic id: `settings.members`.
 - Screen (`lib/features/settings/manage_members_screen.dart`): list of all
-  household members; each row shows the avatar (colored circle +
-  first-letter initial — same rendering as the chore tile avatar; extract
-  a shared widget if the tile's avatar is currently private) and the name.
+  household members; each row shows the avatar and the name. The avatar
+  (`lib/features/members/member_avatar.dart`, shared with the chore tile)
+  is **a ring in the member's color around their two-letter initials on the
+  neutral surface** — radius 21 (42px) on this screen, per the design
+  canvas. It was a filled circle with a one-letter initial before G-4.
+  - **The initials rule**: the first two characters of the trimmed display
+    name, uppercased (`"Mia"` → `"MI"`). A one-character name gives one
+    character (`"J"` → `"J"`), never padded. `"Anna Maria"` gives `"AN"`,
+    not `"AM"` — these are name-initials, not word-initials. A blank or
+    whitespace-only name gives `"?"`. `memberInitials` is exported so the
+    picker's taken-swatch badge cannot drift from the avatar.
+  - "Character" means **grapheme cluster** (`String.characters`), never a
+    UTF-16 code unit. `substring(0, 2)` splits a non-BMP character's
+    surrogate pair — an emoji as the second character renders as a tofu box
+    — and cuts a decomposed diacritic into a letter plus a floating
+    combining mark. Emoji are not excluded: the rule is "the first two
+    characters", so `"A🎈"` keeps both. Excluding them would need a
+    definition of "letter" that nothing has decided, and would reduce an
+    all-emoji name to `"?"`.
+  - Two characters rather than one because for a color-blind viewer the
+    initials are the only channel that separates members. The chore-tile
+    avatar was enlarged from 20px to 24px to fit them; the rule was not
+    weakened to fit the old size.
   Row semantic id: `members.row.<name>` is NOT allowed (names collide) —
   use `members.row.<memberId>`; E2E selects rows by visible text, ids
   exist for uniqueness fallback (matches manage_categories conventions).
@@ -61,8 +81,27 @@ superseded; see that spec for the current behavior.
   - name: required, trimmed, non-empty; duplicates ALLOWED (consistent
     with the chores duplicate-names decision) — no warning;
   - color: the same fixed palette picker used by the category edit sheet
-    (reuse the widget/palette, do not fork it); default = first palette
-    color not yet used by another member, else first.
+    (reuse the widget/palette, do not fork it) — `CategoryRepository.palette`,
+    **twelve** colors since G-5b, drawn six across as theme-rendered rings;
+    default = first palette color not yet used by another member, else first.
+  - **Member colors are unique per household** (G-4): a color another
+    active member holds is drawn inert and badged with that member's
+    initials, with a `Taken by <name>` screen-reader label. The member being
+    edited is excluded, so their own current color stays selectable. The
+    rule **relaxes** once the roster outgrows the palette — a thirteenth
+    member gets every swatch enabled rather than being blocked over a color.
+    It is UI guidance and never a database constraint: under sync two
+    devices can claim the same color concurrently and the loser's save must
+    not fail.
+  - The sheet shows a live 66px preview avatar (`members.edit.avatar`),
+    which updates as the name is typed and the swatch picked, and the
+    uniqueness hint (`members.edit.colorHint`).
+  - **No column was added to `members`.** The design canvas suggested a
+    nullable text column for an initials override; the feature needs none
+    (initials derive from `name`, the ring reads `color`), and `members` is
+    a synced table, so a column there is a Supabase migration + an RLS
+    UPDATE grant + both directions of `row_mappers.dart` + pull/push
+    coverage. If an override is ever wanted it is its own ticket.
   - New members get `MemberRole.member` and are immediately available in
     the chore form and the acting switcher.
 - Rename / recolor: tapping a row opens the same sheet pre-filled

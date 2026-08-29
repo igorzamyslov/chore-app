@@ -201,8 +201,11 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final me = await soleBootstrapMember(database);
-      // The bootstrap 'Me' member's fixed color isn't part of the seed
-      // palette, so any swatch pick below is guaranteed to differ.
+      // `HouseholdRepository.createLocalHousehold` gives the bootstrap 'Me'
+      // member `seedColors.first` (== `palette[0]`), so index 2 is
+      // guaranteed to differ. It is also free: 'Me' is the only member, and
+      // the member being edited is never marked taken by the G-4 uniqueness
+      // rule, so every swatch in this household is selectable.
       const newColorIndex = 2;
       final newColor = CategoryRepository.seedColors[newColorIndex];
 
@@ -232,15 +235,25 @@ void main() {
 
       final avatarFinder = find.descendant(
         of: find.bySemanticsIdentifier('members.row.${me.id}'),
-        matching: find.byType(CircleAvatar),
+        matching: find.byType(MemberAvatar),
       );
-      final circleAvatar = tester.widget<CircleAvatar>(avatarFinder);
-      // Theme v2 (spec docs/specs/theme-v2.md §1.3): the avatar fill is the
-      // seed color's theme-rendered tone, not the raw stored ARGB -- assert
-      // via categoryTone rather than the literal `Color(newColor)` this
-      // asserted before that wave.
+      final decoration =
+          tester
+                  .widget<Container>(
+                    find.descendant(
+                      of: avatarFinder,
+                      matching: find.byType(Container),
+                    ),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      // G-4: the avatar is a RING in the member's theme-rendered tone on a
+      // neutral ground -- it was a filled circle before that wave, and this
+      // assertion checked `CircleAvatar.backgroundColor`. The tone, not the
+      // raw stored ARGB, is still what is asserted (spec
+      // `docs/specs/theme-v2.md` §1.3).
       expect(
-        circleAvatar.backgroundColor,
+        (decoration.border! as Border).top.color,
         categoryTone(tester.element(avatarFinder), newColor),
       );
 
@@ -842,6 +855,86 @@ void main() {
         database.members,
       )..where((tbl) => tbl.id.equals(anna.id))).getSingle();
       expect(after.deletedAt, isNull);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a colour another member holds is disabled and badged with their '
+    'initials',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final repo = HouseholdRepository(database);
+      // 'Me' (the bootstrap member) holds palette[0]; give Anna palette[3].
+      await repo.addMember(
+        householdId,
+        name: 'Anna',
+        color: CategoryRepository.palette[3],
+      );
+      final me = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.name.equals('Me'))).getSingle();
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+
+      // Anna's initials badge her swatch, and tapping it does nothing.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('members.edit.color.3'),
+          matching: find.text('AN'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.bySemanticsIdentifier('members.edit.color.3'));
+      await tester.tap(find.bySemanticsIdentifier('members.edit.save'));
+      await tester.pumpAndSettle();
+
+      final unchanged = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.id.equals(me.id))).getSingle();
+      expect(
+        unchanged.color,
+        CategoryRepository.palette.first,
+        reason: "tapping Anna's colour must not recolour Me",
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    "the member's own current colour stays selectable while editing",
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('members.row.${me.id}'));
+      await tester.pumpAndSettle();
+
+      // 'Me' holds palette[0]; it must show the check, not a taken badge.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('members.edit.color.0'),
+          matching: find.byIcon(Icons.check),
+        ),
+        findsOneWidget,
+      );
+      // The live preview avatar is present and reads the picked colour.
+      final preview = tester.widget<MemberAvatar>(
+        find.descendant(
+          of: find.bySemanticsIdentifier('members.edit.avatar'),
+          matching: find.byType(MemberAvatar),
+        ),
+      );
+      expect(preview.member.color, CategoryRepository.palette.first);
+      expect(preview.radius, 33);
 
       handle.dispose();
     },
