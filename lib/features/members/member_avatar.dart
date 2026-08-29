@@ -44,6 +44,21 @@ Member previewMember({required String name, required int color}) => Member(
 /// "AN", not "AM". The trailing trim handles a name whose second character
 /// is a space ("J Smith" -> "J").
 ///
+/// "Two characters" means two **grapheme clusters**, via `String.characters`
+/// -- never `substring(0, 2)`, which indexes UTF-16 code units. A name whose
+/// second character is non-BMP ("A(emoji)") would have its surrogate pair
+/// split by `substring`, rendering an unpaired surrogate as a tofu box; and a
+/// decomposed diacritic ("A" + U+030A ring, as in a decomposed "Angstrom")
+/// would be cut into a letter plus a floating combining mark, yielding one
+/// visible glyph where two were intended. Both are plausible in a family's
+/// member names, and a tofu box separates nobody -- which is the whole
+/// argument for two characters in the first place.
+///
+/// Emoji are NOT excluded: the rule is "the first two characters", so
+/// "A(emoji)" keeps both, as one clean grapheme each. Filtering to
+/// letters-only would need a definition of "letter" that nothing has
+/// decided, and would turn an all-emoji name into "?".
+///
 /// Shared with the member edit sheet's taken-swatch badge, so a disabled
 /// swatch always shows exactly what that member's avatar shows.
 String memberInitials(String name) {
@@ -51,7 +66,9 @@ String memberInitials(String name) {
   if (trimmed.isEmpty) {
     return '?';
   }
-  final head = trimmed.length < 2 ? trimmed : trimmed.substring(0, 2);
+  // `characters` comes from Flutter's own re-export in `widgets.dart`, so
+  // this needs no import and no pubspec entry.
+  final head = trimmed.characters.take(2).toString();
   return head.trim().toUpperCase();
 }
 

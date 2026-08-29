@@ -61,6 +61,14 @@ superseded; see that spec for the current behavior.
     not `"AM"` — these are name-initials, not word-initials. A blank or
     whitespace-only name gives `"?"`. `memberInitials` is exported so the
     picker's taken-swatch badge cannot drift from the avatar.
+  - "Character" means **grapheme cluster** (`String.characters`), never a
+    UTF-16 code unit. `substring(0, 2)` splits a non-BMP character's
+    surrogate pair — an emoji as the second character renders as a tofu box
+    — and cuts a decomposed diacritic into a letter plus a floating
+    combining mark. Emoji are not excluded: the rule is "the first two
+    characters", so `"A🎈"` keeps both. Excluding them would need a
+    definition of "letter" that nothing has decided, and would reduce an
+    all-emoji name to `"?"`.
   - Two characters rather than one because for a color-blind viewer the
     initials are the only channel that separates members. The chore-tile
     avatar was enlarged from 20px to 24px to fit them; the rule was not

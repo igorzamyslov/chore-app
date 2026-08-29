@@ -46,6 +46,33 @@ BoxDecoration _decoration(WidgetTester tester) =>
             .decoration!
         as BoxDecoration;
 
+/// Whether [value] contains a lone surrogate -- a high surrogate not
+/// followed by a low one, or a low surrogate not preceded by a high one.
+///
+/// This is the tofu `memberInitials` exists to prevent: `substring(0, 2)`
+/// indexes UTF-16 code units, so it can cut a non-BMP character in half and
+/// leave exactly this. Checked by scanning code units directly, because a
+/// lone surrogate survives a `runes` round trip unchanged and so would slip
+/// past the obvious version of this check.
+bool _hasLoneSurrogate(String value) {
+  final units = value.codeUnits;
+  for (var i = 0; i < units.length; i++) {
+    final unit = units[i];
+    final isHigh = unit >= 0xD800 && unit <= 0xDBFF;
+    final isLow = unit >= 0xDC00 && unit <= 0xDFFF;
+    if (isHigh) {
+      final next = i + 1 < units.length ? units[i + 1] : 0;
+      if (next < 0xDC00 || next > 0xDFFF) {
+        return true;
+      }
+      i++;
+    } else if (isLow) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void main() {
   const stored = 0xFFD98E73; // renders 0xFFB96A4C light / 0xFFF0AF95 dark
 
@@ -98,6 +125,48 @@ void main() {
     expect(memberInitials('  mia  '), 'MI');
     expect(memberInitials('   '), '?');
     expect(memberInitials(''), '?');
+  });
+
+  test('the initials rule counts graphemes, not UTF-16 code units', () {
+    // `substring(0, 2)` would split the balloon's surrogate pair here and
+    // render an unpaired surrogate as a tofu box. The rule takes two
+    // GRAPHEME CLUSTERS, so both survive intact. Emoji are deliberately not
+    // excluded -- the rule is "the first two characters", and filtering to
+    // letters-only would need a definition of "letter" that nothing has
+    // decided (and would turn an all-emoji name into '?').
+    expect(memberInitials('A\u{1F388}'), 'A\u{1F388}');
+    // Leading non-BMP: pinned rather than left accidental.
+    expect(memberInitials('\u{1F388}A'), '\u{1F388}A');
+    expect(memberInitials('\u{1F388}'), '\u{1F388}');
+
+    // A DECOMPOSED diacritic: 'A' + U+030A combining ring above, as in a
+    // decomposed "Angstrom". `substring(0, 2)` takes the letter and its
+    // combining mark, yielding ONE visible glyph; graphemes take the whole
+    // cluster plus the following letter, yielding the two that were meant.
+    expect(memberInitials('A\u030Angstro\u0308m'), 'A\u030AN');
+    expect(
+      memberInitials('A\u030Angstro\u0308m').characters,
+      hasLength(2),
+      reason: 'two visible glyphs, not a letter plus a floating diacritic',
+    );
+
+    // Whatever the rule yields, it is never half a character.
+    for (final name in [
+      'A\u{1F388}',
+      '\u{1F388}A',
+      '\u{1F388}',
+      'A\u030Angstro\u0308m',
+      'Mia',
+      'J Smith',
+    ]) {
+      expect(
+        _hasLoneSurrogate(memberInitials(name)),
+        isFalse,
+        reason: 'lone surrogate (tofu) for "$name"',
+      );
+    }
+    // ...and the guard itself can fail: half a balloon is a lone surrogate.
+    expect(_hasLoneSurrogate('A\u{1F388}'.substring(0, 2)), isTrue);
   });
 
   testWidgets('uses the DARK tone under the dark theme', (tester) async {
