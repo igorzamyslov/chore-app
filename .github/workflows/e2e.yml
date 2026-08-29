@@ -462,6 +462,19 @@ jobs:
             cp -R "$(ls -dt "$HOME"/.maestro/tests/*/ | head -1)" \
               "$OUT/$label.maestro-debug" 2>/dev/null || true
 
+            # NODE COUNT, not just "were there ids". A reproduction that
+            # can say "0 nodes where a healthy app on this same runner had
+            # 47" is a far stronger claim than "the tree looked empty",
+            # and it is the only way to tell a PARTIALLY built tree from a
+            # wholly absent one -- an engine that presented and got part
+            # way is a different bug from one that never presented.
+            # Maestro emits one "attributes" object per node, so counting
+            # those counts nodes without having to parse the JSON (whose
+            # dump can carry a log line ahead of it).
+            CAPTURED_NODES=$(grep -o '"attributes"' \
+              "$OUT/$label.hierarchy.json" | wc -l | tr -d ' ')
+            CAPTURED_IDS=$(grep -oE '"resource-id"[ ]*:[ ]*"[^"]+"' \
+              "$OUT/$label.hierarchy.json" | wc -l | tr -d ' ')
             CAPTURED_LAUNCHES=$(grep -c 'Dart VM service is listening' \
               "$OUT/$label.runner.log" || true)
             if [ "$CAPTURED_LAUNCHES" -eq 0 ]; then
@@ -514,16 +527,27 @@ jobs:
             echo "instrument is wrong or the control itself hit the flake."
             control_ok=no
           fi
+          if [ "$CAPTURED_NODES" -eq 0 ]; then
+            echo "::error::A-6 control dumped an EMPTY hierarchy for an"
+            echo "app that had just rendered the welcome gate. The"
+            echo "hierarchy instrument reports nothing either way, so an"
+            echo "empty tree in a reproduction would prove nothing."
+            control_ok=no
+          fi
           echo "control: verdict=$CAPTURED_VERDICT png=$CAPTURED_PNG bytes"
+          echo "control: healthy hierarchy = $CAPTURED_NODES nodes,"
+          echo "control: $CAPTURED_IDS of them carrying a semantic id"
           echo "control: launches=$CAPTURED_LAUNCHES ok=$control_ok"
           if [ "$control_ok" != "yes" ]; then
             echo "::error::A-6 negative control failed; not measuring."
             exit 1
           fi
           control_png=$CAPTURED_PNG
+          control_nodes=$CAPTURED_NODES
+          control_ids=$CAPTURED_IDS
 
           # ---- MEASUREMENT ---------------------------------------------
-          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png" \
+          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png,nodes,ids" \
             > "$OUT/results.csv"
           failures=0
           launched=0
@@ -547,6 +571,8 @@ jobs:
 
             start=$SECONDS
             png_bytes=0
+            nodes=-
+            ids=-
             if "$MAESTRO" test --env APP_ID="$APP_ID" \
                  e2e/amplify/blank_frame_probe.yaml \
                  > "$OUT/batch-$i.maestro.log" 2>&1; then
@@ -556,6 +582,8 @@ jobs:
               capture_failure "batch-$i"
               verdict=$CAPTURED_VERDICT
               png_bytes=$CAPTURED_PNG
+              nodes=$CAPTURED_NODES
+              ids=$CAPTURED_IDS
               if [ "$verdict" = "HARNESS_NO_LAUNCH" ]; then
                 echo "::error::A-6 batch $i never launched; not counted"
                 result=harness
@@ -576,13 +604,14 @@ jobs:
             n=$(grep -c 'Dart VM service is listening' \
               "$OUT/batch-$i.runner.log" || true)
             launched=$((launched + n))
-            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes" \
+            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes,$nodes,$ids" \
               >> "$OUT/results.csv"
             echo "batch $i: $result, $n launches in ${run_s}s ($verdict)"
           done
 
           echo "=== A-6: $failures reproductions, $launched cold launches"
-          echo "=== control png was $control_png bytes (healthy frame)"
+          echo "=== healthy baseline on THIS runner: $control_nodes nodes,"
+          echo "=== $control_ids semantic ids, $control_png-byte frame"
           cat "$OUT/runner-fingerprint.txt"
           cat "$OUT/results.csv"
       - name: Upload A-6 amplifier artifacts
