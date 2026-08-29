@@ -591,6 +591,89 @@ class AppLocalizationsEn extends AppLocalizations {
       'Follows the start date — change the start date to change the day.';
 
   @override
+  String choreFormSentenceDay(String interval, String unit) {
+    return 'Repeat every $interval $unit';
+  }
+
+  @override
+  String choreFormSentenceWeek(String interval, String unit) {
+    return 'Repeat every $interval $unit on';
+  }
+
+  @override
+  String choreFormSentenceMonthDayOfMonth(
+    String interval,
+    String unit,
+    String day,
+  ) {
+    return 'Repeat every $interval $unit on the $day';
+  }
+
+  @override
+  String choreFormSentenceMonthWeekday(
+    String interval,
+    String unit,
+    String ordinal,
+    String weekday,
+  ) {
+    return 'Repeat every $interval $unit on the $ordinal $weekday';
+  }
+
+  @override
+  String get choreFormDayOfMonthLast => 'last day';
+
+  @override
+  String get choreFormOrdinalLast => 'last';
+
+  @override
+  String get choreFormMonthlyModeDayOfMonth => 'A day of the month';
+
+  @override
+  String get choreFormMonthlyModeWeekday => 'A weekday';
+
+  @override
+  String get choreFormCountingFromLabel => 'Counting from';
+
+  @override
+  String get choreFormCountingFromWeekdayOnly =>
+      'A weekday pattern is a position in the calendar, so there is nothing for a completion date to count from.';
+
+  @override
+  String choreFormPreviewNextThree(
+    String pattern,
+    String first,
+    String second,
+    String third,
+  ) {
+    return '$pattern. Next $first, then $second and $third.';
+  }
+
+  @override
+  String choreFormPreviewCompletionRolledForward(String base, String weekdays) {
+    return '$base, rolled forward to the next $weekdays.';
+  }
+
+  @override
+  String choreFormPreviewCompletionDependsOnDay(String base) {
+    return '$base — the next due date depends on the day you do it.';
+  }
+
+  @override
+  String get choreFormSentenceIntervalA11y => 'Repeat interval';
+
+  @override
+  String get choreFormSentenceUnitA11y => 'Repeat unit';
+
+  @override
+  String get choreFormSentenceMonthlyDayA11y => 'Day of the month';
+
+  @override
+  String get choreFormSentenceMonthlyOrdinalA11y => 'Which one in the month';
+
+  @override
+  String get choreFormSentenceMonthlyWeekdayA11y => 'Weekday';
+
+  @override
   String get choreFormAssignmentFixed => 'Fixed';
 
   @override
