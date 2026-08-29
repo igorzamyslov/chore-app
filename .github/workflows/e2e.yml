@@ -224,8 +224,26 @@ jobs:
           flutter-version: 3.44.8
           channel: stable
           cache: true
+      # AMPLIFIER RUNS ONLY (backlog A-6), so an ordinary verification run
+      # still builds from scratch exactly as before and this cannot hand it
+      # a stale binary. The amplifier wants many INDEPENDENT runners far
+      # more than it wants many cycles on one -- the flake's own history is
+      # 9 of 10 reds inside 2 of 61 runs, which is what a per-runner or
+      # per-simulator condition looks like, and under that shape a 25-cycle
+      # run is worth almost exactly as much as a 100-cycle one. Short runs
+      # are then strictly better, except that a ~12-minute build dwarfs an
+      # 8-minute experiment. Keying on the commit sha makes every dispatch
+      # of the same ref after the first reuse one build.
+      - name: Cache the simulator app (A-6 amplifier)
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        id: ios_app_cache
+        uses: actions/cache@v4
+        with:
+          path: build/ios/iphonesimulator
+          key: ios-sim-app-${{ github.sha }}
       - name: Build simulator app (pinned E2E clock)
         # SUPABASE_* defines empty — see the Android job's build step.
+        if: steps.ios_app_cache.outputs.cache-hit != 'true'
         run: flutter build ios --simulator --debug --dart-define=E2E_TODAY=2026-07-24 --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
       - name: Boot simulator
         run: |
