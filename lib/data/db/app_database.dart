@@ -41,6 +41,7 @@ part 'app_database.g.dart';
     ChoreOccurrences,
     ShoppingItems,
     Settings,
+    ReminderSnoozes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -53,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

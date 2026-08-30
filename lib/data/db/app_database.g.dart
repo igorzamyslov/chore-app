@@ -1826,6 +1826,17 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _reminderMinutesMeta = const VerificationMeta(
+    'reminderMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> reminderMinutes = GeneratedColumn<int>(
+    'reminder_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdByMeta = const VerificationMeta(
     'createdBy',
   );
@@ -1885,6 +1896,7 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    reminderMinutes,
     createdBy,
     createdAt,
     updatedAt,
@@ -1948,6 +1960,15 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
       context.handle(
         _pausedAtMeta,
         pausedAt.isAcceptableOrUnknown(data['paused_at']!, _pausedAtMeta),
+      );
+    }
+    if (data.containsKey('reminder_minutes')) {
+      context.handle(
+        _reminderMinutesMeta,
+        reminderMinutes.isAcceptableOrUnknown(
+          data['reminder_minutes']!,
+          _reminderMinutesMeta,
+        ),
       );
     }
     if (data.containsKey('created_by')) {
@@ -2033,6 +2054,10 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
         DriftSqlType.string,
         data['${effectivePrefix}paused_at'],
       ),
+      reminderMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes'],
+      ),
       createdBy: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_by'],
@@ -2100,6 +2125,23 @@ class Chore extends DataClass implements Insertable<Chore> {
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   final String? pausedAt;
 
+  /// The per-chore individual reminder's fire time, as minutes since local
+  /// midnight, or `NULL` for "no individual reminder" (spec
+  /// `docs/specs/notifications-n2.md` D1, §2.1).
+  ///
+  /// **One nullable column, deliberately, rather than a boolean beside a
+  /// time:** the opt-in and the time are one fact, so they cannot disagree.
+  /// Turning the switch off writes `NULL`, so there is no state in which
+  /// the app holds a reminder time it is not using.
+  ///
+  /// **This is household data and it SYNCS** (§8.2) -- `DESIGN.md` §1 lists
+  /// "reminder overrides" as a field of the chore definition, and "the bins
+  /// go out Tuesday evening" is a fact about the bins, not about a phone. It
+  /// replicating does NOT mean both partners are reminded: the recipient
+  /// predicate in `projectDigestCounts` decides whose device rings (§2.2).
+  /// Added in schemaVersion 13; see `AppDatabase.migration`.
+  final int? reminderMinutes;
+
   /// The member who created this chore, if known.
   final String? createdBy;
 
@@ -2122,6 +2164,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     required this.startDate,
     required this.assignmentMode,
     this.pausedAt,
+    this.reminderMinutes,
     this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -2158,6 +2201,9 @@ class Chore extends DataClass implements Insertable<Chore> {
     if (!nullToAbsent || pausedAt != null) {
       map['paused_at'] = Variable<String>(pausedAt);
     }
+    if (!nullToAbsent || reminderMinutes != null) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes);
+    }
     if (!nullToAbsent || createdBy != null) {
       map['created_by'] = Variable<String>(createdBy);
     }
@@ -2189,6 +2235,9 @@ class Chore extends DataClass implements Insertable<Chore> {
       pausedAt: pausedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(pausedAt),
+      reminderMinutes: reminderMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMinutes),
       createdBy: createdBy == null && nullToAbsent
           ? const Value.absent()
           : Value(createdBy),
@@ -2218,6 +2267,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         serializer.fromJson<String>(json['assignmentMode']),
       ),
       pausedAt: serializer.fromJson<String?>(json['pausedAt']),
+      reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
       createdBy: serializer.fromJson<String?>(json['createdBy']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
@@ -2240,6 +2290,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         $ChoresTable.$converterassignmentMode.toJson(assignmentMode),
       ),
       'pausedAt': serializer.toJson<String?>(pausedAt),
+      'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
       'createdBy': serializer.toJson<String?>(createdBy),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
@@ -2258,6 +2309,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     PlainDate? startDate,
     AssignmentMode? assignmentMode,
     Value<String?> pausedAt = const Value.absent(),
+    Value<int?> reminderMinutes = const Value.absent(),
     Value<String?> createdBy = const Value.absent(),
     String? createdAt,
     String? updatedAt,
@@ -2273,6 +2325,9 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate: startDate ?? this.startDate,
     assignmentMode: assignmentMode ?? this.assignmentMode,
     pausedAt: pausedAt.present ? pausedAt.value : this.pausedAt,
+    reminderMinutes: reminderMinutes.present
+        ? reminderMinutes.value
+        : this.reminderMinutes,
     createdBy: createdBy.present ? createdBy.value : this.createdBy,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2298,6 +2353,9 @@ class Chore extends DataClass implements Insertable<Chore> {
           ? data.assignmentMode.value
           : this.assignmentMode,
       pausedAt: data.pausedAt.present ? data.pausedAt.value : this.pausedAt,
+      reminderMinutes: data.reminderMinutes.present
+          ? data.reminderMinutes.value
+          : this.reminderMinutes,
       createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -2318,6 +2376,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -2338,6 +2397,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    reminderMinutes,
     createdBy,
     createdAt,
     updatedAt,
@@ -2357,6 +2417,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           other.startDate == this.startDate &&
           other.assignmentMode == this.assignmentMode &&
           other.pausedAt == this.pausedAt &&
+          other.reminderMinutes == this.reminderMinutes &&
           other.createdBy == this.createdBy &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -2374,6 +2435,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   final Value<PlainDate> startDate;
   final Value<AssignmentMode> assignmentMode;
   final Value<String?> pausedAt;
+  final Value<int?> reminderMinutes;
   final Value<String?> createdBy;
   final Value<String> createdAt;
   final Value<String> updatedAt;
@@ -2390,6 +2452,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     this.startDate = const Value.absent(),
     this.assignmentMode = const Value.absent(),
     this.pausedAt = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2407,6 +2470,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     required PlainDate startDate,
     required AssignmentMode assignmentMode,
     this.pausedAt = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     required String createdAt,
     required String updatedAt,
@@ -2430,6 +2494,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Expression<String>? startDate,
     Expression<String>? assignmentMode,
     Expression<String>? pausedAt,
+    Expression<int>? reminderMinutes,
     Expression<String>? createdBy,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
@@ -2447,6 +2512,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       if (startDate != null) 'start_date': startDate,
       if (assignmentMode != null) 'assignment_mode': assignmentMode,
       if (pausedAt != null) 'paused_at': pausedAt,
+      if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2466,6 +2532,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Value<PlainDate>? startDate,
     Value<AssignmentMode>? assignmentMode,
     Value<String?>? pausedAt,
+    Value<int?>? reminderMinutes,
     Value<String?>? createdBy,
     Value<String>? createdAt,
     Value<String>? updatedAt,
@@ -2483,6 +2550,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       startDate: startDate ?? this.startDate,
       assignmentMode: assignmentMode ?? this.assignmentMode,
       pausedAt: pausedAt ?? this.pausedAt,
+      reminderMinutes: reminderMinutes ?? this.reminderMinutes,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2530,6 +2598,9 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     if (pausedAt.present) {
       map['paused_at'] = Variable<String>(pausedAt.value);
     }
+    if (reminderMinutes.present) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes.value);
+    }
     if (createdBy.present) {
       map['created_by'] = Variable<String>(createdBy.value);
     }
@@ -2561,6 +2632,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4429,6 +4501,71 @@ class $SettingsTable extends Settings
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _quietHoursEnabledMeta = const VerificationMeta(
+    'quietHoursEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> quietHoursEnabled = GeneratedColumn<bool>(
+    'quiet_hours_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("quiet_hours_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _quietStartMinutesMeta = const VerificationMeta(
+    'quietStartMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> quietStartMinutes = GeneratedColumn<int>(
+    'quiet_start_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1320),
+  );
+  static const VerificationMeta _quietEndMinutesMeta = const VerificationMeta(
+    'quietEndMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> quietEndMinutes = GeneratedColumn<int>(
+    'quiet_end_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(420),
+  );
+  static const VerificationMeta _eveningReminderEnabledMeta =
+      const VerificationMeta('eveningReminderEnabled');
+  @override
+  late final GeneratedColumn<bool> eveningReminderEnabled =
+      GeneratedColumn<bool>(
+        'evening_reminder_enabled',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("evening_reminder_enabled" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _eveningReminderMinutesMeta =
+      const VerificationMeta('eveningReminderMinutes');
+  @override
+  late final GeneratedColumn<int> eveningReminderMinutes = GeneratedColumn<int>(
+    'evening_reminder_minutes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1200),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4466,6 +4603,11 @@ class $SettingsTable extends Settings
     syncLastPulledAt,
     membershipRevoked,
     pendingJoinCode,
+    quietHoursEnabled,
+    quietStartMinutes,
+    quietEndMinutes,
+    eveningReminderEnabled,
+    eveningReminderMinutes,
     createdAt,
     updatedAt,
   ];
@@ -4588,6 +4730,51 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('quiet_hours_enabled')) {
+      context.handle(
+        _quietHoursEnabledMeta,
+        quietHoursEnabled.isAcceptableOrUnknown(
+          data['quiet_hours_enabled']!,
+          _quietHoursEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quiet_start_minutes')) {
+      context.handle(
+        _quietStartMinutesMeta,
+        quietStartMinutes.isAcceptableOrUnknown(
+          data['quiet_start_minutes']!,
+          _quietStartMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quiet_end_minutes')) {
+      context.handle(
+        _quietEndMinutesMeta,
+        quietEndMinutes.isAcceptableOrUnknown(
+          data['quiet_end_minutes']!,
+          _quietEndMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evening_reminder_enabled')) {
+      context.handle(
+        _eveningReminderEnabledMeta,
+        eveningReminderEnabled.isAcceptableOrUnknown(
+          data['evening_reminder_enabled']!,
+          _eveningReminderEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evening_reminder_minutes')) {
+      context.handle(
+        _eveningReminderMinutesMeta,
+        eveningReminderMinutes.isAcceptableOrUnknown(
+          data['evening_reminder_minutes']!,
+          _eveningReminderMinutesMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4665,6 +4852,26 @@ class $SettingsTable extends Settings
         DriftSqlType.string,
         data['${effectivePrefix}pending_join_code'],
       ),
+      quietHoursEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}quiet_hours_enabled'],
+      )!,
+      quietStartMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quiet_start_minutes'],
+      )!,
+      quietEndMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quiet_end_minutes'],
+      )!,
+      eveningReminderEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}evening_reminder_enabled'],
+      )!,
+      eveningReminderMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}evening_reminder_minutes'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -4780,6 +4987,45 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// household). Added in schemaVersion 12; see `AppDatabase.migration`.
   final String? pendingJoinCode;
 
+  /// Whether quiet hours are active (spec `docs/specs/notifications-n2.md`
+  /// §6). Default `false`, so upgrading to schemaVersion 13 changes the
+  /// behaviour of exactly zero installs until someone opens Settings.
+  /// Added in schemaVersion 13; see `AppDatabase.migration`.
+  final bool quietHoursEnabled;
+
+  /// The start of the quiet-hours window, as minutes since local midnight
+  /// (default `1320` = 22:00).
+  ///
+  /// The window WRAPS midnight in the normal case and must be evaluated as
+  /// a wrapping interval, never as a numeric range;
+  /// `quietStartMinutes == quietEndMinutes` is treated as OFF, not as a
+  /// 24-hour window (spec `docs/specs/notifications-n2.md` §6) -- the
+  /// latter would mean "never notify", which is what [quietHoursEnabled] is
+  /// for. The single implementation of that rule is `applyQuietHours` in
+  /// `lib/domain/reminder_planner.dart`. Added in schemaVersion 13.
+  final int quietStartMinutes;
+
+  /// The end of the quiet-hours window, as minutes since local midnight
+  /// (default `420` = 07:00) -- see [quietStartMinutes]. Added in
+  /// schemaVersion 13.
+  final int quietEndMinutes;
+
+  /// Whether the evening re-reminder is enabled (spec
+  /// `docs/specs/notifications-n2.md` §5).
+  ///
+  /// **Ships OFF** (D12): the governing principle is digest by default,
+  /// never nag, and defaulting a second daily notification to on would
+  /// impose a behaviour change on every existing user who never asked for
+  /// one. Added in schemaVersion 13.
+  final bool eveningReminderEnabled;
+
+  /// The evening re-reminder's fire time, as minutes since local midnight
+  /// (default `1200` = 20:00 -- an hour clear of the 22:00 quiet-hours
+  /// default, so a user turning the feature on with defaults gets a working
+  /// feature, spec `docs/specs/notifications-n2.md` §5.1). Added in
+  /// schemaVersion 13.
+  final int eveningReminderMinutes;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -4799,6 +5045,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     this.syncLastPulledAt,
     required this.membershipRevoked,
     this.pendingJoinCode,
+    required this.quietHoursEnabled,
+    required this.quietStartMinutes,
+    required this.quietEndMinutes,
+    required this.eveningReminderEnabled,
+    required this.eveningReminderMinutes,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -4840,6 +5091,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     if (!nullToAbsent || pendingJoinCode != null) {
       map['pending_join_code'] = Variable<String>(pendingJoinCode);
     }
+    map['quiet_hours_enabled'] = Variable<bool>(quietHoursEnabled);
+    map['quiet_start_minutes'] = Variable<int>(quietStartMinutes);
+    map['quiet_end_minutes'] = Variable<int>(quietEndMinutes);
+    map['evening_reminder_enabled'] = Variable<bool>(eveningReminderEnabled);
+    map['evening_reminder_minutes'] = Variable<int>(eveningReminderMinutes);
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -4879,6 +5135,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       pendingJoinCode: pendingJoinCode == null && nullToAbsent
           ? const Value.absent()
           : Value(pendingJoinCode),
+      quietHoursEnabled: Value(quietHoursEnabled),
+      quietStartMinutes: Value(quietStartMinutes),
+      quietEndMinutes: Value(quietEndMinutes),
+      eveningReminderEnabled: Value(eveningReminderEnabled),
+      eveningReminderMinutes: Value(eveningReminderMinutes),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4907,6 +5168,15 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       syncLastPulledAt: serializer.fromJson<String?>(json['syncLastPulledAt']),
       membershipRevoked: serializer.fromJson<bool>(json['membershipRevoked']),
       pendingJoinCode: serializer.fromJson<String?>(json['pendingJoinCode']),
+      quietHoursEnabled: serializer.fromJson<bool>(json['quietHoursEnabled']),
+      quietStartMinutes: serializer.fromJson<int>(json['quietStartMinutes']),
+      quietEndMinutes: serializer.fromJson<int>(json['quietEndMinutes']),
+      eveningReminderEnabled: serializer.fromJson<bool>(
+        json['eveningReminderEnabled'],
+      ),
+      eveningReminderMinutes: serializer.fromJson<int>(
+        json['eveningReminderMinutes'],
+      ),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -4932,6 +5202,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'syncLastPulledAt': serializer.toJson<String?>(syncLastPulledAt),
       'membershipRevoked': serializer.toJson<bool>(membershipRevoked),
       'pendingJoinCode': serializer.toJson<String?>(pendingJoinCode),
+      'quietHoursEnabled': serializer.toJson<bool>(quietHoursEnabled),
+      'quietStartMinutes': serializer.toJson<int>(quietStartMinutes),
+      'quietEndMinutes': serializer.toJson<int>(quietEndMinutes),
+      'eveningReminderEnabled': serializer.toJson<bool>(eveningReminderEnabled),
+      'eveningReminderMinutes': serializer.toJson<int>(eveningReminderMinutes),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -4951,6 +5226,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     Value<String?> syncLastPulledAt = const Value.absent(),
     bool? membershipRevoked,
     Value<String?> pendingJoinCode = const Value.absent(),
+    bool? quietHoursEnabled,
+    int? quietStartMinutes,
+    int? quietEndMinutes,
+    bool? eveningReminderEnabled,
+    int? eveningReminderMinutes,
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -4979,6 +5259,13 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     pendingJoinCode: pendingJoinCode.present
         ? pendingJoinCode.value
         : this.pendingJoinCode,
+    quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+    quietStartMinutes: quietStartMinutes ?? this.quietStartMinutes,
+    quietEndMinutes: quietEndMinutes ?? this.quietEndMinutes,
+    eveningReminderEnabled:
+        eveningReminderEnabled ?? this.eveningReminderEnabled,
+    eveningReminderMinutes:
+        eveningReminderMinutes ?? this.eveningReminderMinutes,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -5017,6 +5304,21 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       pendingJoinCode: data.pendingJoinCode.present
           ? data.pendingJoinCode.value
           : this.pendingJoinCode,
+      quietHoursEnabled: data.quietHoursEnabled.present
+          ? data.quietHoursEnabled.value
+          : this.quietHoursEnabled,
+      quietStartMinutes: data.quietStartMinutes.present
+          ? data.quietStartMinutes.value
+          : this.quietStartMinutes,
+      quietEndMinutes: data.quietEndMinutes.present
+          ? data.quietEndMinutes.value
+          : this.quietEndMinutes,
+      eveningReminderEnabled: data.eveningReminderEnabled.present
+          ? data.eveningReminderEnabled.value
+          : this.eveningReminderEnabled,
+      eveningReminderMinutes: data.eveningReminderMinutes.present
+          ? data.eveningReminderMinutes.value
+          : this.eveningReminderMinutes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -5038,6 +5340,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('membershipRevoked: $membershipRevoked, ')
           ..write('pendingJoinCode: $pendingJoinCode, ')
+          ..write('quietHoursEnabled: $quietHoursEnabled, ')
+          ..write('quietStartMinutes: $quietStartMinutes, ')
+          ..write('quietEndMinutes: $quietEndMinutes, ')
+          ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
+          ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -5059,6 +5366,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     syncLastPulledAt,
     membershipRevoked,
     pendingJoinCode,
+    quietHoursEnabled,
+    quietStartMinutes,
+    quietEndMinutes,
+    eveningReminderEnabled,
+    eveningReminderMinutes,
     createdAt,
     updatedAt,
   );
@@ -5080,6 +5392,11 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.syncLastPulledAt == this.syncLastPulledAt &&
           other.membershipRevoked == this.membershipRevoked &&
           other.pendingJoinCode == this.pendingJoinCode &&
+          other.quietHoursEnabled == this.quietHoursEnabled &&
+          other.quietStartMinutes == this.quietStartMinutes &&
+          other.quietEndMinutes == this.quietEndMinutes &&
+          other.eveningReminderEnabled == this.eveningReminderEnabled &&
+          other.eveningReminderMinutes == this.eveningReminderMinutes &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -5098,6 +5415,11 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<String?> syncLastPulledAt;
   final Value<bool> membershipRevoked;
   final Value<String?> pendingJoinCode;
+  final Value<bool> quietHoursEnabled;
+  final Value<int> quietStartMinutes;
+  final Value<int> quietEndMinutes;
+  final Value<bool> eveningReminderEnabled;
+  final Value<int> eveningReminderMinutes;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -5115,6 +5437,11 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncLastPulledAt = const Value.absent(),
     this.membershipRevoked = const Value.absent(),
     this.pendingJoinCode = const Value.absent(),
+    this.quietHoursEnabled = const Value.absent(),
+    this.quietStartMinutes = const Value.absent(),
+    this.quietEndMinutes = const Value.absent(),
+    this.eveningReminderEnabled = const Value.absent(),
+    this.eveningReminderMinutes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5133,6 +5460,11 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.syncLastPulledAt = const Value.absent(),
     this.membershipRevoked = const Value.absent(),
     this.pendingJoinCode = const Value.absent(),
+    this.quietHoursEnabled = const Value.absent(),
+    this.quietStartMinutes = const Value.absent(),
+    this.quietEndMinutes = const Value.absent(),
+    this.eveningReminderEnabled = const Value.absent(),
+    this.eveningReminderMinutes = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -5153,6 +5485,11 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<String>? syncLastPulledAt,
     Expression<bool>? membershipRevoked,
     Expression<String>? pendingJoinCode,
+    Expression<bool>? quietHoursEnabled,
+    Expression<int>? quietStartMinutes,
+    Expression<int>? quietEndMinutes,
+    Expression<bool>? eveningReminderEnabled,
+    Expression<int>? eveningReminderMinutes,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -5173,6 +5510,13 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       if (syncLastPulledAt != null) 'sync_last_pulled_at': syncLastPulledAt,
       if (membershipRevoked != null) 'membership_revoked': membershipRevoked,
       if (pendingJoinCode != null) 'pending_join_code': pendingJoinCode,
+      if (quietHoursEnabled != null) 'quiet_hours_enabled': quietHoursEnabled,
+      if (quietStartMinutes != null) 'quiet_start_minutes': quietStartMinutes,
+      if (quietEndMinutes != null) 'quiet_end_minutes': quietEndMinutes,
+      if (eveningReminderEnabled != null)
+        'evening_reminder_enabled': eveningReminderEnabled,
+      if (eveningReminderMinutes != null)
+        'evening_reminder_minutes': eveningReminderMinutes,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5193,6 +5537,11 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<String?>? syncLastPulledAt,
     Value<bool>? membershipRevoked,
     Value<String?>? pendingJoinCode,
+    Value<bool>? quietHoursEnabled,
+    Value<int>? quietStartMinutes,
+    Value<int>? quietEndMinutes,
+    Value<bool>? eveningReminderEnabled,
+    Value<int>? eveningReminderMinutes,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -5213,6 +5562,13 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       syncLastPulledAt: syncLastPulledAt ?? this.syncLastPulledAt,
       membershipRevoked: membershipRevoked ?? this.membershipRevoked,
       pendingJoinCode: pendingJoinCode ?? this.pendingJoinCode,
+      quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+      quietStartMinutes: quietStartMinutes ?? this.quietStartMinutes,
+      quietEndMinutes: quietEndMinutes ?? this.quietEndMinutes,
+      eveningReminderEnabled:
+          eveningReminderEnabled ?? this.eveningReminderEnabled,
+      eveningReminderMinutes:
+          eveningReminderMinutes ?? this.eveningReminderMinutes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5265,6 +5621,25 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (pendingJoinCode.present) {
       map['pending_join_code'] = Variable<String>(pendingJoinCode.value);
     }
+    if (quietHoursEnabled.present) {
+      map['quiet_hours_enabled'] = Variable<bool>(quietHoursEnabled.value);
+    }
+    if (quietStartMinutes.present) {
+      map['quiet_start_minutes'] = Variable<int>(quietStartMinutes.value);
+    }
+    if (quietEndMinutes.present) {
+      map['quiet_end_minutes'] = Variable<int>(quietEndMinutes.value);
+    }
+    if (eveningReminderEnabled.present) {
+      map['evening_reminder_enabled'] = Variable<bool>(
+        eveningReminderEnabled.value,
+      );
+    }
+    if (eveningReminderMinutes.present) {
+      map['evening_reminder_minutes'] = Variable<int>(
+        eveningReminderMinutes.value,
+      );
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -5293,6 +5668,364 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('syncLastPulledAt: $syncLastPulledAt, ')
           ..write('membershipRevoked: $membershipRevoked, ')
           ..write('pendingJoinCode: $pendingJoinCode, ')
+          ..write('quietHoursEnabled: $quietHoursEnabled, ')
+          ..write('quietStartMinutes: $quietStartMinutes, ')
+          ..write('quietEndMinutes: $quietEndMinutes, ')
+          ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
+          ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ReminderSnoozesTable extends ReminderSnoozes
+    with TableInfo<$ReminderSnoozesTable, ReminderSnooze> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReminderSnoozesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _occurrenceIdMeta = const VerificationMeta(
+    'occurrenceId',
+  );
+  @override
+  late final GeneratedColumn<String> occurrenceId = GeneratedColumn<String>(
+    'occurrence_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES chore_occurrences (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _snoozedUntilMeta = const VerificationMeta(
+    'snoozedUntil',
+  );
+  @override
+  late final GeneratedColumn<String> snoozedUntil = GeneratedColumn<String>(
+    'snoozed_until',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    occurrenceId,
+    snoozedUntil,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reminder_snoozes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReminderSnooze> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('occurrence_id')) {
+      context.handle(
+        _occurrenceIdMeta,
+        occurrenceId.isAcceptableOrUnknown(
+          data['occurrence_id']!,
+          _occurrenceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_occurrenceIdMeta);
+    }
+    if (data.containsKey('snoozed_until')) {
+      context.handle(
+        _snoozedUntilMeta,
+        snoozedUntil.isAcceptableOrUnknown(
+          data['snoozed_until']!,
+          _snoozedUntilMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_snoozedUntilMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {occurrenceId};
+  @override
+  ReminderSnooze map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReminderSnooze(
+      occurrenceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}occurrence_id'],
+      )!,
+      snoozedUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}snoozed_until'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ReminderSnoozesTable createAlias(String alias) {
+    return $ReminderSnoozesTable(attachedDatabase, alias);
+  }
+}
+
+class ReminderSnooze extends DataClass implements Insertable<ReminderSnooze> {
+  /// The deferred occurrence. Primary key: one live snooze per occurrence.
+  ///
+  /// **The cascade delete is load-bearing, not decoration.**
+  /// `ChoreService.pauseChore` HARD-DELETES the pending occurrence, and
+  /// foreign keys are ON (`AppDatabase.migration`'s `beforeOpen` sets
+  /// `PRAGMA foreign_keys = ON`), so without `onDelete: KeyAction.cascade`
+  /// a snoozed chore could not be paused at all.
+  final String occurrenceId;
+
+  /// The instant the reminder should be re-armed for, as an ISO-8601 UTC
+  /// string -- the convention every other timestamp column in this file
+  /// uses.
+  ///
+  /// Stores INTENT, not deliverability: the quiet-hours shift is applied at
+  /// plan time (§2.3 step 4), never at write time, so exactly one code path
+  /// decides when a reminder may fire.
+  final String snoozedUntil;
+
+  /// ISO-8601 UTC creation timestamp.
+  final String createdAt;
+
+  /// ISO-8601 UTC timestamp of the last update.
+  final String updatedAt;
+  const ReminderSnooze({
+    required this.occurrenceId,
+    required this.snoozedUntil,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['occurrence_id'] = Variable<String>(occurrenceId);
+    map['snoozed_until'] = Variable<String>(snoozedUntil);
+    map['created_at'] = Variable<String>(createdAt);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  ReminderSnoozesCompanion toCompanion(bool nullToAbsent) {
+    return ReminderSnoozesCompanion(
+      occurrenceId: Value(occurrenceId),
+      snoozedUntil: Value(snoozedUntil),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ReminderSnooze.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReminderSnooze(
+      occurrenceId: serializer.fromJson<String>(json['occurrenceId']),
+      snoozedUntil: serializer.fromJson<String>(json['snoozedUntil']),
+      createdAt: serializer.fromJson<String>(json['createdAt']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'occurrenceId': serializer.toJson<String>(occurrenceId),
+      'snoozedUntil': serializer.toJson<String>(snoozedUntil),
+      'createdAt': serializer.toJson<String>(createdAt),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  ReminderSnooze copyWith({
+    String? occurrenceId,
+    String? snoozedUntil,
+    String? createdAt,
+    String? updatedAt,
+  }) => ReminderSnooze(
+    occurrenceId: occurrenceId ?? this.occurrenceId,
+    snoozedUntil: snoozedUntil ?? this.snoozedUntil,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ReminderSnooze copyWithCompanion(ReminderSnoozesCompanion data) {
+    return ReminderSnooze(
+      occurrenceId: data.occurrenceId.present
+          ? data.occurrenceId.value
+          : this.occurrenceId,
+      snoozedUntil: data.snoozedUntil.present
+          ? data.snoozedUntil.value
+          : this.snoozedUntil,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderSnooze(')
+          ..write('occurrenceId: $occurrenceId, ')
+          ..write('snoozedUntil: $snoozedUntil, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(occurrenceId, snoozedUntil, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReminderSnooze &&
+          other.occurrenceId == this.occurrenceId &&
+          other.snoozedUntil == this.snoozedUntil &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ReminderSnoozesCompanion extends UpdateCompanion<ReminderSnooze> {
+  final Value<String> occurrenceId;
+  final Value<String> snoozedUntil;
+  final Value<String> createdAt;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const ReminderSnoozesCompanion({
+    this.occurrenceId = const Value.absent(),
+    this.snoozedUntil = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReminderSnoozesCompanion.insert({
+    required String occurrenceId,
+    required String snoozedUntil,
+    required String createdAt,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  }) : occurrenceId = Value(occurrenceId),
+       snoozedUntil = Value(snoozedUntil),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<ReminderSnooze> custom({
+    Expression<String>? occurrenceId,
+    Expression<String>? snoozedUntil,
+    Expression<String>? createdAt,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (occurrenceId != null) 'occurrence_id': occurrenceId,
+      if (snoozedUntil != null) 'snoozed_until': snoozedUntil,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReminderSnoozesCompanion copyWith({
+    Value<String>? occurrenceId,
+    Value<String>? snoozedUntil,
+    Value<String>? createdAt,
+    Value<String>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ReminderSnoozesCompanion(
+      occurrenceId: occurrenceId ?? this.occurrenceId,
+      snoozedUntil: snoozedUntil ?? this.snoozedUntil,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (occurrenceId.present) {
+      map['occurrence_id'] = Variable<String>(occurrenceId.value);
+    }
+    if (snoozedUntil.present) {
+      map['snoozed_until'] = Variable<String>(snoozedUntil.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderSnoozesCompanion(')
+          ..write('occurrenceId: $occurrenceId, ')
+          ..write('snoozedUntil: $snoozedUntil, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -5314,6 +6047,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $ShoppingItemsTable shoppingItems = $ShoppingItemsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
+  late final $ReminderSnoozesTable reminderSnoozes = $ReminderSnoozesTable(
+    this,
+  );
   late final Index choreOccurrencesChoreStatusIdx = Index(
     'chore_occurrences_chore_status_idx',
     'CREATE INDEX chore_occurrences_chore_status_idx ON chore_occurrences (chore_id, status)',
@@ -5339,10 +6075,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     choreOccurrences,
     shoppingItems,
     settings,
+    reminderSnoozes,
     choreOccurrencesChoreStatusIdx,
     choreOccurrencesStatusDueDateIdx,
     choreOccurrencesStatusClosedOnIdx,
   ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'chore_occurrences',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('reminder_snoozes', kind: UpdateKind.delete)],
+    ),
+  ]);
 }
 
 typedef $$HouseholdsTableCreateCompanionBuilder =
@@ -7277,6 +8024,7 @@ typedef $$ChoresTableCreateCompanionBuilder =
       required PlainDate startDate,
       required AssignmentMode assignmentMode,
       Value<String?> pausedAt,
+      Value<int?> reminderMinutes,
       Value<String?> createdBy,
       required String createdAt,
       required String updatedAt,
@@ -7295,6 +8043,7 @@ typedef $$ChoresTableUpdateCompanionBuilder =
       Value<PlainDate> startDate,
       Value<AssignmentMode> assignmentMode,
       Value<String?> pausedAt,
+      Value<int?> reminderMinutes,
       Value<String?> createdBy,
       Value<String> createdAt,
       Value<String> updatedAt,
@@ -7445,6 +8194,11 @@ class $$ChoresTableFilterComposer
 
   ColumnFilters<String> get pausedAt => $composableBuilder(
     column: $table.pausedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7632,6 +8386,11 @@ class $$ChoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -7755,6 +8514,11 @@ class $$ChoresTableAnnotationComposer
 
   GeneratedColumn<String> get pausedAt =>
       $composableBuilder(column: $table.pausedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7929,6 +8693,7 @@ class $$ChoresTableTableManager
                 Value<PlainDate> startDate = const Value.absent(),
                 Value<AssignmentMode> assignmentMode = const Value.absent(),
                 Value<String?> pausedAt = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
@@ -7945,6 +8710,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -7963,6 +8729,7 @@ class $$ChoresTableTableManager
                 required PlainDate startDate,
                 required AssignmentMode assignmentMode,
                 Value<String?> pausedAt = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
@@ -7979,6 +8746,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -8615,6 +9383,26 @@ final class $$ChoreOccurrencesTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$ReminderSnoozesTable, List<ReminderSnooze>>
+  _reminderSnoozesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.reminderSnoozes,
+    aliasName: 'chore_occurrences__id__reminder_snoozes__occurrence_id',
+  );
+
+  $$ReminderSnoozesTableProcessedTableManager get reminderSnoozesRefs {
+    final manager = $$ReminderSnoozesTableTableManager(
+      $_db,
+      $_db.reminderSnoozes,
+    ).filter((f) => f.occurrenceId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _reminderSnoozesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ChoreOccurrencesTableFilterComposer
@@ -8731,6 +9519,31 @@ class $$ChoreOccurrencesTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> reminderSnoozesRefs(
+    Expression<bool> Function($$ReminderSnoozesTableFilterComposer f) f,
+  ) {
+    final $$ReminderSnoozesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.reminderSnoozes,
+      getReferencedColumn: (t) => t.occurrenceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReminderSnoozesTableFilterComposer(
+            $db: $db,
+            $table: $db.reminderSnoozes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -8946,6 +9759,31 @@ class $$ChoreOccurrencesTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> reminderSnoozesRefs<T extends Object>(
+    Expression<T> Function($$ReminderSnoozesTableAnnotationComposer a) f,
+  ) {
+    final $$ReminderSnoozesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.reminderSnoozes,
+      getReferencedColumn: (t) => t.occurrenceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReminderSnoozesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.reminderSnoozes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ChoreOccurrencesTableTableManager
@@ -8965,6 +9803,7 @@ class $$ChoreOccurrencesTableTableManager
             bool choreId,
             bool assignedMemberId,
             bool completedBy,
+            bool reminderSnoozesRefs,
           })
         > {
   $$ChoreOccurrencesTableTableManager(
@@ -9045,10 +9884,13 @@ class $$ChoreOccurrencesTableTableManager
                 choreId = false,
                 assignedMemberId = false,
                 completedBy = false,
+                reminderSnoozesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
-                  explicitlyWatchedTables: [],
+                  explicitlyWatchedTables: [
+                    if (reminderSnoozesRefs) db.reminderSnoozes,
+                  ],
                   addJoins:
                       <
                         T extends TableManagerState<
@@ -9114,7 +9956,29 @@ class $$ChoreOccurrencesTableTableManager
                         return state;
                       },
                   getPrefetchedDataCallback: (items) async {
-                    return [];
+                    return [
+                      if (reminderSnoozesRefs)
+                        await $_getPrefetchedData<
+                          ChoreOccurrence,
+                          $ChoreOccurrencesTable,
+                          ReminderSnooze
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ChoreOccurrencesTableReferences
+                              ._reminderSnoozesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ChoreOccurrencesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).reminderSnoozesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.occurrenceId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
                 );
               },
@@ -9138,6 +10002,7 @@ typedef $$ChoreOccurrencesTableProcessedTableManager =
         bool choreId,
         bool assignedMemberId,
         bool completedBy,
+        bool reminderSnoozesRefs,
       })
     >;
 typedef $$ShoppingItemsTableCreateCompanionBuilder =
@@ -9775,6 +10640,11 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<String?> syncLastPulledAt,
       Value<bool> membershipRevoked,
       Value<String?> pendingJoinCode,
+      Value<bool> quietHoursEnabled,
+      Value<int> quietStartMinutes,
+      Value<int> quietEndMinutes,
+      Value<bool> eveningReminderEnabled,
+      Value<int> eveningReminderMinutes,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -9794,6 +10664,11 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<String?> syncLastPulledAt,
       Value<bool> membershipRevoked,
       Value<String?> pendingJoinCode,
+      Value<bool> quietHoursEnabled,
+      Value<int> quietStartMinutes,
+      Value<int> quietEndMinutes,
+      Value<bool> eveningReminderEnabled,
+      Value<int> eveningReminderMinutes,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -9870,6 +10745,31 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get pendingJoinCode => $composableBuilder(
     column: $table.pendingJoinCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get quietHoursEnabled => $composableBuilder(
+    column: $table.quietHoursEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quietStartMinutes => $composableBuilder(
+    column: $table.quietStartMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quietEndMinutes => $composableBuilder(
+    column: $table.quietEndMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get eveningReminderEnabled => $composableBuilder(
+    column: $table.eveningReminderEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get eveningReminderMinutes => $composableBuilder(
+    column: $table.eveningReminderMinutes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9958,6 +10858,31 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get quietHoursEnabled => $composableBuilder(
+    column: $table.quietHoursEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quietStartMinutes => $composableBuilder(
+    column: $table.quietStartMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quietEndMinutes => $composableBuilder(
+    column: $table.quietEndMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get eveningReminderEnabled => $composableBuilder(
+    column: $table.eveningReminderEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get eveningReminderMinutes => $composableBuilder(
+    column: $table.eveningReminderMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -10037,6 +10962,31 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get quietHoursEnabled => $composableBuilder(
+    column: $table.quietHoursEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quietStartMinutes => $composableBuilder(
+    column: $table.quietStartMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quietEndMinutes => $composableBuilder(
+    column: $table.quietEndMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get eveningReminderEnabled => $composableBuilder(
+    column: $table.eveningReminderEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get eveningReminderMinutes => $composableBuilder(
+    column: $table.eveningReminderMinutes,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -10089,6 +11039,11 @@ class $$SettingsTableTableManager
                 Value<String?> syncLastPulledAt = const Value.absent(),
                 Value<bool> membershipRevoked = const Value.absent(),
                 Value<String?> pendingJoinCode = const Value.absent(),
+                Value<bool> quietHoursEnabled = const Value.absent(),
+                Value<int> quietStartMinutes = const Value.absent(),
+                Value<int> quietEndMinutes = const Value.absent(),
+                Value<bool> eveningReminderEnabled = const Value.absent(),
+                Value<int> eveningReminderMinutes = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -10106,6 +11061,11 @@ class $$SettingsTableTableManager
                 syncLastPulledAt: syncLastPulledAt,
                 membershipRevoked: membershipRevoked,
                 pendingJoinCode: pendingJoinCode,
+                quietHoursEnabled: quietHoursEnabled,
+                quietStartMinutes: quietStartMinutes,
+                quietEndMinutes: quietEndMinutes,
+                eveningReminderEnabled: eveningReminderEnabled,
+                eveningReminderMinutes: eveningReminderMinutes,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -10126,6 +11086,11 @@ class $$SettingsTableTableManager
                 Value<String?> syncLastPulledAt = const Value.absent(),
                 Value<bool> membershipRevoked = const Value.absent(),
                 Value<String?> pendingJoinCode = const Value.absent(),
+                Value<bool> quietHoursEnabled = const Value.absent(),
+                Value<int> quietStartMinutes = const Value.absent(),
+                Value<int> quietEndMinutes = const Value.absent(),
+                Value<bool> eveningReminderEnabled = const Value.absent(),
+                Value<int> eveningReminderMinutes = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -10143,6 +11108,11 @@ class $$SettingsTableTableManager
                 syncLastPulledAt: syncLastPulledAt,
                 membershipRevoked: membershipRevoked,
                 pendingJoinCode: pendingJoinCode,
+                quietHoursEnabled: quietHoursEnabled,
+                quietStartMinutes: quietStartMinutes,
+                quietEndMinutes: quietEndMinutes,
+                eveningReminderEnabled: eveningReminderEnabled,
+                eveningReminderMinutes: eveningReminderMinutes,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -10172,6 +11142,316 @@ typedef $$SettingsTableProcessedTableManager =
       DeviceSettings,
       PrefetchHooks Function()
     >;
+typedef $$ReminderSnoozesTableCreateCompanionBuilder =
+    ReminderSnoozesCompanion Function({
+      required String occurrenceId,
+      required String snoozedUntil,
+      required String createdAt,
+      required String updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ReminderSnoozesTableUpdateCompanionBuilder =
+    ReminderSnoozesCompanion Function({
+      Value<String> occurrenceId,
+      Value<String> snoozedUntil,
+      Value<String> createdAt,
+      Value<String> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$ReminderSnoozesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $ReminderSnoozesTable, ReminderSnooze> {
+  $$ReminderSnoozesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ChoreOccurrencesTable _occurrenceIdTable(_$AppDatabase db) => db
+      .choreOccurrences
+      .createAlias('reminder_snoozes__occurrence_id__chore_occurrences__id');
+
+  $$ChoreOccurrencesTableProcessedTableManager get occurrenceId {
+    final $_column = $_itemColumn<String>('occurrence_id')!;
+
+    final manager = $$ChoreOccurrencesTableTableManager(
+      $_db,
+      $_db.choreOccurrences,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_occurrenceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ReminderSnoozesTableFilterComposer
+    extends Composer<_$AppDatabase, $ReminderSnoozesTable> {
+  $$ReminderSnoozesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get snoozedUntil => $composableBuilder(
+    column: $table.snoozedUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ChoreOccurrencesTableFilterComposer get occurrenceId {
+    final $$ChoreOccurrencesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.occurrenceId,
+      referencedTable: $db.choreOccurrences,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ChoreOccurrencesTableFilterComposer(
+            $db: $db,
+            $table: $db.choreOccurrences,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderSnoozesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReminderSnoozesTable> {
+  $$ReminderSnoozesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get snoozedUntil => $composableBuilder(
+    column: $table.snoozedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ChoreOccurrencesTableOrderingComposer get occurrenceId {
+    final $$ChoreOccurrencesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.occurrenceId,
+      referencedTable: $db.choreOccurrences,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ChoreOccurrencesTableOrderingComposer(
+            $db: $db,
+            $table: $db.choreOccurrences,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderSnoozesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReminderSnoozesTable> {
+  $$ReminderSnoozesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get snoozedUntil => $composableBuilder(
+    column: $table.snoozedUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$ChoreOccurrencesTableAnnotationComposer get occurrenceId {
+    final $$ChoreOccurrencesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.occurrenceId,
+      referencedTable: $db.choreOccurrences,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ChoreOccurrencesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.choreOccurrences,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderSnoozesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ReminderSnoozesTable,
+          ReminderSnooze,
+          $$ReminderSnoozesTableFilterComposer,
+          $$ReminderSnoozesTableOrderingComposer,
+          $$ReminderSnoozesTableAnnotationComposer,
+          $$ReminderSnoozesTableCreateCompanionBuilder,
+          $$ReminderSnoozesTableUpdateCompanionBuilder,
+          (ReminderSnooze, $$ReminderSnoozesTableReferences),
+          ReminderSnooze,
+          PrefetchHooks Function({bool occurrenceId})
+        > {
+  $$ReminderSnoozesTableTableManager(
+    _$AppDatabase db,
+    $ReminderSnoozesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReminderSnoozesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReminderSnoozesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReminderSnoozesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> occurrenceId = const Value.absent(),
+                Value<String> snoozedUntil = const Value.absent(),
+                Value<String> createdAt = const Value.absent(),
+                Value<String> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderSnoozesCompanion(
+                occurrenceId: occurrenceId,
+                snoozedUntil: snoozedUntil,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String occurrenceId,
+                required String snoozedUntil,
+                required String createdAt,
+                required String updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderSnoozesCompanion.insert(
+                occurrenceId: occurrenceId,
+                snoozedUntil: snoozedUntil,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ReminderSnoozesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({occurrenceId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (occurrenceId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.occurrenceId,
+                                referencedTable:
+                                    $$ReminderSnoozesTableReferences
+                                        ._occurrenceIdTable(db),
+                                referencedColumn:
+                                    $$ReminderSnoozesTableReferences
+                                        ._occurrenceIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ReminderSnoozesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ReminderSnoozesTable,
+      ReminderSnooze,
+      $$ReminderSnoozesTableFilterComposer,
+      $$ReminderSnoozesTableOrderingComposer,
+      $$ReminderSnoozesTableAnnotationComposer,
+      $$ReminderSnoozesTableCreateCompanionBuilder,
+      $$ReminderSnoozesTableUpdateCompanionBuilder,
+      (ReminderSnooze, $$ReminderSnoozesTableReferences),
+      ReminderSnooze,
+      PrefetchHooks Function({bool occurrenceId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10192,4 +11472,6 @@ class $AppDatabaseManager {
       $$ShoppingItemsTableTableManager(_db, _db.shoppingItems);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
+  $$ReminderSnoozesTableTableManager get reminderSnoozes =>
+      $$ReminderSnoozesTableTableManager(_db, _db.reminderSnoozes);
 }
