@@ -108,7 +108,7 @@ bool isWithinQuietHours({
   required int startMinutes,
   required int endMinutes,
 }) {
-  if (!enabled || startMinutes == endMinutes) {
+  if (!enabled) {
     return false;
   }
   if (startMinutes < endMinutes) {
@@ -162,12 +162,12 @@ DateTime applyQuietHours({
   // same one to decide whether to say "Inside your quiet hours -- not
   // delivering". A second copy here could drift from it, and the user would
   // then see that sub-line on a notification that delivers.
-  // INVERSION: stop delegating, and restate the membership test WRONGLY
-  // (non-wrapping only). This is the divergence the agreement test exists
-  // to catch; nothing else in the app changes.
-  if (!enabled ||
-      startMinutes == endMinutes ||
-      !(minuteOfDay >= startMinutes && minuteOfDay < endMinutes)) {
+  if (!isWithinQuietHours(
+    minuteOfDay: minuteOfDay,
+    enabled: enabled,
+    startMinutes: startMinutes,
+    endMinutes: endMinutes,
+  )) {
     return candidate;
   }
   final hour = endMinutes ~/ 60;
