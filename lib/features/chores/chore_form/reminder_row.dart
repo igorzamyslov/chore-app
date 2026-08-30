@@ -65,7 +65,7 @@ class ChoreFormReminderRow extends StatelessWidget {
             title: Text(l10n.choreFormReminderToggle),
             value: current != null,
             onChanged: (enabled) =>
-                onChanged(enabled ? defaultReminderMinutes : 0),
+                onChanged(enabled ? defaultReminderMinutes : null),
           ),
         ),
         if (current != null) ...[
