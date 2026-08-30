@@ -80,6 +80,37 @@ const int reminderArmWindowDays = 14;
 /// that the two never read as one event.
 const int defaultReminderMinutes = 1080;
 
+/// Whether [minuteOfDay] falls inside the quiet-hours window
+/// `[startMinutes, endMinutes)` (spec `docs/specs/notifications-n2.md` §6).
+///
+/// The window WRAPS MIDNIGHT in the normal case (22:00 to 07:00), so this is
+/// a wrapping-interval test, never a `start <= m <= end` range comparison.
+/// `startMinutes == endMinutes` is OFF, not a 24-hour window -- "never
+/// notify" is what the toggle is for.
+///
+/// Exactly at [startMinutes] is inside; exactly at [endMinutes] is outside.
+///
+/// This is the single membership test in the app: [applyQuietHours]
+/// delegates to it, and `SettingsScreen` reads it to decide whether the
+/// evening re-reminder's time collides with the window (§5.1). Two
+/// implementations could disagree, and a user would then see "not
+/// delivering" on a notification that delivers.
+///
+/// Deliberately takes a minute-of-day rather than a `DateTime`: it
+/// constructs no date and therefore has no DST exposure at all. The
+/// DST-sensitive half -- building the deferral target from calendar
+/// components -- lives in [applyQuietHours] and is untouched by this. Range
+/// validation likewise stays there: this predicate answers a question about
+/// a number, and its callers feed it already-validated settings columns.
+bool isWithinQuietHours({
+  required int minuteOfDay,
+  required bool enabled,
+  required int startMinutes,
+  required int endMinutes,
+}) {
+  return false;
+}
+
 /// [candidate] itself when quiet hours are off or [candidate] falls outside
 /// the window; otherwise the first instant at or after [candidate] whose
 /// minute-of-day equals [endMinutes] (spec `docs/specs/notifications-n2.md`
