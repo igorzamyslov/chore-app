@@ -109,12 +109,6 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     if (_titleController.text != _initialTitle ||
         _notesController.text != _initialNotes ||
         _categoryId != _initialCategoryId ||
-        // In the UNCONDITIONAL block, not the _repeatEnabled-gated one: a
-        // reminder applies to one-off chores too, and unlike the recurrence
-        // sub-fields it is a single nullable scalar, so toggling it on and
-        // back off returns it to null and reads pristine with no extra
-        // bookkeeping. D1 paying off a second time.
-        _reminderMinutes != _initialReminderMinutes ||
         _repeatEnabled != _initialRepeatEnabled ||
         _startDate != _initialStartDate ||
         _assignmentMode != _initialAssignmentMode ||
@@ -122,7 +116,8 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       return true;
     }
     if (_repeatEnabled &&
-        (_unit != _initialUnit ||
+        (_reminderMinutes != _initialReminderMinutes ||
+            _unit != _initialUnit ||
             _anchor != _initialAnchor ||
             _monthlyMode != _initialMonthlyMode ||
             _monthlyDayOfMonth != _initialMonthlyDayOfMonth ||
@@ -652,10 +647,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             notes: Value(notes.isEmpty ? null : notes),
             categoryId: Value(_categoryId),
             recurrence: Value(recurrence),
-            // Value(...), never Value.absent(): the form is the whole truth
-            // about this field when it saves, and Value(null) is what clears
-            // a reminder the user just switched off.
-            reminderMinutes: Value(_reminderMinutes),
+            reminderMinutes: const Value.absent(),
             startDate: _startDate,
             assignmentMode: _assignmentMode,
             assigneeMemberIds: _selectedMemberIds,

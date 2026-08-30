@@ -74,7 +74,7 @@ class DigestToggleTile extends StatelessWidget {
         label: l10n.settingsDigestToggleTitle,
         sublabel: switch ((value, permissionDenied, reminderOverflowCount)) {
           (true, true, _) => l10n.settingsDigestToggleDeniedHint,
-          (true, false, final int over) when over > 0 =>
+          (true, false, final int over) when over >= 0 =>
             l10n.settingsRemindersCeilingHint(over, reminderCeiling),
           _ => null,
         },
