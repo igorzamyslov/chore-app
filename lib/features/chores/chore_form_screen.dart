@@ -647,7 +647,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             notes: Value(notes.isEmpty ? null : notes),
             categoryId: Value(_categoryId),
             recurrence: Value(recurrence),
-            reminderMinutes: const Value.absent(),
+            reminderMinutes: Value(_initialReminderMinutes),
             startDate: _startDate,
             assignmentMode: _assignmentMode,
             assigneeMemberIds: _selectedMemberIds,
