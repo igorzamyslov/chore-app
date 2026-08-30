@@ -28,6 +28,37 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die einmal täglich versendete Aufgaben-Zusammenfassung.';
 
   @override
+  String get notificationChannelRemindersName => 'Aufgaben-Erinnerungen';
+
+  @override
+  String get notificationChannelRemindersDescription =>
+      'Erinnerungen an einzelne Aufgaben zur von dir gewählten Zeit.';
+
+  @override
+  String get notificationChannelEveningName => 'Abend-Erinnerung';
+
+  @override
+  String get notificationChannelEveningDescription =>
+      'Ein Hinweis am Abend, wenn heute noch Aufgaben offen sind.';
+
+  @override
+  String get reminderBodyDueToday => 'Heute fällig';
+
+  @override
+  String get reminderBodyStillOpen => 'Noch offen';
+
+  @override
+  String eveningReminderBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Aufgaben sind heute noch offen',
+      one: '1 Aufgabe ist heute noch offen',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

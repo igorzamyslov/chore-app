@@ -13,6 +13,7 @@ class ScheduledCall {
     required this.title,
     required this.body,
     required this.fireAt,
+    required this.channelId,
     required this.channelName,
     required this.channelDescription,
     this.payload,
@@ -30,6 +31,11 @@ class ScheduledCall {
 
   /// The fire time passed to `zonedSchedule`.
   final DateTime fireAt;
+
+  /// The Android notification channel id passed to `zonedSchedule` (spec
+  /// `docs/specs/notifications-n2.md` §9.3): one of `digestChannelId`,
+  /// `remindersChannelId` or `eveningChannelId`.
+  final String channelId;
 
   /// The localized Android notification channel name passed to
   /// `zonedSchedule` (backlog E-1).
@@ -50,7 +56,8 @@ class ScheduledCall {
   @override
   String toString() =>
       'ScheduledCall(id: $id, title: $title, body: $body, fireAt: $fireAt, '
-      'channelName: $channelName, channelDescription: $channelDescription, '
+      'channelId: $channelId, channelName: $channelName, '
+      'channelDescription: $channelDescription, '
       'payload: $payload, actionable: $actionable)';
 }
 
@@ -119,6 +126,7 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -129,6 +137,7 @@ class FakeDigestNotificationPlugin implements DigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,

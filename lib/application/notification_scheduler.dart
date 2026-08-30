@@ -86,6 +86,31 @@ const String digestChannelId = 'digest_v2';
 /// English-named, and no way to tell which is which.
 const String legacyDigestChannelId = 'digest';
 
+/// The Android notification channel per-chore reminders are posted on (spec
+/// `docs/specs/notifications-n2.md` §9.3).
+///
+/// Its own channel, not the digest's, so a user can mute one instrument
+/// without losing the others. **Default importance**, matching the digest,
+/// and that is a decision rather than an oversight: AC1's complaint is that
+/// reminders are untimely and anonymous, not that they are quiet, and
+/// shipping high-importance heads-up popups for household chores is what
+/// gets an app muted wholesale. A user who wants more can raise it per
+/// channel in system Settings.
+///
+/// Inherits E-1's constraints in full (see [digestChannelId]): the localized
+/// name and description are passed per
+/// [DigestNotificationPlugin.zonedSchedule] call and take effect only the
+/// FIRST time this app creates the channel on a device, and **any future
+/// change to that copy must mint a new id AND delete the one it replaces**
+/// -- Android has no rename. The same accepted staleness applies: a language
+/// switch does not relabel an existing channel.
+const String remindersChannelId = 'reminders_v1';
+
+/// The Android notification channel the evening re-reminder is posted on
+/// (spec `docs/specs/notifications-n2.md` §9.3). Same importance and same
+/// id-versioning constraint as [remindersChannelId].
+const String eveningChannelId = 'evening_v1';
+
 /// The iOS `UNNotificationCategory` identifier carrying the digest's "Done"
 /// action (spec `docs/specs/notifications.md` N2).
 ///
@@ -148,12 +173,18 @@ abstract class DigestNotificationPlugin {
   /// would freeze its body text at whatever the counts were when it was
   /// armed.
   ///
-  /// [channelName] and [channelDescription] are the localized copy for the
-  /// Android channel [digestChannelId], and they take effect only the FIRST
-  /// time this app ever creates that channel on the device -- see that
-  /// constant's doc comment for why a later call cannot rename it. They are
-  /// passed per-call rather than once at init because only the caller knows
-  /// the current locale, and the locale can change between launches.
+  /// [channelId] is which Android channel to post on -- the caller decides,
+  /// because one apply now writes three id ranges with three different
+  /// channels ([digestChannelId], [remindersChannelId],
+  /// [eveningChannelId], spec `docs/specs/notifications-n2.md` §9.3).
+  /// Ignored off Android, which has no channel concept.
+  ///
+  /// [channelName] and [channelDescription] are the localized copy for that
+  /// channel, and they take effect only the FIRST time this app ever creates
+  /// it on the device -- see [digestChannelId]'s doc comment for why a later
+  /// call cannot rename it. They are passed per-call rather than once at
+  /// init because only the caller knows the current locale, and the locale
+  /// can change between launches.
   ///
   /// [payload] is the JSON action payload (see
   /// `lib/application/digest_action_payload.dart`) delivered back to the app
@@ -172,6 +203,7 @@ abstract class DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -326,6 +358,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -356,7 +389,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
       // architecture #3), so neither is passed explicitly here.
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          digestChannelId,
+          channelId,
           channelName,
           channelDescription: channelDescription,
           // Attached per notification, which is what lets the label follow
@@ -594,6 +627,7 @@ class NotificationScheduler {
           title: l10n.appTitle,
           body: _digestBody(l10n, plan),
           fireAt: plan.fireAt,
+          channelId: digestChannelId,
           channelName: l10n.notificationChannelDigestName,
           channelDescription: l10n.notificationChannelDigestDescription,
           payload: soleOccurrenceId == null

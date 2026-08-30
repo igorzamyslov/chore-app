@@ -63,6 +63,7 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -74,6 +75,7 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,
@@ -116,6 +118,7 @@ class _ThrowingOncePlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -130,6 +133,7 @@ class _ThrowingOncePlugin extends FakeDigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,
@@ -536,6 +540,23 @@ void main() {
   });
 
   group('notification channel (backlog E-1)', () {
+    test(
+      'the reminder and evening channel ids are minted fresh and are '
+      "distinct from the digest's -- Android caches channel copy at "
+      'creation and cannot rename, so reusing digest_v2 would give these '
+      "two the digest's name forever (spec "
+      'docs/specs/notifications-n2.md §9.3)',
+      () {
+        expect(remindersChannelId, 'reminders_v1');
+        expect(eveningChannelId, 'evening_v1');
+        expect({
+          digestChannelId,
+          remindersChannelId,
+          eveningChannelId,
+        }, hasLength(3));
+      },
+    );
+
     List<DigestPlan?> onlySlotZero() => [
       DigestPlan(
         fireAt: DateTime(2026, 7, 25, 8),
@@ -551,6 +572,15 @@ void main() {
       'reach an existing install on a NEW id',
       () {
         expect(digestChannelId, 'digest_v2');
+      },
+    );
+
+    test(
+      "the digest still schedules on its OWN channel now that the seam "
+      "carries a channel id -- E-1's localized name must not move",
+      () async {
+        await scheduler.applyDigestPlans(onlySlotZero());
+        expect(plugin.scheduledCalls.single.channelId, digestChannelId);
       },
     );
 

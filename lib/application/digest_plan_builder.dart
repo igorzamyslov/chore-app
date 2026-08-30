@@ -127,15 +127,12 @@ NotificationPlanSet buildNotificationPlans({
 
   return NotificationPlanSet(
     digest: digest,
-    // INVERSION (Task 9 step 4 inversion 2): padded at the FRONT, so a
-    // plan's position is no longer its id offset. To be reverted.
     reminders: List<ReminderPlan?>.unmodifiable([
-      for (var i = reminderResult.armed.length; i < reminderCeiling; i++) null,
       ...reminderResult.armed,
+      for (var i = reminderResult.armed.length; i < reminderCeiling; i++) null,
     ]),
     evening: evening,
-    // INVERSION (Task 9 step 4 inversion 4). To be reverted.
-    reminderOverflowCount: 0,
+    reminderOverflowCount: reminderResult.overflowCount,
   );
 }
 
@@ -224,9 +221,12 @@ List<DigestPlan?> _digestPlans({
     // Nothing ships changed by this: quiet hours default OFF, and the
     // shipped 08:00 digest sits outside the default 22:00-07:00 window
     // anyway (§6's closing paragraph).
-    // INVERSION (Task 9 step 4 inversion 5, added by Task 0 correction 1):
-    // quiet hours NOT applied to the digest. To be reverted.
-    final fireAt = rawFireAt;
+    final fireAt = applyQuietHours(
+      candidate: rawFireAt,
+      enabled: settings.quietHoursEnabled,
+      startMinutes: settings.quietStartMinutes,
+      endMinutes: settings.quietEndMinutes,
+    );
     final counts = projectDigestCounts(
       occurrences: occurrences,
       date: PlainDate.fromDateTime(fireAt),
