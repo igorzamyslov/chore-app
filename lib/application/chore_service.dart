@@ -67,7 +67,7 @@ class ChoreService {
     String? notes,
     String? categoryId,
     Recurrence? recurrence,
-    int? reminderMinutes = defaultReminderMinutes,
+    int? reminderMinutes,
     List<String> assigneeMemberIds = const [],
     String? createdBy,
   }) {
@@ -80,7 +80,7 @@ class ChoreService {
         notes: notes,
         categoryId: categoryId,
         recurrence: recurrence,
-        reminderMinutes: reminderMinutes,
+        reminderMinutes: reminderMinutes ?? defaultReminderMinutes,
         assigneeMemberIds: assigneeMemberIds,
         createdBy: createdBy,
       );
