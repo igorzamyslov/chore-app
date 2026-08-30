@@ -36,8 +36,8 @@
 ///    document it — the bound is the one
 ///    `docs/handover-2026-08-14-planning.md` §4 already accepts for a
 ///    mid-apply process kill: at worst one duplicate morning notification. Do
-///    NOT respond by switching to `cancelDigest()`, which trades one wrong
-///    notification for up to 83 days of silence.*
+///    NOT respond by switching to `NotificationScheduler.cancelAll()`, which
+///    trades one wrong notification for up to 83 days of silence.*
 ///
 /// A third assumption the plan flagged IS now verified, from the installed
 /// package's own Android source rather than on a device — see the routing note

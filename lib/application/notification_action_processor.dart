@@ -98,9 +98,9 @@ Future<void> applyDoneAction({
 /// Concretely: a one-off marked done from the notification, app never
 /// re-opened — the next slot fires saying "1 overdue chore" about a chore the
 /// user has just told the app they did. Rewriting costs the same
-/// `digestHorizonSlots` platform calls as `cancelDigest()` would and is
-/// strictly better: cancelling produces up to 83 days of silence for exactly
-/// the disengaged user the horizon exists to serve.
+/// `digestHorizonSlots` platform calls as a cancel would and is strictly
+/// better: cancelling produces up to 83 days of silence for exactly the
+/// disengaged user the horizon exists to serve.
 ///
 /// Re-uses `buildDigestPlans` rather than re-deriving counts. That free
 /// function already had two callers "that cannot share a controller"; a third,
@@ -109,7 +109,8 @@ Future<void> applyDoneAction({
 /// ## One concurrency hazard, recorded rather than fixed
 ///
 /// **`applyDigestPlans`' serialization does not cross isolates.** Its
-/// `_digestWriteTail` chain is per-instance, so the scheduler this function is
+/// `_notificationWriteTail` chain is per-instance, so the scheduler this
+/// function is
 /// given (constructed inside the background isolate) and the main isolate's own
 /// can interleave writes to the same `digestHorizonSlots` ids. It is
 /// self-correcting whenever it can happen at all: interleaving requires the app
@@ -120,10 +121,11 @@ Future<void> applyDoneAction({
 /// app is dead there is no second writer at all. **Do not add a cross-isolate
 /// lock.**
 ///
-/// The second hazard this comment used to record — **`cancelDigest()`
+/// The second hazard this comment used to record — **the wipe's cancel
 /// unserialized against `applyDigestPlans`** — is **FIXED** (backlog G-12,
 /// 2026-08-28, `docs/plans/2026-08-28-g12-cancel-digest-serialization.md`).
-/// `cancelDigest` now rides the same `_digestWriteTail` queue, so a wipe
+/// `cancelAll` (widened from `cancelDigest` at schema v13) rides the same
+/// `_notificationWriteTail` queue, so a wipe
 /// (`reset_flow.dart`) racing this function can no longer leave slots the apply
 /// re-armed after the cancel cleared them. That fix is deliberately
 /// **within one isolate only**; it does nothing about the hazard above and must
