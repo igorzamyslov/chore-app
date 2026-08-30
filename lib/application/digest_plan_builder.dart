@@ -97,7 +97,7 @@ NotificationPlanSet buildNotificationPlans({
   // 2. Evening, which is suppressed by a still-to-come reminder (§5).
   final evening = planEveningSlots(
     now: now,
-    enabled: settings.eveningReminderEnabled,
+    enabled: true,
     eveningMinutes: settings.eveningReminderMinutes,
     occurrences: occurrences,
     recipientMemberId: recipientMemberId,
