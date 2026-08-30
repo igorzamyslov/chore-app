@@ -123,12 +123,9 @@ DateTime applyQuietHours({
   final minuteOfDay = candidate.hour * 60 + candidate.minute;
   final inside = startMinutes < endMinutes
       // A non-wrapping window: [start, end).
-      // INVERSION (Task 5 step 4 inversions 1 and 2): both boundaries
-      // flipped -- `> start` excludes a candidate exactly at the start,
-      // `<= end` includes one exactly at the end. To be reverted.
-      ? minuteOfDay > startMinutes && minuteOfDay <= endMinutes
+      ? minuteOfDay >= startMinutes && minuteOfDay < endMinutes
       // A wrapping window: [start, midnight) union [midnight, end).
-      : minuteOfDay > startMinutes || minuteOfDay <= endMinutes;
+      : minuteOfDay >= startMinutes || minuteOfDay < endMinutes;
   if (!inside) {
     return candidate;
   }
@@ -276,9 +273,7 @@ ReminderPlanResult planReminders({
         assignee != recipientMemberId) {
       continue;
     }
-    // INVERSION (Task 6 step 5 inversion 1): the occurrence's own due date
-    // instead of the projected roll-forward. To be reverted.
-    final armDate = occurrence.dueDate;
+    final armDate = projectedDueDateOn(occurrence, today);
     // Calendar components, never `add(Duration(days:))` -- the same DST
     // reason `nextDigestSlot` documents.
     var armAt = DateTime(
@@ -288,19 +283,16 @@ ReminderPlanResult planReminders({
       reminderMinutes ~/ 60,
       reminderMinutes % 60,
     );
-    // INVERSION (Task 6 step 5 inversion 4): the shift applied BEFORE the
-    // snooze override, so a snoozed moment never goes through it. To be
-    // reverted.
+    final snoozedUntil = snoozedUntilByOccurrenceId[occurrence.id]?.toLocal();
+    if (snoozedUntil != null && snoozedUntil.isAfter(now)) {
+      armAt = snoozedUntil;
+    }
     armAt = applyQuietHours(
       candidate: armAt,
       enabled: quietHoursEnabled,
       startMinutes: quietStartMinutes,
       endMinutes: quietEndMinutes,
     );
-    final snoozedUntil = snoozedUntilByOccurrenceId[occurrence.id]?.toLocal();
-    if (snoozedUntil != null && snoozedUntil.isAfter(now)) {
-      armAt = snoozedUntil;
-    }
     if (!armAt.isAfter(now)) {
       continue; // Already past: overdue is the digest's job (D8).
     }

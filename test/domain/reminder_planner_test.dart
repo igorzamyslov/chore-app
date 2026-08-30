@@ -426,16 +426,34 @@ void main() {
       'CHORE id ascending -- stable across recomputes and across devices '
       '(D4)',
       () {
+        // The occurrence ids and the chore ids are deliberately
+        // ANTI-CORRELATED on the tied pair: occurrence `o1` carries chore
+        // `c-zulu` and `o2` carries `c-bravo`, so sorting by occurrence id
+        // and sorting by chore id give DIFFERENT answers. With correlated
+        // ids (the obvious way to write this) both orderings agree and the
+        // test cannot fail for the very property it names -- verified by
+        // running the occurrence-id tiebreak against it.
+        //
+        // Why chore id and not occurrence id: an occurrence id changes
+        // every time the chore regenerates, so it is not stable across
+        // recomputes; the chore id is (D4).
         final result = _plan([
-          _occ(id: 'o3', choreId: 'c-zulu', dueDate: PlainDate(2026, 8, 30)),
-          _occ(id: 'o1', choreId: 'c-alpha', dueDate: PlainDate(2026, 8, 31)),
+          _occ(id: 'o1', choreId: 'c-zulu', dueDate: PlainDate(2026, 8, 30)),
           _occ(id: 'o2', choreId: 'c-bravo', dueDate: PlainDate(2026, 8, 30)),
+          _occ(id: 'o3', choreId: 'c-alpha', dueDate: PlainDate(2026, 8, 31)),
         ]);
         expect(result.armed.map((plan) => plan.choreId), [
           'c-bravo',
           'c-zulu',
           'c-alpha',
         ]);
+        expect(
+          result.armed.map((plan) => plan.occurrenceId),
+          ['o2', 'o1', 'o3'],
+          reason:
+              'the tied pair is ordered by CHORE id, which puts o2 '
+              'first even though o1 sorts first by occurrence id',
+        );
       },
     );
 
