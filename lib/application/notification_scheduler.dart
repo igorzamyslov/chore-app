@@ -9,6 +9,9 @@ import 'dart:ui' as ui;
 import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/domain/digest_planner.dart';
+// INVERSION side effect: the Task 11 body inversion removes this
+// import's only use, and an analyzer failure is not a test red.
+// ignore: unused_import
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
