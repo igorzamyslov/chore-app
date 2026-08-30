@@ -969,7 +969,13 @@ void main() {
           );
 
           await failingScheduler.cancelAll();
-          expect(failingPlugin.cancelCallCount, digestHorizonSlots);
+          // All three ranges, not just the digest's: the assertion is that
+          // the cancel RAN to completion after a failed apply, and since
+          // schema v13 completion means all 64 ids (§9.2).
+          expect(
+            failingPlugin.cancelCallCount,
+            digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          );
         },
       );
     },
