@@ -579,7 +579,7 @@ void main() {
     );
 
     test(
-      "the digest still schedules on its OWN channel now that the seam "
+      'the digest still schedules on its OWN channel now that the seam '
       "carries a channel id -- E-1's localized name must not move",
       () async {
         await scheduler.applyDigestPlans(onlySlotZero());

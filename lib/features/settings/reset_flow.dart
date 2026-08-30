@@ -58,8 +58,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// Steps 1 and 2 are individually best-effort
 /// ([_cancelNotifications]/[_signOut]): a network hiccup signing out, or an
-/// OS plugin hiccup cancelling a notification, must never block the wipe — the double-confirmed delete is
-/// the one promise in this flow that must always be kept. **Do not reorder
+/// OS plugin hiccup cancelling a notification, must never block the wipe —
+/// the double-confirmed delete is the one promise in this flow that must
+/// always be kept. **Do not reorder
 /// them after the wipe and do not let either throw.**
 ///
 /// If [resetAppData] itself throws, this shows

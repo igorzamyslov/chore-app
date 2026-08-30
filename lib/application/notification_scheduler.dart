@@ -521,8 +521,8 @@ class NotificationScheduler {
   /// via the future its own method returned to them.
   Future<void> _notificationWriteTail = Future<void>.value();
 
-  /// Chains [write] onto [_notificationWriteTail] and hands the caller the future
-  /// for its own link, so concurrent digest writes run one after another
+  /// Chains [write] onto [_notificationWriteTail] and hands the caller the
+  /// future for its own link, so concurrent digest writes run one after another
   /// instead of interleaving their platform calls.
   ///
   /// **Synchronous on purpose, and this is load-bearing.** The tail is read
@@ -591,9 +591,10 @@ class NotificationScheduler {
   /// could otherwise interleave their writes to the very same
   /// [digestHorizonSlots] ids (`DigestRescheduleController`
   /// and `DigestPrepromptBanner._enable` both call this independently).
-  /// This method therefore chains every call onto [_notificationWriteTail], so a
-  /// call that arrives while another is still mid-loop waits for it to
-  /// finish completely before writing a single slot of its own, no matter
+  /// This method therefore chains every call onto
+  /// [_notificationWriteTail], so a call that arrives while another is
+  /// still mid-loop waits for it to finish completely before writing a
+  /// single slot of its own, no matter
   /// which caller either one is — and [cancelAll] rides the same queue,
   /// so a wipe cannot interleave with an apply either (backlog G-12).
   /// `DigestRescheduleController`'s own in-flight/queued bookkeeping
