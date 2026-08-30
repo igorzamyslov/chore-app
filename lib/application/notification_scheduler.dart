@@ -673,7 +673,8 @@ class NotificationScheduler {
           title: l10n.appTitle,
           body: _digestBody(l10n, plan),
           fireAt: plan.fireAt,
-          channelId: digestChannelId,
+          // INVERSION (Task 10 step 5). To be reverted.
+          channelId: remindersChannelId,
           channelName: l10n.notificationChannelDigestName,
           channelDescription: l10n.notificationChannelDigestDescription,
           payload: soleOccurrenceId == null
@@ -743,9 +744,8 @@ class NotificationScheduler {
           // Two plain keys rather than date arithmetic inside a localized
           // string. The armed date differs from the due date exactly when a
           // snooze or a quiet-hours deferral moved it (§11).
-          body: PlainDate.fromDateTime(plan.fireAt) == plan.dueDate
-              ? l10n.reminderBodyDueToday
-              : l10n.reminderBodyStillOpen,
+          // INVERSION (Task 11 step 4 inversion 2). To be reverted.
+          body: l10n.reminderBodyDueToday,
           fireAt: plan.fireAt,
           channelId: remindersChannelId,
           channelName: l10n.notificationChannelRemindersName,
@@ -816,11 +816,8 @@ class NotificationScheduler {
     // before the tail is captured would be a suspension point that
     // subverts the ordering. Same placement as _applyDigestPlansNow's.
     await ensureInitialized();
-    for (final id in [
-      ...digestNotificationIds,
-      ...reminderNotificationIds,
-      ...eveningNotificationIds,
-    ]) {
+    // INVERSION (Task 12 step 4 inversion 1). To be reverted.
+    for (final id in digestNotificationIds) {
       await plugin.cancel(id);
     }
   }
