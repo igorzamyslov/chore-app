@@ -41,6 +41,7 @@ part 'app_database.g.dart';
     ChoreOccurrences,
     ShoppingItems,
     Settings,
+    ReminderSnoozes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -53,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -135,6 +136,26 @@ class AppDatabase extends _$AppDatabase {
           // error.
           await migrator.addColumn(settings, settings.pendingJoinCode);
         }
+        if (from < 13) {
+          // v12 -> v13 (spec `docs/specs/notifications-n2.md` §8.1): quiet
+          // hours (3 columns) and the evening re-reminder (2 columns), all
+          // with defaults, no data rewrite. Both features default OFF, so
+          // this upgrade changes the behaviour of exactly zero installs
+          // until someone opens Settings.
+          //
+          // Lives here, inside the `else` branch, for exactly the reason
+          // spelled out for `membershipRevoked` and `pendingJoinCode`
+          // above: `settings` did not exist before v2, so a v1 -> v13 jump
+          // builds the table at full current width via [createTable], and a
+          // second unconditional `addColumn` for the same column would
+          // throw a duplicate-column error. §8.1 states that this
+          // placement is not a free choice.
+          await migrator.addColumn(settings, settings.quietHoursEnabled);
+          await migrator.addColumn(settings, settings.quietStartMinutes);
+          await migrator.addColumn(settings, settings.quietEndMinutes);
+          await migrator.addColumn(settings, settings.eveningReminderEnabled);
+          await migrator.addColumn(settings, settings.eveningReminderMinutes);
+        }
       }
       if (from < 8) {
         // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
@@ -187,6 +208,27 @@ class AppDatabase extends _$AppDatabase {
         // mean the upgrade path itself is wrong, and throwing is the right
         // way to find that out.
         await migrator.createIndex(choreOccurrencesStatusClosedOnIdx);
+      }
+      if (from < 13) {
+        // v12 -> v13 (spec `docs/specs/notifications-n2.md` §8.2/§8.3): the
+        // nullable `chores.reminderMinutes` column, defaulting to `NULL`
+        // (no individual reminder), and the device-scoped, unsynced
+        // `reminder_snoozes` table -- no data rewrite for either.
+        //
+        // Flat and UNCONDITIONAL, NOT inside the `settings` `else` branch
+        // above, and the distinction is the whole trap that branch exists
+        // to document. `chores` has existed since schemaVersion 1, so
+        // `createTable` never covers this column on any path and an
+        // `else`-placed backfill would skip it entirely for a v1 install.
+        // Same shape as the `syncDirty` (v8) and `members.deletedAt` (v9)
+        // backfills above.
+        await migrator.addColumn(chores, chores.reminderMinutes);
+        // The table is introduced HERE, so no install at any shipped
+        // version 1..12 can already carry it, and a plain `createTable`
+        // (drift offers no `IF NOT EXISTS` form) throwing would mean the
+        // upgrade path itself is wrong -- which is worth finding out. Same
+        // reasoning as the `from < 11` index above.
+        await migrator.createTable(reminderSnoozes);
       }
     },
     beforeOpen: (details) async {

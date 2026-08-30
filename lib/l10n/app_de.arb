@@ -6,6 +6,13 @@
 
   "notificationChannelDigestName": "Tägliche Zusammenfassung",
   "notificationChannelDigestDescription": "Die einmal täglich versendete Aufgaben-Zusammenfassung.",
+  "notificationChannelRemindersName": "Aufgaben-Erinnerungen",
+  "notificationChannelRemindersDescription": "Erinnerungen an einzelne Aufgaben zur von dir gewählten Zeit.",
+  "notificationChannelEveningName": "Abend-Erinnerung",
+  "notificationChannelEveningDescription": "Ein Hinweis am Abend, wenn heute noch Aufgaben offen sind.",
+  "reminderBodyDueToday": "Heute fällig",
+  "reminderBodyStillOpen": "Noch offen",
+  "eveningReminderBody": "{count, plural, one{1 Aufgabe ist heute noch offen} other{{count} Aufgaben sind heute noch offen}}",
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",

@@ -7,7 +7,10 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:chore_app/application/digest_action_payload.dart';
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/domain/digest_planner.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -31,6 +34,23 @@ const int digestNotificationIdBase = 1001;
 /// anything to say can never keep a stale notification armed.
 final List<int> digestNotificationIds = List<int>.unmodifiable([
   for (var k = 0; k < digestHorizonSlots; k++) digestNotificationIdBase + k,
+]);
+
+/// Every notification id per-chore reminders own, in position order (spec
+/// `docs/specs/notifications-n2.md` §3.1).
+///
+/// Derived from [reminderCeiling], never a literal range, for the same
+/// reason [digestNotificationIds] is derived from `digestHorizonSlots`: the
+/// split must move as one number when it moves at all.
+final List<int> reminderNotificationIds = List<int>.unmodifiable([
+  for (var i = 0; i < reminderCeiling; i++) reminderNotificationIdBase + i,
+]);
+
+/// Every notification id the evening re-reminder horizon owns, in slot
+/// order (spec `docs/specs/notifications-n2.md` §3.1). Derived from
+/// [eveningHorizonSlots] -- see [reminderNotificationIds].
+final List<int> eveningNotificationIds = List<int>.unmodifiable([
+  for (var k = 0; k < eveningHorizonSlots; k++) eveningNotificationIdBase + k,
 ]);
 
 /// The Android notification channel the digest notification is posted on.
@@ -85,6 +105,31 @@ const String digestChannelId = 'digest_v2';
 /// digest entries in system Settings -> Notifications, one of them dead and
 /// English-named, and no way to tell which is which.
 const String legacyDigestChannelId = 'digest';
+
+/// The Android notification channel per-chore reminders are posted on (spec
+/// `docs/specs/notifications-n2.md` §9.3).
+///
+/// Its own channel, not the digest's, so a user can mute one instrument
+/// without losing the others. **Default importance**, matching the digest,
+/// and that is a decision rather than an oversight: AC1's complaint is that
+/// reminders are untimely and anonymous, not that they are quiet, and
+/// shipping high-importance heads-up popups for household chores is what
+/// gets an app muted wholesale. A user who wants more can raise it per
+/// channel in system Settings.
+///
+/// Inherits E-1's constraints in full (see [digestChannelId]): the localized
+/// name and description are passed per
+/// [DigestNotificationPlugin.zonedSchedule] call and take effect only the
+/// FIRST time this app creates the channel on a device, and **any future
+/// change to that copy must mint a new id AND delete the one it replaces**
+/// -- Android has no rename. The same accepted staleness applies: a language
+/// switch does not relabel an existing channel.
+const String remindersChannelId = 'reminders_v1';
+
+/// The Android notification channel the evening re-reminder is posted on
+/// (spec `docs/specs/notifications-n2.md` §9.3). Same importance and same
+/// id-versioning constraint as [remindersChannelId].
+const String eveningChannelId = 'evening_v1';
 
 /// The iOS `UNNotificationCategory` identifier carrying the digest's "Done"
 /// action (spec `docs/specs/notifications.md` N2).
@@ -148,12 +193,18 @@ abstract class DigestNotificationPlugin {
   /// would freeze its body text at whatever the counts were when it was
   /// armed.
   ///
-  /// [channelName] and [channelDescription] are the localized copy for the
-  /// Android channel [digestChannelId], and they take effect only the FIRST
-  /// time this app ever creates that channel on the device -- see that
-  /// constant's doc comment for why a later call cannot rename it. They are
-  /// passed per-call rather than once at init because only the caller knows
-  /// the current locale, and the locale can change between launches.
+  /// [channelId] is which Android channel to post on -- the caller decides,
+  /// because one apply now writes three id ranges with three different
+  /// channels ([digestChannelId], [remindersChannelId],
+  /// [eveningChannelId], spec `docs/specs/notifications-n2.md` §9.3).
+  /// Ignored off Android, which has no channel concept.
+  ///
+  /// [channelName] and [channelDescription] are the localized copy for that
+  /// channel, and they take effect only the FIRST time this app ever creates
+  /// it on the device -- see [digestChannelId]'s doc comment for why a later
+  /// call cannot rename it. They are passed per-call rather than once at
+  /// init because only the caller knows the current locale, and the locale
+  /// can change between launches.
   ///
   /// [payload] is the JSON action payload (see
   /// `lib/application/digest_action_payload.dart`) delivered back to the app
@@ -172,6 +223,7 @@ abstract class DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -326,6 +378,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -356,7 +409,7 @@ class FlutterLocalNotificationsAdapter implements DigestNotificationPlugin {
       // architecture #3), so neither is passed explicitly here.
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          digestChannelId,
+          channelId,
           channelName,
           channelDescription: channelDescription,
           // Attached per notification, which is what lets the label follow
@@ -443,27 +496,33 @@ class NotificationScheduler {
 
   bool _initialized = false;
 
-  /// The tail of the serialized chain of digest *writes*: resolves once
-  /// whichever write is currently running -- from ANY caller -- has
-  /// finished touching its share of the [digestHorizonSlots] ids. A new
-  /// write waits on this before issuing a single platform call of its own;
-  /// see [_enqueueDigestWrite].
+  /// The tail of the serialized chain of notification *writes*: resolves
+  /// once whichever write is currently running -- from ANY caller -- has
+  /// finished touching its share of the ids. A new write waits on this
+  /// before issuing a single platform call of its own; see
+  /// [_enqueueNotificationWrite].
   ///
-  /// Both [applyDigestPlans] and [cancelDigest] ride this one queue
-  /// (backlog G-12). It is deliberately NOT named `_applyTail`: a cancel
-  /// interleaving with an apply is the same hazard as two applies
+  /// [applyDigestPlans], [applyPlans] and [cancelAll] all ride this one
+  /// queue (backlog G-12). It is deliberately NOT named `_applyTail`: a
+  /// cancel interleaving with an apply is the same hazard as two applies
   /// interleaving, and worse in its consequence -- a wipe whose cancel loop
   /// ran while an apply was mid-loop can be left with slots the apply
   /// re-armed behind it, i.e. a wiped app that still notifies.
+  ///
+  /// Since N2 it covers all THREE id ranges rather than the digest's alone
+  /// (spec `docs/specs/notifications-n2.md` §9.2, D9): Rule D couples the
+  /// digest's counts to the reminders' arming, so a write that touched the
+  /// ranges under separate queue entries would leave a window in which a
+  /// chore is announced twice or not at all.
   ///
   /// Deliberately never allowed to complete with an error: a failed write
   /// must not permanently jam the queue for every write that comes after
   /// it. The error itself still reaches the caller that made THAT call,
   /// via the future its own method returned to them.
-  Future<void> _digestWriteTail = Future<void>.value();
+  Future<void> _notificationWriteTail = Future<void>.value();
 
-  /// Chains [write] onto [_digestWriteTail] and hands the caller the future
-  /// for its own link, so concurrent digest writes run one after another
+  /// Chains [write] onto [_notificationWriteTail] and hands the caller the
+  /// future for its own link, so concurrent digest writes run one after another
   /// instead of interleaving their platform calls.
   ///
   /// **Synchronous on purpose, and this is load-bearing.** The tail is read
@@ -480,13 +539,13 @@ class NotificationScheduler {
   /// wipe wins), and an apply arriving during a cancel therefore still ends
   /// up armed (a legitimate post-wipe recompute wins).
   ///
-  /// Keeps the two error properties documented on [_digestWriteTail]: the
+  /// Keeps the two error properties documented on [_notificationWriteTail]: the
   /// tail is assigned the error-swallowing variant, the caller is given the
   /// raw one.
-  Future<void> _enqueueDigestWrite(Future<void> Function() write) {
-    final waitForPrevious = _digestWriteTail.catchError((_) {});
+  Future<void> _enqueueNotificationWrite(Future<void> Function() write) {
+    final waitForPrevious = _notificationWriteTail.catchError((_) {});
     final thisWrite = waitForPrevious.then((_) => write());
-    _digestWriteTail = thisWrite.catchError((_) {});
+    _notificationWriteTail = thisWrite.catchError((_) {});
     return thisWrite;
   }
 
@@ -532,10 +591,11 @@ class NotificationScheduler {
   /// could otherwise interleave their writes to the very same
   /// [digestHorizonSlots] ids (`DigestRescheduleController`
   /// and `DigestPrepromptBanner._enable` both call this independently).
-  /// This method therefore chains every call onto [_digestWriteTail], so a
-  /// call that arrives while another is still mid-loop waits for it to
-  /// finish completely before writing a single slot of its own, no matter
-  /// which caller either one is — and [cancelDigest] rides the same queue,
+  /// This method therefore chains every call onto
+  /// [_notificationWriteTail], so a call that arrives while another is
+  /// still mid-loop waits for it to finish completely before writing a
+  /// single slot of its own, no matter
+  /// which caller either one is — and [cancelAll] rides the same queue,
   /// so a wipe cannot interleave with an apply either (backlog G-12).
   /// `DigestRescheduleController`'s own in-flight/queued bookkeeping
   /// (`_inFlightRecompute`/`_recomputeQueued`) is a separate, narrower
@@ -568,7 +628,7 @@ class NotificationScheduler {
         'Must be exactly digestHorizonSlots ($digestHorizonSlots)',
       );
     }
-    return _enqueueDigestWrite(
+    return _enqueueNotificationWrite(
       () => _applyDigestPlansNow(plans, actingMemberId),
     );
   }
@@ -578,7 +638,26 @@ class NotificationScheduler {
     String? actingMemberId,
   ) async {
     await ensureInitialized();
-    final l10n = lookupAppLocalizations(localeResolver());
+    await _writeDigestRange(
+      plans,
+      actingMemberId,
+      lookupAppLocalizations(localeResolver()),
+    );
+  }
+
+  /// Writes the digest id range: schedules where non-null, cancels where
+  /// null.
+  ///
+  /// Shared by [applyDigestPlans] and [applyPlans] so there is exactly one
+  /// implementation of the digest range rather than two that can drift.
+  /// Does NOT enqueue and does NOT initialize -- both callers have already
+  /// done each, and doing either here would put a suspension point inside a
+  /// serialized body or, worse, enqueue from inside the queue.
+  Future<void> _writeDigestRange(
+    List<DigestPlan?> plans,
+    String? actingMemberId,
+    AppLocalizations l10n,
+  ) async {
     for (var k = 0; k < plans.length; k++) {
       final plan = plans[k];
       final id = digestNotificationIdBase + k;
@@ -594,6 +673,7 @@ class NotificationScheduler {
           title: l10n.appTitle,
           body: _digestBody(l10n, plan),
           fireAt: plan.fireAt,
+          channelId: digestChannelId,
           channelName: l10n.notificationChannelDigestName,
           channelDescription: l10n.notificationChannelDigestDescription,
           payload: soleOccurrenceId == null
@@ -608,11 +688,108 @@ class NotificationScheduler {
     }
   }
 
-  /// Cancels every day of the digest horizon.
+  /// Rewrites ALL THREE notification id ranges -- the digest horizon, the
+  /// individual reminders and the evening re-reminder horizon -- inside a
+  /// SINGLE enqueued write (spec `docs/specs/notifications-n2.md` §9.2, D9).
   ///
-  /// Rides the same [_digestWriteTail] queue as [applyDigestPlans] (backlog
-  /// G-12), so a cancel and an apply can never interleave their writes to
-  /// the same [digestHorizonSlots] ids. Without that, a wipe
+  /// Not three enqueued writes: Rule D couples the digest's counts to the
+  /// reminders' arming, and two writes with a gap between them is a window
+  /// in which a chore is announced twice or not at all -- or in which a
+  /// `cancelAll` lands between the ranges and leaves half of them armed.
+  ///
+  /// A non-null entry is scheduled on its range's base plus its index; a
+  /// `null` entry cancels that id. Rewriting every id on every call is what
+  /// makes the whole thing self-correcting, exactly as [applyDigestPlans]
+  /// documents for the digest alone.
+  ///
+  /// Reminders and evening slots are scheduled **non-actionable and with no
+  /// payload**: their actions (`reminder.done`, `reminder.snooze`,
+  /// `evening.done`) and payload `v:2` are slice 7's, and
+  /// `docs/specs/notifications.md` forbids a new surface from reusing
+  /// [digestDoneActionId].
+  ///
+  /// Throws [ArgumentError] if any of the three lists is the wrong length.
+  Future<void> applyPlans(
+    NotificationPlanSet plans, {
+    String? actingMemberId,
+  }) {
+    _requireLength(plans.digest.length, digestHorizonSlots, 'digest');
+    _requireLength(plans.reminders.length, reminderCeiling, 'reminders');
+    _requireLength(plans.evening.length, eveningHorizonSlots, 'evening');
+    return _enqueueNotificationWrite(
+      () => _applyPlansNow(plans, actingMemberId),
+    );
+  }
+
+  Future<void> _applyPlansNow(
+    NotificationPlanSet plans,
+    String? actingMemberId,
+  ) async {
+    await ensureInitialized();
+    final l10n = lookupAppLocalizations(localeResolver());
+    await _writeDigestRange(plans.digest, actingMemberId, l10n);
+    for (var i = 0; i < plans.reminders.length; i++) {
+      final plan = plans.reminders[i];
+      final id = reminderNotificationIdBase + i;
+      if (plan == null) {
+        await plugin.cancel(id);
+      } else {
+        await plugin.zonedSchedule(
+          id: id,
+          // The chore title VERBATIM: user data, never localized. This is
+          // what makes an individual reminder actionable, and it is the
+          // whole of AC1 (spec `docs/specs/notifications-n2.md` §11).
+          title: plan.choreTitle,
+          // Two plain keys rather than date arithmetic inside a localized
+          // string. The armed date differs from the due date exactly when a
+          // snooze or a quiet-hours deferral moved it (§11).
+          body: PlainDate.fromDateTime(plan.fireAt) == plan.dueDate
+              ? l10n.reminderBodyDueToday
+              : l10n.reminderBodyStillOpen,
+          fireAt: plan.fireAt,
+          channelId: remindersChannelId,
+          channelName: l10n.notificationChannelRemindersName,
+          channelDescription: l10n.notificationChannelRemindersDescription,
+        );
+      }
+    }
+    for (var k = 0; k < plans.evening.length; k++) {
+      final plan = plans.evening[k];
+      final id = eveningNotificationIdBase + k;
+      if (plan == null) {
+        await plugin.cancel(id);
+      } else {
+        await plugin.zonedSchedule(
+          id: id,
+          title: l10n.appTitle,
+          body: l10n.eveningReminderBody(plan.openCount),
+          fireAt: plan.fireAt,
+          channelId: eveningChannelId,
+          channelName: l10n.notificationChannelEveningName,
+          channelDescription: l10n.notificationChannelEveningDescription,
+        );
+      }
+    }
+  }
+
+  void _requireLength(int actual, int expected, String name) {
+    if (actual != expected) {
+      throw ArgumentError.value(actual, '$name.length', 'Must be $expected');
+    }
+  }
+
+  /// Cancels every notification this app can have armed: the digest
+  /// horizon, every individual reminder and every evening slot (spec
+  /// `docs/specs/notifications-n2.md` §9.2).
+  ///
+  /// Widened from the digest-only `cancelDigest` it replaces, deliberately
+  /// and without leaving a narrow wrapper behind: a wipe that leaves
+  /// per-chore reminders armed is strictly worse than the digest case G-12
+  /// fixed, because a reminder NAMES a chore that no longer exists.
+  ///
+  /// Rides the same [_notificationWriteTail] queue as [applyPlans] and
+  /// [applyDigestPlans] (backlog G-12), so a cancel and an apply can never
+  /// interleave their writes to the same ids. Without that, a wipe
   /// (`lib/features/settings/reset_flow.dart`) racing the notification
   /// action's horizon rewrite (`rewriteDigestHorizon`) could finish its
   /// cancel loop while the apply was mid-loop, and the apply would then
@@ -622,24 +799,28 @@ class NotificationScheduler {
   /// Because the queue is FIFO by arrival, a cancel issued while an apply
   /// is in flight runs after it (nothing stays armed) and an apply issued
   /// while a cancel is in flight runs after it (a legitimate post-wipe
-  /// recompute still arms). See [_enqueueDigestWrite].
+  /// recompute still arms). See [_enqueueNotificationWrite].
   ///
-  /// One consequence for the wipe path, accepted deliberately: this may now
-  /// WAIT behind an in-flight apply, where before it proceeded immediately.
-  /// That path is documented as best-effort and must never block the wipe,
-  /// but it already awaited [ensureInitialized] -- i.e. a
-  /// `plugin.initialize()` platform call -- so the wipe already depended on
-  /// this plugin's calls returning; the `on Object` guard there was always
-  /// about a throw, not a hang. A timeout on the queue wait would
+  /// One consequence for the wipe path, accepted deliberately and unchanged
+  /// from G-12: this may WAIT behind an in-flight apply, where before it
+  /// proceeded immediately. That path is documented as best-effort and must
+  /// never block the wipe, but it already awaited [ensureInitialized] --
+  /// i.e. a `plugin.initialize()` platform call -- so the wipe already
+  /// depended on this plugin's calls returning; the `on Object` guard there
+  /// was always about a throw, not a hang. A timeout on the queue wait would
   /// reintroduce precisely the interleaving this fixes.
-  Future<void> cancelDigest() => _enqueueDigestWrite(_cancelDigestNow);
+  Future<void> cancelAll() => _enqueueNotificationWrite(_cancelAllNow);
 
-  Future<void> _cancelDigestNow() async {
+  Future<void> _cancelAllNow() async {
     // Inside the serialized body, not in front of the queue wait: an await
     // before the tail is captured would be a suspension point that
     // subverts the ordering. Same placement as _applyDigestPlansNow's.
     await ensureInitialized();
-    for (final id in digestNotificationIds) {
+    for (final id in [
+      ...digestNotificationIds,
+      ...reminderNotificationIds,
+      ...eveningNotificationIds,
+    ]) {
       await plugin.cancel(id);
     }
   }

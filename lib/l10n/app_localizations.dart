@@ -128,6 +128,48 @@ abstract class AppLocalizations {
   /// **'The once-a-day chores digest notification.'**
   String get notificationChannelDigestDescription;
 
+  /// Android notification channel name for per-chore reminders (spec docs/specs/notifications-n2.md §9.3), shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why remindersChannelId is versioned (_v1). Any change to this copy must mint a new channel id AND delete the one it replaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore reminders'**
+  String get notificationChannelRemindersName;
+
+  /// Android notification channel description for per-chore reminders, shown under notificationChannelRemindersName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders for individual chores at the time you chose.'**
+  String get notificationChannelRemindersDescription;
+
+  /// Android notification channel name for the evening re-reminder (spec docs/specs/notifications-n2.md §9.3). Same channel-id versioning constraint as notificationChannelRemindersName.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening reminder'**
+  String get notificationChannelEveningName;
+
+  /// Android notification channel description for the evening re-reminder, shown under notificationChannelEveningName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'An evening nudge when chores are still open today.'**
+  String get notificationChannelEveningDescription;
+
+  /// Body of a per-chore reminder notification whose armed date IS the chore's due date (spec docs/specs/notifications-n2.md §11). The notification's TITLE is the chore title verbatim (user data, not localized) -- that is what makes it actionable. Keep this short: it sits under the chore's own name.
+  ///
+  /// In en, this message translates to:
+  /// **'Due today'**
+  String get reminderBodyDueToday;
+
+  /// Body of a per-chore reminder notification whose armed date is LATER than the due date -- a snooze, or a quiet-hours deferral. Deliberately a second plain key rather than date arithmetic inside one string.
+  ///
+  /// In en, this message translates to:
+  /// **'Still open'**
+  String get reminderBodyStillOpen;
+
+  /// Body of the evening re-reminder notification (spec docs/specs/notifications-n2.md §11). count >= 1 by construction (a slot counting nothing is never scheduled), hence no zero branch -- and CLDR has no distinct zero category in en or de anyway.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore still open today} other{{count} chores still open today}}'**
+  String eveningReminderBody(int count);
+
   /// Daily digest notification body when there are due-today occurrences but nothing overdue.
   ///
   /// In en, this message translates to:
@@ -1166,7 +1208,7 @@ abstract class AppLocalizations {
   /// **'Open settings'**
   String get settingsDigestPermissionAction;
 
-  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet.
+  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness.
   ///
   /// In en, this message translates to:
   /// **'Export data'**

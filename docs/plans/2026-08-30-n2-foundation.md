@@ -219,6 +219,98 @@ spec line it serves.
      precisely that wrong implementation and requires it to go red.
    - **Slice 4 consumes it and cites §9.1**; it must never construct it.
 
+## Task 0 corrections (refresh pass, 2026-08-30, wave-7 implementer)
+
+Everything below was found by re-reading the code this plan cites, as it
+actually stands on `integration/wave-7` (`28d38bc`). Each is a correction to
+this plan, not a redesign of the spec.
+
+1. **§6's "quiet hours apply to the digest as well" was NOT planned.** The
+   spec is explicit — "Quiet hours apply to the **digest** as well, which is
+   a behaviour change to a shipped feature and so is stated deliberately" —
+   and D7 names the digest first in "deferred, never dropped". This plan's
+   self-review maps §6 onto Tasks 4 and 5, but Task 5 only *builds*
+   `applyQuietHours` and nothing ever applies it to a digest slot. That is an
+   omission, not a decision (no interpretation note claims it), so **Task 9
+   now shifts each digest slot moment through `applyQuietHours` before
+   computing that slot's counts**, and the counts are computed for the
+   SHIFTED date. Consequences, all checked:
+   - Slots stay pairwise distinct: slot `k` at 23:30 on day `k` defers to
+     07:00 on day `k+1`, and slot `k+1` defers to day `k+2`. Two slots can
+     never land on one date.
+   - Rule D stays coherent, because it was already keyed on a calendar date
+     that both channels compute the same way.
+   - Nothing ships changed: quiet hours default OFF, and the shipped 08:00
+     digest is outside the default 22:00–07:00 window anyway (§6's own
+     closing paragraph).
+   - `buildDigestPlans` (the digest-only wrapper) gets the shift too. Its two
+     callers already pass real `DeviceSettings`, so they stay consistent with
+     the recompute rather than drifting from it.
+
+2. **Task 11's "ONE enqueued write, not three" test cannot fail.** Its
+   assertion is that the later caller's title wins, and that is FIFO, which
+   holds in BOTH shapes: `_enqueueNotificationWrite` is synchronous, so
+   splitting `applyPlans` into three chained enqueues still leaves A's
+   reminder write ahead of B's reminder write. The test would stay green
+   through the very inversion it exists to catch — wave 6's failure shape
+   exactly. **Replaced** with a test of the property D9 actually names (a
+   *window* between two writes): gate the first `cancel`, let `applyPlans`
+   pause inside the digest range, enqueue `cancelAll()` behind it, release,
+   and assert `plugin.pending` is empty. With three sub-writes the reminder
+   and evening ranges are written AFTER the cancel and stay armed, so it goes
+   red. See Task 11 step 1.
+
+3. **Task 9's partition test skipped every `null` digest slot, which is a
+   hole in the invariant it exists to prove.** A `null` slot is a slot whose
+   counts are zero — that is an answer, not the absence of one — so the
+   identity must be asserted on it too. As written, an over-omitting Rule D
+   that drove a slot to zero would be silently skipped. The walk now derives
+   the slot moments independently (from `digestSlots`, shifted by
+   `applyQuietHours` per correction 1), asserts each non-null plan's `fireAt`
+   agrees with the derived moment, and treats a `null` plan as
+   `digestTotal == 0`.
+
+4. **`test/application/digest_plan_builder_test.dart` has no `_settings()`,
+   `_row()` or `_reminderAt()` helpers**, and its own doc comment says it is
+   integration-style on purpose: real in-memory `AppDatabase` + real
+   `ChoreService`, so `OccurrenceWithChore` rows are the exact shape
+   production makes. Task 9's partition fixture cannot be built that way — it
+   needs ~45 rows with DETERMINISTIC chore ids (D4's tiebreak is "lowest
+   chore id", and the ceiling test names a specific loser), and
+   `ChoreRepository.newId` hands out UUIDs. Resolution, recorded rather than
+   improvised: the new groups add hand-built `_row`/`_reminderAt` helpers
+   constructing `Chore`/`ChoreOccurrence` directly, and `_settings(...)` is a
+   `copyWith` over the REAL `ensureSettings()` row from `setUp` (never a
+   hand-built `DeviceSettings` literal, which would rot the moment a column
+   is added). Every pre-existing test in the file is left untouched and still
+   integration-style.
+
+5. **Task 13's fixture cannot set `reminder_minutes` through the service.**
+   `ChoreService.createChore` has no such parameter and adding one is slice
+   4's job (the chore form). Use `ChoreRepository.updateChore(id,
+   reminderMinutes: Value(1080))` instead — Task 2 adds exactly that.
+
+6. **`schema_migration_test.dart` has ELEVEN tests, ten of which rewind below
+   13** (`1 -> 2`, `3 -> 12`, `2 -> 12`, `5 -> 12`, `6 -> 12`, `7 -> 12`,
+   `8 -> 12`, `9 -> 12`, `10 -> 12`, `11 -> 12`, plus the fresh-database one
+   that rewinds nothing). Tasks 1–3 name only four of them. All ten need the
+   collateral drops, and the `10 -> 12` test — which the plan never mentions
+   — is one of them.
+
+7. **Task 4 step 4 inversion 2 is a compile guard, not a test red.** Removing
+   the five fields from `ensureSettings`'s hand-built `DeviceSettings`
+   literal fails at analysis because drift makes non-nullable columns
+   required constructor parameters. The plan says as much; it is recorded
+   here so it is not counted as inversion evidence. Inversion 1
+   (`setQuietHours` writing one end) is this task's real red.
+
+8. Line-number drift, all harmless and all corrected in place where a step
+   quotes one: `app_database.dart`'s `from < 12` block ends at ~140 (plan
+   says ~137); `projectDigestCounts` is at 157–190 (plan says 160–194);
+   `DigestRescheduleController._recompute` is at 1294–1322 (plan says
+   1290–1317). `ProjectedOccurrence.id`'s doc comment says "there are only
+   two construction sites in the tree" and becomes three — Task 6 updates it.
+
 ## Closed product decisions
 
 **OQ-P1 — Does the B1 backup document include `reminder_snoozes`? CLOSED
@@ -3544,6 +3636,7 @@ Then **the partition test**, in its own group:
       required String? recipientMemberId,
       required bool quietHoursEnabled,
       required DateTime now,
+      bool requireSilentSlot = false,
     }) {
       final plans = buildNotificationPlans(
         now: now,
@@ -3566,19 +3659,48 @@ Then **the partition test**, in its own group:
       ];
       final armed = plans.reminders.whereType<ReminderPlan>().toList();
 
+      // CORRECTED IN TASK 0. The original walk did `if (fireAt == null)
+      // continue;`, which skipped every SILENT slot -- and a silent slot's
+      // answer is "zero", not "no answer". An over-omitting Rule D that
+      // drove a slot to zero would have been silently skipped by the one
+      // test that exists to catch exactly that. So the slot moments are
+      // derived here instead, independently of whether a plan came back,
+      // and a `null` plan contributes a digestTotal of 0.
+      //
+      // The moments are `digestSlots` put through `applyQuietHours`,
+      // mirroring what `buildNotificationPlans` does (§6: quiet hours
+      // apply to the digest as well). `applyQuietHours` is not the
+      // function under test here -- it has its own unit tests in
+      // `test/domain/reminder_planner_test.dart` -- so re-using it is not
+      // an oracle that agrees with itself.
+      final moments = [
+        for (final moment in digestSlots(
+          now: now,
+          digestMinutes: settings.digestMinutes,
+        ))
+          applyQuietHours(
+            candidate: moment,
+            enabled: quietHoursEnabled,
+            startMinutes: settings.quietStartMinutes,
+            endMinutes: settings.quietEndMinutes,
+          ),
+      ];
+      expect(moments, hasLength(plans.digest.length));
+
       var sawAnArmedDate = false;
       var sawANonSilentSlot = false;
-      for (final digestPlan in plans.digest) {
-        // A null slot is a SILENT slot: counts of zero, not "no answer".
-        // The slot dates are the only dates on which the digest has an
-        // answer at all, so the identity is asserted over exactly those.
-        // (A reminder can be armed on a date with no slot -- today, when
-        // the digest time has already passed. That is still XOR-true: it
-        // is armed and it is not counted. It simply is not a date this
-        // identity can speak about.)
-        final fireAt = digestPlan?.fireAt;
-        if (fireAt == null) {
-          continue;
+      var sawASilentSlot = false;
+      for (var k = 0; k < moments.length; k++) {
+        final digestPlan = plans.digest[k];
+        final fireAt = moments[k];
+        if (digestPlan != null) {
+          expect(
+            digestPlan.fireAt,
+            fireAt,
+            reason: 'slot $k fired at a moment the caller cannot predict',
+          );
+        } else {
+          sawASilentSlot = true;
         }
         final date = PlainDate.fromDateTime(fireAt);
         final oracle = oracleCountedOn(projected, date, recipientMemberId);
@@ -3586,7 +3708,11 @@ Then **the partition test**, in its own group:
             .where((plan) => PlainDate.fromDateTime(plan.fireAt) == date)
             .map((plan) => plan.occurrenceId)
             .toSet();
-        final digestTotal = digestPlan.dueTodayCount + digestPlan.overdueCount;
+        // A null plan is a slot that counted ZERO -- an answer, not the
+        // absence of one.
+        final digestTotal = digestPlan == null
+            ? 0
+            : digestPlan.dueTodayCount + digestPlan.overdueCount;
 
         // (a) NEVER NEITHER, half one: an armed reminder is always for
         //     something this date's digest would otherwise have reported.
@@ -3627,6 +3753,16 @@ Then **the partition test**, in its own group:
           reason: 'a walk in which no reminder is ever armed proves nothing');
       expect(sawANonSilentSlot, isTrue,
           reason: 'a walk in which the digest never speaks proves nothing');
+      // Coverage rather than vacuity, added in Task 0. `mixedPending`
+      // cannot produce a silent slot -- a one-off stays overdue forever,
+      // so once anything is due every later slot has something to say --
+      // which is precisely why the silent-slot branch needs a fixture of
+      // its own (the last test in this group). Only that one asks for it.
+      if (requireSilentSlot) {
+        expect(sawASilentSlot, isTrue,
+            reason: 'the fixture must reach at least one silent slot, '
+                'since skipping those was the hole Task 0 closed');
+      }
     }
 
     // A mixed set covering every projection path AND every §2-§6 rule at
@@ -3717,16 +3853,55 @@ Then **the partition test**, in its own group:
         now: DateTime(2026, 8, 30, 20),
       );
     });
+
+    test('holds across SILENT slots too -- a slot that counts zero has an '
+        'answer, and §2.5 says the digest goes silent on exactly the date '
+        'a reminder speaks for it', () {
+      // Everything is far enough out that the horizon opens with genuinely
+      // empty slots. `mixedPending` cannot do this: a one-off stays
+      // overdue forever, so once anything is due every later slot speaks.
+      expectPartition(
+        pending: [
+          _row(id: 'later', choreId: 'c-later', dueDate: PlainDate(2026, 9, 5)),
+          _row(id: 'later-rem', choreId: 'c-later-rem',
+              dueDate: PlainDate(2026, 9, 8), reminderMinutes: 1080),
+        ],
+        recipientMemberId: null,
+        quietHoursEnabled: false,
+        now: DateTime(2026, 8, 30, 9),
+        requireSilentSlot: true,
+      );
+    });
   });
 ```
 
-You will need two small fixture helpers in this file if it does not already
-have them — `_settings({bool quietHoursEnabled = false})` returning a
-`DeviceSettings` literal, `_row(...)` returning an `OccurrenceWithChore`, and
-`_reminderAt(row, minutes)` returning a copy with a different
-`chore.reminderMinutes`. **Read the top of
-`test/application/digest_plan_builder_test.dart` and extend whatever is
-already there rather than adding a parallel set.**
+**CORRECTED IN TASK 0 — the helpers do not exist and the file is
+deliberately integration-style.** `test/application/digest_plan_builder_test
+.dart` builds every `OccurrenceWithChore` through a real in-memory
+`AppDatabase` + real `ChoreService`, and its own doc comment says why:
+"rather than hand-built drift rows that could drift from it". That cannot
+serve this group — the partition fixture needs ~45 rows with DETERMINISTIC
+chore ids (D4's tiebreak is "lowest chore id" and the ceiling test names a
+specific loser), and `ChoreRepository.newId` hands out UUIDs.
+
+So add these three helpers, and say at the top of the new groups that they
+are hand-built on purpose:
+
+- `_row({required String id, required PlainDate dueDate, String? choreId,
+  String choreTitle = 'Chore', int? reminderMinutes, PlainDate? startDate,
+  Recurrence? recurrence, String? assignedMemberId})` — constructs
+  `OccurrenceWithChore` from a `Chore` and a `ChoreOccurrence` literal
+  directly. `choreId` defaults to `id`.
+- `_reminderAt(OccurrenceWithChore row, int minutes)` — returns a copy with
+  `chore: row.chore.copyWith(reminderMinutes: Value(minutes))`.
+- `_settings({bool quietHoursEnabled = false, int? digestMinutes})` —
+  **`settings.copyWith(...)` over the REAL `ensureSettings()` row from
+  `setUp`**, never a hand-built `DeviceSettings` literal. A literal would
+  have to be edited every time any column is added to `settings`, and would
+  silently disagree with the schema's own defaults in between.
+
+Leave every pre-existing test in the file exactly as it is: they stay
+integration-style, and this group is the only hand-built one.
 
 - [ ] **Step 2: Run and watch it go RED**
 
@@ -3859,7 +4034,88 @@ implementation — extract its `ProjectedOccurrence` mapping into
 `List<ProjectedOccurrence> _projected(List<OccurrenceWithChore> pending)` and
 its slot loop into `List<DigestPlan?> _digestPlans({...required Map<String,
 PlainDate> armedReminderDates})`, then make `buildDigestPlans` call them with
-`armedReminderDates: const {}`. Add to `buildDigestPlans`'s doc comment:
+`armedReminderDates: const {}`.
+
+**`_digestPlans` puts every slot moment through `applyQuietHours` before
+using it** (ADDED IN TASK 0 — see correction 1; §6 says in as many words
+that "quiet hours apply to the **digest** as well", and D7 names the digest
+first in "deferred, never dropped", but no task in this plan applied it):
+
+```dart
+  for (final rawFireAt in digestSlots(
+    now: now,
+    digestMinutes: settings.digestMinutes,
+  )) {
+    // Spec §6/D7: quiet hours DEFER the digest, never drop it -- the
+    // evening re-reminder is the sole exception and it lives in
+    // `planEveningSlots`. The counts are then computed for the SHIFTED
+    // date, because the slot now speaks on that date and Rule D is keyed
+    // on the date each channel actually fires on.
+    //
+    // Two slots can never collide: slot k at 23:30 on day k defers to
+    // 07:00 on day k+1, and slot k+1 defers to day k+2.
+    //
+    // Nothing ships changed by this: quiet hours default OFF, and the
+    // shipped 08:00 digest is outside the default 22:00-07:00 window
+    // anyway (§6's closing paragraph).
+    final fireAt = applyQuietHours(
+      candidate: rawFireAt,
+      enabled: settings.quietHoursEnabled,
+      startMinutes: settings.quietStartMinutes,
+      endMinutes: settings.quietEndMinutes,
+    );
+    ...
+```
+
+Add three tests for it to the `buildNotificationPlans` group:
+
+```dart
+    test('quiet hours DEFER a digest slot rather than dropping it (§6, '
+        'D7) -- and the counts follow it onto the shifted date', () {
+      final plans = buildNotificationPlans(
+        now: DateTime(2026, 8, 30, 9),
+        // 23:30 digest, inside the default 22:00-07:00 window.
+        settings: _settings(quietHoursEnabled: true, digestMinutes: 1410),
+        pending: [_row(id: 'o1', dueDate: PlainDate(2026, 8, 31))],
+        recipientMemberId: null,
+      );
+      expect(plans.digest.first!.fireAt, DateTime(2026, 8, 31, 7));
+      expect(
+        plans.digest.first!.dueTodayCount,
+        1,
+        reason: 'the slot deferred onto the 31st, so it must count the '
+            "31st's work, not the 30th's",
+      );
+    });
+
+    test('...and a digest slot OUTSIDE the window is untouched, which is '
+        'every shipped install: 08:00 is outside 22:00-07:00', () {
+      final plans = buildNotificationPlans(
+        now: DateTime(2026, 8, 30, 9),
+        settings: _settings(quietHoursEnabled: true),
+        pending: [_row(id: 'o1', dueDate: PlainDate(2026, 8, 31))],
+        recipientMemberId: null,
+      );
+      expect(plans.digest.first!.fireAt, DateTime(2026, 8, 31, 8));
+    });
+
+    test('quiet hours OFF leave a late digest exactly where it was -- the '
+        'shift is opt-in, so v0.8.0 behaviour is byte-identical', () {
+      final plans = buildNotificationPlans(
+        now: DateTime(2026, 8, 30, 9),
+        settings: _settings(digestMinutes: 1410),
+        pending: [_row(id: 'o1', dueDate: PlainDate(2026, 8, 30))],
+        recipientMemberId: null,
+      );
+      expect(plans.digest.first!.fireAt, DateTime(2026, 8, 30, 23, 30));
+    });
+```
+
+and a fourth inversion at step 4: drop the `applyQuietHours` call from
+`_digestPlans`. **Expected RED:** *quiet hours DEFER a digest slot* fails
+with `Expected: <2026-08-31 07:00:00.000> Actual: <2026-08-31 23:30:00.000>`.
+
+Add to `buildDigestPlans`'s doc comment:
 
 ```dart
 /// **Rule D is deliberately NOT applied here** (`armedReminderDates` is
@@ -4225,44 +4481,21 @@ Add a group to `test/application/notification_scheduler_test.dart`:
       );
     });
 
-    test('ONE enqueued write, not three (D9): Rule D couples the ranges, '
-        'so a gap between two writes is a window in which a chore is '
-        'announced twice or not at all', () async {
-      // The gated plugin pauses the FIRST schedule call. If applyPlans
-      // enqueued three writes, a second apply arriving now would interleave
-      // into the ranges the first has not reached yet.
-      final gatedPlugin = _GatedPlugin();
-      final gated = NotificationScheduler(
-        plugin: gatedPlugin,
-        localeResolver: () => const Locale('en'),
-      );
-      final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
-      reminders[0] = ReminderPlan(
-        fireAt: DateTime(2026, 8, 30, 18),
-        occurrenceId: 'o1',
-        choreId: 'c1',
-        choreTitle: 'First',
-        dueDate: PlainDate(2026, 8, 30),
-      );
-      final second = List<ReminderPlan?>.filled(reminderCeiling, null);
-      second[0] = ReminderPlan(
-        fireAt: DateTime(2026, 8, 30, 18),
-        occurrenceId: 'o1',
-        choreId: 'c1',
-        choreTitle: 'Second',
-        dueDate: PlainDate(2026, 8, 30),
-      );
-      final callA = gated.applyPlans(planSet(reminders: reminders));
-      final callB = gated.applyPlans(planSet(reminders: second));
-      gatedPlugin.release();
-      await Future.wait([callA, callB]);
-      expect(
-        gatedPlugin.pending[reminderNotificationIdBase]!.title,
-        'Second',
-        reason: 'FIFO by arrival: the later caller holds the later view of '
-            'the world and gets the last word',
-      );
-    });
+    // CORRECTED IN TASK 0: the "ONE enqueued write, not three (D9)" test
+    // that stood here asserted that the later of two concurrent applies
+    // wins the reminder range. That is FIFO, and FIFO holds in BOTH shapes
+    // -- the enqueue is synchronous, so three chained sub-writes still
+    // leave A's reminder write ahead of B's. It could not fail through the
+    // very inversion it existed to catch, which is wave 6's failure shape.
+    // Two all-`applyPlans` callers cannot discriminate either: B's own
+    // per-range sub-writes land behind A's, range by range, and the end
+    // state is identical.
+    //
+    // What actually distinguishes one write from three is that three leave
+    // GAPS a DIFFERENT KIND of write can be scheduled into -- and the only
+    // other write is `cancelAll`, which arrives in Task 12. The replacement
+    // test therefore lives in **Task 12 step 1**, where it can exist at
+    // all. Nothing about D9 is untested; it is tested one task later.
 
     test('rejects a plan set whose lists are the wrong length', () {
       expect(
@@ -4404,13 +4637,7 @@ In `lib/application/notification_scheduler.dart`:
 
 Expected: all pass.
 
-1. Split `applyPlans` into three separate `_enqueueNotificationWrite` calls.
-   **Expected RED at the test step:** *ONE enqueued write, not three* fails
-   with `Expected: 'Second' Actual: 'First'` — with three enqueued writes,
-   B's digest write is queued behind A's digest write but A's reminder write
-   is queued behind B's digest write, so the interleaving puts A last on the
-   reminder range.
-2. Change the reminder body to always use `l10n.reminderBodyDueToday`.
+1. Change the reminder body to always use `l10n.reminderBodyDueToday`.
    **Expected RED:** *a reminder armed LATER than its due date* fails with
    `Expected: 'Still open' Actual: 'Due today'`.
 
@@ -4468,6 +4695,56 @@ currently line 610:
 Add:
 
 ```dart
+    test('ONE enqueued write, not three (D9): a wipe arriving DURING an '
+        'apply must leave nothing armed in any range -- three enqueued '
+        'writes would leave gaps for it to land in, and Rule D couples '
+        'the ranges (spec docs/specs/notifications-n2.md §9.2)', () async {
+      // MOVED HERE IN TASK 0 from Task 11, where `cancelAll` did not yet
+      // exist. The version that stood in Task 11 asserted that the later
+      // of two concurrent applies wins the reminder range -- that is FIFO,
+      // it holds in both shapes, and the test could not fail.
+      //
+      // Gate the first `cancel`, which pauses `applyPlans` inside its
+      // DIGEST range (the digest list here is all-null, so its first act
+      // is a cancel). Then enqueue `cancelAll()` behind it. With ONE write
+      // the cancel waits for all three ranges and clears everything. With
+      // THREE, the reminder and evening sub-writes are only enqueued once
+      // the digest sub-write completes -- i.e. BEHIND the cancel -- so
+      // they arm ids the wipe has already cleared.
+      final gatedPlugin = _GatedPlugin(target: _DigestCall.cancel);
+      final gated = NotificationScheduler(
+        plugin: gatedPlugin,
+        localeResolver: () => const Locale('en'),
+      );
+      final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
+      reminders[0] = ReminderPlan(
+        fireAt: DateTime(2026, 8, 30, 18),
+        occurrenceId: 'o1',
+        choreId: 'c1',
+        choreTitle: 'Bins',
+        dueDate: PlainDate(2026, 8, 30),
+      );
+      final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+      evening[0] = EveningPlan(fireAt: DateTime(2026, 8, 30, 20), openCount: 1);
+
+      final apply = gated.applyPlans(
+        NotificationPlanSet(
+          digest: List<DigestPlan?>.filled(digestHorizonSlots, null),
+          reminders: reminders,
+          evening: evening,
+          reminderOverflowCount: 0,
+        ),
+      );
+      // Let the apply actually reach the gate, so the wipe arrives
+      // mid-apply rather than before it.
+      await pumpEventQueue();
+      final wipe = gated.cancelAll();
+      gatedPlugin.release();
+      await Future.wait([apply, wipe]);
+
+      expect(gatedPlugin.pending, isEmpty);
+    });
+
     test('leaves nothing armed in ANY range', () async {
       final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
       reminders[0] = ReminderPlan(
@@ -4589,10 +4866,17 @@ flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= \
 
 Expected: all pass.
 
-Invert: make `_cancelAllNow` iterate `digestNotificationIds` only. **Expected
-RED at the test step:** *cancels every id in all three ranges* fails with
-`Expected: <64> Actual: <24>`, and *leaves nothing armed in ANY range* fails
-with `Expected: empty Actual: {2001: ..., 3001: ...}`. Restore.
+1. Make `_cancelAllNow` iterate `digestNotificationIds` only. **Expected
+   RED at the test step:** *cancels every id in all three ranges* fails with
+   `Expected: <64> Actual: <24>`, and *leaves nothing armed in ANY range*
+   fails with `Expected: empty Actual: {2001: ..., 3001: ...}`. Restore.
+2. Split `applyPlans` into three separate `_enqueueNotificationWrite` calls
+   (one per range, each awaited in turn). **Expected RED at the test step:**
+   *ONE enqueued write, not three (D9)* fails with
+   `Expected: empty Actual: {2001: ..., 3001: ...}` — the reminder and
+   evening sub-writes are enqueued behind the wipe and arm ids it already
+   cleared. Restore. **This is the only test in the plan that discriminates
+   on D9; if it does not go red, fix it before this task is done.**
 
 - [ ] **Step 5: Analyze and commit**
 
@@ -4769,7 +5053,13 @@ In `test/app/digest_reschedule_test.dart`, add:
     'which a chore is announced twice or not at all',
     (tester) async {
       // (build the container the way this file's existing tests do, create
-      // a chore with a reminder_minutes and one without, then:)
+      // two chores through `choreServiceProvider`, then give one of them a
+      // reminder via
+      // `container.read(choreRepositoryProvider).updateChore(id,
+      // reminderMinutes: const Value(1080))` -- CORRECTED IN TASK 0:
+      // `ChoreService.createChore` has no `reminderMinutes` parameter and
+      // adding one is slice 4's job, so the repository is the right seam
+      // here. Then:)
       await tester.pump(digestRescheduleDebounce);
 
       // One apply writes every id exactly once: schedules plus cancels.

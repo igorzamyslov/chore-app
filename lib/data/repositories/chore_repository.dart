@@ -124,6 +124,7 @@ class ChoreRepository {
     Recurrence? recurrence,
     List<String> assigneeMemberIds = const [],
     String? createdBy,
+    int? reminderMinutes,
   }) async {
     _validateAssignees(assignmentMode, assigneeMemberIds);
     final now = _isoNow();
@@ -141,6 +142,7 @@ class ChoreRepository {
               recurrence: Value(recurrence),
               startDate: startDate,
               assignmentMode: assignmentMode,
+              reminderMinutes: Value(reminderMinutes),
               createdBy: Value(createdBy),
               createdAt: now,
               updatedAt: now,
@@ -157,6 +159,7 @@ class ChoreRepository {
         recurrence: recurrence,
         startDate: startDate,
         assignmentMode: assignmentMode,
+        reminderMinutes: reminderMinutes,
         createdBy: createdBy,
         createdAt: now,
         updatedAt: now,
@@ -168,12 +171,16 @@ class ChoreRepository {
   /// Updates the given fields of an existing chore.
   ///
   /// [title], [startDate], and [assignmentMode] are plain "leave unchanged
-  /// if omitted" parameters. [notes], [categoryId], and [recurrence] are
-  /// themselves nullable in the schema, so a bare `null` would be
-  /// ambiguous between "unchanged" and "clear it"; they use drift's
-  /// `Value` wrapper instead — omit the parameter (default
+  /// if omitted" parameters. [notes], [categoryId], [recurrence] and
+  /// [reminderMinutes] are themselves nullable in the schema, so a bare
+  /// `null` would be ambiguous between "unchanged" and "clear it"; they use
+  /// drift's `Value` wrapper instead — omit the parameter (default
   /// `Value.absent()`) to leave it unchanged, or pass `Value(null)` to
-  /// write `NULL`.
+  /// write `NULL`. For [reminderMinutes] that distinction is not academic:
+  /// `Value(null)` is exactly what turning the chore form's reminder switch
+  /// off writes (spec `docs/specs/notifications-n2.md` §2.1), since the
+  /// opt-in and the time are one column rather than a flag beside a
+  /// value.
   ///
   /// If [assigneeMemberIds] is provided, it replaces the chore's assignee
   /// list (preserving the given order as rotation position). The same
@@ -189,6 +196,7 @@ class ChoreRepository {
     Value<Recurrence?> recurrence = const Value.absent(),
     PlainDate? startDate,
     AssignmentMode? assignmentMode,
+    Value<int?> reminderMinutes = const Value.absent(),
     List<String>? assigneeMemberIds,
   }) async {
     await db.transaction(() async {
@@ -212,6 +220,7 @@ class ChoreRepository {
           assignmentMode: assignmentMode != null
               ? Value(assignmentMode)
               : const Value.absent(),
+          reminderMinutes: reminderMinutes,
           updatedAt: Value(_isoNow()),
           syncDirty: syncDirtyOnWrite,
         ),

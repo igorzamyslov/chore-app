@@ -27,6 +27,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'The once-a-day chores digest notification.';
 
   @override
+  String get notificationChannelRemindersName => 'Chore reminders';
+
+  @override
+  String get notificationChannelRemindersDescription =>
+      'Reminders for individual chores at the time you chose.';
+
+  @override
+  String get notificationChannelEveningName => 'Evening reminder';
+
+  @override
+  String get notificationChannelEveningDescription =>
+      'An evening nudge when chores are still open today.';
+
+  @override
+  String get reminderBodyDueToday => 'Due today';
+
+  @override
+  String get reminderBodyStillOpen => 'Still open';
+
+  @override
+  String eveningReminderBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chores still open today',
+      one: '1 chore still open today',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String notificationDigestDueOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

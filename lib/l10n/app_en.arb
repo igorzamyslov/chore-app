@@ -27,6 +27,40 @@
   "@notificationChannelDigestDescription": {
     "description": "Android notification channel description for the daily digest, shown under notificationChannelDigestName in system Settings."
   },
+  "notificationChannelRemindersName": "Chore reminders",
+  "@notificationChannelRemindersName": {
+    "description": "Android notification channel name for per-chore reminders (spec docs/specs/notifications-n2.md §9.3), shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why remindersChannelId is versioned (_v1). Any change to this copy must mint a new channel id AND delete the one it replaces."
+  },
+  "notificationChannelRemindersDescription": "Reminders for individual chores at the time you chose.",
+  "@notificationChannelRemindersDescription": {
+    "description": "Android notification channel description for per-chore reminders, shown under notificationChannelRemindersName in system Settings."
+  },
+  "notificationChannelEveningName": "Evening reminder",
+  "@notificationChannelEveningName": {
+    "description": "Android notification channel name for the evening re-reminder (spec docs/specs/notifications-n2.md §9.3). Same channel-id versioning constraint as notificationChannelRemindersName."
+  },
+  "notificationChannelEveningDescription": "An evening nudge when chores are still open today.",
+  "@notificationChannelEveningDescription": {
+    "description": "Android notification channel description for the evening re-reminder, shown under notificationChannelEveningName in system Settings."
+  },
+  "reminderBodyDueToday": "Due today",
+  "@reminderBodyDueToday": {
+    "description": "Body of a per-chore reminder notification whose armed date IS the chore's due date (spec docs/specs/notifications-n2.md §11). The notification's TITLE is the chore title verbatim (user data, not localized) -- that is what makes it actionable. Keep this short: it sits under the chore's own name."
+  },
+  "reminderBodyStillOpen": "Still open",
+  "@reminderBodyStillOpen": {
+    "description": "Body of a per-chore reminder notification whose armed date is LATER than the due date -- a snooze, or a quiet-hours deferral. Deliberately a second plain key rather than date arithmetic inside one string."
+  },
+  "eveningReminderBody": "{count, plural, one{1 chore still open today} other{{count} chores still open today}}",
+  "@eveningReminderBody": {
+    "description": "Body of the evening re-reminder notification (spec docs/specs/notifications-n2.md §11). count >= 1 by construction (a slot counting nothing is never scheduled), hence no zero branch -- and CLDR has no distinct zero category in en or de anyway.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
   "notificationDigestDueOnly": "{count, plural, one{1 chore today} other{{count} chores today}}",
   "@notificationDigestDueOnly": {
     "description": "Daily digest notification body when there are due-today occurrences but nothing overdue.",
@@ -1005,7 +1039,7 @@
 
   "settingsExportEntry": "Export data",
   "@settingsExportEntry": {
-    "description": "Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet."
+    "description": "Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness."
   },
   "settingsExportError": "Couldn't export your data. Please try again.",
   "@settingsExportError": {

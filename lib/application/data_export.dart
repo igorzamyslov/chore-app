@@ -20,6 +20,16 @@ const int dataExportFormat = 1;
 /// Every exported table, in FK-parent-first order -- also the order they
 /// appear under the document's `tables` key -- using their raw SQL names
 /// (spec `docs/specs/polish-round-1.md` B1 lists this exact key set).
+///
+/// `reminder_snoozes` (schema v13) is deliberately NOT here, decided
+/// 2026-08-30: a snooze is device-scoped, transient NOTIFICATION
+/// bookkeeping -- "I pushed this notification to tomorrow" -- not household
+/// data. This document exists so a user keeps the things they created, and
+/// restoring a snooze would resurrect a deferral against an occurrence that
+/// may no longer exist, or that another device completed in the meantime,
+/// which is worse than losing it. Its absence costs the user nothing they
+/// would notice. See "Closed product decisions" in
+/// `docs/plans/2026-08-30-n2-foundation.md` before adding it.
 const List<String> exportedTableNames = [
   'households',
   'members',

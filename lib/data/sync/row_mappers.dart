@@ -103,6 +103,7 @@ Map<String, Object?> choreRow(Chore chore) => {
   'start_date': chore.startDate.toIso8601(),
   'assignment_mode': chore.assignmentMode.name,
   'paused_at': chore.pausedAt,
+  'reminder_minutes': chore.reminderMinutes,
   'created_by': chore.createdBy,
   'created_at': chore.createdAt,
   'updated_at': chore.updatedAt,
@@ -125,6 +126,12 @@ Chore choreFromRow(Map<String, Object?> row) => Chore(
     row['assignment_mode']! as String,
   ),
   pausedAt: row['paused_at'] as String?,
+  // `as num?` rather than `as int?`, matching how `color`/`sort_order`
+  // already tolerate PostgREST's JSON numbers. A MISSING key yields `null`
+  // here too, which is the mixed-version tolerance spec
+  // `docs/specs/notifications-n2.md` §8.2 point 3 requires: an un-migrated
+  // server simply does not send the column.
+  reminderMinutes: (row['reminder_minutes'] as num?)?.toInt(),
   createdBy: row['created_by'] as String?,
   createdAt: row['created_at']! as String,
   updatedAt: row['updated_at']! as String,

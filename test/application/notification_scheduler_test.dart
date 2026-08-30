@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/domain/digest_planner.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_digest_notification_plugin.dart';
@@ -63,6 +66,7 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -74,6 +78,7 @@ class _GatedPlugin extends FakeDigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,
@@ -116,6 +121,7 @@ class _ThrowingOncePlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -130,6 +136,7 @@ class _ThrowingOncePlugin extends FakeDigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,
@@ -160,23 +167,75 @@ void main() {
   });
 
   group('the notification id budget', () {
-    test("the digest leaves at least 32 of iOS's 64 pending slots for "
-        'per-chore reminders', () {
-      // iOS caps an app at 64 pending notifications. The number the digest
-      // actually competes with is NOT 64 -- it is whatever N2 / per-chore
-      // reminders (backlog G-6 / F16) will need, and those are unbuilt, so
-      // nothing else can defend their share. Raising the horizon past this
-      // guard means renegotiating that split, not editing this number.
-      // Documented in docs/specs/notifications.md, "Notification id
-      // budget".
-      expect(
-        digestHorizonSlots,
-        lessThanOrEqualTo(32),
-        reason:
-            "at least 32 of iOS's 64 pending notification slots must stay "
-            'available for N2 / per-chore reminders (backlog G-6 / F16)',
-      );
-    });
+    test(
+      'the three ranges spend at most the 64 ids iOS allows, computed from '
+      'the constants rather than from literals (spec '
+      'docs/specs/notifications-n2.md §3.3)',
+      () {
+        // REPLACES `digestHorizonSlots <= 32`, deliberately and not by
+        // deletion. That guard's job was to make N2 renegotiate the split
+        // explicitly rather than let the digest eat it; N2 IS that
+        // renegotiation, and deleting the guard instead of replacing it
+        // would leave the 64 undefended for the first time since N1.
+        //
+        // The total is now EXACTLY 64 and there is no slack left. Anything
+        // new must take ids from one of these three ranges, by amending
+        // §3.1's table.
+        expect(
+          digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          lessThanOrEqualTo(64),
+          reason:
+              'iOS caps an app at 64 pending notifications, and all three '
+              'ranges are now spent against it',
+        );
+      },
+    );
+
+    test(
+      'the three id ranges are pairwise disjoint -- the bases are '
+      'deliberately far apart (1001/2001/3001) so an off-by-one inside one '
+      'range cannot silently land in another',
+      () {
+        final ranges = {
+          'digest': digestNotificationIds.toSet(),
+          'reminders': reminderNotificationIds.toSet(),
+          'evening': eveningNotificationIds.toSet(),
+        };
+        for (final a in ranges.entries) {
+          for (final b in ranges.entries) {
+            if (a.key == b.key) {
+              continue;
+            }
+            expect(
+              a.value.intersection(b.value),
+              isEmpty,
+              reason: '${a.key} and ${b.key} overlap',
+            );
+          }
+        }
+        // ...and nothing is double-counted in the sum above.
+        expect(
+          ranges.values.expand((ids) => ids).toSet(),
+          hasLength(
+            digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          ),
+        );
+      },
+    );
+
+    test(
+      'reminder and evening ids are exactly consecutive from their bases',
+      () {
+        expect(reminderNotificationIds, [
+          for (var i = 0; i < reminderCeiling; i++)
+            reminderNotificationIdBase + i,
+        ]);
+        expect(eveningNotificationIds, [
+          for (var k = 0; k < eveningHorizonSlots; k++)
+            eveningNotificationIdBase + k,
+        ]);
+      },
+    );
 
     test('the ids are exactly digestHorizonSlots consecutive ids from the '
         'base', () {
@@ -536,6 +595,23 @@ void main() {
   });
 
   group('notification channel (backlog E-1)', () {
+    test(
+      'the reminder and evening channel ids are minted fresh and are '
+      "distinct from the digest's -- Android caches channel copy at "
+      'creation and cannot rename, so reusing digest_v2 would give these '
+      "two the digest's name forever (spec "
+      'docs/specs/notifications-n2.md §9.3)',
+      () {
+        expect(remindersChannelId, 'reminders_v1');
+        expect(eveningChannelId, 'evening_v1');
+        expect({
+          digestChannelId,
+          remindersChannelId,
+          eveningChannelId,
+        }, hasLength(3));
+      },
+    );
+
     List<DigestPlan?> onlySlotZero() => [
       DigestPlan(
         fireAt: DateTime(2026, 7, 25, 8),
@@ -551,6 +627,15 @@ void main() {
       'reach an existing install on a NEW id',
       () {
         expect(digestChannelId, 'digest_v2');
+      },
+    );
+
+    test(
+      'the digest still schedules on its OWN channel now that the seam '
+      "carries a channel id -- E-1's localized name must not move",
+      () async {
+        await scheduler.applyDigestPlans(onlySlotZero());
+        expect(plugin.scheduledCalls.single.channelId, digestChannelId);
       },
     );
 
@@ -599,26 +684,38 @@ void main() {
     );
   });
 
-  group('cancelDigest', () {
+  group('cancelAll', () {
     test('initializes the plugin implicitly if not done already', () async {
-      await scheduler.cancelDigest();
+      await scheduler.cancelAll();
       expect(plugin.initializeCallCount, 1);
     });
 
-    test('cancels every id in the horizon, not just the first', () async {
-      await scheduler.cancelDigest();
-      expect(plugin.cancelCallCount, digestHorizonSlots);
-      // Derived from the constant rather than hard-coded, so this survives
-      // a change to the horizon's size: the ids are exactly
-      // `digestNotificationIdBase` and the `digestHorizonSlots - 1`
-      // consecutive ids after it.
-      expect(digestNotificationIds, hasLength(digestHorizonSlots));
-      expect(digestNotificationIds.first, digestNotificationIdBase);
-      expect(digestNotificationIds, [
-        for (var k = 0; k < digestHorizonSlots; k++)
-          digestNotificationIdBase + k,
-      ]);
-    });
+    test(
+      'cancels every id in all three ranges -- all 64 -- because a wipe '
+      'that leaves per-chore reminders armed is strictly worse than the '
+      'digest case G-12 fixed: a reminder NAMES a chore that no longer '
+      'exists (spec docs/specs/notifications-n2.md §9.2)',
+      () async {
+        await scheduler.cancelAll();
+        expect(
+          plugin.cancelCallCount,
+          digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+        );
+        expect(
+          digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          64,
+          reason: 'the whole iOS budget, spent exactly (§3.1)',
+        );
+        // Derived from the constants rather than hard-coded, so this
+        // survives a change to any range's size.
+        expect(digestNotificationIds, hasLength(digestHorizonSlots));
+        expect(digestNotificationIds.first, digestNotificationIdBase);
+        expect(digestNotificationIds, [
+          for (var k = 0; k < digestHorizonSlots; k++)
+            digestNotificationIdBase + k,
+        ]);
+      },
+    );
 
     test('leaves nothing armed', () async {
       await scheduler.applyDigestPlans([
@@ -629,18 +726,104 @@ void main() {
             overdueCount: 0,
           ),
       ]);
-      await scheduler.cancelDigest();
+      await scheduler.cancelAll();
       expect(plugin.pending, isEmpty);
     });
 
+    test('leaves nothing armed in ANY range', () async {
+      final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
+      reminders[0] = ReminderPlan(
+        fireAt: DateTime(2026, 8, 30, 18),
+        occurrenceId: 'o1',
+        choreId: 'c1',
+        choreTitle: 'Bins',
+        dueDate: PlainDate(2026, 8, 30),
+      );
+      final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+      evening[0] = EveningPlan(
+        fireAt: DateTime(2026, 8, 30, 20),
+        openCount: 1,
+      );
+      await scheduler.applyPlans(
+        NotificationPlanSet(
+          digest: List<DigestPlan?>.filled(digestHorizonSlots, null),
+          reminders: reminders,
+          evening: evening,
+          reminderOverflowCount: 0,
+        ),
+      );
+      expect(plugin.pending, isNotEmpty);
+
+      await scheduler.cancelAll();
+      expect(plugin.pending, isEmpty);
+    });
+
+    test(
+      'ONE enqueued write, not three (D9): a wipe arriving DURING an apply '
+      'must leave nothing armed in any range -- three enqueued writes would '
+      'leave gaps for it to land in, and Rule D couples the ranges (spec '
+      'docs/specs/notifications-n2.md §9.2)',
+      () async {
+        // The obvious version of this test -- two concurrent applies, the
+        // later one expected to win the reminder range -- CANNOT FAIL: that
+        // is FIFO, the enqueue is synchronous, and three chained sub-writes
+        // leave the same winner. What actually distinguishes one write from
+        // three is that three leave GAPS a different kind of write can land
+        // in, and the only other write is `cancelAll`.
+        //
+        // Gate the first `cancel`, which pauses `applyPlans` inside its
+        // DIGEST range (the digest list here is all-null, so its first act
+        // is a cancel). Then enqueue `cancelAll()` behind it. With ONE
+        // write the cancel waits for all three ranges and clears
+        // everything. With THREE, the reminder and evening sub-writes are
+        // only enqueued once the digest sub-write completes -- i.e. BEHIND
+        // the cancel -- so they arm ids the wipe has already cleared.
+        final gatedPlugin = _GatedPlugin(target: _DigestCall.cancel);
+        final gated = NotificationScheduler(
+          plugin: gatedPlugin,
+          localeResolver: () => const Locale('en'),
+        );
+        final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
+        reminders[0] = ReminderPlan(
+          fireAt: DateTime(2026, 8, 30, 18),
+          occurrenceId: 'o1',
+          choreId: 'c1',
+          choreTitle: 'Bins',
+          dueDate: PlainDate(2026, 8, 30),
+        );
+        final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+        evening[0] = EveningPlan(
+          fireAt: DateTime(2026, 8, 30, 20),
+          openCount: 1,
+        );
+
+        final apply = gated.applyPlans(
+          NotificationPlanSet(
+            digest: List<DigestPlan?>.filled(digestHorizonSlots, null),
+            reminders: reminders,
+            evening: evening,
+            reminderOverflowCount: 0,
+          ),
+        );
+        // Let the apply actually reach the gate, so the wipe arrives
+        // mid-apply rather than before it.
+        await pumpEventQueue();
+        final wipe = gated.cancelAll();
+        gatedPlugin.release();
+        await Future.wait([apply, wipe]);
+
+        expect(gatedPlugin.pending, isEmpty);
+      },
+    );
+
     test('does not request permission (no schedule attempt)', () async {
-      await scheduler.cancelDigest();
+      await scheduler.cancelAll();
       expect(plugin.requestPermissionCallCount, 0);
     });
   });
 
   group(
-    'cancelDigest is serialized against applyDigestPlans (backlog G-12)',
+    'cancelAll is serialized against applyDigestPlans (backlog G-12)',
     () {
       List<DigestPlan?> fullHorizon(int count) => [
         for (var k = 0; k < digestHorizonSlots; k++)
@@ -668,7 +851,7 @@ void main() {
           await Future<void>.delayed(Duration.zero);
 
           // The wipe's cancel arrives while the apply is paused mid-loop.
-          final cancel = gatedScheduler.cancelDigest();
+          final cancel = gatedScheduler.cancelAll();
           await Future<void>.delayed(Duration.zero);
 
           // Nothing gates `cancel`, so if the cancel could run
@@ -709,7 +892,7 @@ void main() {
 
           // The cancel starts first and blocks on the gate BEFORE clearing
           // its first id.
-          final cancel = gatedScheduler.cancelDigest();
+          final cancel = gatedScheduler.cancelAll();
           await Future<void>.delayed(Duration.zero);
 
           // A recompute arrives while the cancel is paused mid-loop.
@@ -754,7 +937,7 @@ void main() {
           );
 
           // Property 1: the error reaches the caller that made THAT call.
-          await expectLater(failingScheduler.cancelDigest(), throwsStateError);
+          await expectLater(failingScheduler.cancelAll(), throwsStateError);
 
           // Property 2: the shared tail was never left completing with an
           // error, so everything queued after it still runs. Getting this
@@ -785,10 +968,218 @@ void main() {
             throwsStateError,
           );
 
-          await failingScheduler.cancelDigest();
-          expect(failingPlugin.cancelCallCount, digestHorizonSlots);
+          await failingScheduler.cancelAll();
+          // All three ranges, not just the digest's: the assertion is that
+          // the cancel RAN to completion after a failed apply, and since
+          // schema v13 completion means all 64 ids (§9.2).
+          expect(
+            failingPlugin.cancelCallCount,
+            digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          );
         },
       );
     },
   );
+
+  group('applyPlans (spec docs/specs/notifications-n2.md §9.2)', () {
+    NotificationPlanSet planSet({
+      List<ReminderPlan?>? reminders,
+      List<EveningPlan?>? evening,
+      List<DigestPlan?>? digest,
+    }) => NotificationPlanSet(
+      digest: digest ?? List<DigestPlan?>.filled(digestHorizonSlots, null),
+      reminders: reminders ?? List<ReminderPlan?>.filled(reminderCeiling, null),
+      evening: evening ?? List<EveningPlan?>.filled(eveningHorizonSlots, null),
+      reminderOverflowCount: 0,
+    );
+
+    List<ReminderPlan?> onlyReminderZero({
+      required DateTime fireAt,
+      required PlainDate dueDate,
+      String choreTitle = 'Bins',
+    }) => [
+      ReminderPlan(
+        fireAt: fireAt,
+        occurrenceId: 'o1',
+        choreId: 'c1',
+        choreTitle: choreTitle,
+        dueDate: dueDate,
+      ),
+      ...List<ReminderPlan?>.filled(reminderCeiling - 1, null),
+    ];
+
+    test('reminder i schedules id reminderNotificationIdBase + i', () async {
+      await scheduler.applyPlans(
+        planSet(
+          reminders: onlyReminderZero(
+            fireAt: DateTime(2026, 8, 30, 18),
+            dueDate: PlainDate(2026, 8, 30),
+          ),
+        ),
+      );
+      final call = plugin.scheduledCalls.single;
+      expect(call.id, reminderNotificationIdBase);
+      expect(
+        call.title,
+        'Bins',
+        reason:
+            'the TITLE is the chore title verbatim -- that is the whole of '
+            'AC1 (§11)',
+      );
+      expect(call.body, 'Due today');
+      expect(call.channelId, remindersChannelId);
+      expect(
+        call.actionable,
+        isFalse,
+        reason:
+            'actions are slice 7; a reminder must NOT reuse '
+            'digestDoneActionId (notifications.md requires each surface to '
+            'mint its own)',
+      );
+      expect(call.payload, isNull);
+    });
+
+    test(
+      'reminder i schedules id reminderNotificationIdBase + i for a '
+      'NON-ZERO i too -- the position IS the id, so an off-by-one here '
+      'would point the payload at the wrong chore',
+      () async {
+        final reminders = List<ReminderPlan?>.filled(reminderCeiling, null);
+        reminders[5] = ReminderPlan(
+          fireAt: DateTime(2026, 8, 30, 18),
+          occurrenceId: 'o6',
+          choreId: 'c6',
+          choreTitle: 'Sixth',
+          dueDate: PlainDate(2026, 8, 30),
+        );
+        await scheduler.applyPlans(planSet(reminders: reminders));
+        expect(plugin.scheduledCalls.single.id, reminderNotificationIdBase + 5);
+      },
+    );
+
+    test(
+      'a reminder armed LATER than its due date says "Still open" -- a '
+      'snooze or a quiet-hours deferral (§11)',
+      () async {
+        await scheduler.applyPlans(
+          planSet(
+            reminders: onlyReminderZero(
+              fireAt: DateTime(2026, 8, 31, 7),
+              dueDate: PlainDate(2026, 8, 30),
+            ),
+          ),
+        );
+        expect(plugin.scheduledCalls.single.body, 'Still open');
+      },
+    );
+
+    test(
+      'evening slot k schedules id eveningNotificationIdBase + k, on its '
+      'own channel, with the ICU plural body',
+      () async {
+        final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+        evening[2] = EveningPlan(
+          fireAt: DateTime(2026, 9, 1, 20),
+          openCount: 3,
+        );
+        await scheduler.applyPlans(planSet(evening: evening));
+        final call = plugin.scheduledCalls.single;
+        expect(call.id, eveningNotificationIdBase + 2);
+        expect(call.channelId, eveningChannelId);
+        expect(call.body, '3 chores still open today');
+        expect(call.actionable, isFalse);
+        expect(call.payload, isNull);
+      },
+    );
+
+    test('a single open chore uses the ICU singular', () async {
+      final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+      evening[0] = EveningPlan(
+        fireAt: DateTime(2026, 8, 30, 20),
+        openCount: 1,
+        soleOccurrenceId: 'o1',
+      );
+      await scheduler.applyPlans(planSet(evening: evening));
+      expect(plugin.scheduledCalls.single.body, '1 chore still open today');
+    });
+
+    test('German locale produces German reminder and evening copy', () async {
+      final german = NotificationScheduler(
+        plugin: plugin,
+        localeResolver: () => const Locale('de'),
+      );
+      final evening = List<EveningPlan?>.filled(eveningHorizonSlots, null);
+      evening[0] = EveningPlan(
+        fireAt: DateTime(2026, 8, 30, 20),
+        openCount: 2,
+      );
+      await german.applyPlans(
+        planSet(
+          reminders: onlyReminderZero(
+            fireAt: DateTime(2026, 8, 30, 18),
+            dueDate: PlainDate(2026, 8, 30),
+          ),
+          evening: evening,
+        ),
+      );
+      expect(plugin.pending[reminderNotificationIdBase]!.body, 'Heute fällig');
+      expect(
+        plugin.pending[reminderNotificationIdBase]!.channelName,
+        'Aufgaben-Erinnerungen',
+      );
+      expect(
+        plugin.pending[eveningNotificationIdBase]!.body,
+        '2 Aufgaben sind heute noch offen',
+      );
+    });
+
+    test(
+      'a null entry CANCELS its id rather than scheduling it, across all '
+      'three ranges',
+      () async {
+        await scheduler.applyPlans(planSet());
+        expect(plugin.scheduledCalls, isEmpty);
+        expect(
+          plugin.cancelCallCount,
+          digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+        );
+      },
+    );
+
+    test('rejects a plan set whose lists are the wrong length', () {
+      expect(
+        () => scheduler.applyPlans(
+          NotificationPlanSet(
+            digest: const [],
+            reminders: List<ReminderPlan?>.filled(reminderCeiling, null),
+            evening: List<EveningPlan?>.filled(eveningHorizonSlots, null),
+            reminderOverflowCount: 0,
+          ),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => scheduler.applyPlans(
+          NotificationPlanSet(
+            digest: List<DigestPlan?>.filled(digestHorizonSlots, null),
+            reminders: const [],
+            evening: List<EveningPlan?>.filled(eveningHorizonSlots, null),
+            reminderOverflowCount: 0,
+          ),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => scheduler.applyPlans(
+          NotificationPlanSet(
+            digest: List<DigestPlan?>.filled(digestHorizonSlots, null),
+            reminders: List<ReminderPlan?>.filled(reminderCeiling, null),
+            evening: const [],
+            reminderOverflowCount: 0,
+          ),
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
 }

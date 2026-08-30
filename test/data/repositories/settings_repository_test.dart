@@ -487,4 +487,107 @@ void main() {
       expect(emissions.last, 'ABC12345');
     },
   );
+
+  group('the schemaVersion 13 notification settings (spec '
+      'docs/specs/notifications-n2.md §6, §5)', () {
+    test(
+      'ensureSettings inserts the v13 defaults: quiet hours off '
+      '22:00-07:00, evening re-reminder off at 20:00 -- both features ship '
+      'OFF, so upgrading changes the behaviour of exactly zero installs',
+      () async {
+        final settings = await repo.ensureSettings();
+        expect(settings.quietHoursEnabled, isFalse);
+        expect(settings.quietStartMinutes, 1320);
+        expect(settings.quietEndMinutes, 420);
+        expect(settings.eveningReminderEnabled, isFalse);
+        expect(settings.eveningReminderMinutes, 1200);
+      },
+    );
+
+    test(
+      "ensureSettings's hand-built return agrees with what is actually on "
+      'disk -- the literal states every default a second time, so a '
+      'mismatch is invisible without reading the row back',
+      () async {
+        final returned = await repo.ensureSettings();
+        final onDisk = await db.select(db.settings).getSingle();
+        expect(returned.quietHoursEnabled, onDisk.quietHoursEnabled);
+        expect(returned.quietStartMinutes, onDisk.quietStartMinutes);
+        expect(returned.quietEndMinutes, onDisk.quietEndMinutes);
+        expect(returned.eveningReminderEnabled, onDisk.eveningReminderEnabled);
+        expect(returned.eveningReminderMinutes, onDisk.eveningReminderMinutes);
+      },
+    );
+
+    test('setQuietHours writes both ends together', () async {
+      await repo.setQuietHours(startMinutes: 1290, endMinutes: 400);
+      final row = await repo.ensureSettings();
+      expect(row.quietStartMinutes, 1290);
+      expect(row.quietEndMinutes, 400);
+    });
+
+    test(
+      'setQuietHours rejects a minute-of-day outside 0..1439, on either end',
+      () async {
+        expect(
+          () => repo.setQuietHours(startMinutes: -1, endMinutes: 400),
+          throwsArgumentError,
+        );
+        expect(
+          () => repo.setQuietHours(startMinutes: 1290, endMinutes: 1440),
+          throwsArgumentError,
+        );
+      },
+    );
+
+    test(
+      'setQuietHours ACCEPTS start == end -- that is "off", not an invalid '
+      'range (spec §6), and rejecting it here would make the value '
+      'unreachable through its own pair of pickers',
+      () async {
+        await repo.setQuietHours(startMinutes: 600, endMinutes: 600);
+        final row = await repo.ensureSettings();
+        expect(row.quietStartMinutes, 600);
+        expect(row.quietEndMinutes, 600);
+      },
+    );
+
+    test(
+      'setQuietHoursEnabled and setEveningReminderEnabled toggle '
+      'independently',
+      () async {
+        await repo.setQuietHoursEnabled(enabled: true);
+        expect((await repo.ensureSettings()).quietHoursEnabled, isTrue);
+        expect((await repo.ensureSettings()).eveningReminderEnabled, isFalse);
+        await repo.setEveningReminderEnabled(enabled: true);
+        expect((await repo.ensureSettings()).eveningReminderEnabled, isTrue);
+        expect((await repo.ensureSettings()).quietHoursEnabled, isTrue);
+      },
+    );
+
+    test(
+      'setEveningReminderTime writes minutes since midnight and validates '
+      'the range',
+      () async {
+        await repo.setEveningReminderTime(1260);
+        expect((await repo.ensureSettings()).eveningReminderMinutes, 1260);
+        expect(() => repo.setEveningReminderTime(1440), throwsArgumentError);
+      },
+    );
+
+    test(
+      'a rejected write leaves the stored value untouched -- validation '
+      'happens before ensureSettings, so nothing is half-applied',
+      () async {
+        await repo.setQuietHours(startMinutes: 1290, endMinutes: 400);
+        expect(
+          () => repo.setQuietHours(startMinutes: 60, endMinutes: 1440),
+          throwsArgumentError,
+        );
+        final row = await repo.ensureSettings();
+        expect(row.quietStartMinutes, 1290);
+        expect(row.quietEndMinutes, 400);
+      },
+    );
+  });
 }
