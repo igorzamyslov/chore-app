@@ -378,7 +378,14 @@ its supporting measurement, not left open.
   `test/features/settings/category_edit_test.dart`'s existing "renders
   every identifier" test).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing tests** — two, not one. The plan's single
+gap-at-412dp test shipped as written (RED at exactly `52.0`). A second test
+was added because correction C1 made a sharper property available: six
+flexible columns put the seventh icon on the second row at **every** width,
+which needs no pinned surface and was RED at the default 800px surface with
+the seventh icon on row one (`Expected: a value greater than <1997.0>,
+Actual: <1997.0>`). The 412dp test also asserts the insets match at both
+ends, which is what separates "equal columns" from "pushed right".
 
 Add to `test/features/settings/category_edit_test.dart`, after the existing
 `'the icon grid renders every identifier...'` test (i.e. as the new last
@@ -452,7 +459,7 @@ test in the file, before the closing `}` of `main()`):
   );
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails** — via CI, both RED as above.
 
 Run: `flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/settings/category_edit_test.dart`
 
@@ -462,8 +469,12 @@ this confirms the test genuinely observes the reported defect against
 today's `Wrap`, not just against a hypothetical. Every other test in the
 file stays green.
 
-- [ ] **Step 3: Replace `_IconGrid`'s `Wrap` with `ColorSwatchPicker`'s
-      six-equal-column pattern**
+- [x] **Step 3: Replace `_IconGrid`'s `Wrap` with `ColorSwatchPicker`'s
+      six-equal-column pattern** — shipped as specified, with one change: the
+column count reuses `ColorSwatchPicker.columns` rather than declaring a
+second private `_columns`, so "both grids stay six across" is one fact rather
+than two that can drift apart. `_tile` also drops its unused `BuildContext`
+parameter.
 
 Replace `lib/features/settings/category_edit_sheet.dart:226-275` (the whole
 `_IconGrid` class, from its doc comment through its closing `}`) with:
@@ -576,7 +587,7 @@ this a minimal, reviewable fix scoped to the one file backlog G-15 names;
 `color_swatch_picker_test.dart` asserts only semantics, positions and
 colours (no `Wrap`/`Row` type-checks), so it is unaffected either way.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes** — CI green.
 
 Run: `flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/settings/category_edit_test.dart`
 
@@ -585,7 +596,7 @@ reported near `7.7px`, comfortably under the 20px threshold) and the
 existing "renders every identifier" test (unaffected — it only checks
 presence and one tap-to-save round trip).
 
-- [ ] **Step 5: Invert to confirm the new test can fail on purpose**
+- [x] **Step 5: Invert to confirm the new test can fail on purpose** — done inside `build()`'s body, both grid tests RED at the test step, then reverted.
 
 Temporarily revert `_IconGrid.build()` to the original `Wrap` (spacing: 8,
 runSpacing: 8, one `semantic(...)`-wrapped `PickerTile` per identifier, no
@@ -597,7 +608,7 @@ same ~52px-gap message as Step 2 — confirming the test is not vacuous at the
 still pass). Then restore the Step 3 implementation and confirm Step 4's
 PASS again before moving on.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/features/settings/category_edit_sheet.dart test/features/settings/category_edit_test.dart
@@ -634,7 +645,7 @@ and `double memberAvatarFontSize(double scaledRadius)` — pure, no
 `MemberAvatar`'s constructor signature is unchanged apart from its `radius`
 default. No `semantic()` id is added, removed or moved by this task.
 
-- [ ] **Step 1 (RED).** Extract the two formulas; add the analytical fit test.
+- [x] **Step 1 (RED).** Extract the two formulas; add the analytical fit test.
   The test must (a) read the default off `const MemberAvatar(...).radius`
   rather than hard-coding it, (b) enumerate every radius `lib/` uses where the
   widget controls its own box, at scale 1.0 and 1.6, (c) carry the chip-forced
@@ -643,7 +654,7 @@ default. No `semantic()` id is added, removed or moved by this task.
   `radius 16.0 at scale 1.0 ... reaches 12.211 ... inner edge is only 10.500px`
   — i.e. the default is still 12 and the enumeration is driven by it.
 
-- [ ] **Step 2 (GREEN).** Bump the default to 16, pin `letterSpacing: 0`, fix
+- [x] **Step 2 (GREEN).** Bump the default to 16, pin `letterSpacing: 0`, fix
   the call sites listed above, update the four widget tests that hard-code the
   24px box / 1.5px ring, update the spec and the backlog. Push; CI green.
 
