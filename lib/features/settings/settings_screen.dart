@@ -135,6 +135,22 @@ class SettingsScreen extends ConsumerWidget {
                   // re-reminder is independent of the digest (§5.1 requires
                   // the row to be findable regardless), and quiet hours
                   // govern per-chore reminders too.
+                  EveningToggleTile(
+                    value: settings.eveningReminderEnabled,
+                    onChanged: (enabled) => settingsRepository
+                        .setEveningReminderEnabled(enabled: enabled),
+                  ),
+                  if (settings.eveningReminderEnabled)
+                    EveningTimeTile(
+                      minutesSinceMidnight: settings.eveningReminderMinutes,
+                      // Quiet hours DROP an evening slot rather than
+                      // deferring it (D7), so a colliding pair of times
+                      // would otherwise silently deliver nothing. Read
+                      // through the SAME predicate the scheduler's shift
+                      // delegates to, so the two cannot disagree.
+                      insideQuietHours: true,
+                      onChanged: settingsRepository.setEveningReminderTime,
+                    ),
                   QuietHoursToggleTile(
                     value: settings.quietHoursEnabled,
                     // A direct comparison rather than a call into
@@ -142,11 +158,12 @@ class SettingsScreen extends ConsumerWidget {
                     // a property of the two stored values, not a membership
                     // question about some minute the sub-line has no
                     // business picking.
-                    emptyWindow: true,
+                    emptyWindow:
+                        settings.quietStartMinutes == settings.quietEndMinutes,
                     onChanged: (enabled) => settingsRepository
                         .setQuietHoursEnabled(enabled: enabled),
                   ),
-                  ...[
+                  if (settings.quietHoursEnabled) ...[
                     QuietHoursStartTile(
                       minutesSinceMidnight: settings.quietStartMinutes,
                       // One setter, both ends together: the window is one
@@ -163,32 +180,11 @@ class SettingsScreen extends ConsumerWidget {
                     QuietHoursEndTile(
                       minutesSinceMidnight: settings.quietEndMinutes,
                       onChanged: (minutes) => settingsRepository.setQuietHours(
-                        startMinutes: minutes,
+                        startMinutes: settings.quietStartMinutes,
                         endMinutes: minutes,
                       ),
                     ),
                   ],
-                  EveningToggleTile(
-                    value: settings.eveningReminderEnabled,
-                    onChanged: (enabled) => settingsRepository
-                        .setEveningReminderEnabled(enabled: enabled),
-                  ),
-                  if (settings.eveningReminderEnabled)
-                    EveningTimeTile(
-                      minutesSinceMidnight: settings.eveningReminderMinutes,
-                      // Quiet hours DROP an evening slot rather than
-                      // deferring it (D7), so a colliding pair of times
-                      // would otherwise silently deliver nothing. Read
-                      // through the SAME predicate the scheduler's shift
-                      // delegates to, so the two cannot disagree.
-                      insideQuietHours: isWithinQuietHours(
-                        minuteOfDay: settings.eveningReminderMinutes,
-                        enabled: false,
-                        startMinutes: settings.quietStartMinutes,
-                        endMinutes: settings.quietEndMinutes,
-                      ),
-                      onChanged: settingsRepository.setEveningReminderTime,
-                    ),
                   // Widened from `digestEnabled` alone: slice 6 creates a
                   // state that never existed before -- a notification that
                   // can be ON while the digest is OFF -- and without this
@@ -196,7 +192,9 @@ class SettingsScreen extends ConsumerWidget {
                   // user whose only notification is the evening
                   // re-reminder. The hint's copy is already
                   // feature-neutral. It stays LAST, per spec §12.
-                  if (settings.digestEnabled && !permissionGranted)
+                  if ((settings.digestEnabled ||
+                          settings.eveningReminderEnabled) &&
+                      !permissionGranted)
                     const DigestPermissionHint(onOpenSettings: openAppSettings),
                 ],
                 loading: () => const [

@@ -53,9 +53,7 @@ class QuietHoursToggleTile extends StatelessWidget {
       child: SettingsRow(
         icon: Icons.bedtime_outlined,
         label: l10n.settingsQuietHoursToggle,
-        sublabel: value && emptyWindow
-            ? l10n.settingsQuietHoursEmptyWindowHint
-            : null,
+        sublabel: emptyWindow ? l10n.settingsQuietHoursEmptyWindowHint : null,
         switchValue: value,
         onSwitchChanged: onChanged,
       ),
