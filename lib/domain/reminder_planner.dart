@@ -405,9 +405,11 @@ List<EveningPlan?> planEveningSlots({
       startMinutes: quietStartMinutes,
       endMinutes: quietEndMinutes,
     );
-    // INVERSION (Task 8 step 4 inversion 3): the slot is DEFERRED to the
-    // window end rather than dropped. To be reverted.
-    final date = PlainDate.fromDateTime(shifted);
+    if (shifted != moment) {
+      plans.add(null);
+      continue;
+    }
+    final date = PlainDate.fromDateTime(moment);
     var openCount = 0;
     String? lastCountedId;
     for (final occurrence in occurrences) {
@@ -418,19 +420,14 @@ List<EveningPlan?> planEveningSlots({
         continue;
       }
       // Due on THIS date. Overdue never counts (D6).
-      // INVERSION (Task 8 step 4 inversion 1): overdue occurrences count.
-      // To be reverted.
-      if (projectedDueDateOn(occurrence, date).isAfter(date)) {
+      if (projectedDueDateOn(occurrence, date) != date) {
         continue;
       }
       final stillToCome = armedReminders.any(
         (reminder) =>
             reminder.occurrenceId == occurrence.id &&
             PlainDate.fromDateTime(reminder.fireAt) == date &&
-            // INVERSION (Task 8 step 4 inversion 2): an ALREADY-FIRED
-            // reminder suppresses, a still-to-come one does not. To be
-            // reverted.
-            reminder.fireAt.isBefore(moment),
+            !reminder.fireAt.isBefore(moment),
       );
       if (stillToCome) {
         continue;
@@ -442,7 +439,7 @@ List<EveningPlan?> planEveningSlots({
       openCount == 0
           ? null
           : EveningPlan(
-              fireAt: shifted,
+              fireAt: moment,
               openCount: openCount,
               soleOccurrenceId: openCount == 1 ? lastCountedId : null,
             ),
