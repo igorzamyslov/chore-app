@@ -736,6 +736,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormStartDateLabel => 'Start date';
 
   @override
+  String get choreFormReminderToggle => 'Remind me about this chore';
+
+  @override
+  String get choreFormReminderTime => 'Reminder time';
+
+  @override
+  String get choreFormReminderHint =>
+      'This chore won\'t be counted in the daily summary';
+
+  @override
   String get shoppingEmptyState => 'Shopping list is empty';
 
   @override
@@ -811,6 +821,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDigestToggleDeniedHint =>
       'Not delivering — notifications are off';
+
+  @override
+  String settingsRemindersCeilingHint(int count, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count chores stay in the daily summary — this device can hold $limit reminders at once.',
+      one:
+          '1 chore stays in the daily summary — this device can hold $limit reminders at once.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get settingsDigestTimeLabel => 'Notification time';

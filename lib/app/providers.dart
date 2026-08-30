@@ -1126,6 +1126,48 @@ final actingMemberProvider = Provider<Member?>((ref) {
   );
 });
 
+/// How many reminder-enabled chores did not fit under `reminderCeiling`
+/// (spec `docs/specs/notifications-n2.md` §3.2), for the Settings ceiling
+/// sub-line.
+///
+/// Reads the count [buildNotificationPlans] already produced while sorting
+/// and truncating the candidates — deliberately NOT a second traversal
+/// applying §2.3's arming rule again. Two implementations of that rule
+/// could disagree, and a sub-line that lies about a set it did not compute
+/// is worse than no sub-line (plan OPD-1, closed as Option A; Option B is
+/// exactly the traversal this must never become).
+///
+/// A pure projection with no state of its own: it recomputes whenever the
+/// settings row or the pending-occurrence set changes, which is every
+/// input the ceiling depends on except one.
+///
+/// **The exception, stated because it is a real gap and not a rounding
+/// error:** [buildNotificationPlans] also takes
+/// `snoozedUntilByOccurrenceId`, and this provider cannot supply it --
+/// `ReminderSnoozeRepository.activeSnoozes()` is a `Future` and this is a
+/// synchronous read -- so that parameter falls back to its `const {}`
+/// default. A snooze can only move a reminder LATER, so the only way it
+/// changes this number is by carrying a candidate across §2.3 step 5's
+/// past-drop or its 14-day window; the error is bounded by the number of
+/// snoozed chores. Today that is always zero, because nothing writes
+/// `reminder_snoozes` until slice 7 adds the notification action. When it
+/// does, this provider should be handed the same snooze map
+/// `DigestRescheduleController._recompute` reads -- never a second answer
+/// to "which reminders are armed".
+final reminderOverflowCountProvider = Provider<int>((ref) {
+  final settings = ref.watch(settingsProvider).valueOrNull;
+  final pending = ref.watch(pendingOccurrencesProvider).valueOrNull;
+  if (settings == null || pending == null) {
+    return 0;
+  }
+  return buildNotificationPlans(
+    now: ref.watch(clockProvider).now(),
+    settings: settings,
+    pending: pending,
+    recipientMemberId: ref.watch(actingMemberProvider)?.id,
+  ).reminderOverflowCount;
+});
+
 /// Debounce delay collapsing bursts of digest-affecting mutations into a
 /// single reschedule (spec `docs/specs/notifications.md` architecture #2).
 const Duration digestRescheduleDebounce = Duration(milliseconds: 500);

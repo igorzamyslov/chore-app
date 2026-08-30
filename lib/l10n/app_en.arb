@@ -925,6 +925,19 @@
     "description": "Label of the chore form's start-date field."
   },
 
+  "choreFormReminderToggle": "Remind me about this chore",
+  "@choreFormReminderToggle": {
+    "description": "Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver."
+  },
+  "choreFormReminderTime": "Reminder time",
+  "@choreFormReminderTime": {
+    "description": "Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over."
+  },
+  "choreFormReminderHint": "This chore won't be counted in the daily summary",
+  "@choreFormReminderHint": {
+    "description": "Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding."
+  },
+
   "shoppingEmptyState": "Shopping list is empty",
   "@shoppingEmptyState": {
     "description": "Shopping list empty-state message, shown when there are no items at all."
@@ -1023,6 +1036,14 @@
   "settingsDigestToggleDeniedHint": "Not delivering — notifications are off",
   "@settingsDigestToggleDeniedHint": {
     "description": "Sub-line shown under the settings screen's digest toggle when the toggle is on but the OS notification permission is denied, so the switch's ON position doesn't look like it is working. Also the accessibility label of the Settings tab's ambient attention dot (lib/app/app_shell.dart), which appears in exactly the same situation."
+  },
+  "settingsRemindersCeilingHint": "{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}",
+  "@settingsRemindersCeilingHint": {
+    "description": "Sub-line under the daily-summary toggle, shown only while more chores have a reminder than the device can arm (spec docs/specs/notifications-n2.md §3.2, decision D4). A pure projection of current state: no stored flag, nothing to dismiss, nothing that can go stale. States the outcome factually and non-alarmingly, because the ceiling costs cadence and never coverage -- the chores it names are still announced, by the daily summary, on their own date. 'stays in the daily summary' matches settingsDigestToggleTitle's own label one line above it. No zero branch: the string is only rendered when count >= 1.",
+    "placeholders": {
+      "count": { "type": "int", "example": "2" },
+      "limit": { "type": "int", "example": "33" }
+    }
   },
   "settingsDigestTimeLabel": "Notification time",
   "@settingsDigestTimeLabel": {

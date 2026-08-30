@@ -1070,6 +1070,24 @@ abstract class AppLocalizations {
   /// **'Start date'**
   String get choreFormStartDateLabel;
 
+  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me about this chore'**
+  String get choreFormReminderToggle;
+
+  /// Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder time'**
+  String get choreFormReminderTime;
+
+  /// Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding.
+  ///
+  /// In en, this message translates to:
+  /// **'This chore won\'t be counted in the daily summary'**
+  String get choreFormReminderHint;
+
   /// Shopping list empty-state message, shown when there are no items at all.
   ///
   /// In en, this message translates to:
@@ -1189,6 +1207,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not delivering — notifications are off'**
   String get settingsDigestToggleDeniedHint;
+
+  /// Sub-line under the daily-summary toggle, shown only while more chores have a reminder than the device can arm (spec docs/specs/notifications-n2.md §3.2, decision D4). A pure projection of current state: no stored flag, nothing to dismiss, nothing that can go stale. States the outcome factually and non-alarmingly, because the ceiling costs cadence and never coverage -- the chores it names are still announced, by the daily summary, on their own date. 'stays in the daily summary' matches settingsDigestToggleTitle's own label one line above it. No zero branch: the string is only rendered when count >= 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}'**
+  String settingsRemindersCeilingHint(int count, int limit);
 
   /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
   ///

@@ -70,6 +70,68 @@ Every task's requirements implicitly include this section.
 
 ---
 
+## Task 0 — refresh pass (implementation, 2026-08-30)
+
+This plan was written **before** slices 1–3 existed. They have since merged into
+`integration/wave-7` at `96933dd`, so every interface below is now real code and
+was re-verified against it rather than against the spec. Everything the
+"Dependencies" table promises **landed as promised**; what was stale was
+citations and one omitted parameter. Corrections, and why each matters:
+
+1. **`e2e/flows/chore_reminder.yaml` is the wrong path.** `e2e/flows/` holds no
+   flow files at all — it holds `config.yaml` plus four feature subdirectories
+   (`chores/`, `settings/`, `shell/`, `shopping/`). A flow dropped at the top
+   level would still be picked up (`config.yaml` globs `"**"`) but would be the
+   only one out of place. Task 6 now creates
+   **`e2e/flows/chores/chore_reminder.yaml`**, and its `runFlow` path is
+   `../../common/onboard_fresh.yaml`, matching its siblings.
+2. **`notification_scheduler.dart:581` is the wrong line.** The claim it
+   supports is true — the scheduler does resolve its own copy — but
+   `_applyDigestPlansNow` is declared at **`:636`** and its
+   `lookupAppLocalizations(localeResolver())` call is at **`:644`**. (`:571` is a
+   different call site.) The conclusion stands: `reminderBodyDueToday`,
+   `reminderBodyStillOpen`, `notificationChannelRemindersName` /
+   `...Description` are all present in **both** ARBs already, so Task 1 Step 3
+   passes and this slice adds none of them.
+3. **`buildNotificationPlans` takes a fifth parameter the plan's Task 5 snippet
+   omits**: `Map<String, DateTime> snoozedUntilByOccurrenceId = const {}`. See
+   the amended Task 5 Step 6 for what that costs and why it is accepted.
+4. **Line-number drift in every ARB and screen citation** (the files have grown
+   since): `app_en.arb`'s `choreForm*` block starts at **526** (plan says ~492)
+   and `settingsDigestToggleDeniedHint` is at **1023** (plan says ~989);
+   `app_de.arb`'s `choreFormRepeatToggleLabel` is at **131** (~124) and its
+   `settingsDigestToggleDeniedHint` at **213** (~206); the chore form's service
+   calls are at **621** / **635** (620/634). All are "insert next to X" hints,
+   so none changes an instruction — they are corrected so the next reader does
+   not trust the numbers.
+5. **The "Note (not a decision)" below mis-glosses the German.**
+   `settingsPreferencesSectionTitle` is **"Präferenzen"** in `app_de.arb:272`,
+   not "Einstellungen". The note's substantive claim is confirmed: there is no
+   "Daily summary" *section*; the digest rows live in the Preferences group
+   (`settings_screen.dart:107-135`), and `settingsDigestSectionTitle` is an
+   orphan key referenced nowhere in `lib/`. A concurrent stream owns fixing §12.
+6. **The semantic-id inventory below is missing two ids** that exist in `lib/`:
+   `chore_form.assignee.<id>.drag` and `chore_form.assignee.<id>.remove`. The
+   claim they support — that this slice renames, removes or reorders no existing
+   id — is still true; the list was just short.
+7. **Task 1 Step 5 (`flutter analyze` + the full `flutter test test/` as a local
+   baseline) is REFUSED.** The Flutter tool lock is global to this machine and
+   several wave-7 streams run concurrently; the standing rule for this wave is
+   that CI is the gate and local full-suite runs are noise. The baseline is
+   taken from CI on the first pushed commit instead.
+
+**Verified present and correct, needing no change:** `chores.reminderMinutes`
+(`tables.dart:417`), the repository's `int? reminderMinutes` /
+`Value<int?> reminderMinutes` pair, both sync mappers, every §3.1 constant with
+`reminderCeiling` derived rather than literal, `applyQuietHours`,
+`ReminderPlan`, and — the one this slice actually depends on —
+**`NotificationPlanSet.reminderOverflowCount`** (`digest_plan_builder.dart:62`),
+forwarded verbatim from `ReminderPlanResult.overflowCount`, which is produced at
+`planReminders`' single truncation site. OPD-1's Option A landed exactly as
+agreed.
+
+---
+
 ## Dependencies: what slices 1–3 hand you
 
 Slices 1, 2 and 3 are planned in parallel and land **first**. Treat the following
@@ -88,7 +150,7 @@ as existing interfaces defined by the spec. **Do not re-specify or re-build them
 
 **Why the notification-body keys are not this slice's, despite the ticket saying
 "the l10n":** `NotificationScheduler` resolves its own copy internally — verified
-at `lib/application/notification_scheduler.dart:581`, `_applyDigestPlansNow` calls
+at `lib/application/notification_scheduler.dart:636`, `_applyDigestPlansNow` calls
 `lookupAppLocalizations(localeResolver())` and reads
 `l10n.notificationChannelDigestName` itself. `applyPlans` cannot compile without
 `reminderBodyDueToday` et al., so those keys land with slice 3. Task 1 verifies
@@ -209,8 +271,8 @@ widget's doc comment (Task 5 Step 5).
 
 §12 and §5.1 speak of "the existing 'Daily summary' section" and of rows joining
 it. **There is no such section.** The digest rows sit inside the **Preferences**
-group (`settingsPreferencesSectionTitle`, "Preferences"/"Einstellungen") at
-`lib/features/settings/settings_screen.dart:106-135`, below the Language and
+group (`settingsPreferencesSectionTitle`, "Preferences"/"Präferenzen") at
+`lib/features/settings/settings_screen.dart:107-135`, below the Language and
 Appearance rows. The key `settingsDigestSectionTitle` ("Daily summary" /
 "Tägliche Zusammenfassung") exists in both ARBs and is **referenced nowhere in
 `lib/`** — verified by grep. §12's binding row order is still satisfiable exactly
@@ -241,7 +303,7 @@ header.
 | `test/application/chore_service_reminder_test.dart` | **create** | Service→repository pass-through. |
 | `test/features/chores/chore_form_reminder_test.dart` | **create** | End-to-end form: default, persist, load, clear, dirty guard. |
 | `test/features/settings/reminders_ceiling_test.dart` | **create** | Ceiling sub-line present/absent/precedence. |
-| `e2e/flows/chore_reminder.yaml` | **create** | Maestro: set a reminder, reopen, see it persisted (§13.3's carve-out). |
+| `e2e/flows/chores/chore_reminder.yaml` | **create** | Maestro: set a reminder, reopen, see it persisted (§13.3's carve-out). |
 
 The row is its own file rather than another block inside `chore_form_screen.dart`
 because that screen is already 652 lines and every other form control
@@ -347,15 +409,19 @@ and 6 (AC1 does not depend on the sub-line). **Do not unblock yourself by
 re-deriving the count from §2.3** — that is Option B, which was rejected
 precisely because two copies of the arming rule will diverge.
 
-- [ ] **Step 5: Baseline the suite**
+- [ ] **Step 5: Baseline the suite — REFUSED as written (Task 0, correction 7)**
 
-Run:
-```bash
-flutter analyze --fatal-infos --fatal-warnings
-flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/
-```
-Expected: clean. A red baseline belongs to whoever made it red — do not start on
-top of one.
+Do **not** run `flutter analyze` and the full `flutter test test/` locally. The
+Flutter tool lock is global to this machine and several wave-7 streams share it,
+so a full local run serializes behind them and reads as a hang; the standing
+rule for this wave is that CI is the gate. Take the baseline from CI instead:
+open the draft PR on the first commit and read `gh pr checks`. A red baseline
+still belongs to whoever made it red — the difference is only where you look.
+
+Every later step in this plan that says "run `flutter test <file>` / `flutter
+analyze`" means the same thing: commit, push, and read that job in CI. The TDD
+loop is unchanged — the RED commit is pushed first and CI must fail with the
+stated mode.
 
 ---
 
@@ -381,7 +447,7 @@ The leaf widget, tested on its own before the screen is touched.
 - [ ] **Step 1: Add the three ARB keys to the template**
 
 In `lib/l10n/app_en.arb`, next to the other `choreForm*` keys (they run from
-line ~492), add:
+line 526), add:
 
 ```json
   "choreFormReminderToggle": "Remind me about this chore",
@@ -400,7 +466,7 @@ line ~492), add:
 
 - [ ] **Step 2: Add the three German strings**
 
-In `lib/l10n/app_de.arb`, next to `choreFormRepeatToggleLabel` (line ~124), add —
+In `lib/l10n/app_de.arb`, next to `choreFormRepeatToggleLabel` (line 131), add —
 no `@`-blocks, that file carries none:
 
 ```json
@@ -755,7 +821,7 @@ Slice 1's scope is stated as "repository methods" (§14.1) — and
 (`lib/application/chore_service.dart:55` and `:304`) are the **application**
 layer, which nothing in §14 assigns. Verified: neither signature carries
 `reminderMinutes` today. The chore form calls the service, never the repository
-directly — `chore_form_screen.dart:620` and `:634` — and
+directly — `chore_form_screen.dart:621` and `:635` — and
 `docs/specs/occurrence-lifecycle.md` §2 is why. Without this task the form has
 nowhere to write.
 
@@ -1452,7 +1518,7 @@ digest is enabled.
 
 **Files:**
 - Modify: `lib/features/settings/digest_section.dart` (`DigestToggleTile`)
-- Modify: `lib/features/settings/settings_screen.dart:113-118`
+- Modify: `lib/features/settings/settings_screen.dart:112-118`
 - Modify: `lib/l10n/app_en.arb`, `lib/l10n/app_de.arb`
 - Test: `test/features/settings/reminders_ceiling_test.dart`
 
@@ -1466,7 +1532,7 @@ digest is enabled.
 
 - [ ] **Step 1: Add the ARB key to the template**
 
-In `lib/l10n/app_en.arb`, next to `settingsDigestToggleDeniedHint` (line ~989):
+In `lib/l10n/app_en.arb`, next to `settingsDigestToggleDeniedHint` (line 1023):
 
 ```json
   "settingsRemindersCeilingHint": "{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}",
@@ -1481,7 +1547,7 @@ In `lib/l10n/app_en.arb`, next to `settingsDigestToggleDeniedHint` (line ~989):
 
 - [ ] **Step 2: Add the German string**
 
-In `lib/l10n/app_de.arb`, next to `settingsDigestToggleDeniedHint` (line ~206):
+In `lib/l10n/app_de.arb`, next to `settingsDigestToggleDeniedHint` (line 213):
 
 ```json
   "settingsRemindersCeilingHint": "{count, plural, one{1 Aufgabe bleibt in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.} other{{count} Aufgaben bleiben in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.}}",
@@ -1680,6 +1746,14 @@ providers:
 /// applying §2.3's arming rule again. Two implementations of that rule
 /// could disagree, and a sub-line that lies about a set it did not compute
 /// is worse than no sub-line.
+///
+/// AMENDED (Task 0, correction 3): `buildNotificationPlans` takes a fifth
+/// parameter, `snoozedUntilByOccurrenceId`, which this provider cannot
+/// supply — `ReminderSnoozeRepository.activeSnoozes()` is a `Future` and
+/// this is a synchronous projection. It is therefore omitted (the
+/// parameter defaults to `const {}`). See the shipped provider's own doc
+/// comment for the bound on what that costs; the alternative, re-deriving
+/// §2.3 here, remains forbidden (OPD-1 Option B).
 final reminderOverflowCountProvider = Provider<int>((ref) {
   final settings = ref.watch(settingsProvider).valueOrNull;
   final pending = ref.watch(pendingOccurrencesProvider).valueOrNull;
@@ -1738,7 +1812,7 @@ surfaces — ... enabling a chore reminder and seeing it persist".
 are noise on this machine and the E2E gate is GitHub CI. Push and let CI run it.
 
 **Files:**
-- Create: `e2e/flows/chore_reminder.yaml`
+- Create: `e2e/flows/chores/chore_reminder.yaml`
 
 - [ ] **Step 1: Read a sibling flow first**
 
@@ -1752,7 +1826,7 @@ already passes in CI.
 
 - [ ] **Step 2: Write the flow**
 
-Create `e2e/flows/chore_reminder.yaml` following the sibling's structure, driving:
+Create `e2e/flows/chores/chore_reminder.yaml` following the sibling's structure, driving:
 onboard → `chores.add` → type a title into `chore_form.title` → tap
 `chore_form.reminder.toggle` → assert `chore_form.reminder.time` is visible →
 tap `chore_form.save` → reopen the chore via its row menu and the edit entry →
@@ -1765,7 +1839,7 @@ build, and it is the half a widget test's in-memory database cannot vouch for.
 - [ ] **Step 3: Commit and let CI gate it**
 
 ```bash
-git add e2e/flows/chore_reminder.yaml
+git add e2e/flows/chores/chore_reminder.yaml
 git commit -m "Add an E2E flow for setting a per-chore reminder"
 ```
 
