@@ -52,6 +52,12 @@ class ChoreService {
   /// `firstDueDate(recurrence, startDate)`. Assigned member: `fixed` -> the
   /// single assignee; `rotation` -> [assigneeMemberIds] position 0; `anyone`
   /// -> `null`.
+  ///
+  /// [reminderMinutes] is the chore's individual reminder time as minutes
+  /// since local midnight, or `null` (the default) for no individual
+  /// reminder — spec `docs/specs/notifications-n2.md` §2.1, decision D1.
+  /// The opt-in and the time are one nullable fact, so `null` here is not
+  /// "unset, use a default": it IS the off state.
   Future<Chore> createChore({
     required String householdId,
     required String title,
@@ -60,6 +66,7 @@ class ChoreService {
     String? notes,
     String? categoryId,
     Recurrence? recurrence,
+    int? reminderMinutes,
     List<String> assigneeMemberIds = const [],
     String? createdBy,
   }) {
@@ -72,6 +79,7 @@ class ChoreService {
         notes: notes,
         categoryId: categoryId,
         recurrence: recurrence,
+        reminderMinutes: reminderMinutes,
         assigneeMemberIds: assigneeMemberIds,
         createdBy: createdBy,
       );
@@ -298,7 +306,21 @@ class ChoreService {
   /// An edit that changes NEITHER `recurrence` nor `startDate` leaves the
   /// pending occurrence — and its assignee — completely untouched, no
   /// matter what else changed (title, notes, category, assignment
-  /// mode/assignees).
+  /// mode/assignees, [reminderMinutes]).
+  ///
+  /// [reminderMinutes] follows the same "omit to leave unchanged"
+  /// convention as [notes] and [categoryId]: `Value.absent()` leaves the
+  /// stored value alone, `Value(null)` clears the chore's individual
+  /// reminder, `Value(m)` sets it (spec
+  /// `docs/specs/notifications-n2.md` §2.1, decision D1).
+  ///
+  /// It is deliberately NOT part of the `recurrenceChanged` /
+  /// `startDateChanged` comparison below, which decides whether to
+  /// regenerate the pending occurrence
+  /// (`docs/specs/occurrence-lifecycle.md` §2). A reminder time is a
+  /// notification fact, not a schedule fact: changing it must not move,
+  /// recreate or reassign an occurrence. That is the same distinction
+  /// decision D5 draws for snooze.
   ///
   /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
   Future<void> updateChore(
@@ -307,6 +329,7 @@ class ChoreService {
     Value<String?> notes = const Value.absent(),
     Value<String?> categoryId = const Value.absent(),
     Value<Recurrence?> recurrence = const Value.absent(),
+    Value<int?> reminderMinutes = const Value.absent(),
     PlainDate? startDate,
     AssignmentMode? assignmentMode,
     List<String>? assigneeMemberIds,
@@ -332,6 +355,7 @@ class ChoreService {
         notes: notes,
         categoryId: categoryId,
         recurrence: recurrence,
+        reminderMinutes: reminderMinutes,
         startDate: startDate,
         assignmentMode: assignmentMode,
         assigneeMemberIds: assigneeMemberIds,
