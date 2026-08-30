@@ -8,6 +8,7 @@
 /// pass whatever that getter returned.
 library;
 
+import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -101,6 +102,39 @@ void main() {
 
       // Spec §2.5: with the digest off, coverage is reminders-only -- the
       // losers are NOT in a daily summary, because there isn't one.
+      expect(find.textContaining('stay in the daily summary'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  // The precedence rule OPD-2 closed (plan
+  // docs/plans/2026-08-30-n2-per-chore-reminders.md): SettingsRow shows ONE
+  // sub-line, and a hard delivery failure -- nothing is arriving at all --
+  // outranks a cadence downgrade -- these arrive in the summary instead.
+  //
+  // This is the only case in the suite where BOTH sub-lines would apply, and
+  // without it the precedence is untestable: swapping the two switch arms
+  // changes nothing unless something exercises them together.
+  testChoreApp(
+    'over the ceiling AND permission denied: the denied hint wins',
+    today: today,
+    overrides: [
+      notificationPermissionGrantedProvider.overrideWith((ref) => false),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await seedReminderChores(database, reminderCeiling + 2);
+      await tester.pumpAndSettle();
+      await openSettingsTab(tester);
+
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.digest.toggle'),
+          matching: find.text('Not delivering — notifications are off'),
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('stay in the daily summary'), findsNothing);
 
       handle.dispose();
