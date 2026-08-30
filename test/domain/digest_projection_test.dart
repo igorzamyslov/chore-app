@@ -6,12 +6,21 @@ import 'package:flutter_test/flutter_test.dart';
 ProjectedOccurrence _occurrence({
   required PlainDate dueDate,
   String id = 'occ',
+  String? choreId,
+  String choreTitle = 'Chore',
+  int? reminderMinutes,
   PlainDate? startDate,
   Recurrence? recurrence,
   String? assignedMemberId,
 }) {
   return ProjectedOccurrence(
     id: id,
+    // Defaults to the occurrence id so existing call sites keep distinct
+    // chore ids without naming them; tests about the D4 tiebreak pass it
+    // explicitly.
+    choreId: choreId ?? id,
+    choreTitle: choreTitle,
+    reminderMinutes: reminderMinutes,
     dueDate: dueDate,
     startDate: startDate ?? dueDate,
     recurrence: recurrence,
@@ -282,6 +291,20 @@ void main() {
     // recipient scoping fails loudly HERE rather than silently turning the
     // tail into a coverage hole.
     //
+    // SCOPE, since N2 (spec `docs/specs/notifications-n2.md` §2.5): this
+    // property holds over the digest TAKEN ALONE only for occurrence sets
+    // with NO armed reminders, and every set below is deliberately such a
+    // set -- none of them passes `armedReminderDates`, so the parameter
+    // defaults to `const {}`. That is not a weakening: for these sets the
+    // sparse tail's original safety argument is untouched and still
+    // load-bearing, which is why the group is kept VERBATIM rather than
+    // relaxed into an `isNotEmpty`-shaped assertion.
+    //
+    // What replaces it in general is §0.1's partition, which holds over the
+    // UNION of the two channels and is tested in
+    // `test/application/digest_plan_builder_test.dart`. The last test in
+    // this group proves the loss is real rather than theoretical.
+    //
     // The walk spans 120 days, comfortably past the furthest slot the
     // shipped horizon can produce (day 83 = digestDailyHorizonDays - 1 +
     // digestHorizonTailStepDays * digestWeeklyHorizonSlots). IF THE HORIZON
@@ -397,7 +420,163 @@ void main() {
       // partner's entries would drop in or out mid-walk and break this.
       expectMonotone(_mixedSet(), recipientMemberId: 'me');
     });
+
+    test(
+      'the property is GENUINELY LOST once a reminder is armed -- §2.5 '
+      'records this as the honest cost, and a comment nobody can fail is '
+      'not a record',
+      () {
+        final occurrences = [
+          _occurrence(id: 'bins', dueDate: PlainDate(2026, 1, 20)),
+        ];
+        final armed = {'bins': PlainDate(2026, 1, 20)};
+        final onItsOwnDate = projectDigestCounts(
+          occurrences: occurrences,
+          date: PlainDate(2026, 1, 20),
+          recipientMemberId: null,
+          armedReminderDates: armed,
+        );
+        final theDayAfter = projectDigestCounts(
+          occurrences: occurrences,
+          date: PlainDate(2026, 1, 21),
+          recipientMemberId: null,
+          armedReminderDates: armed,
+        );
+        expect(
+          onItsOwnDate.isSilent,
+          isTrue,
+          reason: 'the reminder speaks for this date, so the digest does not',
+        );
+        expect(
+          theDayAfter.isSilent,
+          isFalse,
+          reason:
+              'silent then non-silent: monotonicity over the digest alone is '
+              'broken, exactly as §2.5 says. If this ever passes as monotone '
+              'again, Rule D has stopped working.',
+        );
+      },
+    );
   });
+
+  group(
+    'Rule D -- never announced twice (spec docs/specs/notifications-n2.md '
+    '§2.4, D2)',
+    () {
+      test(
+        'an occurrence with a reminder armed on THIS date is omitted from '
+        'dueCount',
+        () {
+          final counts = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 30),
+            recipientMemberId: null,
+            armedReminderDates: {'bins': PlainDate(2026, 8, 30)},
+          );
+          expect(counts.dueCount, 0);
+          expect(counts.overdueCount, 0);
+          expect(counts.isSilent, isTrue);
+        },
+      );
+
+      test(
+        '...and from overdueCount too, when a quiet-hours deferral moved the '
+        'reminder onto a date the occurrence is already overdue on -- §2.4 '
+        'states the GENERAL form for exactly this case',
+        () {
+          final counts = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 31),
+            recipientMemberId: null,
+            armedReminderDates: {'bins': PlainDate(2026, 8, 31)},
+          );
+          expect(counts.overdueCount, 0);
+          expect(counts.isSilent, isTrue);
+        },
+      );
+
+      test(
+        'an occurrence armed on a DIFFERENT date is counted normally -- the '
+        'rule is keyed on the ARMED date, not on the chore',
+        () {
+          final counts = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 31),
+            recipientMemberId: null,
+            armedReminderDates: {'bins': PlainDate(2026, 8, 30)},
+          );
+          expect(
+            counts.overdueCount,
+            1,
+            reason:
+                'bins reminded Tuesday and ignored MUST reappear in '
+                "Wednesday's digest -- that is escalation, not repetition, "
+                'and the digest is the overdue channel (§2.4, D8)',
+          );
+        },
+      );
+
+      test(
+        'the omission clears the soleOccurrenceId gate as well as the counts '
+        '-- a slot that now counts nothing may not carry a Done button for '
+        'the thing it stopped counting',
+        () {
+          final counts = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 30),
+            recipientMemberId: null,
+            armedReminderDates: {'bins': PlainDate(2026, 8, 30)},
+          );
+          expect(counts.soleOccurrenceId, isNull);
+        },
+      );
+
+      test(
+        'omitting one of two occurrences promotes the OTHER to sole '
+        'occurrence -- the gate is re-decided after the omission, not before '
+        'it',
+        () {
+          final counts = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+              _occurrence(id: 'dishes', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 30),
+            recipientMemberId: null,
+            armedReminderDates: {'bins': PlainDate(2026, 8, 30)},
+          );
+          expect(counts.dueCount, 1);
+          expect(counts.soleOccurrenceId, 'dishes');
+        },
+      );
+
+      test(
+        'an empty armed map changes nothing at all -- which is what lets '
+        'every existing caller and the monotonicity group above stay '
+        'verbatim',
+        () {
+          final withMap = projectDigestCounts(
+            occurrences: [
+              _occurrence(id: 'bins', dueDate: PlainDate(2026, 8, 30)),
+            ],
+            date: PlainDate(2026, 8, 30),
+            recipientMemberId: null,
+            armedReminderDates: const {},
+          );
+          expect(withMap.dueCount, 1);
+          expect(withMap.soleOccurrenceId, 'bins');
+        },
+      );
+    },
+  );
 }
 
 /// A set covering every projection path at once, with a mix of assigned,

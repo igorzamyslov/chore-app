@@ -40,6 +40,9 @@ List<DigestPlan?> buildDigestPlans({
     for (final row in pending)
       ProjectedOccurrence(
         id: row.occurrence.id,
+        choreId: row.chore.id,
+        choreTitle: row.chore.title,
+        reminderMinutes: row.chore.reminderMinutes,
         dueDate: row.occurrence.dueDate,
         startDate: row.chore.startDate,
         recurrence: row.chore.recurrence,
