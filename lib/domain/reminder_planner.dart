@@ -108,7 +108,15 @@ bool isWithinQuietHours({
   required int startMinutes,
   required int endMinutes,
 }) {
-  return false;
+  if (!enabled || startMinutes == endMinutes) {
+    return false;
+  }
+  if (startMinutes < endMinutes) {
+    return minuteOfDay >= startMinutes && minuteOfDay < endMinutes;
+  }
+  // Wrapping: the window is the union of the two arcs the midnight
+  // boundary splits it into.
+  return minuteOfDay >= startMinutes || minuteOfDay < endMinutes;
 }
 
 /// [candidate] itself when quiet hours are off or [candidate] falls outside
@@ -148,16 +156,18 @@ DateTime applyQuietHours({
 }) {
   _validateMinuteOfDay(startMinutes, 'startMinutes');
   _validateMinuteOfDay(endMinutes, 'endMinutes');
-  if (!enabled || startMinutes == endMinutes) {
-    return candidate;
-  }
   final minuteOfDay = candidate.hour * 60 + candidate.minute;
-  final inside = startMinutes < endMinutes
-      // A non-wrapping window: [start, end).
-      ? minuteOfDay >= startMinutes && minuteOfDay < endMinutes
-      // A wrapping window: [start, midnight) union [midnight, end).
-      : minuteOfDay >= startMinutes || minuteOfDay < endMinutes;
-  if (!inside) {
+  // Delegated, never restated: [isWithinQuietHours] is the app's ONE
+  // wrapping-interval implementation, and the settings screen reads the
+  // same one to decide whether to say "Inside your quiet hours -- not
+  // delivering". A second copy here could drift from it, and the user would
+  // then see that sub-line on a notification that delivers.
+  if (!isWithinQuietHours(
+    minuteOfDay: minuteOfDay,
+    enabled: enabled,
+    startMinutes: startMinutes,
+    endMinutes: endMinutes,
+  )) {
     return candidate;
   }
   final hour = endMinutes ~/ 60;

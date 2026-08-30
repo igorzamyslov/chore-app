@@ -215,6 +215,10 @@
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
 
+  "settingsEveningToggle": "Abends noch mal erinnern",
+  "settingsEveningToggleSubtitle": "Nur wenn heute noch etwas offen ist",
+  "settingsQuietHoursToggle": "Ruhezeiten",
+
   "settingsExportEntry": "Daten exportieren",
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
 

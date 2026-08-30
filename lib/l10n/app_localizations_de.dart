@@ -828,6 +828,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDigestPermissionAction => 'Einstellungen öffnen';
 
   @override
+  String get settingsEveningToggle => 'Abends noch mal erinnern';
+
+  @override
+  String get settingsEveningToggleSubtitle =>
+      'Nur wenn heute noch etwas offen ist';
+
+  @override
+  String get settingsQuietHoursToggle => 'Ruhezeiten';
+
+  @override
   String get settingsExportEntry => 'Daten exportieren';
 
   @override

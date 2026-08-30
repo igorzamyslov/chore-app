@@ -823,6 +823,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDigestPermissionAction => 'Open settings';
 
   @override
+  String get settingsEveningToggle => 'Remind me again in the evening';
+
+  @override
+  String get settingsEveningToggleSubtitle =>
+      'Only if something is still open today';
+
+  @override
+  String get settingsQuietHoursToggle => 'Quiet hours';
+
+  @override
   String get settingsExportEntry => 'Export data';
 
   @override

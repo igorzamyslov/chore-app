@@ -7,10 +7,12 @@ import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/account_section.dart';
 import 'package:chore_app/features/settings/appearance_section.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
+import 'package:chore_app/features/settings/evening_section.dart';
 import 'package:chore_app/features/settings/export_row.dart';
 import 'package:chore_app/features/settings/language_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
+import 'package:chore_app/features/settings/quiet_hours_section.dart';
 import 'package:chore_app/features/settings/reset_flow.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/features/stats/stats_screen.dart';
@@ -122,6 +124,26 @@ class SettingsScreen extends ConsumerWidget {
                       minutesSinceMidnight: settings.digestMinutes,
                       onChanged: settingsRepository.setDigestTime,
                     ),
+                  // Row order from here down is BINDING (spec
+                  // docs/specs/notifications-n2.md §12, decision D12): it is
+                  // the whole of the evening re-reminder's discoverability,
+                  // and test/features/settings/settings_row_order_test.dart
+                  // is the guard a later tidy-up cannot talk its way past.
+                  //
+                  // Neither toggle is gated on `digestEnabled`: the evening
+                  // re-reminder is independent of the digest (§5.1 requires
+                  // the row to be findable regardless), and quiet hours
+                  // govern per-chore reminders too.
+                  EveningToggleTile(
+                    value: settings.eveningReminderEnabled,
+                    onChanged: (enabled) => settingsRepository
+                        .setEveningReminderEnabled(enabled: enabled),
+                  ),
+                  QuietHoursToggleTile(
+                    value: settings.quietHoursEnabled,
+                    onChanged: (enabled) => settingsRepository
+                        .setQuietHoursEnabled(enabled: enabled),
+                  ),
                   if (settings.digestEnabled && !permissionGranted)
                     const DigestPermissionHint(onOpenSettings: openAppSettings),
                 ],

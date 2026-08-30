@@ -1037,6 +1037,19 @@
     "description": "Button label in the digest permission hint row; opens the OS app settings screen."
   },
 
+  "settingsEveningToggle": "Remind me again in the evening",
+  "@settingsEveningToggle": {
+    "description": "BINDING COPY -- spec docs/specs/notifications-n2.md §5.1 and §11 fix this string verbatim; do not reword without amending the spec. Title of the settings switch that turns on a second daily notification in the evening. It ships OFF (decision D12), so this label is the only thing that leads the person it exists for to it -- someone whose notification 'arrives, then it's gone'. It therefore names their problem, never our mechanism: 'Evening re-reminder' is the feature's name in the spec and must not become the name of the row."
+  },
+  "settingsEveningToggleSubtitle": "Only if something is still open today",
+  "@settingsEveningToggleSubtitle": {
+    "description": "BINDING COPY -- spec docs/specs/notifications-n2.md §5.1 and §11 fix this string verbatim. Permanent sub-line under settingsEveningToggle, shown whether the switch is on or off, stating the condition in the same register as the label: the evening notification only fires when at least one chore is due TODAY and still open (overdue ones never count, decision D6, which is what makes it impossible to receive two evenings running about the same chore)."
+  },
+  "settingsQuietHoursToggle": "Quiet hours",
+  "@settingsQuietHoursToggle": {
+    "description": "Title of the settings screen's quiet-hours on/off switch row, directly below the evening re-reminder rows in the Preferences group (spec docs/specs/notifications-n2.md §12). While on, the digest and per-chore reminders that would fall inside the window are deferred to its end rather than dropped (§6)."
+  },
+
   "settingsExportEntry": "Export data",
   "@settingsExportEntry": {
     "description": "Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness."
