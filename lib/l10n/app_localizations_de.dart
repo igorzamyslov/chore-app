@@ -740,6 +740,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormStartDateLabel => 'Startdatum';
 
   @override
+  String get choreFormReminderToggle => 'An diese Aufgabe erinnern';
+
+  @override
+  String get choreFormReminderTime => 'Erinnerungszeit';
+
+  @override
+  String get choreFormReminderHint =>
+      'Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf';
+
+  @override
   String get shoppingEmptyState => 'Die Einkaufsliste ist leer';
 
   @override
