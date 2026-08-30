@@ -35,7 +35,7 @@ is built so that a negative GATE 3 leaves AC1 and two thirds of AC2 untouched.
 | Row | What landed |
 | --- | --- |
 | **N2 slices 1–3** | Schema v13, the pure planning core (`lib/domain/reminder_planner.dart`), Rule D inside `digest_projection.dart`, and `applyPlans` as ONE enqueued write over all three id ranges. **Nothing user-visible** — correct and stated at the top of the plan. |
-| **N2 slice 4** | *(pending — filled in when the stream lands)* |
+| **N2 slice 4** | The chore form's reminder row (switch + time card, pre-filled at 18:00 from `defaultReminderMinutes`), `reminderMinutes` threaded through `ChoreService`, the Settings ceiling sub-line, and a `chore_reminder` Maestro flow. **This is what makes AC1 live.** |
 | **N2 slices 5–6** | Quiet hours and the evening re-reminder, both settings surfaces, the §12 row-order guard, and the corrections to §11/§12 of the spec itself. Makes the isolate-free half of AC2 live. |
 | **G-15** | The category icon grid is six equal flexible columns spanning the sheet, sharing `ColorSwatchPicker.columns`. |
 | **G-16** | Two-letter initials measured against the real shipped font for the first time; default avatar radius 12 → 16 (24px → 32px). |
@@ -209,6 +209,110 @@ branch** — a partial restore is the one failure mode that looks like success.
 
 ---
 
+### Two more process findings, added after the last merge
+
+#### A red that looked like total collapse was the emulator's own launcher
+
+The final accumulated state failed `android` with **15 of 15 flows failing at
+their first assertion** — the most alarming possible signature, and one that
+reads as "the app no longer starts". It was not ours. The Maestro debug
+artifacts' `screen-hierarchy` dump at the failure instant carries
+`android:id/aerr_close` / `aerr_wait` and the title **"Quickstep isn't
+responding"** — the emulator's launcher had ANR'd, and its modal dialog owned
+the foreground window for the whole 17-minute run. Our package does not appear
+in the dump for that reason alone. `checks` was green at the same SHA, both
+halves had passed `android` on their own bases, and a re-run of the identical
+SHA passed 15/15.
+
+The distinguishing evidence cost one `gh run download` and two greps. Filed as
+**G-18**, because the signature is indistinguishable at a glance from a real
+regression and the next person should not bisect their own code first. It is
+the same lesson **A-6** records from the other direction: a blank or blocked
+app window has several unrelated causes and only one of them is ours.
+
+#### A merge that GitHub calls CLEAN can still need verifying
+
+Slice 4 branched before slices 5–6 merged, so **its green was against a
+superseded tree** — the same trap section 8 records for `origin/main` moving
+mid-wave. Both streams had touched `digest_section.dart`,
+`settings_screen.dart` and all five l10n files, and GitHub reported the merge
+`MERGEABLE`/`CLEAN`. A textual auto-merge of *generated* l10n is exactly what
+made a wave-3 PR unmergeable, so it was checked rather than trusted: all eight
+new ARB keys present in **both** locales, `flutter gen-l10n` a zero diff (which
+is what proves the auto-merged generated files match a real regeneration rather
+than merely merging without markers), both streams' widgets present in the two
+shared source files, and `dart format` clean. Then CI re-run on the combined
+tree, which is the only green that counts.
+
+#### One line of the wave's own binding constraints was wrong
+
+The constraints handed to every stream said `find.bySemanticsIdentifier` lives
+in `test/test_utils/pump_app.dart`. It does not — it is a **Flutter built-in**
+(`flutter_test/src/finders.dart`). Only `testChoreApp` is local. Harmless here,
+but it is the same error class §4 catalogues, this time in the orchestration
+brief rather than in a spec, and it survived three waves unchallenged.
+
+---
+
 ## 6. What is open
 
-*(completed when slice 4 lands)*
+- **Slice 7 — the notification actions.** `reminder.done`, `reminder.snooze`,
+  `evening.done`, payload `v:2` (whose decoder must keep accepting `v:1`, since
+  a pending notification survives an app upgrade), the snooze write path in the
+  background isolate, and **GATE 4**. Deliberately not started. See backlog
+  **G-6**, which now carries the full remaining scope.
+- **F-1 GATE 3** — unchanged by this wave, still needs a human with a phone. N2
+  no longer depends on it, by construction (§10.1), but it remains open.
+- **Two things slice 7 must be handed, both recorded at their call sites:**
+  `reminderOverflowCountProvider` passes `snoozedUntilByOccurrenceId: const {}`
+  because `activeSnoozes()` is a `Future` and the provider is synchronous —
+  inert while nothing writes `reminder_snoozes`, wrong the moment slice 7 does;
+  and `ReminderSnoozeRepository`'s garbage collection uses
+  `DateTime.now().toUtc()` rather than `clockProvider`.
+- **A bounded partition window, and it is a deliberate deviation from §9.2.**
+  That section says `applyDigestPlans` may survive "only if nothing outside the
+  scheduler calls them". Two callers remain: `DigestPrepromptBanner._enable`
+  and the background isolate's `rewriteDigestHorizon`. `cancelDigest` was
+  removed outright, but this one was kept because §10.1 limits the isolate to
+  the digest, and routing it through `applyPlans` would make the already
+  unverified GATE 3 depend on a 64-call rewrite instead of 24 — strictly worse.
+  **The consequence is real:** that path writes digest counts *without* Rule D,
+  so until the next recompute an occurrence can be both counted by the digest
+  and individually reminded, violating §0.1's "never both". It always errs
+  toward *reporting* a chore rather than hiding one, which is the same trade
+  §10.1 makes explicitly for snooze. Slice 7's author needs to know this.
+- **G-13** — the 12sp category-label 4.5:1 contrast gap. Untouched.
+- **G-17** — chip avatars cannot fit two-letter initials and silently ignore
+  their `radius`. Opened by the G-16 work; the remedies are product calls, not
+  geometry.
+- **G-18** — the emulator system-UI hang, above.
+- **Everything in §3's "NOT verified" list**, which for this wave is unusually
+  large: N2 is a notifications feature and **no CI job puts a real notification
+  on a real device.** Green CI here means the planning is right, not that a
+  reminder arrives.
+
+---
+
+## 7. Housekeeping
+
+**None performed, and none was in scope.** Five worktrees and their branches
+from wave 6 are still present (`chore-app-w6-a6`, `-icons`, `-integration`,
+`-palette`, `-repeat`), as are this wave's four (`chore-app-w7-foundation`,
+`-icons`, `-reminders`, `-evening`) plus `chore-app-orchestrator`. Deleting
+branches or worktrees was a hard stop this wave, so they were left alone. They
+are safe to remove once `main` takes this merge; the wave-6 set has been
+mergeable since `132c1c4`.
+
+---
+
+## 8. If you read only one thing
+
+The wave's most reusable output is not the feature. It is the **partition
+test** in `test/application/digest_plan_builder_test.dart` and the shape it
+demonstrates: an invariant stated in the spec (§0.1), made executable by
+walking every date against an independently computed oracle and asserting
+`|counted| + |armed| == |open|`, with **vacuity guards** proving the fixture
+actually exercises both halves. Seven tests in this repo have now been found
+that could not fail. Every one of them would have been caught by asking the two
+questions that test answers by construction: *what concrete change makes this
+go red*, and *does my fixture actually reach the case I am asserting about*.
