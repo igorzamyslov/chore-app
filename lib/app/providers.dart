@@ -1337,14 +1337,13 @@ class DigestRescheduleController {
       pendingOccurrenceIds: {for (final row in pending) row.occurrence.id},
       nowUtc: DateTime.now().toUtc(),
     );
-    // INVERSION (Task 13 step 6): back to the digest range alone, so the
-    // reminder and evening ranges are never touched. To be reverted.
-    await scheduler.applyDigestPlans(
-      buildDigestPlans(
+    await scheduler.applyPlans(
+      buildNotificationPlans(
         now: _ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
         recipientMemberId: actingMemberId,
+        snoozedUntilByOccurrenceId: await snoozeRepository.activeSnoozes(),
       ),
       // Carried into each actionable slot's payload so the background isolate
       // never has to re-derive it -- it could not do so correctly (no auth

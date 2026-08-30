@@ -59,8 +59,7 @@ const int reminderNotificationIdBase = 2001;
 /// `k` uses `eveningNotificationIdBase + k` (spec
 /// `docs/specs/notifications-n2.md` §3.1). See [reminderNotificationIdBase]
 /// for why the bases are spaced out.
-// INVERSION (Task 13 step 2 inversion 2). To be reverted.
-const int eveningNotificationIdBase = 1010;
+const int eveningNotificationIdBase = 3001;
 
 /// How far ahead an individual reminder may be armed, in days (spec
 /// `docs/specs/notifications-n2.md` D3).
