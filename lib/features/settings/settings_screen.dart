@@ -136,11 +136,13 @@ class SettingsScreen extends ConsumerWidget {
                   // govern per-chore reminders too.
                   EveningToggleTile(
                     value: settings.eveningReminderEnabled,
-                    onChanged: (enabled) {},
+                    onChanged: (enabled) => settingsRepository
+                        .setEveningReminderEnabled(enabled: enabled),
                   ),
                   QuietHoursToggleTile(
                     value: settings.quietHoursEnabled,
-                    onChanged: (enabled) {},
+                    onChanged: (enabled) => settingsRepository
+                        .setQuietHoursEnabled(enabled: enabled),
                   ),
                   if (settings.digestEnabled && !permissionGranted)
                     const DigestPermissionHint(onOpenSettings: openAppSettings),

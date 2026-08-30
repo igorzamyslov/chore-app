@@ -111,7 +111,12 @@ bool isWithinQuietHours({
   if (!enabled || startMinutes == endMinutes) {
     return false;
   }
-  return minuteOfDay >= startMinutes && minuteOfDay < endMinutes;
+  if (startMinutes < endMinutes) {
+    return minuteOfDay >= startMinutes && minuteOfDay < endMinutes;
+  }
+  // Wrapping: the window is the union of the two arcs the midnight
+  // boundary splits it into.
+  return minuteOfDay >= startMinutes || minuteOfDay < endMinutes;
 }
 
 /// [candidate] itself when quiet hours are off or [candidate] falls outside
