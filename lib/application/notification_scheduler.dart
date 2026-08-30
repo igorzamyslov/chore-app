@@ -9,9 +9,6 @@ import 'dart:ui' as ui;
 import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/application/digest_plan_builder.dart';
 import 'package:chore_app/domain/digest_planner.dart';
-// INVERSION side effect: the Task 11 body inversion removes this
-// import's only use, and an analyzer failure is not a test red.
-// ignore: unused_import
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -676,8 +673,7 @@ class NotificationScheduler {
           title: l10n.appTitle,
           body: _digestBody(l10n, plan),
           fireAt: plan.fireAt,
-          // INVERSION (Task 10 step 5). To be reverted.
-          channelId: remindersChannelId,
+          channelId: digestChannelId,
           channelName: l10n.notificationChannelDigestName,
           channelDescription: l10n.notificationChannelDigestDescription,
           payload: soleOccurrenceId == null
@@ -720,18 +716,31 @@ class NotificationScheduler {
     _requireLength(plans.digest.length, digestHorizonSlots, 'digest');
     _requireLength(plans.reminders.length, reminderCeiling, 'reminders');
     _requireLength(plans.evening.length, eveningHorizonSlots, 'evening');
-    return _enqueueNotificationWrite(
-      () => _applyPlansNow(plans, actingMemberId),
-    );
+    // INVERSION (Task 12 step 4 inversion 2): three enqueued writes instead
+    // of one, so another write can be scheduled into the gaps between the
+    // ranges. To be reverted.
+    return _applyPlansSplit(plans, actingMemberId);
   }
 
-  Future<void> _applyPlansNow(
+  Future<void> _applyPlansSplit(
     NotificationPlanSet plans,
     String? actingMemberId,
   ) async {
+    await _enqueueNotificationWrite(() async {
+      await ensureInitialized();
+      await _writeDigestRange(
+        plans.digest,
+        actingMemberId,
+        lookupAppLocalizations(localeResolver()),
+      );
+    });
+    await _enqueueNotificationWrite(() => _writeReminderRange(plans));
+    await _enqueueNotificationWrite(() => _writeEveningRange(plans));
+  }
+
+  Future<void> _writeReminderRange(NotificationPlanSet plans) async {
     await ensureInitialized();
     final l10n = lookupAppLocalizations(localeResolver());
-    await _writeDigestRange(plans.digest, actingMemberId, l10n);
     for (var i = 0; i < plans.reminders.length; i++) {
       final plan = plans.reminders[i];
       final id = reminderNotificationIdBase + i;
@@ -747,8 +756,9 @@ class NotificationScheduler {
           // Two plain keys rather than date arithmetic inside a localized
           // string. The armed date differs from the due date exactly when a
           // snooze or a quiet-hours deferral moved it (§11).
-          // INVERSION (Task 11 step 4 inversion 2). To be reverted.
-          body: l10n.reminderBodyDueToday,
+          body: PlainDate.fromDateTime(plan.fireAt) == plan.dueDate
+              ? l10n.reminderBodyDueToday
+              : l10n.reminderBodyStillOpen,
           fireAt: plan.fireAt,
           channelId: remindersChannelId,
           channelName: l10n.notificationChannelRemindersName,
@@ -756,6 +766,11 @@ class NotificationScheduler {
         );
       }
     }
+  }
+
+  Future<void> _writeEveningRange(NotificationPlanSet plans) async {
+    await ensureInitialized();
+    final l10n = lookupAppLocalizations(localeResolver());
     for (var k = 0; k < plans.evening.length; k++) {
       final plan = plans.evening[k];
       final id = eveningNotificationIdBase + k;
@@ -819,8 +834,11 @@ class NotificationScheduler {
     // before the tail is captured would be a suspension point that
     // subverts the ordering. Same placement as _applyDigestPlansNow's.
     await ensureInitialized();
-    // INVERSION (Task 12 step 4 inversion 1). To be reverted.
-    for (final id in digestNotificationIds) {
+    for (final id in [
+      ...digestNotificationIds,
+      ...reminderNotificationIds,
+      ...eveningNotificationIds,
+    ]) {
       await plugin.cancel(id);
     }
   }
