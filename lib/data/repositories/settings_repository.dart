@@ -27,8 +27,12 @@ class SettingsRepository {
   /// Returns the current UTC time, used for `created_at` / `updated_at`.
   final DateTime Function() nowUtc;
 
-  /// Returns the settings row, inserting it with schema defaults
-  /// (`digestEnabled: true`, `digestMinutes: 480`) if it doesn't exist yet.
+  /// Returns the settings row, inserting it with schema defaults if it
+  /// doesn't exist yet: `digestEnabled: true`, `digestMinutes: 480`, and
+  /// -- since schemaVersion 13 (spec `docs/specs/notifications-n2.md` §8.1)
+  /// -- quiet hours OFF at 22:00-07:00 and the evening re-reminder OFF at
+  /// 20:00. Both N2 features ship off, so a fresh install and an upgraded
+  /// one behave identically until someone opens Settings.
   ///
   /// Idempotent and race-safe, mirroring
   /// `HouseholdRepository.createLocalHousehold`.
@@ -52,11 +56,21 @@ class SettingsRepository {
               updatedAt: now,
             ),
           );
+      // Hand-built rather than re-selected, so the insert stays a single
+      // write. Every non-nullable column is a REQUIRED parameter here, and
+      // that is what stops this literal silently drifting from the schema's
+      // own defaults: adding a defaulted column to `Settings` breaks this
+      // line until someone restates the same default here, deliberately.
       return DeviceSettings(
         id: deviceId,
         digestEnabled: true,
         digestMinutes: 480,
         membershipRevoked: false,
+        quietHoursEnabled: false,
+        quietStartMinutes: 1320,
+        quietEndMinutes: 420,
+        eveningReminderEnabled: false,
+        eveningReminderMinutes: 1200,
         createdAt: now,
         updatedAt: now,
       );

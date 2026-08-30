@@ -39,9 +39,7 @@ Map<String, Object?> _serverChoreRow({
     'deleted_at': null,
     ...extra,
   };
-  for (final key in without) {
-    row.remove(key);
-  }
+  without.forEach(row.remove);
   return row;
 }
 
