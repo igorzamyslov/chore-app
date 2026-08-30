@@ -1037,6 +1037,14 @@
   "@settingsDigestToggleDeniedHint": {
     "description": "Sub-line shown under the settings screen's digest toggle when the toggle is on but the OS notification permission is denied, so the switch's ON position doesn't look like it is working. Also the accessibility label of the Settings tab's ambient attention dot (lib/app/app_shell.dart), which appears in exactly the same situation."
   },
+  "settingsRemindersCeilingHint": "{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}",
+  "@settingsRemindersCeilingHint": {
+    "description": "Sub-line under the daily-summary toggle, shown only while more chores have a reminder than the device can arm (spec docs/specs/notifications-n2.md §3.2, decision D4). A pure projection of current state: no stored flag, nothing to dismiss, nothing that can go stale. States the outcome factually and non-alarmingly, because the ceiling costs cadence and never coverage -- the chores it names are still announced, by the daily summary, on their own date. 'stays in the daily summary' matches settingsDigestToggleTitle's own label one line above it. No zero branch: the string is only rendered when count >= 1.",
+    "placeholders": {
+      "count": { "type": "int", "example": "2" },
+      "limit": { "type": "int", "example": "33" }
+    }
+  },
   "settingsDigestTimeLabel": "Notification time",
   "@settingsDigestTimeLabel": {
     "description": "Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap."

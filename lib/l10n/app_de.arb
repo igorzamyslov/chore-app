@@ -215,6 +215,7 @@
   "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleDeniedHint": "Wird nicht zugestellt — Benachrichtigungen sind aus",
+  "settingsRemindersCeilingHint": "{count, plural, one{1 Aufgabe bleibt in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.} other{{count} Aufgaben bleiben in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.}}",
   "settingsDigestTimeLabel": "Benachrichtigungszeit",
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",

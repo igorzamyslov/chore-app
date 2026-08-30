@@ -1208,6 +1208,12 @@ abstract class AppLocalizations {
   /// **'Not delivering — notifications are off'**
   String get settingsDigestToggleDeniedHint;
 
+  /// Sub-line under the daily-summary toggle, shown only while more chores have a reminder than the device can arm (spec docs/specs/notifications-n2.md §3.2, decision D4). A pure projection of current state: no stored flag, nothing to dismiss, nothing that can go stale. States the outcome factually and non-alarmingly, because the ceiling costs cadence and never coverage -- the chores it names are still announced, by the daily summary, on their own date. 'stays in the daily summary' matches settingsDigestToggleTitle's own label one line above it. No zero branch: the string is only rendered when count >= 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}'**
+  String settingsRemindersCeilingHint(int count, int limit);
+
   /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
   ///
   /// In en, this message translates to:

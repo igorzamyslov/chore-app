@@ -828,6 +828,19 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wird nicht zugestellt — Benachrichtigungen sind aus';
 
   @override
+  String settingsRemindersCeilingHint(int count, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Aufgaben bleiben in der täglichen Zusammenfassung — dieses Gerät kann $limit Erinnerungen gleichzeitig vormerken.',
+      one:
+          '1 Aufgabe bleibt in der täglichen Zusammenfassung — dieses Gerät kann $limit Erinnerungen gleichzeitig vormerken.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get settingsDigestTimeLabel => 'Benachrichtigungszeit';
 
   @override

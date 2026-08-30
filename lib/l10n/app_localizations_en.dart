@@ -823,6 +823,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not delivering — notifications are off';
 
   @override
+  String settingsRemindersCeilingHint(int count, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count chores stay in the daily summary — this device can hold $limit reminders at once.',
+      one:
+          '1 chore stays in the daily summary — this device can hold $limit reminders at once.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get settingsDigestTimeLabel => 'Notification time';
 
   @override
