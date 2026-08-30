@@ -108,7 +108,7 @@ bool isWithinQuietHours({
   required int startMinutes,
   required int endMinutes,
 }) {
-  if (!enabled) {
+  if (!enabled || startMinutes == endMinutes) {
     return false;
   }
   if (startMinutes < endMinutes) {
