@@ -167,23 +167,75 @@ void main() {
   });
 
   group('the notification id budget', () {
-    test("the digest leaves at least 32 of iOS's 64 pending slots for "
-        'per-chore reminders', () {
-      // iOS caps an app at 64 pending notifications. The number the digest
-      // actually competes with is NOT 64 -- it is whatever N2 / per-chore
-      // reminders (backlog G-6 / F16) will need, and those are unbuilt, so
-      // nothing else can defend their share. Raising the horizon past this
-      // guard means renegotiating that split, not editing this number.
-      // Documented in docs/specs/notifications.md, "Notification id
-      // budget".
-      expect(
-        digestHorizonSlots,
-        lessThanOrEqualTo(32),
-        reason:
-            "at least 32 of iOS's 64 pending notification slots must stay "
-            'available for N2 / per-chore reminders (backlog G-6 / F16)',
-      );
-    });
+    test(
+      'the three ranges spend at most the 64 ids iOS allows, computed from '
+      'the constants rather than from literals (spec '
+      'docs/specs/notifications-n2.md §3.3)',
+      () {
+        // REPLACES `digestHorizonSlots <= 32`, deliberately and not by
+        // deletion. That guard's job was to make N2 renegotiate the split
+        // explicitly rather than let the digest eat it; N2 IS that
+        // renegotiation, and deleting the guard instead of replacing it
+        // would leave the 64 undefended for the first time since N1.
+        //
+        // The total is now EXACTLY 64 and there is no slack left. Anything
+        // new must take ids from one of these three ranges, by amending
+        // §3.1's table.
+        expect(
+          digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          lessThanOrEqualTo(64),
+          reason:
+              'iOS caps an app at 64 pending notifications, and all three '
+              'ranges are now spent against it',
+        );
+      },
+    );
+
+    test(
+      'the three id ranges are pairwise disjoint -- the bases are '
+      'deliberately far apart (1001/2001/3001) so an off-by-one inside one '
+      'range cannot silently land in another',
+      () {
+        final ranges = {
+          'digest': digestNotificationIds.toSet(),
+          'reminders': reminderNotificationIds.toSet(),
+          'evening': eveningNotificationIds.toSet(),
+        };
+        for (final a in ranges.entries) {
+          for (final b in ranges.entries) {
+            if (a.key == b.key) {
+              continue;
+            }
+            expect(
+              a.value.intersection(b.value),
+              isEmpty,
+              reason: '${a.key} and ${b.key} overlap',
+            );
+          }
+        }
+        // ...and nothing is double-counted in the sum above.
+        expect(
+          ranges.values.expand((ids) => ids).toSet(),
+          hasLength(
+            digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+          ),
+        );
+      },
+    );
+
+    test(
+      'reminder and evening ids are exactly consecutive from their bases',
+      () {
+        expect(reminderNotificationIds, [
+          for (var i = 0; i < reminderCeiling; i++)
+            reminderNotificationIdBase + i,
+        ]);
+        expect(eveningNotificationIds, [
+          for (var k = 0; k < eveningHorizonSlots; k++)
+            eveningNotificationIdBase + k,
+        ]);
+      },
+    );
 
     test('the ids are exactly digestHorizonSlots consecutive ids from the '
         'base', () {

@@ -162,15 +162,21 @@ const int digestHorizonTailStepDays = 7;
 /// at day 2. What a longer horizon buys is the difference between a
 /// possibly-stale count and no notification at all.
 ///
-/// The budget it spends is iOS's 64-pending-notification cap, but the
-/// number to protect is NOT 64: it is the share left for the unbuilt
-/// per-chore reminders (backlog G-6 / F16), which nothing else defends.
-/// 24 here leaves 40 for them, and
-/// `test/application/notification_scheduler_test.dart` asserts
-/// `digestHorizonSlots <= 32` so a future raise renegotiates that split
-/// rather than silently eating it. See "Notification id budget" in
-/// `docs/specs/notifications.md`, and
-/// `docs/plans/2026-08-14-digest-horizon-ceiling.md` for the full
+/// The budget it spends is iOS's 64-pending-notification cap, and since
+/// schema v13 that cap is spent EXACTLY, three ways: 24 here, 33 for
+/// per-chore reminders (`reminderCeiling`) and 7 for the evening
+/// re-reminder (`eveningHorizonSlots`) -- see
+/// `docs/specs/notifications-n2.md` §3.1's table, which is the
+/// renegotiation the old `digestHorizonSlots <= 32` guard existed to force.
+/// That guard is gone, REPLACED rather than deleted, by
+/// `test/application/notification_scheduler_test.dart`'s pair: the three
+/// counts sum to at most 64, and the three id ranges are pairwise disjoint,
+/// both computed from the constants (§3.3).
+///
+/// **There is no slack left.** Raising this number now takes ids from one
+/// of the other two ranges and must amend §3.1's table to say which. See
+/// also "Notification id budget" in `docs/specs/notifications.md`, and
+/// `docs/plans/2026-08-14-digest-horizon-ceiling.md` for the original
 /// reasoning.
 const int digestHorizonSlots =
     digestDailyHorizonDays + digestWeeklyHorizonSlots;
