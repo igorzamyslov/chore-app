@@ -540,6 +540,37 @@ void main() {
 
   group('pauseChore / unpauseChore', () {
     test(
+      'pausing a chore with a SNOOZED pending occurrence deletes the snooze '
+      'row rather than throwing -- the cascade FK is load-bearing because '
+      'pauseChore HARD-DELETES the occurrence while foreign keys are ON '
+      '(spec docs/specs/notifications-n2.md §4.2)',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bins',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        final occurrence = await repo.pendingOccurrenceOf(chore.id);
+        await db
+            .into(db.reminderSnoozes)
+            .insert(
+              ReminderSnoozesCompanion.insert(
+                occurrenceId: occurrence!.id,
+                snoozedUntil: '2026-09-01T18:00:00.000Z',
+                createdAt: 't0',
+                updatedAt: 't0',
+              ),
+            );
+
+        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(chore.id);
+
+        expect(await db.select(db.reminderSnoozes).get(), isEmpty);
+      },
+    );
+
+    test(
       'pausing deletes the pending occurrence; pausing again is a no-op',
       () async {
         final m1 = await _insertMember(db, 'm1', householdId);
