@@ -124,7 +124,8 @@ DateTime nextDigestSlot({required DateTime now, required int digestMinutes}) {
 /// Fourteen: two weeks of unbroken daily cadence matches a plausible
 /// holiday, which is the gap most likely to be survived without the user
 /// ever noticing the horizon exists.
-const int digestDailyHorizonDays = 14;
+// INVERSION (Task 13 step 2 inversion 1). To be reverted.
+const int digestDailyHorizonDays = 25;
 
 /// How many *trailing* digest slots follow the daily segment, spaced
 /// [digestHorizonTailStepDays] apart.

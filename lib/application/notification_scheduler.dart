@@ -716,31 +716,18 @@ class NotificationScheduler {
     _requireLength(plans.digest.length, digestHorizonSlots, 'digest');
     _requireLength(plans.reminders.length, reminderCeiling, 'reminders');
     _requireLength(plans.evening.length, eveningHorizonSlots, 'evening');
-    // INVERSION (Task 12 step 4 inversion 2): three enqueued writes instead
-    // of one, so another write can be scheduled into the gaps between the
-    // ranges. To be reverted.
-    return _applyPlansSplit(plans, actingMemberId);
+    return _enqueueNotificationWrite(
+      () => _applyPlansNow(plans, actingMemberId),
+    );
   }
 
-  Future<void> _applyPlansSplit(
+  Future<void> _applyPlansNow(
     NotificationPlanSet plans,
     String? actingMemberId,
   ) async {
-    await _enqueueNotificationWrite(() async {
-      await ensureInitialized();
-      await _writeDigestRange(
-        plans.digest,
-        actingMemberId,
-        lookupAppLocalizations(localeResolver()),
-      );
-    });
-    await _enqueueNotificationWrite(() => _writeReminderRange(plans));
-    await _enqueueNotificationWrite(() => _writeEveningRange(plans));
-  }
-
-  Future<void> _writeReminderRange(NotificationPlanSet plans) async {
     await ensureInitialized();
     final l10n = lookupAppLocalizations(localeResolver());
+    await _writeDigestRange(plans.digest, actingMemberId, l10n);
     for (var i = 0; i < plans.reminders.length; i++) {
       final plan = plans.reminders[i];
       final id = reminderNotificationIdBase + i;
@@ -766,11 +753,6 @@ class NotificationScheduler {
         );
       }
     }
-  }
-
-  Future<void> _writeEveningRange(NotificationPlanSet plans) async {
-    await ensureInitialized();
-    final l10n = lookupAppLocalizations(localeResolver());
     for (var k = 0; k < plans.evening.length; k++) {
       final plan = plans.evening[k];
       final id = eveningNotificationIdBase + k;
