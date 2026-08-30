@@ -50,7 +50,7 @@ class ActingMemberButton extends ConsumerWidget {
         'chores.actingMember',
         child: Tooltip(
           message: l10n.actingMemberSignedInAs(member.name),
-          child: Center(child: MemberAvatar(member: member, radius: 14)),
+          child: Center(child: MemberAvatar(member: member)),
         ),
       );
     }
@@ -63,7 +63,7 @@ class ActingMemberButton extends ConsumerWidget {
         onPressed: canSwitch ? () => showActingMemberSheet(context) : null,
         icon: member == null || mode != MemberIdentityMode.switching
             ? const Icon(Icons.account_circle_outlined)
-            : MemberAvatar(member: member, radius: 14),
+            : MemberAvatar(member: member),
       ),
     );
   }
@@ -107,7 +107,7 @@ class _ActingMemberSheet extends ConsumerWidget {
               semantic(
                 'actingMember.sheet.row.${member.id}',
                 child: ListTile(
-                  leading: MemberAvatar(member: member, radius: 14),
+                  leading: MemberAvatar(member: member),
                   title: Text(member.name),
                   trailing: member.id == currentId
                       ? const Icon(Icons.check)

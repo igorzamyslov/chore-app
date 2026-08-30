@@ -223,10 +223,19 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
   }
 }
 
-/// The icon picker: a wrapped grid of [categoryIconIdentifiers], each drawn
-/// via `categoryIcon`. The selected tile is marked two ways — a filled
+/// The icon picker: a six-across grid of [categoryIconIdentifiers], each
+/// drawn via `categoryIcon`. The selected tile is marked two ways — a filled
 /// background AND a small check badge — so selection never rides on color
 /// alone (`docs/specs/design-language.md` color-usage rules).
+///
+/// Six EQUAL, FLEXIBLE columns per row (design canvas frames 1b/1d:
+/// `grid-template-columns: repeat(6, 1fr)`), laid out with the same
+/// `Row` + `Expanded` pattern [ColorSwatchPicker] uses — not a `Wrap`. A
+/// `Wrap` sizes a row to the sum of its fixed-size children, so it fits
+/// `floor((width + 8) / 56)` tiles per row: thirteen on the widget suite's
+/// 800px surface, eight on a 480dp phone, and six only in the 360-415dp
+/// band. On Igor's ~412dp Android it landed in that band, six across but
+/// 328px wide inside a 380px sheet — backlog G-15.
 class _IconGrid extends StatelessWidget {
   const _IconGrid({required this.selected, required this.onSelected});
 
@@ -236,40 +245,70 @@ class _IconGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final identifier in categoryIconIdentifiers)
-          semantic(
-            'settings.categories.icon.$identifier',
-            child: PickerTile(
-              isSelected: identifier == selected,
-              onTap: () => onSelected(identifier),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    categoryIcon(identifier),
-                    color: identifier == selected
-                        ? colorScheme.onSecondaryContainer
-                        : colorScheme.onSurfaceVariant,
+    const identifiers = categoryIconIdentifiers;
+    const columns = ColorSwatchPicker.columns;
+    final rows = <Widget>[];
+    for (var start = 0; start < identifiers.length; start += columns) {
+      final end = start + columns > identifiers.length
+          ? identifiers.length
+          : start + columns;
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(top: start == 0 ? 0 : 8),
+          child: Row(
+            children: [
+              for (var index = start; index < end; index++)
+                Expanded(
+                  // Expanded hands its child a TIGHT horizontal constraint,
+                  // which PickerTile's SizedBox(width: 48) would resolve to
+                  // the full column width -- stretching the tile into an
+                  // oval on a phone-width sheet. Center shrink-wraps it back
+                  // to 48 while Expanded still divides the row into six
+                  // equal columns spanning the sheet.
+                  child: Center(
+                    child: _tile(colorScheme, identifiers[index]),
                   ),
-                  if (identifier == selected)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Icon(
-                        Icons.check_circle,
-                        size: 14,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                ),
+              // Pad a short final row so its tiles keep the same column
+              // width as every full row above them.
+              for (var filler = end; filler < start + columns; filler++)
+                const Expanded(child: SizedBox.shrink()),
+            ],
           ),
-      ],
+        ),
+      );
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: rows);
+  }
+
+  Widget _tile(ColorScheme colorScheme, String identifier) {
+    return semantic(
+      'settings.categories.icon.$identifier',
+      child: PickerTile(
+        isSelected: identifier == selected,
+        onTap: () => onSelected(identifier),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              categoryIcon(identifier),
+              color: identifier == selected
+                  ? colorScheme.onSecondaryContainer
+                  : colorScheme.onSurfaceVariant,
+            ),
+            if (identifier == selected)
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Icon(
+                  Icons.check_circle,
+                  size: 14,
+                  color: colorScheme.primary,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

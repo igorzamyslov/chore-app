@@ -71,8 +71,20 @@ superseded; see that spec for the current behavior.
     all-emoji name to `"?"`.
   - Two characters rather than one because for a color-blind viewer the
     initials are the only channel that separates members. The chore-tile
-    avatar was enlarged from 20px to 24px to fit them; the rule was not
-    weakened to fit the old size.
+    avatar was enlarged from 20px to 24px to fit them (G-4), and again to
+    32px (G-16) after a real Android device showed them still touching the
+    ring at 24px. 32px is not a round-up: it is the smallest avatar at which
+    the 11px legibility floor stops holding the glyphs larger than the
+    ring's own size formula asks for, which is what produced G-16 in the
+    first place. Measured against the actual shipped Inter-SemiBold rather
+    than asserted — `tool/measure_avatar_font.py` prints the numbers,
+    `test/features/members/member_avatar_test.dart` holds them. The
+    two-character rule was not weakened to fit either old size.
+    One exception, and it is a real cost: Material force-sizes a chip's
+    avatar to ~24px whatever radius it is given, so the chore form's
+    assignee chips keep the old 24px avatar and their initials still touch
+    the ring (`docs/backlog.md` G-17). The member's full name is that
+    chip's own label, so identity does not rest on the initials there.
   Row semantic id: `members.row.<name>` is NOT allowed (names collide) —
   use `members.row.<memberId>`; E2E selects rows by visible text, ids
   exist for uniqueness fallback (matches manage_categories conventions).
