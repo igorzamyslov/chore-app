@@ -12,6 +12,7 @@ import 'package:chore_app/features/chores/chore_form/assignment_fields.dart';
 import 'package:chore_app/features/chores/chore_form/category_chips.dart';
 import 'package:chore_app/features/chores/chore_form/form_validation.dart';
 import 'package:chore_app/features/chores/chore_form/recurrence_builder.dart';
+import 'package:chore_app/features/chores/chore_form/reminder_row.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_controls.dart';
 import 'package:chore_app/features/chores/chore_form/repeat_section.dart'
     show RepeatToggle;
@@ -50,6 +51,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
 
   bool _loading = false;
   String? _categoryId;
+  // Minutes since local midnight, or null for no individual reminder --
+  // ONE nullable fact (spec docs/specs/notifications-n2.md D1), so there is
+  // no separate enabled flag that could disagree with a retained time.
+  int? _reminderMinutes;
   bool _repeatEnabled = false;
   RecurrenceUnit _unit = RecurrenceUnit.week;
   RecurrenceAnchor _anchor = RecurrenceAnchor.schedule;
@@ -79,6 +84,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   late String _initialTitle;
   late String _initialNotes;
   String? _initialCategoryId;
+  int? _initialReminderMinutes;
   late bool _initialRepeatEnabled;
   late RecurrenceUnit _initialUnit;
   late RecurrenceAnchor _initialAnchor;
@@ -103,6 +109,12 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     if (_titleController.text != _initialTitle ||
         _notesController.text != _initialNotes ||
         _categoryId != _initialCategoryId ||
+        // In the UNCONDITIONAL block, not the _repeatEnabled-gated one: a
+        // reminder applies to one-off chores too, and unlike the recurrence
+        // sub-fields it is a single nullable scalar, so toggling it on and
+        // back off returns it to null and reads pristine with no extra
+        // bookkeeping. D1 paying off a second time.
+        _reminderMinutes != _initialReminderMinutes ||
         _repeatEnabled != _initialRepeatEnabled ||
         _startDate != _initialStartDate ||
         _assignmentMode != _initialAssignmentMode ||
@@ -127,6 +139,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     _initialTitle = _titleController.text;
     _initialNotes = _notesController.text;
     _initialCategoryId = _categoryId;
+    _initialReminderMinutes = _reminderMinutes;
     _initialRepeatEnabled = _repeatEnabled;
     _initialUnit = _unit;
     _initialAnchor = _anchor;
@@ -208,6 +221,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       _titleController.text = chore.title;
       _notesController.text = chore.notes ?? '';
       _categoryId = chore.categoryId;
+      _reminderMinutes = chore.reminderMinutes;
       _startDate = chore.startDate;
       _assignmentMode = chore.assignmentMode;
       _selectedMemberIds = List.of(details.assigneeMemberIds);
@@ -359,6 +373,20 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
               value: _startDate,
               today: today,
               onChanged: _onStartDateChanged,
+            ),
+            const SizedBox(height: 16),
+            // After the start date and before assignment, deliberately: the
+            // form reads what -> when -> who, and a reminder time is a WHEN
+            // fact that is downstream of the due date it is derived from
+            // (spec docs/specs/notifications-n2.md §2.3 arms it at the
+            // occurrence's projected due date). It must not sit between
+            // RepeatToggle and RepeatControls, which are one control, and it
+            // must not go last: it applies to one-off chores too, and under
+            // the rotation reorder list it would read as an assignment
+            // property.
+            ChoreFormReminderRow(
+              minutes: _reminderMinutes,
+              onChanged: (value) => setState(() => _reminderMinutes = value),
             ),
             const SizedBox(height: 16),
             AssignmentFields(
@@ -624,6 +652,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             notes: Value(notes.isEmpty ? null : notes),
             categoryId: Value(_categoryId),
             recurrence: Value(recurrence),
+            // Value(...), never Value.absent(): the form is the whole truth
+            // about this field when it saves, and Value(null) is what clears
+            // a reminder the user just switched off.
+            reminderMinutes: Value(_reminderMinutes),
             startDate: _startDate,
             assignmentMode: _assignmentMode,
             assigneeMemberIds: _selectedMemberIds,
@@ -640,6 +672,7 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
             notes: notes.isEmpty ? null : notes,
             categoryId: _categoryId,
             recurrence: recurrence,
+            reminderMinutes: _reminderMinutes,
             assigneeMemberIds: _selectedMemberIds,
             createdBy: ref.read(actingMemberProvider)?.id,
           );
