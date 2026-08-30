@@ -123,6 +123,9 @@ at `analyze` means the tests never ran and is not a valid red. Highlights:
 - The repeat sentence's line wrapping at large text scales on a narrow phone.
 - Anything iOS. `ios` does not run on PRs; use the `workflow_dispatch` button.
 
+**Verifiable as of 2026-08-30, and verified:** every visual decision traceable
+to the design canvas, now that it is committed. See §5.
+
 **A claim I could not verify at all:** see §5, `famdo_design.txt`.
 
 ---
@@ -171,20 +174,47 @@ Plus one instruction refused as unexecutable rather than wrong:
 
 ## 5. Process findings
 
-### The design canvas is not in the repository
+### The design canvas was not in the repository — now it is, and the claims check out
 
-**`famdo_design.txt` is cited by all three wave-6 plans as the source for the
-nine icons, the twelve colours and the sentence wording. It does not exist —
-not tracked, not untracked, nowhere on disk.** Verified directly.
+For the duration of this wave, **`famdo_design.txt` was cited by all three
+plans as the source for the nine icons, the twelve colours and the sentence
+wording, and did not exist in the repo** — not tracked, not untracked, nowhere
+on disk. Every "closed decision" in those plans traced to a file an implementer
+could not open. They were implemented as written, which was right under the
+wave's rules, but *closed* and *unfalsifiable* are different things.
 
-So the visual decisions this wave implemented are unverifiable and
-un-re-derivable from inside the repo. They were treated as recorded decisions
-and implemented as written, which is the right call under the wave's rules —
-but "closed" and "unverifiable" are different things. Every claim these plans
-make *about code* has so far been wrong at some rate; their claims about design
-intent are now simply unfalsifiable. **Committing the canvas would fix this
-permanently**, and it should happen before wave 7 plans G-7, which sits on top
-of what this wave did to member and category legibility.
+**Closed 2026-08-30 at `c118915`**: `docs/design/2026-08-18-famdo-features.dc.html`
+is the authority (it carries the `sentence()`, `nextDates()`, `RING` and the
+`g2notes`/`g4notes` arrays the plans cite directly), with a lossy `.md` beside
+it for terminal reading.
+
+**Every canvas-derived claim was then re-checked against the committed source,
+and all of them hold:**
+
+- **`RING[0..7]` are byte-for-byte the eight shipped light renders.** Canvas:
+  `#4E7E54 #6B57B0 #B96A4C #3F8697 #A86485 #8E7833 #5A73AD #77716A`. `theme.dart`'s
+  first eight `light:` values: identical. So **"extend, do not replace" is now a
+  verified fact rather than an asserted one**, and the plan's original
+  "palette replacement with a data migration" instruction was definitively
+  wrong — the thing an implementer refused on reasoning alone.
+- **The canvas's ninth colour IS `#1E7A6E`, and `#1E7A6E` IS `_lightPrimary`**
+  (`theme.dart:42`), byte-for-byte. R1's substitution to `#9A3D80` therefore
+  rests on a correctness argument that is now provable: drawn as the canvas
+  specifies, a member ring would have been painted in the exact accent that
+  means "interactive / selected" everywhere else in the UI. **This is the one
+  deliberate deviation from the canvas in the wave**, and it is the right one.
+- **The nine icon identifiers match the canvas exactly**, and the remaining
+  three new colours (`#96562F` rust, `#7A5AA8` violet, `#4C6B45` moss) match
+  byte-for-byte.
+
+**The generalisable point:** the plans' claims about *code* were wrong at a
+steady rate all wave; their claims about the *canvas* turn out to have been
+accurate. That is worth knowing — it says the design record was reliable and
+the code record was not, which is the opposite of the prior this project had
+been running on. It only became knowable once the source was committed.
+
+Canvas sections **designed but not yet planned**: 1c (G-8), 1e (G-7), 1f (F-2),
+1g (F-3). Whoever runs that planning round now has the input.
 
 ### Two named safety gates were vacuous
 
@@ -251,6 +281,36 @@ bootstrap), full tree (presented and built — the fault is the driver's).
 **If a reproduction ever lands on `app.loading`, the bug is ours** — something
 `bootstrapProvider` awaits on a first-launch-only path — not the simulator's.
 
+### A mis-calibrated instrument manufactures findings — it does not fail loudly
+
+The A-6 stream reported two reproductions of a flake, upward, and then retracted
+them on its own re-examination. Both were artifacts of a **20s** probe measuring
+a gate the real suite gives **60s**: both frames had rendered by roughly
+launch+40s and would have *passed*. A third "failure" was a launch that took
+12.4s to reach the Dart VM against a 0.8s median — slow startup, not the flake.
+
+The defect is precise and worth naming: **the justification and the measurement
+had different origins.** The 20s threshold was defended on the observed wait
+being bimodal — 4.8–9.0s or never — but that bimodality describes the wait
+*after the app is up*, while the clock started at `launchApp` and silently
+swallowed process startup. Every part of that reasoning was individually true.
+
+**This is the same bug as a vacuous assertion, wearing different clothes.** A
+test that cannot fail and a probe that cannot help but "succeed" are one shape:
+an instrument whose output is decoupled from the thing it claims to measure.
+This project has now caught it four ways — `PRAGMA table_info` (a nullable
+column reads `null` whether or not the migration ran), `TestWidgetsFlutterBinding`'s
+HTTP override (an empty 400 for every request, presenting as a server
+rejection), the font metrics that make a containment check pass regardless of
+geometry, and now a threshold that generates the failures it was built to find.
+
+The defence is the same in all four: **make the instrument fail on purpose
+before trusting a result from it.** A-6's amplifier ends up doing exactly that —
+a negative control on every run, forcing a failure on a healthy app, refusing to
+measure unless the capture path produced all four artifacts. That control is why
+its final zero is a real zero. It was added only after being asked for; the
+first 500 cycles were collected without it and are reported separately.
+
 ### `git branch --merged` is not sufficient evidence of merged-ness
 
 Squash-merged branches never become ancestors of `main`, so they look unmerged
@@ -299,7 +359,6 @@ second half.
   sentence to change.
 - **F-1 GATE 3** — unchanged by this wave, still needs a human with a phone.
 - **Device verification** of everything in §3's "NOT verified" list.
-- **`famdo_design.txt`** — commit it.
 
 ---
 
