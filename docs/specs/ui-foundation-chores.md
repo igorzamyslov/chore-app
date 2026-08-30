@@ -50,6 +50,18 @@ Widget semantic(String id, {required Widget child});
 Convention `<screen>.<element>[.<qualifier>]`, kebab-free, dot-separated.
 EVERY interactive widget gets one. IDs used in this spec are normative:
 
+- App root: `app.loading` (the startup scaffold shown while
+  `householdGateProvider`/`bootstrapProvider` load), `app.bootstrap_error`
+  and its two actions, listed under **main.dart** below.
+  `app.loading` is a DIAGNOSTIC id, not a selector: nothing taps it and no
+  flow waits on it. It exists because without it that scaffold emits no
+  accessibility node whatsoever (`Scaffold` contributes none, and
+  `CircularProgressIndicator` wraps itself in a `Semantics` whose label and
+  value are both null, which is dropped), so a startup stuck there is
+  indistinguishable in a hierarchy dump from one where the Flutter view
+  never presented at all and iOS is still showing the equally white
+  `LaunchScreen.storyboard` — the ambiguity that made backlog A-6's
+  blank-frame flake undiagnosable from CI artifacts.
 - Shell: `shell.tab.chores`, `shell.tab.shopping`, `shell.tab.settings`
 - Chores list: `chores.add`, `chores.filter.member`, `chores.filter.category`,
   `chores.occurrence.<choreId>` (tile), `chores.occurrence.<choreId>.complete`,
@@ -58,10 +70,14 @@ EVERY interactive widget gets one. IDs used in this spec are normative:
   `chores.menu.delete`, `chores.delete.confirm`, `chores.delete.cancel`
 - Chore form: `chore_form.title`, `chore_form.notes`, `chore_form.category`,
   `chore_form.category.<categoryId>`, `chore_form.repeat.toggle`,
-  `chore_form.repeat.interval`, `chore_form.repeat.unit.<day|week|month>`,
+  `chore_form.repeat.interval`, `chore_form.repeat.unit` (opens the unit
+  menu), `chore_form.repeat.unit.<day|week|month>` (entries **inside** that
+  menu — they do not exist until it is opened),
   `chore_form.repeat.anchor.<schedule|completion>`,
   `chore_form.repeat.weekday.<1..7>`,
   `chore_form.repeat.monthly_mode.<day_of_month|nth_weekday>`,
+  `chore_form.repeat.monthly_day`, `chore_form.repeat.monthly_ordinal`,
+  `chore_form.repeat.monthly_weekday`, `chore_form.repeat.preview`,
   `chore_form.start_date`, `chore_form.assignment.<fixed|rotation|anyone>`,
   `chore_form.assignee.<memberId>`, `chore_form.assignee.<memberId>.drag`
   (rotation reorder drag handle), `chore_form.assignee.<memberId>.remove`
@@ -71,16 +87,28 @@ EVERY interactive widget gets one. IDs used in this spec are normative:
 Material 3, `ColorScheme.fromSeed(seedColor: Color(0xFF26A69A))`, light +
 dark themes (`themeMode: ThemeMode.system`). Category icons render via
 `Icons`-by-name lookup: a `categoryIcon(String identifier)` function mapping
-the Material Symbols identifiers used in seeds (cleaning_services, skillet,
-local_laundry_service, yard, pets, build, directions_car, nutrition, egg,
-set_meal, bakery_dining, ac_unit, local_cafe, home, shopping_bag) to
-`IconData` constants, falling back to `Icons.label_outlined` for unknown
-ids. Icons are always drawn in the category's color at regular weight — the
-"flat, not colorful-emoji" decision.
+`categoryIconIdentifiers` (`lib/features/categories/category_icons.dart`) —
+the seven chore-seed and eight shopping-seed identifiers (cleaning_services,
+skillet, local_laundry_service, yard, pets, build, directions_car,
+nutrition, egg, set_meal, bakery_dining, ac_unit, local_cafe, home,
+shopping_bag) plus nine picker-only additions with no seeded category
+(bathtub, delete, potted_plant, child_care, pedal_bike, description,
+celebration, thermostat, fitness_center; backlog G-5a) — to `IconData`
+constants, falling back to `Icons.label_outlined` for unknown ids. Icons
+are always drawn in the category's color at regular weight — the "flat,
+not colorful-emoji" decision.
+
+The two structures are independent, and an identifier listed in
+`categoryIconIdentifiers` without a `categoryIcon` case fails silently —
+the tile renders, with the fallback glyph, so several such identifiers all
+render alike. `test/app/theme_test.dart` pins the invariant: every
+identifier maps to its own distinct, non-default `IconData`.
 
 ### main.dart
 `ProviderScope` → `ChoreApp`. While `bootstrapProvider` loads: blank
-scaffold with a centered `CircularProgressIndicator`; on error: a centered
+scaffold with a centered `CircularProgressIndicator`, carrying
+`semantic('app.loading')` so the state is identifiable from outside the
+process (see the Semantic IDs list above for why); on error: a centered
 plain-language headline, the raw exception as a de-emphasized detail line
 `semantic('app.bootstrap_error')`, and two actions —
 `semantic('app.bootstrap_error.retry')`, which re-invalidates whichever of
@@ -128,29 +156,74 @@ the whole bug report.
   (validation happens on save; recovery must work — E2E tests this).
 - Notes: optional multiline.
 - Category: horizontal chip row of active chore categories (+ 'None').
-- Repeat toggle OFF = one-off. ON reveals:
-  - interval stepper/text (int ≥ 1; invalid input → inline error 'Must be
-    at least 1'),
-  - unit segmented control (day/week/month) — chip labels pluralize with
-    the current interval ('Day'/'Days' etc., field feedback G3 stage 1:
-    it's the only place a unit noun renders next to the interval number,
-    so it doubles as the "2 months" composed reading the feedback asked
-    for),
-  - anchor choice with the user-facing labels 'On fixed days' / 'After
-    last completion' (subtitle hints: 'e.g. every Tuesday' / a concrete,
-    interval-aware sentence e.g. '3 days after last done' — field
-    feedback G3 stage 1),
-  - week unit: weekday chips Mon..Sun (multi-select; empty allowed =
-    derive from start date),
-  - month unit + schedule anchor: monthly mode toggle (day-of-month vs
-    nth-weekday, computed from the picked start date, e.g. 'On the 15th' /
-    'On the 3rd Tuesday'),
-  - whenever the pattern silently derives from the start date (monthly
-    mode always; weekly with no weekday picked) a one-line caption below
-    it says so ('Follows the start date — change the start date to change
-    the day.', field feedback G3 stage 1) — it disappears once a weekday
-    is explicitly picked, since the pattern is then fully visible in the
-    chips.
+- Repeat toggle OFF = one-off. ON reveals the repeat block, which since
+  **G-2** (`docs/plans/2026-08-18-repeat-form-sentence.md`, field feedback
+  G3 stage 2) is one **fill-in-the-blank sentence** plus the pattern
+  pickers that belong to the chosen unit, an anchor section, and a preview.
+
+  **The organising rule: a control that does not apply DOES NOT EXIST.** It
+  is never disabled, never greyed, never present-but-inert. This design has
+  no disabled pattern, and the rule applies uniformly — to the weekday
+  chips for a non-week unit, to the monthly holes for a non-month unit, to
+  the whole monthly-mode row under a completion anchor, and to the
+  after-last-completion anchor card in monthly weekday mode.
+
+  - **The sentence** (`RepeatSentence`): one whole localized ARB message per
+    shape, with widget-shaped holes punched into it by splitting on
+    Unicode-noncharacter sentinels, laid out as a `Wrap` of one `Text` per
+    literal word and a chip per hole. **Never a concatenation of
+    fragments** — German inflects the frame by both the unit's gender and
+    the interval's number, and a fixed widget order bakes English syntax
+    into the tree. Every hole shares one chip container and is a ≥40px tap
+    target. The four shapes are: day, week (trailing preposition, chips
+    below), month + day-of-month, month + nth-weekday.
+  - **The interval hole** stays a `TextField` (int ≥ 1; invalid input →
+    inline error 'Must be at least 1' under the hole itself). A bounded
+    picker would forbid legitimate rules like 'every 90 days'.
+  - **The unit hole** is a menu, not a segmented control. The chip shows the
+    current unit, pluralized live by the interval the user is typing
+    ('Day'/'Days', field feedback G3 stage 1). The three
+    `chore_form.repeat.unit.<x>` ids moved into that menu — see
+    `theme-v2.md` §4.4 for the recorded §0 exception.
+  - **week unit:** weekday chips Mon..Sun, multi-select, **at least one
+    always selected**. The form seeds the start date's own weekday on open
+    (including for an already-persisted rule with an empty stored set) and
+    refuses to deselect the last one. The model still permits an empty set,
+    meaning 'derive from the start date' — the form simply no longer lets a
+    user reach it, because that derivation is the hidden dependency G3
+    stage 2 exists to remove.
+  - **month unit + schedule anchor:** a monthly-mode row naming the MODE
+    ('A day of the month' / 'A weekday'), and the concrete day / ordinal +
+    weekday as holes in the sentence itself. Nothing is computed from the
+    start date. The row is absent under a completion anchor, where
+    `nextAfterCompletion` reads no monthly field.
+  - **The anchor** sits below a 1px hairline under an uppercase 'Counting
+    from' header, as explanatory radio cards naming the actual configured
+    rule ('Every 2 weeks on Tuesday, Friday' / '3 days after last done'). In
+    monthly weekday mode the after-last-completion card is **absent**, with
+    one `bodySmall` line saying why — an nth-weekday pattern is a position
+    in the calendar, so there is nothing for a completion date to count
+    from, and `Recurrence.validated` throws on the pair.
+  - **The preview** (`chore_form.repeat.preview`) is always visible, for
+    every unit and both anchors. For a schedule anchor it names the next
+    **three real dates**, because 'every 2 weeks on Tuesday and Friday' is
+    ambiguous in prose and unambiguous in dates, and because it lets the
+    month-length clamp show itself rather than being explained. For a
+    completion anchor there are no real dates to name, so it is prose.
+  - **One formatter, two surfaces.** `recurrenceSentence` /
+    `recurrencePreview` in `lib/features/chores/recurrence_sentence.dart`
+    is the only thing in the app that turns a recurrence into prose. It
+    serves the form and the paused rows. The design that motivated G-2
+    assumed 'one formatter serves three places' because the paused rows and
+    the chore tiles supposedly already rendered such a string; they did not
+    — there were **zero** such places, and neither file even imported
+    `recurrence.dart`. **Two** is the right number, not three: the pending
+    tiles are excluded deliberately, because a tile answers 'when is this
+    due', already carries a due chip, and recurrence prose there would
+    spend density on the most-opened screen for something the user did not
+    come there for. Do not 'complete' the third place later. A second
+    switch over `RecurrenceUnit` producing user-facing prose anywhere in
+    `lib/` is a regression.
 - Start date: date picker, defaults to today, min today - 1 year.
 - Assignment: segmented fixed/rotation/anyone; fixed → single-select member
   chips, each showing the member's `MemberAvatar` before their name (field
@@ -194,8 +267,12 @@ Streams → `AsyncValue` with loading (skeleton-free plain
 7. Form validation: empty title error + recovery; rotation with one member
    error + recovery; interval 0 error + recovery.
 8. Form recurrence controls: weekday chips only for week unit; monthly
-   mode only for month+schedule; anchor selection persists to the saved
-   Recurrence (assert via repository read).
+   mode only for month+schedule; the after-last-completion anchor absent in
+   monthly weekday mode; anchor selection, an explicitly picked monthly day,
+   and an explicitly picked ordinal + weekday all persist to the saved
+   Recurrence (assert via repository read). The preview names the next three
+   real dates, and picking a monthly day moves the start date onto that day
+   (the cross-version alignment invariant, `recurrence-engine.md` §2).
 9. Edit round-trip: open prefilled, change title, save, list shows it.
 10. Both themes render the list screen without exceptions (smoke,
     `ThemeMode.dark`).

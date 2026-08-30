@@ -64,6 +64,47 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.bySemanticsIdentifier('chore_form.save'), findsOneWidget);
 
+      // G-2: the repeat block is now one sentence whose words and chips
+      // flow in a Wrap, and it is by far the widest thing on this form.
+      // Opening the form without turning the toggle on never renders it at
+      // all, which made this gate vacuous for the whole redesign.
+      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.toggle'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      // Every unit is a different sentence shape with a different number of
+      // holes; the month + weekday shape is the longest of the four.
+      for (final unit in ['day', 'month', 'week']) {
+        await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.unit'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.bySemanticsIdentifier('chore_form.repeat.unit.$unit'),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.takeException(),
+          isNull,
+          reason:
+              'the repeat sentence overflowed for the $unit unit at '
+              'text scale 2.0 -- fix the chip constraint or the Wrap, never '
+              'the tap-target size',
+        );
+      }
+
+      await tester.tap(find.bySemanticsIdentifier('chore_form.repeat.unit'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('chore_form.repeat.unit.month'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier(
+          'chore_form.repeat.monthly_mode.nth_weekday',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
       handle.dispose();
     },
   );

@@ -595,6 +595,89 @@ class AppLocalizationsDe extends AppLocalizations {
       'Richtet sich nach dem Startdatum — ändere das Startdatum, um den Tag zu ändern.';
 
   @override
+  String choreFormSentenceDay(String interval, String unit) {
+    return 'Wiederholung: alle $interval $unit';
+  }
+
+  @override
+  String choreFormSentenceWeek(String interval, String unit) {
+    return 'Wiederholung: alle $interval $unit am';
+  }
+
+  @override
+  String choreFormSentenceMonthDayOfMonth(
+    String interval,
+    String unit,
+    String day,
+  ) {
+    return 'Wiederholung: alle $interval $unit am $day';
+  }
+
+  @override
+  String choreFormSentenceMonthWeekday(
+    String interval,
+    String unit,
+    String ordinal,
+    String weekday,
+  ) {
+    return 'Wiederholung: alle $interval $unit am $ordinal $weekday';
+  }
+
+  @override
+  String get choreFormDayOfMonthLast => 'letzten Tag';
+
+  @override
+  String get choreFormOrdinalLast => 'letzten';
+
+  @override
+  String get choreFormMonthlyModeDayOfMonth => 'Ein Tag im Monat';
+
+  @override
+  String get choreFormMonthlyModeWeekday => 'Ein Wochentag';
+
+  @override
+  String get choreFormCountingFromLabel => 'Gezählt ab';
+
+  @override
+  String get choreFormCountingFromWeekdayOnly =>
+      'Ein Wochentagsmuster ist eine Position im Kalender — es gibt also nichts, wovon ein Erledigungsdatum aus zählen könnte.';
+
+  @override
+  String choreFormPreviewNextThree(
+    String pattern,
+    String first,
+    String second,
+    String third,
+  ) {
+    return '$pattern — als Nächstes $first, dann $second und $third';
+  }
+
+  @override
+  String choreFormPreviewCompletionRolledForward(String base, String weekdays) {
+    return '$base, weitergeschoben auf den nächsten $weekdays.';
+  }
+
+  @override
+  String choreFormPreviewCompletionDependsOnDay(String base) {
+    return '$base — das nächste Fälligkeitsdatum hängt vom Tag ab, an dem du sie erledigst.';
+  }
+
+  @override
+  String get choreFormSentenceIntervalA11y => 'Wiederholungsintervall';
+
+  @override
+  String get choreFormSentenceUnitA11y => 'Wiederholungseinheit';
+
+  @override
+  String get choreFormSentenceMonthlyDayA11y => 'Tag im Monat';
+
+  @override
+  String get choreFormSentenceMonthlyOrdinalA11y => 'Der wievielte im Monat';
+
+  @override
+  String get choreFormSentenceMonthlyWeekdayA11y => 'Wochentag';
+
+  @override
   String get choreFormAssignmentFixed => 'Fest';
 
   @override
@@ -769,6 +852,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get memberEditColorLabel => 'Farbe';
+
+  @override
+  String get memberEditColorUniqueHint =>
+      'Deine Farbe zeigt dich bei jeder Aufgabe, in der Zusammenfassung und im Verlauf. Zwei Personen können nicht dieselbe nehmen.';
+
+  @override
+  String memberEditColorTakenBy(String memberName) {
+    return 'Schon von $memberName belegt';
+  }
 
   @override
   String get memberEditDeleteBlockedLastMember =>

@@ -107,6 +107,110 @@ void main() {
     });
   });
 
+  // G-2 (docs/plans/2026-08-18-repeat-form-sentence.md Task 3): the explicit
+  // day-of-month field, and the cross-version convergence guard that is the
+  // whole reason OPD-1 was accepted rather than deferred.
+  group('scheduleOccurrences - month unit explicit monthlyDayOfMonth', () {
+    test('day 31 clamps to the month length, exactly like the derived day', () {
+      final rule = Recurrence.monthlyOnDay(monthlyDayOfMonth: 31);
+      final start = PlainDate(2026, 1, 31);
+      expect(_iso(scheduleOccurrences(rule, start).take(4)), [
+        '2026-01-31',
+        '2026-02-28',
+        '2026-03-31',
+        '2026-04-30',
+      ]);
+    });
+
+    test('the -1 sentinel means the last day of every month', () {
+      final rule = Recurrence.monthlyOnDay(monthlyDayOfMonth: -1);
+      // Deliberately a start date mid-month: -1 is an absolute position in
+      // the month, so unlike a derived day it does not depend on it.
+      final start = PlainDate(2026, 1, 15);
+      expect(_iso(scheduleOccurrences(rule, start).take(4)), [
+        '2026-01-31',
+        '2026-02-28',
+        '2026-03-31',
+        '2026-04-30',
+      ]);
+    });
+
+    test('-1 finds February 29 in a leap year', () {
+      final rule = Recurrence.monthlyOnDay(monthlyDayOfMonth: -1);
+      final start = PlainDate(2028, 2, 1);
+      expect(_iso(scheduleOccurrences(rule, start).take(1)), ['2028-02-29']);
+    });
+
+    test('an explicit day overrides the start date day', () {
+      final rule = Recurrence.monthlyOnDay(monthlyDayOfMonth: 5);
+      final start = PlainDate(2026, 1, 3);
+      expect(_iso(scheduleOccurrences(rule, start).take(3)), [
+        '2026-01-05',
+        '2026-02-05',
+        '2026-03-05',
+      ]);
+    });
+  });
+
+  // Analysis 2a / OPD-1 obligation 1. The engine's derived branch computes
+  // min(startDate.day, daysInMonth) and the explicit branch computes
+  // min(D, daysInMonth); those are the SAME expression when
+  // startDate.day == D. So a household member still running a client that
+  // predates monthlyDayOfMonth -- which ignores the unknown JSON key and
+  // therefore evaluates the derived branch -- computes a byte-identical
+  // series, and the silent cross-device disagreement never happens.
+  //
+  // If this group ever goes red, the mitigation is broken and the sync
+  // hazard is live again. It is not a formatting test.
+  group('cross-version convergence: aligned start date == old client', () {
+    void expectConverged(int day, PlainDate start, {int interval = 1}) {
+      final explicit = Recurrence.monthlyOnDay(
+        interval: interval,
+        monthlyDayOfMonth: day,
+      );
+      // What a client predating the field decodes the very same JSON as.
+      final derived = Recurrence.monthlyOnDay(interval: interval);
+
+      // Guard against the vacuous version of this assertion: two rules that
+      // are equal in this field would of course agree.
+      expect(explicit.monthlyDayOfMonth, day);
+      expect(derived.monthlyDayOfMonth, isNull);
+      expect(start.day, day, reason: 'the alignment invariant must hold');
+
+      expect(
+        _iso(scheduleOccurrences(explicit, start).take(6)),
+        _iso(scheduleOccurrences(derived, start).take(6)),
+      );
+    }
+
+    test('day 20 from an aligned 2026-01-20', () {
+      expectConverged(20, PlainDate(2026, 1, 20));
+    });
+
+    test('day 31 from an aligned 2026-01-31, across the February clamp', () {
+      expectConverged(31, PlainDate(2026, 1, 31));
+    });
+
+    test('day 1 from an aligned 2026-02-01', () {
+      expectConverged(1, PlainDate(2026, 2, 1));
+    });
+
+    test('day 29 from an aligned 2026-01-29, across a non-leap February', () {
+      expectConverged(29, PlainDate(2026, 1, 29));
+    });
+
+    test('holds for interval > 1 too', () {
+      expectConverged(15, PlainDate(2026, 1, 15), interval: 3);
+      expectConverged(31, PlainDate(2026, 1, 31), interval: 2);
+    });
+
+    test('every day 1..31 aligned into a 31-day month converges', () {
+      for (var day = 1; day <= 31; day++) {
+        expectConverged(day, PlainDate(2026, 1, day));
+      }
+    });
+  });
+
   group('scheduleOccurrences - month unit nthWeekday', () {
     test('first Saturday of the month, starting on a Saturday', () {
       // 2026-07-04 is itself a Saturday and thus the first Saturday of July,

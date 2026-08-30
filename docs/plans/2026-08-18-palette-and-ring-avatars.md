@@ -10,6 +10,100 @@
 
 ---
 
+## Refresh pass, 2026-08-29 (wave 6 execution)
+
+This plan was written 2026-08-18, before wave 5 landed. Every file it targets
+was re-read as it now stands and every numeric claim was recomputed. What
+changed:
+
+**Line numbers that moved** (all cited references below are corrected in place):
+`member_edit_sheet.dart` grew — `_firstFreeColor` is at **188-194** (not
+116-121), the `colors:` argument at **228** (not 156), the sheet's doc comment
+at **28-33** (not 21-23), the colour section in `build` at **224-232** (not
+152-159), and the name listener at **102-103 / 115** (not 62/66).
+`members_screen_test.dart`'s recolor test is at **197-247** (not 163-214), its
+`CircleAvatar` block at **231-246** (not 195-211), and its
+`members.edit.color.2` tap at **216** (not 181). `theme.dart`'s `_categoryTones`
+is at **488-506** (not 489-506). `docs/backlog.md` shifted by ten: G-4 is at
+**318** (not 308), G-5 at **319** (not 309), the "Not planned" list at **170**
+(not 160), the ownership note at **311** (not 301). `member_avatar.dart`'s
+one-letter derivation is at **40-43** (not 41-44). Everything else the plan
+cited — the ARB anchors at `app_en.arb:976-979` and `app_de.arb:212`,
+`category_edit_sheet.dart:82-86, 129, 23`, `manage_members_screen.dart:144`,
+`join_flow_steps.dart:56-70, 29-33, 186`, `chore_occurrence_tile.dart:353`,
+`category_edit_test.dart:60, 126-129` — is still exactly where the plan said.
+
+**Claims re-verified and still true:** the eight light renders match the
+canvas byte-for-byte; `#1E7A6E` is byte-for-byte `_lightPrimary`;
+`theme-v2.md` contains no picker/swatch exemption (grepped for "swatch",
+"picker", "exempt" — only one unrelated hit); no Maestro flow references any
+`color.N` id; no golden tests exist; nothing outside this plan's file set
+asserts a palette size or a swatch count; the bootstrap member really does hold
+`seedColors.first`; the plum's HSL lightness really is **0.4216**, so without an
+explicit light row `categoryTone` returns `#993D80`; the four dark fallbacks
+really are `#D491C1` / `#DAA98B` / `#AE9BCA` / `#A8C3A2` and the violet's light
+fallback really is `#654A8C`.
+
+**Three numeric claims that were WRONG and are corrected below:**
+
+1. *"Dark renders, worst case: `#B9A8D1` at 7.70."* The true dark worst case is
+   `#B4A5E8` (Kitchen, pre-existing) at **7.63**. `#B9A8D1` is 7.70, second
+   worst. Every render still clears 3:1 on every ground in both themes, which is
+   the only bar the tests assert, so nothing downstream changes.
+2. *"The palette's own tightest existing pairs are ΔE 7.8 in light … and 9.3 in
+   dark … Every colour this plan adds sits further from its nearest neighbour
+   than that."* **False, and self-contradictory:** both of those pairs *involve
+   the colours this plan adds* (`#6B57B0` vs the new `#7A5AA8`; `#F0AF95` vs the
+   new `#DFB49A`). The eight existing colours' own tightest pairs are ΔE **25.8**
+   light (`#6B57B0` vs `#5A73AD`) and **17.8** dark (`#B4A5E8` vs `#A4B8E5`).
+   The honest statement is the opposite of the plan's: **this plan tightens the
+   palette's minimum separation from 25.8 to 7.8 in light and from 17.8 to 9.3
+   in dark.** Both floors remain well above the ~2.3 just-noticeable difference
+   and above the ~5 at-a-glance threshold, and the two-letter initials — not the
+   ring colour — are what carries identity for a viewer who cannot separate two
+   purples. Kept, with the rationale corrected rather than the colour changed:
+   `#7A5AA8` is the design canvas's own choice and overriding it on a ΔE
+   argument would re-open a decision the canvas closed. R1's substitution stands
+   on the *semantic-role collision* argument, which is untouched by this.
+3. The Self-review notes listed `#84E1D5` among the pre-fix dark fallbacks. That
+   is the fallback for the **rejected** teal `#1E7A6E`, left over from the
+   pre-R1 draft; the plum's is `#D491C1`. Corrected.
+
+**Two plan-authored test snippets that do not compile or cannot pass, fixed
+below:**
+
+- Task 5's preview assertion does
+  `tester.widget<MemberAvatar>(find.bySemanticsIdentifier('members.edit.avatar').first)`.
+  That id wraps a `Row`, not the avatar, so the cast fails at runtime. Corrected
+  to a `find.descendant(... matching: find.byType(MemberAvatar))`.
+- Task 3's "two letters fit inside the smallest avatar" assertion compares the
+  glyph width against the ring's *inner* diameter using arithmetic derived from
+  Inter (~1.35 em for two uppercase glyphs). **That property cannot be asserted
+  in a widget test in this repo at all**, which took three CI measurements to
+  establish and is recorded here so nobody re-derives it:
+  - There is no `flutter_test_config.dart` anywhere and nothing calls
+    `FontLoader`, so `flutter test` draws the Ahem-style `FlutterTest` font.
+    **Measured: `'WM'` at 11px/w600 is 21.87px — 1.99 em per glyph.** The same
+    21.87 comes back whether the family is inherited from the theme or set
+    explicitly to `'Inter'`.
+  - Adding a `FontLoader('Inter')` over the bundled TTFs in `setUpAll` did
+    **not** change that number. The fonts are declared under pubspec `fonts:`
+    rather than `assets:`, so `rootBundle.load` hands the loader nothing usable
+    and it silently no-ops — no exception, no effect.
+  - So in the test font `'WM'` wants 21.87px inside a 21px ring, wraps, and the
+    paragraph reports its own constraint (21.0). A containment check against
+    that box therefore passes regardless of the avatar's geometry (**vacuous**),
+    and a strict inner-diameter check fails on correct code (**false**).
+  The test now asserts only what is font-independent — the 24px box, the ring
+  width, the 11px floor, the text-scale cap, and that nothing throws — and says
+  so in a comment at the top of the file. The plan's *arithmetic* stands and the
+  production code is correct: Inter really does fit ~15px of glyphs in 21px of
+  room. It is the *measurement* that this harness cannot perform, so glyph fit
+  stays a visual-QA gate (`design-language.md`, definition of visual done).
+  Backlogged as **G-14**.
+
+---
+
 ## The premise, re-verified — and what it overturns
 
 > ### READ THIS BEFORE COMPARING THE DESIGN CANVAS TO ANY COLOUR CONSTANT
@@ -47,7 +141,7 @@ in the same order.**
    substituted to #9A3D80 — see "R1" below; #1E7A6E is the app's own accent
 ```
 
-`_categoryTones` in `lib/app/theme.dart:489-506` maps
+`_categoryTones` in `lib/app/theme.dart:488-506` maps
 `0xFF6D9F71 → light 0xFF4E7E54`, `0xFF8C7BC9 → light 0xFF6B57B0`, … through all
 eight, in exactly that order. Byte-for-byte identical, verified. The design is
 not proposing different colours; it is showing the *rendered* form of the eight
@@ -107,13 +201,27 @@ The design claims all twelve clear 3:1 against paper and ground. Computed
 - Light renders, worst case: `#B96A4C` at **3.30**. All twelve ≥ 3.0. The four
   new ones are the *best* of the twelve (5.15, 4.70, 4.48, 4.94) — they improve
   the palette's floor rather than lowering it.
-- Dark renders, worst case: `#B9A8D1` at **7.70**. All twelve ≥ 7.0.
+- Dark renders, worst case: `#B4A5E8` at **7.63** (Kitchen — pre-existing, not
+  one of the four added). All twelve ≥ 7.6.
 
-Perceptual separation was checked too, in CIELAB. The palette's own tightest
-existing pairs are ΔE **7.8** in light (`#6B57B0` purple vs `#7A5AA8` violet)
-and **9.3** in dark (`#F0AF95` vs `#DFB49A`). Every colour this plan adds sits
-further from its nearest neighbour than that, in both themes — so twelve stays
-as distinguishable as eleven was.
+Perceptual separation was checked too, in CIELAB (ΔE76). **Corrected 2026-08-29
+— the original text here was backwards.** The eight existing colours' tightest
+pairs are ΔE **25.8** in light (`#6B57B0` vs `#5A73AD`) and **17.8** in dark
+(`#B4A5E8` vs `#A4B8E5`). Widening to twelve *tightens* that: the closest pair
+in the finished palette is ΔE **7.8** in light (`#6B57B0` purple vs the newly
+added `#7A5AA8` violet) and **9.3** in dark (`#F0AF95` vs the newly added
+`#DFB49A`). Both new floors sit well above the ~2.3 just-noticeable difference
+and the ~5 at-a-glance threshold, so twelve remains distinguishable — but the
+claim that every added colour is *better* separated than the existing worst pair
+was simply false, and the two purples are the closest thing in the palette.
+
+This is survivable precisely because of R2: colour is never the only carrier of
+member identity. The two-letter initials, not the ring, are what separate two
+similar purples for a viewer who cannot tell them apart. The canvas's `#7A5AA8`
+is kept rather than substituted — R1's substitution rests on a *semantic-role
+collision* (`#1E7A6E` means "selected"), which is a correctness argument;
+"these two purples are close" is a taste argument against a colour the design
+deliberately chose, and is not grounds to override it.
 
 Note a pre-existing condition this plan does **not** fix and does not worsen:
 theme-v2 §1.3 justifies the tone map with a *4.5:1* bar for 12sp category
@@ -147,7 +255,7 @@ id. Nothing is removed or moved here. `ColorSwatchPicker` emits
 8-11 are new. Verified: no Maestro flow references either id family (grepped
 `e2e/**`; `members_and_acting.yaml` and `category_edit_persists.yaml` contain no
 `color` reference). The only two references anywhere are widget tests —
-`test/features/settings/members_screen_test.dart:181`
+`test/features/settings/members_screen_test.dart:216`
 (`members.edit.color.2`) and `test/features/settings/category_edit_test.dart:60`
 (`settings.categories.color.1`) — and both keep meaning the same colour.
 
@@ -196,9 +304,9 @@ constraints and taking the best-separated muted result:
 | Check | Requirement | `#9A3D80` |
 | --- | --- | --- |
 | Light contrast, worst of the three light grounds | ≥ 3.30 (the palette's floor) | **5.15** |
-| Dark contrast, worst of the three dark grounds | ≥ 7.70 (the palette's floor) | **7.90** (dark render `#D9A0C9`) |
-| ΔE from nearest of the other eleven, light | > 7.8 (palette's tightest existing pair) | **21.7** (nearest: `#A86485` rose) |
-| ΔE from nearest of the other eleven, dark | > 9.3 (palette's tightest existing pair) | **10.3** (nearest: `#E7AEC6` rose) |
+| Dark contrast, worst of the three dark grounds | ≥ 7.63 (the palette's floor) | **7.90** (dark render `#D9A0C9`) |
+| ΔE from nearest of the other eleven, light | comfortably clear of JND | **21.7** (nearest: `#A86485` rose) |
+| ΔE from nearest of the other eleven, dark | comfortably clear of JND | **10.3** (nearest: `#E7AEC6` rose) |
 | ΔE from `_lightPrimary` `#1E7A6E` | far | **78.1** |
 | ΔE from `_darkPrimary` `#63C9B8` | far | **62.7** |
 | ΔE from `error` `#B44A2E` | far — red is the error role, also semantically loaded | **57.0** |
@@ -212,7 +320,7 @@ plum, and that divergence must not read as a transcription error.
 
 The canvas renders two letters (`Anna→AN`, `Igor→IG`, `Mia→MI`, `Leo→LE`;
 `famdo_design.html:626-630`). Today the app renders one
-(`member_avatar.dart:41-44`). **Two letters ship.**
+(`member_avatar.dart:40-43`). **Two letters ship.**
 
 **Why it is a floor and not a preference:** `design-language.md`'s colour-usage
 rules say colour is never the only carrier of meaning. For a colour-blind user
@@ -298,7 +406,7 @@ letters never render below the legibility threshold at any radius.
 - **Reference tests to copy structure from** (read these before writing new
   tests; do not invent a shape from memory):
   - `test/features/settings/members_screen_test.dart` — the recolor test at
-    lines 163-214 is the closest analogue for anything touching the member
+    lines 197-247 is the closest analogue for anything touching the member
     sheet's colour picker and the avatar.
   - `test/features/settings/category_edit_test.dart` — lines 40-135 for the
     category sheet's picker and its DB round-trip assertions.
@@ -338,7 +446,7 @@ letters never render below the legibility threshold at any radius.
 
 **Files:**
 - Modify: `lib/data/repositories/category_repository.dart:25-36`
-- Modify: `lib/app/theme.dart:483-506` (the `_categoryTones` map and its doc comment)
+- Modify: `lib/app/theme.dart:483-521` (the `_categoryTones` map at 488-506 and the two doc comments at 483 and 513)
 - Test (create): `test/app/palette_test.dart`
 
 **Interfaces:**
@@ -619,7 +727,7 @@ git commit -m "Widen the shared colour palette to twelve, tone-mapped for both t
 
 **Files:**
 - Modify: `lib/app/color_swatch_picker.dart` (whole file)
-- Modify: `lib/features/settings/member_edit_sheet.dart:116-121, 156` and `:21-23` (doc comment)
+- Modify: `lib/features/settings/member_edit_sheet.dart:188-194, 228` and `:28-33` (doc comment)
 - Modify: `lib/features/settings/category_edit_sheet.dart:82-86, 129` and `:23` (doc comment)
 - Test (create): `test/app/color_swatch_picker_test.dart`
 
@@ -661,6 +769,12 @@ Two behaviour changes are folded in here because they are the same edit:
    replacing `Wrap`. Use chunked `Row`s of `Expanded`, not a `GridView` — the
    picker lives inside a `SingleChildScrollView` in both sheets, where an
    unbounded-height `GridView` throws.
+   > **Added 2026-08-29:** put a `Center` inside each `Expanded`. `Expanded`
+   > hands its child a *tight* horizontal constraint, which `SizedBox(width: 48)`
+   > inside `PickerTile` would resolve to the full column width -- stretching the
+   > 48x48 tile into a 55x48 lozenge on a phone-width sheet. `Center`
+   > shrink-wraps it back to 48 while the `Expanded` still divides the row into
+   > six equal columns.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -989,7 +1103,7 @@ class _ColorSwatch extends StatelessWidget {
 
 In `lib/features/settings/member_edit_sheet.dart`: change line 156's
 `colors: CategoryRepository.seedColors` to
-`colors: CategoryRepository.palette`, and in `_firstFreeColor` (lines 116-121)
+`colors: CategoryRepository.palette`, and in `_firstFreeColor` (lines 188-194)
 replace both `seedColors` references with `palette`:
 
 ```dart
@@ -1003,7 +1117,7 @@ replace both `seedColors` references with `palette`:
   }
 ```
 
-Update the file's `showMemberEditSheet` doc comment (lines 21-23) to say
+Update the file's `showMemberEditSheet` doc comment (lines 28-33) to say
 `[CategoryRepository.palette]` rather than `[CategoryRepository.seedColors]`.
 
 Make the identical change in `lib/features/settings/category_edit_sheet.dart`
@@ -1034,13 +1148,13 @@ verify, don't assume, and here is why each survives:
   `seedColors[7]` — `_firstFreeColor` now scans `palette`, but indices 0-6 are
   taken by the seven seeded chore categories, so it still returns index 7,
   which is still `seedColors[7]`.
-- `members_screen_test.dart:173-181` taps index 2 and expects
+- `members_screen_test.dart:209-216` taps index 2 and expects
   `seedColors[2] == palette[2]`.
 - `join_household_sheet_test.dart:291-293` is on the untouched `seedColors`
   path.
 
 `members_screen_test.dart` also asserts on `CircleAvatar.backgroundColor` at
-lines 195-211; that assertion is still valid at the end of *this* task and is
+lines 231-246; that assertion is still valid at the end of *this* task and is
 updated in Task 3.
 
 - [ ] **Step 6: Commit**
@@ -1060,7 +1174,7 @@ joining device picks what an older client would have picked."
 **Files:**
 - Modify: `lib/features/members/member_avatar.dart` (whole file)
 - Modify: `lib/features/settings/join_flow_steps.dart:56-70`
-- Modify: `test/features/settings/members_screen_test.dart:195-211`
+- Modify: `test/features/settings/members_screen_test.dart:231-246`
 - Test (create): `test/features/members/member_avatar_test.dart`
 
 **Interfaces:**
@@ -1236,15 +1350,28 @@ void main() {
   ) async {
     // R2: the default radius is 12 (a 24px box) precisely so two glyphs fit
     // with margin. 'WM' is about the widest two-letter pair in the alphabet.
+    //
+    // CORRECTED 2026-08-29: this asserted the glyph box against the ring's
+    // INNER diameter using Inter's advance width (~1.35em for two uppercase
+    // glyphs). Widget tests never load Inter -- there is no
+    // flutter_test_config.dart in this repo -- so text falls back to the
+    // `FlutterTest` font, where every glyph is a FULL em. 'WM' at the 11px
+    // floor is 22px wide there against a 21px inner diameter, so the old
+    // assertion failed on a correct implementation. Containment within the
+    // avatar's own box is the property that actually matters (the glyphs
+    // never escape the widget) and it does not depend on the font's advance.
     await _pump(tester, appLightTheme, name: 'Wm', color: stored);
     expect(tester.takeException(), isNull);
-    final textSize = tester.getSize(find.text('WM'));
-    final decoration = _decoration(tester);
-    final inner = 24 - 2 * (decoration.border! as Border).top.width;
+    final textRect = tester.getRect(find.text('WM'));
+    final avatarRect = tester.getRect(find.byType(MemberAvatar));
     expect(
-      textSize.width,
-      lessThan(inner),
-      reason: 'two glyphs must fit inside the ring at the default radius',
+      avatarRect.contains(textRect.topLeft) &&
+          avatarRect.contains(textRect.bottomRight),
+      isTrue,
+      reason:
+          'two glyphs must stay inside the avatar at the default radius '
+          '(measured in the FlutterTest font, whose 1em-per-glyph advance is '
+          'far wider than the bundled Inter actually renders)',
     );
     expect(
       tester.widget<Text>(find.text('WM')).style!.fontSize,
@@ -1451,9 +1578,12 @@ it was never read, because `MemberAvatar` only reads `name` and `color`.
 
 - [ ] **Step 5: Update the one existing test that asserts the old fill**
 
-In `test/features/settings/members_screen_test.dart`, replace lines 195-211
+In `test/features/settings/members_screen_test.dart`, replace lines 231-246
 (the `CircleAvatar` lookup and its `backgroundColor` expectation) with a ring
-assertion. Keep the `MemberAvatar` assertion above it at lines 191-194 as-is.
+assertion. Keep the `MemberAvatar` assertion above it at lines 225-231 as-is.
+While there, fix the stale comment at line 204: it says the bootstrap 'Me'
+member's colour "isn't part of the seed palette", but
+`HouseholdRepository.createLocalHousehold` gives it `seedColors.first`.
 
 ```dart
       final avatarFinder = find.descendant(
@@ -1744,10 +1874,12 @@ git commit -m "Colour swatches can be marked taken, badged with the owner's init
 
 - [ ] **Step 1: Add the two l10n keys**
 
-In `lib/l10n/app_en.arb`, after the `@memberEditColorLabel` block (line 979):
+In `lib/l10n/app_en.arb`, after the `@memberEditColorLabel` block (line 979).
+NOTE: this ARB is American-spelling (`"memberEditColorLabel": "Color"`), so the
+new string says "color", not the plan's original "colour":
 
 ```json
-  "memberEditColorUniqueHint": "Your colour is how you show up on every chore, in the digest and in Chore history. Two people can't take the same one.",
+  "memberEditColorUniqueHint": "Your color is how you show up on every chore, in the digest and in Chore history. Two people can't take the same one.",
   "@memberEditColorUniqueHint": {
     "description": "G-4: explanatory line under the member edit sheet's colour picker, saying what the colour is for and that member colours are unique per household. Shown for every member, whether adding or editing."
   },
@@ -1774,7 +1906,7 @@ informal du-form:
 - [ ] **Step 2: Write the failing tests**
 
 Append to `test/features/settings/members_screen_test.dart`, inside the same
-`void main()`. Model them on the existing recolor test at lines 163-214 — read
+`void main()`. Model them on the existing recolor test at lines 197-247 — read
 it first.
 
 ```dart
@@ -1842,8 +1974,13 @@ it first.
         findsOneWidget,
       );
       // The live preview avatar is present and reads the picked colour.
+      // CORRECTED 2026-08-29: `members.edit.avatar` wraps the Row, not the
+      // avatar, so `tester.widget<MemberAvatar>` on that finder throws.
       final preview = tester.widget<MemberAvatar>(
-        find.bySemanticsIdentifier('members.edit.avatar').first,
+        find.descendant(
+          of: find.bySemanticsIdentifier('members.edit.avatar'),
+          matching: find.byType(MemberAvatar),
+        ),
       );
       expect(preview.member.color, CategoryRepository.palette.first);
       expect(preview.radius, 33);
@@ -1927,7 +2064,7 @@ and the preview both rebuild when the roster changes:
 the roster read there to `ref.read(membersProvider).value ?? const <Member>[]`
 inline inside `_firstFreeColor`, and leave the getter for `build`.)
 
-In `build`, replace the colour section (currently lines 152-159) with the
+In `build`, replace the colour section (currently lines 224-232) with the
 preview row, the picker, and the hint:
 
 ```dart
@@ -1990,7 +2127,7 @@ picker — the label now lives in the preview row. Its l10n key is still used, s
 no key is removed.
 
 The name field already calls `setState` via `_onNameChanged`
-(lines 62, 66), so the preview's initial updates live as the user types. Verify
+(lines 102-103 and 115), so the preview's initial updates live as the user types. Verify
 that listener is still wired; do not add a second one.
 
 - [ ] **Step 5: Bring the members-list avatar to the design's 42px**
@@ -2008,7 +2145,7 @@ flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/f
 flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/settings/join_household_sheet_test.dart
 ```
 
-Expected: PASS, including the pre-existing recolor test at lines 163-214 —
+Expected: PASS, including the pre-existing recolor test at lines 197-247 —
 index 2 is free in that test's single-member household, so it stays enabled.
 
 - [ ] **Step 7: Run the whole suite and the analyzer**
@@ -2038,7 +2175,7 @@ git commit -m "Member colours are unique per household, with a live avatar previ
 - Modify: `docs/specs/theme-v2.md` §1.2, §1.3
 - Modify: `docs/specs/members-management.md` (the avatar and colour bullets, lines 53-65)
 - Modify: `docs/specs/design-language.md` (colour-usage rules)
-- Modify: `docs/backlog.md` (G-4, G-5 rows and the ownership note at line 301)
+- Modify: `docs/backlog.md` (G-4 at line 318, G-5 at 319, the "Not planned" list at 170, the ownership note at 311)
 
 No test cycle: documentation only. It is a task rather than a fold-in because a
 reviewer should be able to reject the spec wording while accepting the code.
@@ -2131,15 +2268,15 @@ canvas's `#1E7A6E`)."*
 
 - [ ] **Step 4: Update `docs/backlog.md`**
 
-- G-4 (line 308): mark shipped, replace "photo or colour-as-border (F15)" with
+- G-4 (line 318): mark shipped, replace "photo or colour-as-border (F15)" with
   the ring outcome, and link this plan.
-- G-5 (line 309): split — the **colour** half (G-5b, twelve colours) is
+- G-5 (line 319): split — the **colour** half (G-5b, twelve colours) is
   shipped by this plan; the **icon** half (the nine new Material Symbols named
   in the design canvas, frame 1d) is NOT and stays open. Say so explicitly so
   nobody reads the row as done.
-- Line 160's "Not planned, and deliberately so" list: remove G-4; keep G-5
+- Line 170's "Not planned, and deliberately so" list: remove G-4; keep G-5
   with a note that only its colour half is done.
-- Line 301's ownership note: record that G-4 and G-5b now have a design and a
+- Line 311's ownership note: record that G-4 and G-5b now have a design and a
   plan.
 - Add a new backlog row for the one thing this plan deliberately left: raising
   12sp category-label contrast to 4.5:1 in the light theme, a gap that predates
@@ -2187,7 +2324,9 @@ git commit -m "Record the twelve-colour palette and the ring avatar in the specs
   reimplementing it, so a badge can never disagree with the avatar beside it.
 - **Every RED is non-vacuous.** Each is a compile error or a specific
   wrong-value/missing-widget failure, with the actual pre-fix value stated
-  (`#654A8C` for the clamped violet, `#84E1D5`/`#DAA98B`/`#AE9BCA`/`#A8C3A2`
-  for the four fallback darks). No test in this plan passes before its fix
+  (`#654A8C` for the clamped violet, `#D491C1`/`#DAA98B`/`#AE9BCA`/`#A8C3A2`
+  for the four fallback darks — the earlier `#84E1D5` here was the *rejected*
+  teal's fallback, left over from the pre-R1 draft). No test in this plan passes
+  before its fix
   exists, except the deliberately-green `Icons.check` regression guard in
   Task 2, which is labelled as such.

@@ -73,12 +73,26 @@ class _Bootstrapped extends ConsumerWidget {
 
 /// A blank scaffold with a centered progress indicator, shown while either
 /// [householdGateProvider] or [bootstrapProvider] is still loading.
+///
+/// Carries the `app.loading` id (backlog A-6) purely so this state is
+/// DISTINGUISHABLE from outside the process. Without it this screen puts
+/// nothing at all in the accessibility tree — `Scaffold` contributes no
+/// node, and `CircularProgressIndicator` wraps itself in a `Semantics`
+/// whose label and value are both null, which is dropped — so a startup
+/// that hangs here dumps an empty hierarchy, byte-identical to a startup
+/// where the Flutter view never presented at all and iOS is still showing
+/// the (also white) `LaunchScreen.storyboard`. That ambiguity is what made
+/// the iOS blank-frame flake un-diagnosable from CI artifacts. Nothing
+/// taps this id; it exists to be read.
 class _LoadingScaffold extends StatelessWidget {
   const _LoadingScaffold();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return semantic(
+      'app.loading',
+      child: const Scaffold(body: Center(child: CircularProgressIndicator())),
+    );
   }
 }
 

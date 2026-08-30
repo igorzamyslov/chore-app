@@ -30,6 +30,13 @@ tags:
 - pressKey: Enter
 - tapOn:
     id: "chore_form.repeat.toggle"
+# The repeat rule is one fill-in-the-blank sentence now, and the unit is a
+# menu hole in it rather than a segmented control (G-2,
+# docs/plans/2026-08-18-repeat-form-sentence.md). The
+# chore_form.repeat.unit.<day|week|month> ids are unchanged -- they moved
+# into the menu -- so reaching them takes an extra tap to open it.
+- tapOn:
+    id: "chore_form.repeat.unit"
 - tapOn:
     id: "chore_form.repeat.unit.day"
 - tapOn:

@@ -828,29 +828,151 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 month after last done} other{{count} months after last done}}'**
   String choreFormAnchorCompletionSubtitleMonth(int count);
 
-  /// Monthly repeat chip label for 'day of month' mode; {ordinalDay} is the already locale-formatted ordinal day (e.g. '15th').
+  /// Retired 2026-08-29 (G-2): the monthly-mode options name the MODE now (see choreFormMonthlyModeDayOfMonth) because the concrete day lives in the repeat sentence's own chip; naming it in both places would be two things to keep in step. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the {ordinalDay}'**
   String monthlyDayOfMonthLabel(String ordinalDay);
 
-  /// Monthly repeat chip label for 'nth weekday of month' mode, e.g. 'On the 3rd Tuesday'. {ordinal} is already locale-formatted (e.g. '3rd'); {weekday} comes from intl's date formatting (e.g. 'Tuesday'), never hardcoded.
+  /// Retired 2026-08-29 (G-2): replaced by choreFormMonthlyModeWeekday, which names the mode rather than the derived ordinal and weekday -- those are now chips in the repeat sentence. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the {ordinal} {weekday}'**
   String monthlyNthWeekdayLabel(String ordinal, String weekday);
 
-  /// Monthly repeat chip label for the last occurrence of a weekday in the month, e.g. 'On the last Tuesday'. {weekday} comes from intl's date formatting, never hardcoded.
+  /// Retired 2026-08-29 (G-2): replaced by choreFormMonthlyModeWeekday, which names the mode rather than the derived weekday -- that is now a chip in the repeat sentence. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'On the last {weekday}'**
   String monthlyLastWeekdayLabel(String weekday);
 
-  /// Caption shown under the monthly pattern selector (and the weekly weekday chips when none are picked), pointing at the start date as the actual lever controlling the derived day/weekday.
+  /// Retired 2026-08-29 (G-2, docs/plans/2026-08-18-repeat-form-sentence.md): nothing in the repeat pattern derives from the start date any more. The weekly weekday set is always non-empty and the monthly day / ordinal / weekday are picked directly in the repeat sentence, so this caption would now be a lie. Key kept, never deleted, per docs/specs/theme-v2.md §0.
   ///
   /// In en, this message translates to:
   /// **'Follows the start date — change the start date to change the day.'**
   String get choreFormPatternFollowsStartDate;
+
+  /// The chore form's whole repeat sentence for the day unit (G-2). {interval} and {unit} are not text: the widget passes a sentinel for each and splits the rendered string on them, replacing each with a tappable chip, so a translator may move the holes anywhere in the sentence. Deliberately NOT an ICU plural: the unit noun is itself a chip whose text already comes from choreFormUnitDayPlural/WeekPlural/MonthPlural, pluralized by the same interval.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat every {interval} {unit}'**
+  String choreFormSentenceDay(String interval, String unit);
+
+  /// The chore form's whole repeat sentence for the week unit (G-2). The weekday chips are the next row down, so the trailing preposition is deliberate — a translator may drop it or move it if their language wants it elsewhere. See choreFormSentenceDay for how the holes work.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat every {interval} {unit} on'**
+  String choreFormSentenceWeek(String interval, String unit);
+
+  /// The chore form's whole repeat sentence for a month-unit, day-of-month rule (G-2). {day} is a chip carrying an already-localized ordinal ('20th', '20.') or the choreFormDayOfMonthLast wording. See choreFormSentenceDay for how the holes work.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat every {interval} {unit} on the {day}'**
+  String choreFormSentenceMonthDayOfMonth(
+    String interval,
+    String unit,
+    String day,
+  );
+
+  /// The chore form's whole repeat sentence for a month-unit, nth-weekday rule (G-2), e.g. 'Repeat every 2 months on the 3rd Tuesday'. {ordinal} is an already-localized ordinal ('3rd', '3.') or the choreFormOrdinalLast wording; {weekday} comes from intl's date formatting, never hardcoded. See choreFormSentenceDay for how the holes work.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat every {interval} {unit} on the {ordinal} {weekday}'**
+  String choreFormSentenceMonthWeekday(
+    String interval,
+    String unit,
+    String ordinal,
+    String weekday,
+  );
+
+  /// The chore form's day-of-month chip when the rule targets the last day of every month rather than a numbered day. There is no numeral form of this, which is why it is a key rather than an ordinal.
+  ///
+  /// In en, this message translates to:
+  /// **'last day'**
+  String get choreFormDayOfMonthLast;
+
+  /// The chore form's monthly-ordinal chip when the rule targets the LAST occurrence of a weekday in the month rather than the 1st..4th. There is no numeral form of this, which is why it is a key rather than an ordinal.
+  ///
+  /// In en, this message translates to:
+  /// **'last'**
+  String get choreFormOrdinalLast;
+
+  /// Chore form monthly-mode option naming the MODE, not the picked day (G-2): the concrete day now lives in the repeat sentence's own chip. Replaces monthlyDayOfMonthLabel, which named the derived day.
+  ///
+  /// In en, this message translates to:
+  /// **'A day of the month'**
+  String get choreFormMonthlyModeDayOfMonth;
+
+  /// Chore form monthly-mode option naming the MODE, not the picked ordinal and weekday (G-2): those now live in the repeat sentence's own chips. Replaces monthlyNthWeekdayLabel/monthlyLastWeekdayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'A weekday'**
+  String get choreFormMonthlyModeWeekday;
+
+  /// Uppercase section header above the chore form's recurrence-anchor cards (G-2), separated from the repeat sentence by a hairline.
+  ///
+  /// In en, this message translates to:
+  /// **'Counting from'**
+  String get choreFormCountingFromLabel;
+
+  /// Shown in the chore form's 'Counting from' section when the monthly mode is 'A weekday' (G-2 / OPD-2). In that state the after-last-completion anchor is ABSENT rather than disabled, and this line says why, in the section whose contents changed.
+  ///
+  /// In en, this message translates to:
+  /// **'A weekday pattern is a position in the calendar, so there is nothing for a completion date to count from.'**
+  String get choreFormCountingFromWeekdayOnly;
+
+  /// The chore form's always-visible preview line for a fixed-schedule rule (G-2). {pattern} receives an already-localized whole clause from recurrenceSentence; {first}/{second}/{third} are the next three real due dates, locale-formatted via intl. Three dates rather than one because 'every 2 weeks on Tue and Fri' is ambiguous in prose and unambiguous in dates. NOTE for translators: the German version deliberately adds NO sentence periods of its own and separates with an em dash instead. German ordinals end in a period ('31.') and intl abbreviates most German months with one ('Aug.'), so a frame that punctuates around the holes renders '31..' and 'Aug...'. Do not 'fix' the German back to periods.
+  ///
+  /// In en, this message translates to:
+  /// **'{pattern}. Next {first}, then {second} and {third}.'**
+  String choreFormPreviewNextThree(
+    String pattern,
+    String first,
+    String second,
+    String third,
+  );
+
+  /// The chore form's preview line for a completion-anchored week rule with more than one picked weekday (G-2). No real dates exist — the series depends on when the user ticks — so the preview explains the roll-forward instead. {base} and {weekdays} both receive already-localized whole clauses.
+  ///
+  /// In en, this message translates to:
+  /// **'{base}, rolled forward to the next {weekdays}.'**
+  String choreFormPreviewCompletionRolledForward(String base, String weekdays);
+
+  /// The chore form's preview line for every other completion-anchored rule (G-2): no real dates can be named, because the series depends on when the user marks it done. {base} receives an already-localized whole clause from recurrenceSentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{base} — the next due date depends on the day you do it.'**
+  String choreFormPreviewCompletionDependsOnDay(String base);
+
+  /// Screen-reader label for the repeat sentence's interval hole (G-2). The visible text is a bare number, which is meaningless out of context.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat interval'**
+  String get choreFormSentenceIntervalA11y;
+
+  /// Screen-reader label for the repeat sentence's unit hole (G-2). The visible text is a bare noun such as 'Weeks', which is meaningless out of context.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat unit'**
+  String get choreFormSentenceUnitA11y;
+
+  /// Screen-reader label for the repeat sentence's day-of-month hole (G-2).
+  ///
+  /// In en, this message translates to:
+  /// **'Day of the month'**
+  String get choreFormSentenceMonthlyDayA11y;
+
+  /// Screen-reader label for the repeat sentence's monthly-ordinal hole (G-2), which picks the 1st..4th or last occurrence of the chosen weekday.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one in the month'**
+  String get choreFormSentenceMonthlyOrdinalA11y;
+
+  /// Screen-reader label for the repeat sentence's monthly-weekday hole (G-2).
+  ///
+  /// In en, this message translates to:
+  /// **'Weekday'**
+  String get choreFormSentenceMonthlyWeekdayA11y;
 
   /// Chore form assignment-mode chip: a fixed single assignee.
   ///
@@ -1145,6 +1267,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Color'**
   String get memberEditColorLabel;
+
+  /// G-4: explanatory line under the member edit sheet's color picker, saying what the color is for and that member colors are unique per household. Shown for every member, whether adding or editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your color is how you show up on every chore, in the digest and in Chore history. Two people can\'t take the same one.'**
+  String get memberEditColorUniqueHint;
+
+  /// G-4: screen-reader label for a color swatch another household member already holds, so it is disabled. The swatch itself shows that member's initials.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken by {memberName}'**
+  String memberEditColorTakenBy(String memberName);
 
   /// T1.7: shown in place of the vanished Delete button when the member being edited is the household's last remaining active member.
   ///

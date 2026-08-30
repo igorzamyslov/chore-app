@@ -4,6 +4,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/chore_occurrence_tile.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,13 +51,20 @@ void main() {
       await tester.pumpAndSettle();
 
       // The bootstrap member is named 'Me'; its first (and only) name
-      // token shows next to a single avatar circle. Scoped to the tiles:
-      // the app bar's acting-member button is a CircleAvatar too.
+      // token shows next to a single avatar. Scoped to the tiles: the app
+      // bar's acting-member button is a MemberAvatar too.
+      //
+      // Asserted on MemberAvatar rather than CircleAvatar since G-4: the
+      // avatar is now a ring (a Container with a circular BoxDecoration)
+      // and there is no CircleAvatar under the tile at all. The widget
+      // TYPE is what this test is about -- the ring's colour and initials
+      // are covered by test/features/members/member_avatar_test.dart, in
+      // both themes.
       expect(find.text('Me'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(ChoreOccurrenceTile),
-          matching: find.byType(CircleAvatar),
+          matching: find.byType(MemberAvatar),
         ),
         findsOneWidget,
       );

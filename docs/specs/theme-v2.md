@@ -87,12 +87,15 @@ and gets its depth from a 1px `outlineVariant` border plus these shadows.
 
 ### 1.3 Category + member tone mapping
 
-The 8 seeded colors in `CategoryRepository.seedColors` are used for both
-categories and members. They are stored as ARGB ints and **must never be
+The 12 colors in `CategoryRepository.palette` are the user-pickable set,
+shared by categories and members. Its first 8 ARE
+`CategoryRepository.seedColors`, in order and by construction — that list
+keeps its separate, narrower meaning ("what color does the Nth seeded
+default category get"). They are stored as ARGB ints and **must never be
 rewritten** — sync would replicate the rewrite to every device. The theme
 maps them at render time:
 
-| Seed (stored) | Light render | Dark render |
+| Stored | Light render | Dark render |
 | --- | --- | --- |
 | `#6D9F71` Cleaning | `#4E7E54` | `#93C297` |
 | `#8C7BC9` Kitchen | `#6B57B0` | `#B4A5E8` |
@@ -102,21 +105,80 @@ maps them at render time:
 | `#B8A15F` Maintenance | `#8E7833` | `#DBC585` |
 | `#7B93C9` Errands | `#5A73AD` | `#A4B8E5` |
 | `#A9A9A9` Other | `#77716A` | `#C8C4BE` |
+| `#9A3D80` plum | `#9A3D80` | `#D9A0C9` |
+| `#96562F` rust | `#96562F` | `#DFB49A` |
+| `#7A5AA8` violet | `#7A5AA8` | `#B9A8D1` |
+| `#4C6B45` moss | `#4C6B45` | `#B4CBAE` |
 
-Reason: 12sp category labels drawn in the raw seed clear 4.5:1 on neither
-ground. The map darkens on paper and lightens on the dark ground.
+For the last four the stored value **is** the light render — they are
+stored as the design canvas's own hex, unlike the eight above whose stored
+value is a mid-tone that the light render darkens. The plum's row is still
+required and is NOT redundant: its HSL lightness is 0.4216, a hair over the
+unknown-color ceiling below, so without an explicit row `categoryTone`
+would silently return `#993D80`.
+
+**Slot 9 is a deliberate substitution.** The design canvas's ninth color is
+`#1E7A6E`. That is byte-for-byte `_lightPrimary` — the accent that means
+"interactive / selected" throughout this UI — so a member ring or category
+dot drawn in it reads as a selection state rather than an identity, most
+confusingly on the very surfaces where selection is also being expressed
+(assignee chips, the acting-member switcher, the swatch grid itself). It is
+substituted with `#9A3D80` plum, which clears the same contrast bar in both
+themes (light 5.15, dark 7.90) and sits ΔE 21.7 (light) / 10.3 (dark) from
+its nearest palette neighbour. See
+`docs/plans/2026-08-18-palette-and-ring-avatars.md` R1. The canvas and the
+app diverge here on purpose; this is not a transcription slip.
+
+Reason for the map: 12sp category labels drawn in the raw seed clear 4.5:1
+on neither ground. The map darkens on paper and lightens on the dark
+ground.
+
+**Verified contrast floor.** All twelve clear 3:1 against `surface`,
+`surfaceContainerLow` and `surfaceContainerHigh` in both themes — light
+floor 3.30 (`#B96A4C`), dark floor 7.63 (`#B4A5E8`); asserted in
+`test/app/palette_test.dart`, in both themes. The 4.5:1 figure in the
+paragraph above describes the 12sp category **label**, which only 3 of the
+8 original light renders in fact reach. That gap predates the widening,
+which neither introduced nor closed it; raising it is backlog work.
+
+**Perceptual separation.** Widening to twelve tightens the palette's
+minimum ΔE76 from 25.8 to **7.8** in light (`#6B57B0` vs `#7A5AA8`) and
+from 17.8 to **9.3** in dark (`#F0AF95` vs `#DFB49A`). Both stay well above
+the ~2.3 just-noticeable difference, and per `design-language.md` the ring
+color is never the only carrier: the two-letter initials are.
 
 API: `Color categoryTone(BuildContext context, int storedArgb)`. A color
-that is not one of the eight (possible via sync from a future picker, or an
-imported archive) falls back to an HSL lightness clamp — light: lightness
-clamped to ≤ 0.42; dark: clamped to ≥ 0.70 — so unknown colors degrade
-gracefully instead of becoming unreadable.
+that is not one of the twelve (possible via sync from a future picker, or
+an imported archive) falls back to an HSL lightness clamp — light:
+lightness clamped to ≤ 0.42; dark: clamped to ≥ 0.70 — so unknown colors
+degrade gracefully instead of becoming unreadable.
 
-**Avatars are the exception**: a member avatar is a filled circle in the
-tone color with `onMemberColor` initials, so the tone map applies to the
-fill and `onMemberColor` to the text. Do not re-derive avatar text color
-with `estimateBrightnessForColor` any more — the tone map already
-guarantees the pairing.
+**Avatars are a ring, not a fill** (G-4): two-letter initials drawn in
+`categoryTone` on `surfaceContainerHigh`, inside a border in the same tone,
+width `radius / 8` clamped to `[1.5, 3.0]`, font `radius * 0.72` with an
+11px floor. The whole avatar scales with the viewer's text scale, capped at
+1.6x. `FamdoColors.onMemberColor` is retained in §1.2 (it is theme API and
+asserted by `test/app/theme_test.dart`) but is no longer read by any
+widget. Do not re-derive avatar text color with `estimateBrightnessForColor`
+— the tone map already guarantees the pairing.
+
+**The swatch picker renders `categoryTone`, not the raw stored value** —
+the swatch is a ring previewing an avatar ring, so the two must agree, and
+four of the twelve stored values are unreadable drawn raw on the dark
+ground. An earlier code comment in `color_swatch_picker.dart` asserted that
+this section exempted the picker from the tone map. It never did; this
+section says nothing about pickers.
+
+**G-5b widened the palette without rewriting one stored value**, and a
+rewrite is not merely discouraged but incorrect. Without `sync_dirty`,
+`SyncRepository.applyPulledMember` is an `insertOnConflictUpdate` gated
+only on the local row being clean, so the next pull replaces the migrated
+row with the server's old color — the migration is silently undone on every
+linked household. With `sync_dirty`, every member and category row on every
+device goes dirty at once and re-pushes, and LWW is on `updated_at` (spec
+`sync-backend.md` §8.3), which a migration does not bump, so the winner is
+undefined and colors flap by upgrade order. Schema stayed at v12; no
+migration exists.
 
 ## 2. Typography
 
@@ -268,12 +330,54 @@ requires).
 - Fields become **filled cards with a permanently visible uppercase
   label** above the value (`primaryOutline` border when focused,
   `outlineVariant` otherwise). No floating labels.
-- Interval unit and assignment mode become **segmented controls** on a
-  `surfaceContainerHigh` track (selected = `surfaceContainerLow` +
-  `primary` ink).
+- Assignment mode is a **segmented control** on a `surfaceContainerHigh`
+  track (selected = `surfaceContainerLow` + `primary` ink).
 - Weekdays become a row of circular toggles (selected = `primary` fill).
-- The anchor choice becomes **two explanatory radio cards** naming the
-  actual interval (selected = `primaryContainer` + `primaryOutline`).
+- **The repeat block is one fill-in-the-blank sentence** (amended
+  2026-08-29 by G-2, `docs/plans/2026-08-18-repeat-form-sentence.md`; the
+  layout itself is specified in `ui-foundation-chores.md`). Every hole
+  shares one chip container — `primaryContainer` fill,
+  `primaryOutline` border, radius 11, `BoxConstraints(minWidth: 40,
+  minHeight: 40)`, `Icons.unfold_more` at 16 on the holes that open a menu
+  — laid out in a `Wrap` of one `Text` per literal word. `minHeight` is a
+  **floor, not a fixed height**: the chip grows with the text and the
+  `Wrap` reflows around it, which is how the sentence survives text scale
+  2.0 (§5). If it ever overflows, the fix is the constraint, never a tap
+  target below 40px.
+- The anchor choice is **explanatory radio cards** naming the actual
+  configured rule (selected = `primaryContainer` + `primaryOutline`),
+  below a 1px `outlineVariant` hairline under an uppercase
+  `onSurfaceVariant` 'Counting from' header at `labelSmall` with
+  letter-spacing 0.7.
+
+**§0 exception, recorded (2026-08-29, G-2).** §0 says no `semantic(...)`
+id may be removed, renamed, **or moved to a different widget**. This wave
+moves three: `chore_form.repeat.unit.<day|week|month>` were the labels of
+three `ButtonSegment`s and are now entries in the menu the new
+`chore_form.repeat.unit` chip opens. Nothing was removed or renamed — all
+three ids still exist and still select the same unit — but they are on a
+different widget and, unlike a segment, they do not exist until the menu is
+opened.
+
+The exception is taken under §0's own final clause: *"When the design
+implies a behavior change (not just a look), it is out of scope for the
+theme waves and belongs in its own spec."* G-2 is that spec, and this is a
+behaviour change, not a restyle — the whole point is that controls which do
+not apply cease to exist.
+
+The obligation §0 exists to protect was met in the same commit: the three
+Maestro flows that tap `chore_form.repeat.unit.day` directly
+(`e2e/flows/settings/chore_history.yaml`,
+`e2e/flows/chores/skip_undo_journey.yaml`,
+`e2e/flows/chores/recurring_complete_advances.yaml`) each gained a
+`chore_form.repeat.unit` tap before it, and `e2e/README.md` convention 5
+was updated to say so. `chore_form.repeat.interval` also moved widget — from
+a `LabelledFieldCard` into the sentence — but it is still a `TextField`
+reached by descendant, so no flow or test path changed.
+
+`chore_form.repeat.anchor.completion` is a related but different case: it is
+not moved, it is conditionally **absent** (monthly weekday mode only), which
+§0 does not speak to and which the "does not exist" rule above requires.
 - Rotation mode shows selected members as a reorderable list with an
   order label per row ("1. Anna", "2. Ben") instead of chips, and
   not-yet-selected members as a chip row below it (spec

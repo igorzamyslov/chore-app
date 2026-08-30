@@ -25,9 +25,30 @@ on:
   # picked as the run target. A dispatched run also runs `android` (there is
   # no per-job trigger), which is the cheap half and worth having anyway.
   workflow_dispatch:
+    inputs:
+      ios_blank_frame_cycles:
+        # Backlog A-6 amplifier. Leave at 0 for an ordinary verification
+        # run; anything higher REPLACES the flow suite with N repetitions of
+        # the minimal failing cycle and skips `android` entirely -- see the
+        # amplifier step in the `ios` job for the full rationale. A choice
+        # rather than free text on purpose: the value is interpolated into
+        # arithmetic in a shell script. The options are multiples of the
+        # probe's batch size (25); anything else would be rounded UP to
+        # one, and the step reports the launches it actually got rather
+        # than the number asked for either way.
+        description: "A-6: blank-frame amplifier cycles (0 = normal run)"
+        type: choice
+        default: "0"
+        options: ["0", "25", "50", "100", "200", "300"]
 
 jobs:
   android:
+    # Skipped for an A-6 amplifier dispatch: that dispatch exists to buy iOS
+    # launch cycles, and a 15-minute Android suite alongside it only adds an
+    # unrelated red/green to read past. `inputs` is an empty context on
+    # push/pull_request, so `inputs.ios_blank_frame_cycles` is null there and
+    # the `|| '0'` fallback is what keeps this `0 == 0` rather than an error.
+    if: fromJSON(inputs.ios_blank_frame_cycles || '0') == 0
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -150,13 +171,55 @@ jobs:
     #   - It is not a hang or a crash. XCTest runs in-process and logged the
     #     app's main thread answering ("MT responded in time"), snapshotting
     #     cleanly in 0.01s — with zero Flutter nodes in the tree.
-    # So the Flutter view permanently fails to present on a fresh install.
-    # Root cause unknown, and it is NOT fixed here: it did not reproduce on
-    # wave-4 code, there is no local reproduction, and the remedies that fit
-    # a bimodal shape (a Maestro `retry`, a CLI --retry-on-failure) cannot be
-    # A/B'd against the 2.7.0 pin without a simulator run — unverified
-    # Maestro changes being exactly what that pin exists to prevent (see the
-    # Install Maestro step).
+    # Wave 5 concluded from those three facts that "the Flutter view
+    # permanently fails to present on a fresh install". THAT WAS NEVER
+    # ESTABLISHED — it is one reading of the artifact, and wave 6 (A-6)
+    # found the evidence does not distinguish it from at least two others.
+    # This row has now recorded a wrong cause once and an unestablished one
+    # once; do not add a third by reasoning from the same artifact.
+    #
+    # WHY THE THREE FACTS DO NOT SETTLE IT. A blank white frame with an
+    # empty accessibility tree is produced identically by (a) iOS's white
+    # LaunchScreen.storyboard, i.e. the Flutter view never presented; (b)
+    # ChoreApp's `_LoadingScaffold`, i.e. the view DID present and the
+    # household gate never resolved — that scaffold emitted no
+    # accessibility node at all until `app.loading` was added in wave 6,
+    # so it photographed and dumped exactly like (a); and (c) an XCTest
+    # driver that went blind to an app Maestro had just uninstalled and
+    # reinstalled, which also explains a responsive main thread and a
+    # 0.01s snapshot. Only (b) would be our bug.
+    #
+    # WHAT WAVE 6 ACTUALLY MEASURED, with the amplifier below. At the
+    # suite's own 60s threshold: 1400 cold launches across 56 fresh
+    # simulator boots (14 dispatched runs), ZERO reproductions. Against
+    # the historical ~0.45%/launch that is p~0.002, and it bounds the
+    # per-launch rate at 0.21% (95%). It bounds it ON THIS IMAGE ONLY --
+    # every boot drew macos26/20260728.0273.1, Xcode 26.6, iPhone 17 Pro,
+    # iOS 26.2 -- and says nothing about the image August's reds came
+    # from. "Does not reproduce on today's CI" is NOT "fixed"; nothing
+    # was fixed, the environment moved. Every run carried a
+    # negative control that forced a failure on a healthy app and proved
+    # the capture path fires, so that count is not a broken instrument
+    # reporting silence.
+    #
+    # TWO TRAPS THAT COST WAVE 6 TIME, recorded so they cost nobody else:
+    #   - A 20s probe is NOT a cheaper 60s probe. Measured from launchApp
+    #     it swallows process startup, and a launch that took 12.4s to
+    #     reach the Dart VM (against a 0.8s median) failed on arithmetic
+    #     alone. Two further 20s failures had rendered by ~launch+40s and
+    #     would have PASSED the suite's 60s gate, so they were not this
+    #     flake either. Measure at 60s or measure nothing.
+    #   - `XCTAS Error: ... Error getting main window Unknown kAXError
+    #     value -25218` looks exactly like the smoking gun and IS NOT ONE.
+    #     It appears in 56 of one run's 100 launches INCLUDING PASSING
+    #     ones, and is absent from one of the two failures it would have
+    #     explained. Already ruled out; do not re-derive it.
+    #
+    # STILL NOT FIXED, and nothing here claims otherwise. The remedies
+    # that fit a bimodal shape (a Maestro `retry`, a CLI
+    # --retry-on-failure) cannot be A/B'd against the 2.7.0 pin without a
+    # simulator run — unverified Maestro changes being exactly what that
+    # pin exists to prevent (see the Install Maestro step).
     #
     # AND NOTE A `paths:` FILTER WOULD NOT HELP the cost side anyway: nearly
     # every PR here touches lib/**, which is iOS-relevant, so "PRs touching
@@ -203,8 +266,29 @@ jobs:
           flutter-version: 3.44.8
           channel: stable
           cache: true
+      # AMPLIFIER RUNS ONLY (backlog A-6). DO NOT GENERALISE THIS CACHE TO
+      # THE NORMAL PATH -- it looks like an obvious speed-up for every run
+      # and it is not one. An ordinary verification run exists to test the
+      # code AT THAT REF, and handing it a cached binary defeats the thing
+      # the run is for. The amplifier is the only caller for which the
+      # binary is a fixed input rather than the subject. The amplifier wants many INDEPENDENT runners far
+      # more than it wants many cycles on one -- the flake's own history is
+      # 9 of 10 reds inside 2 of 61 runs, which is what a per-runner or
+      # per-simulator condition looks like, and under that shape a 25-cycle
+      # run is worth almost exactly as much as a 100-cycle one. Short runs
+      # are then strictly better, except that a ~12-minute build dwarfs an
+      # 8-minute experiment. Keying on the commit sha makes every dispatch
+      # of the same ref after the first reuse one build.
+      - name: Cache the simulator app (A-6 amplifier)
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        id: ios_app_cache
+        uses: actions/cache@v4
+        with:
+          path: build/ios/iphonesimulator
+          key: ios-sim-app-${{ github.sha }}
       - name: Build simulator app (pinned E2E clock)
         # SUPABASE_* defines empty — see the Android job's build step.
+        if: steps.ios_app_cache.outputs.cache-hit != 'true'
         run: flutter build ios --simulator --debug --dart-define=E2E_TODAY=2026-07-24 --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY=
       - name: Boot simulator
         run: |
@@ -222,6 +306,9 @@ jobs:
         # PINNED — see the Android job's install step for the full story.
         run: curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=2.7.0 bash
       - name: Run flows on simulator
+        # Skipped when the A-6 amplifier is asked for: the two want the same
+        # simulator and the amplifier wants all of the job's minutes.
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') == 0
         run: |
           $HOME/.maestro/bin/maestro test \
             --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
@@ -232,3 +319,394 @@ jobs:
           name: maestro-debug-ios
           path: ~/.maestro/tests/
           retention-days: 14
+
+      # ---- A-6 blank-frame amplifier (dispatch-only) ------------------
+      # WHY THIS EXISTS. The flake is ~0.4% per flow, so waiting for a
+      # natural reproduction is hopeless and every recorded observation of
+      # it comes from a single expired artifact. This step repeats the
+      # MINIMAL failing cycle -- Maestro `clearState`, which on iOS is
+      # uninstall + reinstall + a genuinely cold launch, then the suite's
+      # own `welcome.create` wait -- dozens of times in one job, capturing
+      # the device log of every launch rather than only the fact of a
+      # failure. macOS minutes are free on this public repo, so the
+      # brute-force is affordable and several dispatches can run at once.
+      #
+      # WHAT EACH FAILING CYCLE ANSWERS. `verdict` in results.csv resolves
+      # the ambiguity that has blocked this diagnosis: a blank white frame
+      # with an empty accessibility tree is produced identically by iOS's
+      # white LaunchScreen.storyboard (the Flutter view never presented --
+      # a platform problem) and by `ChoreApp`'s `_LoadingScaffold` (the
+      # view presented and `householdGateProvider` never resolved -- our
+      # bug). The `app.loading` id added in lib/app/app.dart makes the
+      # second case name itself in the hierarchy dump.
+      #
+      # It never fails the job. The output IS the result, and a red run
+      # here would only obscure how many cycles were actually collected.
+      - name: Fingerprint this runner (A-6)
+        # ON EVERY AMPLIFIER RUN, PASS OR FAIL, and that is the point. The
+        # flake's history clumps -- 9 of 10 reds inside 2 of 61 runs -- which
+        # is the shape of a per-runner or per-boot condition rather than an
+        # independent per-launch one. A condition like that can only ever be
+        # found by CORRELATING reproductions against the machines that
+        # produced them, and nothing can be correlated that was not recorded
+        # on the clean runs too. A reproduction carrying no fingerprint is
+        # worth a fraction of one that does.
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        run: |
+          set -u
+          OUT="$RUNNER_TEMP/a6-amplifier"
+          mkdir -p "$OUT"
+          {
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "sha=${{ github.sha }}"
+            echo "ImageOS=${ImageOS:-unknown}"
+            echo "ImageVersion=${ImageVersion:-unknown}"
+            echo "runner_arch=${RUNNER_ARCH:-unknown}"
+            echo "hw_ncpu=$(sysctl -n hw.ncpu)"
+            echo "hw_memsize=$(sysctl -n hw.memsize)"
+            echo "cpu_brand=$(sysctl -n machdep.cpu.brand_string)"
+            echo "--- sw_vers ---"; sw_vers
+            echo "--- xcodebuild ---"; xcodebuild -version
+            echo "--- booted device ---"
+            xcrun simctl list devices booted
+            echo "--- runtimes ---"
+            xcrun simctl list runtimes
+          } | tee "$OUT/runner-fingerprint.txt"
+      - name: Amplify the blank-frame flake (A-6)
+        if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        env:
+          CYCLES: ${{ inputs.ios_blank_frame_cycles }}
+          APP_ID: io.github.igorzamyslov.famdo
+        run: |
+          set -u
+          MAESTRO="$HOME/.maestro/bin/maestro"
+          OUT="$RUNNER_TEMP/a6-amplifier"
+          mkdir -p "$OUT"
+          DEVICE_ID=$(xcrun simctl list devices booted \
+            | grep -oE "[0-9A-F-]{36}" | head -1)
+          echo "device=$DEVICE_ID" >> "$OUT/runner-fingerprint.txt"
+
+          # MUST equal the probe flow's `repeat.times`. The probe repeats
+          # internally so Maestro's ~25s of JVM start, driver install and
+          # teardown is paid once per batch instead of once per cycle. 25
+          # is also deliberately close to the real job's 14 flows, which
+          # makes a batch a rough REPLICA of one `ios` run: one boot, one
+          # warm-up launch, then a couple of dozen cold starts.
+          BATCH=25
+          batches=$(( (CYCLES + BATCH - 1) / BATCH ))
+
+          # A FRESH BOOT PER BATCH, which is the experiment's real
+          # subject. If the condition is per-boot rather than per-runner,
+          # cycles 26+ on one boot measure almost nothing, and this is
+          # what separates the two: reproductions spread across the boots
+          # of many runners means per-boot; reproductions concentrated in
+          # every boot of a few runners means per-runner. Same
+          # shutdown/boot/install/warm-up sequence as the `Boot simulator`
+          # step, so a batch reproduces the real job's starting conditions
+          # rather than an artificial one.
+          reboot_simulator() {
+            xcrun simctl shutdown "$DEVICE_ID" >/dev/null 2>&1 || true
+            xcrun simctl boot "$DEVICE_ID"
+            xcrun simctl bootstatus "$DEVICE_ID" -b
+            xcrun simctl install booted build/ios/iphonesimulator/Runner.app
+            xcrun simctl launch booted "$APP_ID" >/dev/null 2>&1 || true
+            sleep 20
+            xcrun simctl terminate booted "$APP_ID" >/dev/null 2>&1 || true
+          }
+
+          start_logs() {
+            xcrun simctl spawn booted log stream --level=debug \
+              --style=syslog --predicate 'process == "Runner"' \
+              > "$OUT/$1.runner.log" 2>&1 &
+            RUNNER_LOG_PID=$!
+            xcrun simctl spawn booted log stream --style=syslog \
+              --predicate 'process == "SpringBoard"' \
+              > "$OUT/$1.system.log" 2>&1 &
+            SYSTEM_LOG_PID=$!
+            sleep 3
+          }
+
+          # Everything worth having about a failed launch, in one place so
+          # the negative control below exercises the SAME code the
+          # measurement loop depends on. A control that proved out a
+          # separate copy would prove nothing about this one.
+          capture_failure() {
+            label="$1"
+            # ORDER IS EVIDENCE. Everything that OBSERVES the failed state
+            # runs before anything that DISTURBS it, most-perishable
+            # first, and the hierarchy dump goes last because it starts a
+            # whole new Maestro/XCTest session -- ~20s, and an
+            # intervention in its own right. Getting this backwards cost
+            # run 33266354426 the one artifact that mattered: its
+            # screenshot was taken after the dump, so it could not say
+            # whether the screen was rendered AT the failure or only
+            # recovered by the time anyone looked.
+            #
+            # Taken with simctl, NOT through the driver, and that is the
+            # point. It tests a hypothesis none of the recorded evidence
+            # could: that the app is fine and XCTest has gone blind to it.
+            # Every fact on record -- a window titled "Famdo" holding
+            # nothing, a main thread that answers, a snapshot in 0.01s
+            # with zero nodes -- fits a driver that lost its accessibility
+            # view of an app Maestro had just uninstalled and reinstalled,
+            # exactly as well as it fits an app that never presented. A
+            # screenshot from outside the driver settles it: a welcome
+            # screen here next to an empty hierarchy means the app was
+            # never the problem.
+            xcrun simctl io booted screenshot "$OUT/$label.png" || true
+            CAPTURED_PNG=$(wc -c < "$OUT/$label.png" 2>/dev/null || echo 0)
+
+            # Maestro's OWN debug directory: the screenshot and hierarchy
+            # it captured at the failure INSTANT, strictly better evidence
+            # than anything gathered afterwards. Its path is read from the
+            # flow's output rather than guessed with `ls -dt`, which is
+            # what run 33266354426 did and why it archived the wrong
+            # directory -- by then `maestro hierarchy` had created a newer
+            # one, so `ls -dt | head -1` faithfully copied the diagnostic
+            # session instead of the failure it was meant to preserve.
+            debug_dir=$(grep -oE '/[^ ]*/\.maestro/tests/[0-9_-]+' \
+              "$OUT/$label.maestro.log" | tail -1)
+            if [ -n "$debug_dir" ] && [ -d "$debug_dir" ]; then
+              cp -R "$debug_dir" "$OUT/$label.maestro-debug" \
+                2>/dev/null || true
+            fi
+
+            # Startup cost of the launch that failed -- the line between
+            # the two different failures this probe can produce. A genuine
+            # blank frame follows a NORMAL start: 0.71s and 0.79s in run
+            # 33263066546's two reproductions, against that run's 0.8s
+            # median over 100 launches. A slow start that merely ran out
+            # of clock looks nothing like it: 12.4s in run 33266354426.
+            # Recorded on every failure so the two are never conflated.
+            last_start=$(grep -oE '^[^ ]+ [0-9:.]+\+0000 .*Runner\[' \
+              "$OUT/$label.runner.log" | tail -1 | awk '{print $2}')
+            last_vm=$(grep 'Dart VM service is listening' \
+              "$OUT/$label.runner.log" | tail -1 | awk '{print $2}')
+            CAPTURED_VMDELTA=$(awk -v a="${last_start:-}" \
+              -v b="${last_vm:-}" 'BEGIN { if (a == "" || b == "") \
+              { print "NA"; exit } split(a, x, ":"); split(b, y, ":"); \
+              printf "%.2f", (y[1]*3600 + y[2]*60 + y[3]) \
+              - (x[1]*3600 + x[2]*60 + x[3]) }')
+
+            # THE PAYLOAD. A debug build starts the Dart VM service and
+            # prints its URL, auth token included, to os_log, which the
+            # stream has already captured; a simulator shares the host's
+            # loopback, so the runner can reach it exactly as `flutter
+            # attach` does. The service answers JSON-RPC over plain HTTP
+            # GET, so `getStack` for every isolate names the Dart frames
+            # the hung launch sits on -- main isolate AND drift's
+            # background database isolate. That separates "awaiting a
+            # path_provider reply that never came" from "awaiting drift's
+            # isolate handshake" from "awaiting nothing, so the hang is
+            # below Dart", which no screenshot or hierarchy can.
+            sleep 3
+            vm_url=$(grep -o \
+              'The Dart VM service is listening on http://[^ ]*' \
+              "$OUT/$label.runner.log" | tail -1 \
+              | sed 's|.*listening on ||')
+            if [ -n "$vm_url" ]; then
+              echo "VM service: $vm_url" > "$OUT/$label.vm.txt"
+              curl -sS --max-time 20 "${vm_url}getVM" \
+                >> "$OUT/$label.vm.txt" 2>&1 || true
+              for iso in $(grep -oE 'isolates.?/[0-9]+' \
+                  "$OUT/$label.vm.txt" | tr -d '\\' | sort -u); do
+                {
+                  echo ""
+                  echo "=== getStack $iso ==="
+                  curl -sS --max-time 20 \
+                    "${vm_url}getStack?isolateId=$iso" 2>&1 || true
+                } >> "$OUT/$label.vm.txt"
+              done
+            else
+              echo 'no VM service URL: Dart never got there' \
+                > "$OUT/$label.vm.txt"
+            fi
+
+            # Belt and braces, because a reproduction is rare and
+            # expensive and the VM service's plain-HTTP RPC is the one
+            # instrument above that could simply have been withdrawn
+            # upstream. A simulator app is an ordinary host process, so
+            # `sample` gives native backtraces for every thread with no
+            # cooperation from Dart -- and it is the only instrument that
+            # still reports anything if Dart never started at all.
+            #
+            # tail, not head: a batch holds up to 25 launches and the one
+            # still on screen is the LAST. `head` would sample a pid that
+            # exited 24 cycles ago, or a recycled one.
+            app_pid=$(grep -oE 'Runner\[[0-9]+\]' \
+              "$OUT/$label.runner.log" | tail -1 | tr -dc '0-9')
+            if [ -n "$app_pid" ]; then
+              /usr/bin/sample "$app_pid" 3 \
+                -file "$OUT/$label.sample.txt" > /dev/null 2>&1 || true
+            fi
+
+            # Deliberately LAST: a new Maestro session, ~20s, and an
+            # intervention in its own right. Maestro leaves the app in its
+            # failed state, so everything above observed that state first.
+            "$MAESTRO" hierarchy > "$OUT/$label.hierarchy.json" 2>&1 || true
+
+            # NODE COUNT, not just "were there ids". A reproduction that
+            # can say "0 nodes where a healthy app on this same runner had
+            # 47" is a far stronger claim than "the tree looked empty",
+            # and it is the only way to tell a PARTIALLY built tree from a
+            # wholly absent one -- an engine that presented and got part
+            # way is a different bug from one that never presented.
+            # Maestro emits one "attributes" object per node, so counting
+            # those counts nodes without having to parse the JSON (whose
+            # dump can carry a log line ahead of it).
+            CAPTURED_NODES=$(grep -o '"attributes"' \
+              "$OUT/$label.hierarchy.json" | wc -l | tr -d ' ')
+            CAPTURED_IDS=$(grep -oE '"resource-id"[ ]*:[ ]*"[^"]+"' \
+              "$OUT/$label.hierarchy.json" | wc -l | tr -d ' ')
+            CAPTURED_LAUNCHES=$(grep -c 'Dart VM service is listening' \
+              "$OUT/$label.runner.log" || true)
+            if [ "$CAPTURED_LAUNCHES" -eq 0 ]; then
+              CAPTURED_VERDICT=HARNESS_NO_LAUNCH
+            elif grep -q 'app\.loading' "$OUT/$label.hierarchy.json"; then
+              CAPTURED_VERDICT=DART_RAN_GATE_NEVER_RESOLVED
+            elif grep -q 'welcome\.' "$OUT/$label.hierarchy.json"; then
+              CAPTURED_VERDICT=FLUTTER_TREE_PRESENT_SELECTOR_MISSED
+            else
+              CAPTURED_VERDICT=NO_FLUTTER_NODES_AT_ALL
+            fi
+          }
+
+          # ---- NEGATIVE CONTROL, before any measurement -----------------
+          # "0 reproductions in N launches" is worthless if the instrument
+          # could not have reported one, and a broken capture path leaves
+          # a run log identical to a clean one. So force a failure on a
+          # HEALTHY, fully rendered app and require the capture to fire.
+          # This is also the calibration for reading a real reproduction:
+          # it establishes what the hierarchy, the screenshot size and the
+          # VM stacks look like when the app is definitely fine.
+          echo "=== A-6 negative control ==="
+          reboot_simulator
+          start_logs control
+          if "$MAESTRO" test --env APP_ID="$APP_ID" \
+               e2e/amplify/blank_frame_control.yaml \
+               > "$OUT/control.maestro.log" 2>&1; then
+            kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+            echo "::error::A-6 control PASSED an impossible assertion."
+            echo "The probe cannot detect a failure; N would be meaningless."
+            exit 1
+          fi
+          capture_failure control
+          kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+          control_ok=yes
+          for f in control.hierarchy.json control.png control.vm.txt \
+              control.sample.txt; do
+            if [ ! -s "$OUT/$f" ]; then
+              echo "::error::A-6 control produced no $f"
+              control_ok=no
+            fi
+          done
+          grep -q 'getStack' "$OUT/control.vm.txt" \
+            || { echo "::error::A-6 control got no Dart stack"; \
+                 control_ok=no; }
+          if [ "$CAPTURED_VERDICT" != "FLUTTER_TREE_PRESENT_SELECTOR_MISSED" ]
+          then
+            echo "::error::A-6 control verdict was $CAPTURED_VERDICT, not"
+            echo "FLUTTER_TREE_PRESENT_SELECTOR_MISSED: either the"
+            echo "instrument is wrong or the control itself hit the flake."
+            control_ok=no
+          fi
+          if [ "$CAPTURED_NODES" -eq 0 ]; then
+            echo "::error::A-6 control dumped an EMPTY hierarchy for an"
+            echo "app that had just rendered the welcome gate. The"
+            echo "hierarchy instrument reports nothing either way, so an"
+            echo "empty tree in a reproduction would prove nothing."
+            control_ok=no
+          fi
+          echo "control: verdict=$CAPTURED_VERDICT png=$CAPTURED_PNG bytes"
+          echo "control: healthy hierarchy = $CAPTURED_NODES nodes,"
+          echo "control: $CAPTURED_IDS of them carrying a semantic id"
+          echo "control: launches=$CAPTURED_LAUNCHES ok=$control_ok"
+          if [ "$control_ok" != "yes" ]; then
+            echo "::error::A-6 negative control failed; not measuring."
+            exit 1
+          fi
+          control_png=$CAPTURED_PNG
+          control_nodes=$CAPTURED_NODES
+          control_ids=$CAPTURED_IDS
+
+          # ---- MEASUREMENT ---------------------------------------------
+          echo "batch,started_utc,boot_s,run_s,launches,result,verdict,png,nodes,ids,vm_delta_s" \
+            > "$OUT/results.csv"
+          failures=0
+          launched=0
+          for i in $(seq 1 "$batches"); do
+            started=$(date -u +%H:%M:%S)
+            boot_start=$SECONDS
+            reboot_simulator
+            boot_s=$((SECONDS - boot_start))
+            # HARNESS GUARD, not a nicety. There is no `set -e` here (the
+            # loop must survive a failing batch), so a simulator that
+            # failed to come back would leave every later batch failing
+            # for want of a device -- and those would be logged as
+            # NO_FLUTTER_NODES_AT_ALL, indistinguishable at a glance from
+            # the thing being hunted. Fabricating reproductions is the
+            # worst failure this step could have, so it stops instead.
+            if ! xcrun simctl list devices booted | grep -q "$DEVICE_ID"; then
+              echo "::error::A-6 simulator did not return after batch $i"
+              break
+            fi
+            start_logs "batch-$i"
+
+            start=$SECONDS
+            png_bytes=0
+            nodes=-
+            ids=-
+            vmd=-
+            if "$MAESTRO" test --env APP_ID="$APP_ID" \
+                 e2e/amplify/blank_frame_probe.yaml \
+                 > "$OUT/batch-$i.maestro.log" 2>&1; then
+              result=pass
+              verdict=-
+            else
+              capture_failure "batch-$i"
+              verdict=$CAPTURED_VERDICT
+              png_bytes=$CAPTURED_PNG
+              nodes=$CAPTURED_NODES
+              ids=$CAPTURED_IDS
+              vmd=$CAPTURED_VMDELTA
+              if [ "$verdict" = "HARNESS_NO_LAUNCH" ]; then
+                echo "::error::A-6 batch $i never launched; not counted"
+                result=harness
+              else
+                result=FAIL
+                failures=$((failures + 1))
+                echo "::warning::A-6 batch $i reproduced: $verdict"
+                echo "::warning::A-6 batch $i failing launch reached the"
+                echo "::warning::Dart VM in ${vmd}s (normal is under ~1.6s)"
+              fi
+            fi
+            run_s=$((SECONDS - start))
+            kill "$RUNNER_LOG_PID" "$SYSTEM_LOG_PID" 2>/dev/null || true
+
+            # The AUTHORITATIVE cycle count: every launch of a debug build
+            # prints exactly one VM-service line, so counting them in this
+            # batch's own log reports the launches that really happened --
+            # including the partial batch a reproduction cuts short, which
+            # the arithmetic would otherwise round up.
+            n=$(grep -c 'Dart VM service is listening' \
+              "$OUT/batch-$i.runner.log" || true)
+            launched=$((launched + n))
+            echo "$i,$started,$boot_s,$run_s,$n,$result,$verdict,$png_bytes,$nodes,$ids,$vmd" \
+              >> "$OUT/results.csv"
+            echo "batch $i: $result, $n launches in ${run_s}s ($verdict)"
+          done
+
+          echo "=== A-6: $failures reproductions, $launched cold launches"
+          echo "=== healthy baseline on THIS runner: $control_nodes nodes,"
+          echo "=== $control_ids semantic ids, $control_png-byte frame"
+          cat "$OUT/runner-fingerprint.txt"
+          cat "$OUT/results.csv"
+      - name: Upload A-6 amplifier artifacts
+        if: always() && fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
+        uses: actions/upload-artifact@v4
+        with:
+          name: a6-amplifier-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/a6-amplifier
+          retention-days: 14
+          if-no-files-found: warn

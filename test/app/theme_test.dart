@@ -1,6 +1,7 @@
 import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
+import 'package:chore_app/features/categories/category_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -221,6 +222,36 @@ void main() {
         expect(renderedHsl.hue, closeTo(unknownHsl.hue, 1));
         expect(renderedHsl.saturation, closeTo(unknownHsl.saturation, 0.02));
         expect(renderedHsl.lightness, closeTo(unknownHsl.lightness, 0.02));
+      },
+    );
+  });
+
+  group('categoryIcon <-> categoryIconIdentifiers invariant', () {
+    test(
+      'every picker identifier maps to its own distinct, non-default icon '
+      '(backlog G-5a: an identifier missing its switch case silently '
+      'falls through to Icons.label_outlined -- a working-looking picker '
+      'that quietly offers duplicate icons)',
+      () {
+        final seen = <IconData>{};
+        for (final identifier in categoryIconIdentifiers) {
+          final icon = categoryIcon(identifier);
+          expect(
+            icon,
+            isNot(Icons.label_outlined),
+            reason:
+                '"$identifier" falls through to categoryIcon\'s default '
+                'branch -- it is missing a dedicated switch case',
+          );
+          expect(
+            seen.add(icon),
+            isTrue,
+            reason:
+                '"$identifier" maps to the same IconData ($icon) as an '
+                'earlier identifier in the list -- two picker tiles would '
+                'render identically',
+          );
+        }
       },
     );
   });

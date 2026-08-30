@@ -22,10 +22,12 @@ import 'package:chore_app/domain/recurrence/recurrence.dart';
 ///   an active week whose weekday is in that set, filtered to >= startDate.
 /// - **month**: months at offset `k * interval` from startDate's month, for
 ///   k = 0, 1, 2, ..., filtered to >= startDate. In [MonthlyMode.dayOfMonth]
-///   the target day is startDate.day, clamped to the month's length. In
-///   [MonthlyMode.nthWeekday] it is the `monthlyOrdinal`-th `monthlyWeekday`
-///   of the month (`-1` = last), which always exists for ordinals 1..4 and
-///   -1.
+///   the target day is [Recurrence.monthlyDayOfMonth] -- or, when that is
+///   null, startDate.day, which is what every rule persisted before that
+///   field means -- clamped to the month's length; `-1` means the month's
+///   last day. In [MonthlyMode.nthWeekday] it is the `monthlyOrdinal`-th
+///   `monthlyWeekday` of the month (`-1` = last), which always exists for
+///   ordinals 1..4 and -1.
 Iterable<PlainDate> scheduleOccurrences(Recurrence rule, PlainDate startDate) {
   switch (rule.unit) {
     case RecurrenceUnit.day:
@@ -69,7 +71,11 @@ PlainDate nextScheduledOnOrAfter(
 ///   weekday.
 /// - **month** ([MonthlyMode.dayOfMonth] only — [Recurrence.validated]
 ///   forbids [MonthlyMode.nthWeekday] with a completion anchor):
-///   `completedOn.addMonths(interval)`.
+///   `completedOn.addMonths(interval)`, which already clamps an
+///   out-of-range day. Note this reads **no** monthly field:
+///   [Recurrence.monthlyDayOfMonth] does not apply to a completion-anchored
+///   rule and `validated` rejects it there, precisely so nobody expects it
+///   to take effect here.
 PlainDate nextAfterCompletion(Recurrence rule, PlainDate completedOn) {
   switch (rule.unit) {
     case RecurrenceUnit.day:
@@ -244,8 +250,9 @@ PlainDate _nthWeekdayOfMonth(int year, int month, int ordinal, int weekday) {
 }
 
 /// The occurrence date within [year]-[month] for a month-unit [rule], mode
-/// aware. Ignores [startDate]'s year/month, using only its day (for
-/// [MonthlyMode.dayOfMonth]) or the rule's nth-weekday fields.
+/// aware. Ignores [startDate]'s year/month, using only its day (for a
+/// [MonthlyMode.dayOfMonth] rule with no explicit
+/// [Recurrence.monthlyDayOfMonth]) or the rule's own monthly fields.
 PlainDate _monthCandidate(
   Recurrence rule,
   PlainDate startDate,
@@ -261,7 +268,17 @@ PlainDate _monthCandidate(
     );
   }
   final maxDay = PlainDate.daysInMonth(year, month);
-  final targetDay = startDate.day < maxDay ? startDate.day : maxDay;
+  // `-1` is the "last day of the month" sentinel; `null` means the rule
+  // predates [Recurrence.monthlyDayOfMonth] (or was built without one) and
+  // still derives its day from the start date. Note the derived branch is
+  // byte-for-byte the expression it always was: that identity is what makes
+  // a client predating the field compute the same series as this one, as
+  // long as the writer kept `startDate.day == monthlyDayOfMonth` (see that
+  // field's alignment contract).
+  final requestedDay = rule.monthlyDayOfMonth ?? startDate.day;
+  final targetDay = requestedDay == -1 || requestedDay > maxDay
+      ? maxDay
+      : requestedDay;
   return PlainDate(year, month, targetDay);
 }
 

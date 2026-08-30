@@ -20,8 +20,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// A new category defaults to the `'label'` icon — `categoryIcon`'s
 /// fallback identifier, not itself one of [categoryIconIdentifiers], so the
 /// icon grid starts with nothing selected — and the first of
-/// [CategoryRepository.seedColors] not already used by an active category
-/// of [kind] (wrapping back to the first color if every seed color is
+/// [CategoryRepository.palette] not already used by an active category
+/// of [kind] (wrapping back to the first color if every palette color is
 /// taken).
 Future<void> showCategoryEditSheet(
   BuildContext context, {
@@ -79,10 +79,10 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
 
   int _firstFreeColor() {
     final usedColors = _currentCategories.map((c) => c.color).toSet();
-    const seedColors = CategoryRepository.seedColors;
-    return seedColors.firstWhere(
+    const palette = CategoryRepository.palette;
+    return palette.firstWhere(
       (color) => !usedColors.contains(color),
-      orElse: () => seedColors[_currentCategories.length % seedColors.length],
+      orElse: () => palette[_currentCategories.length % palette.length],
     );
   }
 
@@ -126,7 +126,7 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
           Text(l10n.categoryEditColorLabel, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           ColorSwatchPicker(
-            colors: CategoryRepository.seedColors,
+            colors: CategoryRepository.palette,
             selected: _color,
             onSelected: (value) => setState(() => _color = value),
             semanticIdPrefix: 'settings.categories.color',

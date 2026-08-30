@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -171,6 +173,81 @@ void main() {
       );
     });
 
+    // G-2 (docs/plans/2026-08-18-repeat-form-sentence.md Task 3): the four
+    // rules on the new monthlyDayOfMonth field.
+    test('monthlyDayOfMonth set when unit != month', () {
+      expect(
+        () => Recurrence.validated(
+          interval: 1,
+          unit: RecurrenceUnit.day,
+          anchor: RecurrenceAnchor.schedule,
+          monthlyDayOfMonth: 15,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('monthlyDayOfMonth set when monthlyMode != dayOfMonth', () {
+      expect(
+        () => Recurrence.validated(
+          interval: 1,
+          unit: RecurrenceUnit.month,
+          anchor: RecurrenceAnchor.schedule,
+          monthlyMode: MonthlyMode.nthWeekday,
+          monthlyOrdinal: 1,
+          monthlyWeekday: 1,
+          monthlyDayOfMonth: 15,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    // Refresh correction 12: nextAfterCompletion's month branch is
+    // completedOn.addMonths(interval) and never reads this field, so a
+    // non-null value under a completion anchor is a field that silently
+    // does nothing.
+    test('monthlyDayOfMonth set when anchor == completion', () {
+      expect(
+        () => Recurrence.validated(
+          interval: 1,
+          unit: RecurrenceUnit.month,
+          anchor: RecurrenceAnchor.completion,
+          monthlyDayOfMonth: 15,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('monthlyDayOfMonth outside 1..31 and not the -1 sentinel', () {
+      for (final day in [0, 32, -2, 100]) {
+        expect(
+          () => Recurrence.validated(
+            interval: 1,
+            unit: RecurrenceUnit.month,
+            anchor: RecurrenceAnchor.schedule,
+            monthlyDayOfMonth: day,
+          ),
+          throwsArgumentError,
+          reason: '$day must be rejected',
+        );
+      }
+    });
+
+    test('monthlyDayOfMonth accepts 1..31 and the -1 "last day" sentinel', () {
+      for (final day in [1, 15, 31, -1]) {
+        expect(
+          () => Recurrence.validated(
+            interval: 1,
+            unit: RecurrenceUnit.month,
+            anchor: RecurrenceAnchor.schedule,
+            monthlyDayOfMonth: day,
+          ),
+          returnsNormally,
+          reason: '$day must be accepted',
+        );
+      }
+    });
+
     test('a fully valid combination does not throw', () {
       expect(
         () => Recurrence.validated(
@@ -219,6 +296,14 @@ void main() {
       expect(rule.unit, RecurrenceUnit.month);
       expect(rule.monthlyMode, MonthlyMode.dayOfMonth);
       expect(rule.interval, 2);
+      // Omitted means "derive the day from the chore's start date", which
+      // is what every rule persisted before G-2 means.
+      expect(rule.monthlyDayOfMonth, isNull);
+    });
+
+    test('monthlyOnDay carries an explicit day of month', () {
+      final rule = Recurrence.monthlyOnDay(monthlyDayOfMonth: 20);
+      expect(rule.monthlyDayOfMonth, 20);
     });
 
     test('monthlyOnNthWeekday builds a schedule-anchored nthWeekday rule', () {
@@ -292,6 +377,8 @@ void main() {
       Recurrence.monthlyOnDay(interval: 3, anchor: RecurrenceAnchor.completion),
       Recurrence.monthlyOnNthWeekday(1, 6),
       Recurrence.monthlyOnNthWeekday(-1, 5, interval: 2),
+      Recurrence.monthlyOnDay(monthlyDayOfMonth: 20),
+      Recurrence.monthlyOnDay(monthlyDayOfMonth: -1, interval: 2),
     ];
 
     for (final rule in representativeRules) {
@@ -311,6 +398,7 @@ void main() {
         'monthly_mode',
         'monthly_ordinal',
         'monthly_weekday',
+        'monthly_day_of_month',
       });
     });
 
@@ -409,6 +497,54 @@ void main() {
         Recurrence.weekly(weekdays: {1, 4}),
       };
       expect(rules, hasLength(2));
+    });
+  });
+
+  // G-2 Task 3: the back-compat guard. `monthly_day_of_month` did not exist
+  // before this wave, so every already-persisted rule lacks the key. It must
+  // decode to null and keep deriving the day from the start date.
+  group('monthlyDayOfMonth back-compat', () {
+    // A rule serialized by a client predating the field: byte-for-byte what
+    // RecurrenceConverter wrote into the TEXT column, with no
+    // monthly_day_of_month key at all.
+    const preExisting =
+        '{"interval":2,"unit":"month","anchor":"schedule","weekdays":[],'
+        '"monthly_mode":"dayOfMonth","monthly_ordinal":null,'
+        '"monthly_weekday":null}';
+
+    test('a rule persisted before the field decodes with a null day', () {
+      final json = jsonDecode(preExisting) as Map<String, Object?>;
+      // Guard against the vacuous version of this test: prove the key really
+      // is absent, not merely present-and-null.
+      expect(json.containsKey('monthly_day_of_month'), isFalse);
+
+      final rule = Recurrence.fromJson(json);
+      expect(rule.monthlyDayOfMonth, isNull);
+      expect(rule.interval, 2);
+      expect(rule.unit, RecurrenceUnit.month);
+      expect(rule.monthlyMode, MonthlyMode.dayOfMonth);
+    });
+
+    test('an explicit day is not equal to the derive-from-start-date rule', () {
+      final derived = Recurrence.monthlyOnDay();
+      final explicit = Recurrence.monthlyOnDay(monthlyDayOfMonth: 20);
+      expect(derived, isNot(explicit));
+      expect(derived.monthlyDayOfMonth, isNull);
+      expect(explicit.monthlyDayOfMonth, 20);
+    });
+
+    test('differing monthlyDayOfMonth makes rules unequal', () {
+      expect(
+        Recurrence.monthlyOnDay(monthlyDayOfMonth: 20),
+        isNot(Recurrence.monthlyOnDay(monthlyDayOfMonth: 21)),
+      );
+    });
+
+    test('equal monthlyDayOfMonth rules hash equally', () {
+      final a = Recurrence.monthlyOnDay(monthlyDayOfMonth: -1);
+      final b = Recurrence.monthlyOnDay(monthlyDayOfMonth: -1);
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
     });
   });
 }

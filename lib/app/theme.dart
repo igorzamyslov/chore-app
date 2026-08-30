@@ -432,10 +432,17 @@ ThemeData _buildTheme({
 /// Icons are always looked up at regular weight and drawn by the caller in
 /// the category's own color — flat, not colorful-emoji.
 ///
-/// Two seed identifiers (`skillet`, `nutrition`) have no equivalent in
-/// Flutter's bundled Material Icons font (they only exist as Material
-/// Symbols, a separate icon set this app doesn't depend on); those map to
-/// the closest visual equivalent instead ([Icons.kitchen], [Icons.eco]).
+/// Three identifiers (`skillet`, `nutrition`, `potted_plant`) have no
+/// equivalent in Flutter's bundled Material Icons font (they only exist as
+/// Material Symbols, a separate icon set this app doesn't depend on); those
+/// map to the closest visual equivalent instead ([Icons.kitchen],
+/// [Icons.eco], [Icons.local_florist]).
+///
+/// Every case here must stay in step with `categoryIconIdentifiers`
+/// (`lib/features/categories/category_icons.dart`): an identifier offered by
+/// the picker but missing a case here falls through to the `default` branch
+/// and renders as a plausible-looking but duplicated tile. That invariant is
+/// pinned by a test — see `test/app/theme_test.dart`.
 IconData categoryIcon(String identifier) {
   switch (identifier) {
     case 'cleaning_services':
@@ -468,6 +475,31 @@ IconData categoryIcon(String identifier) {
       return Icons.home;
     case 'shopping_bag':
       return Icons.shopping_bag;
+    case 'bathtub':
+      return Icons.bathtub;
+    case 'delete':
+      // The "bins" category's trash-can glyph -- shares its identifier
+      // name with the app's actual delete actions elsewhere, which is a
+      // naming coincidence in Material's icon set, not a collision:
+      // IconData values carry no behavior, only a glyph.
+      return Icons.delete;
+    case 'potted_plant':
+      // No bundled-Flutter equivalent (Material Symbols only, same gap as
+      // skillet/nutrition above) -- local_florist is the closest visual
+      // match not already taken by 'yard' (outdoor garden).
+      return Icons.local_florist;
+    case 'child_care':
+      return Icons.child_care;
+    case 'pedal_bike':
+      return Icons.pedal_bike;
+    case 'description':
+      return Icons.description;
+    case 'celebration':
+      return Icons.celebration;
+    case 'thermostat':
+      return Icons.thermostat;
+    case 'fitness_center':
+      return Icons.fitness_center;
     default:
       return Icons.label_outlined;
   }
@@ -480,11 +512,11 @@ IconData categoryIcon(String identifier) {
 /// One seeded color's hand-picked light/dark render.
 typedef _ToneRender = ({Color light, Color dark});
 
-/// The eight `CategoryRepository.seedColors` (shared by categories and
+/// The twelve `CategoryRepository.palette` entries (shared by categories and
 /// members), each mapped to its light/dark render (spec §1.3 table): drawn
-/// raw, none of them clears 4.5:1 on both grounds at the 12sp category-label
-/// size, so the theme darkens them on paper and lightens them on the dark
-/// ground.
+/// raw, none of the original eight clears 4.5:1 on both grounds at the 12sp
+/// category-label size, so the theme darkens them on paper and lightens them
+/// on the dark ground.
 const Map<int, _ToneRender> _categoryTones = {
   0xFF6D9F71: (light: Color(0xFF4E7E54), dark: Color(0xFF93C297)), // Cleaning
   0xFF8C7BC9: (light: Color(0xFF6B57B0), dark: Color(0xFFB4A5E8)), // Kitchen
@@ -497,6 +529,21 @@ const Map<int, _ToneRender> _categoryTones = {
   ), // Maintenance
   0xFF7B93C9: (light: Color(0xFF5A73AD), dark: Color(0xFFA4B8E5)), // Errands
   0xFFA9A9A9: (light: Color(0xFF77716A), dark: Color(0xFFC8C4BE)), // Other
+  // The four added for the twelve-color picker (G-5b, design canvas frames
+  // 1b/1d). Unlike the eight above -- whose STORED value is a mid-tone and
+  // whose light render is a darkened variant -- these four are stored as the
+  // design's own hex, so `light` is the identity. `dark` is that hue and
+  // saturation at HSL lightness 0.74, the mean of the eight rows above.
+  //
+  // The plum's light row is NOT redundant despite looking like an identity
+  // mapping: its HSL lightness is 0.4216, a hair over
+  // [_unknownToneLightMaxLightness], so without this row the fallback would
+  // silently return Color(0xFF993D80) -- a different colour that looks right
+  // in a diff.
+  0xFF9A3D80: (light: Color(0xFF9A3D80), dark: Color(0xFFD9A0C9)), // plum
+  0xFF96562F: (light: Color(0xFF96562F), dark: Color(0xFFDFB49A)), // rust
+  0xFF7A5AA8: (light: Color(0xFF7A5AA8), dark: Color(0xFFB9A8D1)), // violet
+  0xFF4C6B45: (light: Color(0xFF4C6B45), dark: Color(0xFFB4CBAE)), // moss
 };
 
 /// The lightness ceiling an unknown color is clamped to for the light
@@ -510,10 +557,10 @@ const double _unknownToneDarkMinLightness = 0.70;
 /// Renders [storedArgb] (a category or member's stored color) for the
 /// current theme brightness (spec `docs/specs/theme-v2.md` §1.3).
 ///
-/// The eight `CategoryRepository.seedColors` resolve through the hand-picked
-/// table above; any other stored value (a future picker, an imported
-/// archive) falls back to an HSL lightness clamp -- light theme: at most
-/// [_unknownToneLightMaxLightness]; dark theme: at least
+/// The twelve `CategoryRepository.palette` entries resolve through the
+/// hand-picked table above; any other stored value (a future picker, an
+/// imported archive) falls back to an HSL lightness clamp -- light theme:
+/// at most [_unknownToneLightMaxLightness]; dark theme: at least
 /// [_unknownToneDarkMinLightness] -- preserving hue and saturation so an
 /// unknown color degrades gracefully instead of becoming unreadable.
 ///
