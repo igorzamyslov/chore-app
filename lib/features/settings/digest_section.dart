@@ -5,6 +5,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
+import 'package:chore_app/features/settings/settings_time_row.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -71,38 +72,14 @@ class DigestTimeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final time = TimeOfDay(
-      hour: minutesSinceMidnight ~/ 60,
-      minute: minutesSinceMidnight % 60,
+    return SettingsTimeRow(
+      // Load-bearing for E2E -- unchanged by this refactor.
+      semanticId: 'settings.digest.time',
+      icon: Icons.schedule_outlined,
+      label: AppLocalizations.of(context).settingsDigestTimeLabel,
+      minutesSinceMidnight: minutesSinceMidnight,
+      onChanged: onChanged,
     );
-    final l10n = AppLocalizations.of(context);
-    return semantic(
-      'settings.digest.time',
-      child: SettingsRow(
-        icon: Icons.schedule_outlined,
-        label: l10n.settingsDigestTimeLabel,
-        value: time.format(context),
-        onTap: () => _pick(context),
-      ),
-    );
-  }
-
-  Future<void> _pick(BuildContext context) async {
-    final time = TimeOfDay(
-      hour: minutesSinceMidnight ~/ 60,
-      minute: minutesSinceMidnight % 60,
-    );
-    // Input mode (rather than the default dial) so the picker is reachable
-    // by typing a time directly — also what makes this deterministically
-    // driveable from a widget test, unlike the dial's freeform gestures.
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: time,
-      initialEntryMode: TimePickerEntryMode.input,
-    );
-    if (picked != null) {
-      onChanged(picked.hour * 60 + picked.minute);
-    }
   }
 }
 

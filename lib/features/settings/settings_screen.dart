@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/account_section.dart';
 import 'package:chore_app/features/settings/appearance_section.dart';
@@ -139,11 +140,56 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: (enabled) => settingsRepository
                         .setEveningReminderEnabled(enabled: enabled),
                   ),
+                  if (settings.eveningReminderEnabled)
+                    EveningTimeTile(
+                      minutesSinceMidnight: settings.eveningReminderMinutes,
+                      // Quiet hours DROP an evening slot rather than
+                      // deferring it (D7), so a colliding pair of times
+                      // would otherwise silently deliver nothing. Read
+                      // through the SAME predicate the scheduler's shift
+                      // delegates to, so the two cannot disagree.
+                      insideQuietHours: isWithinQuietHours(
+                        minuteOfDay: settings.eveningReminderMinutes,
+                        enabled: settings.quietHoursEnabled,
+                        startMinutes: settings.quietStartMinutes,
+                        endMinutes: settings.quietEndMinutes,
+                      ),
+                      onChanged: settingsRepository.setEveningReminderTime,
+                    ),
                   QuietHoursToggleTile(
                     value: settings.quietHoursEnabled,
+                    // A direct comparison rather than a call into
+                    // `isWithinQuietHours`: "the window has zero length" is
+                    // a property of the two stored values, not a membership
+                    // question about some minute the sub-line has no
+                    // business picking.
+                    emptyWindow:
+                        settings.quietStartMinutes == settings.quietEndMinutes,
                     onChanged: (enabled) => settingsRepository
                         .setQuietHoursEnabled(enabled: enabled),
                   ),
+                  if (settings.quietHoursEnabled) ...[
+                    QuietHoursStartTile(
+                      minutesSinceMidnight: settings.quietStartMinutes,
+                      // One setter, both ends together: the window is one
+                      // fact, so the end that did not move passes through
+                      // unchanged rather than leaving a half-updated window
+                      // visible to the debounced recompute. `settings` is
+                      // the snapshot this row was built from, so the pair is
+                      // always self-consistent.
+                      onChanged: (minutes) => settingsRepository.setQuietHours(
+                        startMinutes: minutes,
+                        endMinutes: settings.quietEndMinutes,
+                      ),
+                    ),
+                    QuietHoursEndTile(
+                      minutesSinceMidnight: settings.quietEndMinutes,
+                      onChanged: (minutes) => settingsRepository.setQuietHours(
+                        startMinutes: settings.quietStartMinutes,
+                        endMinutes: minutes,
+                      ),
+                    ),
+                  ],
                   if (settings.digestEnabled && !permissionGranted)
                     const DigestPermissionHint(onOpenSettings: openAppSettings),
                 ],

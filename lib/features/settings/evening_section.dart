@@ -14,6 +14,7 @@ library;
 
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
+import 'package:chore_app/features/settings/settings_time_row.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -48,6 +49,54 @@ class EveningToggleTile extends StatelessWidget {
         switchValue: value,
         onSwitchChanged: onChanged,
       ),
+    );
+  }
+}
+
+/// The evening re-reminder's fire-time row, revealed while
+/// [EveningToggleTile] is on.
+class EveningTimeTile extends StatelessWidget {
+  /// Creates the time row.
+  const EveningTimeTile({
+    required this.minutesSinceMidnight,
+    required this.onChanged,
+    this.insideQuietHours = false,
+    super.key,
+  });
+
+  /// The currently-chosen evening time, as minutes since local midnight.
+  final int minutesSinceMidnight;
+
+  /// Called with the newly-picked time, also as minutes since midnight.
+  final ValueChanged<int> onChanged;
+
+  /// Whether [minutesSinceMidnight] falls inside the user's quiet-hours
+  /// window (spec `docs/specs/notifications-n2.md` §6).
+  ///
+  /// When true this grows a factual sub-line, because an evening
+  /// re-reminder inside the window is DROPPED rather than deferred
+  /// (decision D7): deferring it to 07:00 would deliver a notification
+  /// whose entire premise -- "these are still open and there is still time
+  /// today" -- is false by then, minutes before the digest says the same
+  /// thing correctly. Without the sub-line the feature would silently do
+  /// nothing.
+  ///
+  /// Computed by the caller as a pure projection of the two settings (see
+  /// `isWithinQuietHours`), never stored: it is always current, it
+  /// self-clears the instant either time moves, and there is nothing to
+  /// dismiss. Same pattern as `DigestToggleTile.permissionDenied`.
+  final bool insideQuietHours;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return SettingsTimeRow(
+      semanticId: 'settings.evening.time',
+      icon: Icons.schedule_outlined,
+      label: l10n.settingsEveningTime,
+      sublabel: insideQuietHours ? l10n.settingsEveningInQuietHoursHint : null,
+      minutesSinceMidnight: minutesSinceMidnight,
+      onChanged: onChanged,
     );
   }
 }

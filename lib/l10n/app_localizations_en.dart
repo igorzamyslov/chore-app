@@ -830,7 +830,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only if something is still open today';
 
   @override
+  String get settingsEveningTime => 'Evening time';
+
+  @override
+  String get settingsEveningInQuietHoursHint =>
+      'Inside your quiet hours — not delivering';
+
+  @override
   String get settingsQuietHoursToggle => 'Quiet hours';
+
+  @override
+  String get settingsQuietHoursFrom => 'From';
+
+  @override
+  String get settingsQuietHoursTo => 'To';
+
+  @override
+  String get settingsQuietHoursEmptyWindowHint =>
+      'Start and end are the same — no quiet time';
 
   @override
   String get settingsExportEntry => 'Export data';

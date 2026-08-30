@@ -1220,11 +1220,41 @@ abstract class AppLocalizations {
   /// **'Only if something is still open today'**
   String get settingsEveningToggleSubtitle;
 
+  /// Title of the settings row holding the evening re-reminder's fire time, revealed under settingsEveningToggle. Shows the chosen time as trailing text via TimeOfDay.format and opens a time picker on tap. Default 20:00, which sits an hour clear of the 22:00 quiet-hours default so the shipped combination does not collide.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening time'**
+  String get settingsEveningTime;
+
+  /// BINDING COPY -- spec docs/specs/notifications-n2.md §6 and §5.1 fix this string verbatim. Factual sub-line on the evening time row, shown only while the chosen evening time falls inside the quiet-hours window. Unlike the digest and per-chore reminders, an evening re-reminder inside the window is DROPPED rather than deferred (decision D7) -- an 'evening' notification delivered at 07:00 has a false premise and would collide with the 08:00 digest -- so without this line the feature would silently do nothing. A pure projection of the two times: no stored flag, always current, self-clearing the moment either one moves. Same pattern as settingsDigestToggleDeniedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside your quiet hours — not delivering'**
+  String get settingsEveningInQuietHoursHint;
+
   /// Title of the settings screen's quiet-hours on/off switch row, directly below the evening re-reminder rows in the Preferences group (spec docs/specs/notifications-n2.md §12). While on, the digest and per-chore reminders that would fall inside the window are deferred to its end rather than dropped (§6).
   ///
   /// In en, this message translates to:
   /// **'Quiet hours'**
   String get settingsQuietHoursToggle;
+
+  /// Title of the settings row holding the START of the quiet-hours window, revealed under the quiet-hours switch. A bare preposition on purpose: the row shows the chosen time as trailing text via TimeOfDay.format, so the label must not repeat the word 'time' or try to compose a '22:00-07:00' range -- the window is two independent rows precisely so no locale-sensitive range string ever has to be built (spec docs/specs/notifications-n2.md §12).
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get settingsQuietHoursFrom;
+
+  /// Title of the settings row holding the END of the quiet-hours window, directly below settingsQuietHoursFrom. See that key for why it is a bare preposition. The window wraps midnight in the normal case (22:00 to 07:00).
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get settingsQuietHoursTo;
+
+  /// Sub-line under the settings screen's quiet-hours toggle, shown only while the switch is ON and the start and end times are equal. Spec docs/specs/notifications-n2.md §6 treats start == end as OFF rather than as a 24-hour window (the latter would mean 'never notify', which is what the toggle is for), so without this line the switch would sit in its ON position while nothing is ever deferred -- the same dishonesty settingsDigestToggleDeniedHint exists to remove. Leads with the thing the user can change, follows with the consequence, matching the register of the other two sub-lines in this group. A pure projection of the two stored times: no flag, always current, self-clearing the moment either one moves.
+  ///
+  /// In en, this message translates to:
+  /// **'Start and end are the same — no quiet time'**
+  String get settingsQuietHoursEmptyWindowHint;
 
   /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness.
   ///
