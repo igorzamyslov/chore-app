@@ -108,20 +108,32 @@ double memberAvatarFontSize(double scaledRadius) =>
 /// on the neutral surface, inside a ring in [member]'s color (G-4, design
 /// canvas frame 1b).
 ///
-/// A ring rather than a fill so the same avatar is legible at 24px in a
+/// A ring rather than a fill so the same avatar is legible at 32px in a
 /// chore tile and 66px in the member edit sheet: the initials always sit on
 /// `surfaceContainerHigh` against `categoryTone`, a pairing the tone table
 /// guarantees at >= 3:1 in both themes (`test/app/palette_test.dart`),
 /// instead of on a fill whose legibility varied with the color.
 ///
-/// [radius] defaults to 12 (the chore tile's compact inline size -- 24px,
-/// sized so two glyphs fit inside the ring with margin); pass a larger
-/// value for a more prominent context (the members list at 21, the
-/// acting-member app-bar button, the switcher sheet, the edit sheet's
-/// 33-radius preview).
+/// [radius] defaults to 16 -- a 32px box. That is the smallest radius at
+/// which [memberAvatarFontSize]'s 11px legibility floor stops binding, and
+/// therefore the smallest at which the initials get the design's own 12.8%
+/// of glyph headroom inside the ring, the same proportion the 42px and 66px
+/// avatars already have. It was 12, and at 12 the widest real two-letter
+/// pair overflowed the ring by 1.16px at ordinary unscaled text -- backlog
+/// G-16, measured against the shipped font by `tool/measure_avatar_font.py`
+/// and asserted in `test/features/members/member_avatar_test.dart`. Pass a
+/// larger value for a more prominent context (the members list at 21, the
+/// edit sheet's 33-radius preview).
+///
+/// One caveat, because it is invisible from here: a parent that imposes a
+/// TIGHT constraint overrides this size entirely. Material chips do exactly
+/// that (`BoxConstraints.tightFor(contentSize)`, ~24px), so the two
+/// `FilterChip` avatars in `chore_form/assignment_fields.dart` pass an
+/// explicit `radius: 12` to match the box they will actually be given, and
+/// sit outside the fit guarantee above.
 class MemberAvatar extends StatelessWidget {
   /// Creates an avatar for [member].
-  const MemberAvatar({required this.member, this.radius = 12, super.key});
+  const MemberAvatar({required this.member, this.radius = 16, super.key});
 
   /// The member this avatar represents.
   final Member member;
@@ -169,6 +181,12 @@ class MemberAvatar extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
+          // Pinned, not inherited. Flutter adds letterSpacing after EVERY
+          // glyph, and this theme ships roles from -1.5 to +1.2, so an
+          // ambient DefaultTextStyle could eat most of the ring clearance
+          // G-16 establishes -- which would make that guarantee depend on
+          // where the avatar happened to be placed.
+          letterSpacing: 0,
           color: tone,
         ),
       ),

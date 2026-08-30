@@ -178,10 +178,7 @@ class JoinChooserStep extends StatelessWidget {
             'settings.account.join.claim.${member.memberId}',
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: MemberAvatar(
-                member: memberForAvatar(member),
-                radius: 16,
-              ),
+              leading: MemberAvatar(member: memberForAvatar(member)),
               title: Text(l10n.joinHouseholdChooserAreYou(member.name)),
               onTap: () => onClaim(member),
             ),

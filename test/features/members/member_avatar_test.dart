@@ -1,6 +1,6 @@
 /// The member avatar is a ring, not a fill (G-4, design canvas frame 1b):
 /// two-letter initials on the neutral surface inside a ring in the member's
-/// theme-rendered colour, legible from the 24px chore tile to the 66px
+/// theme-rendered colour, legible from the 32px chore tile to the 66px
 /// edit-sheet preview, and at text scale 2.0.
 library;
 
@@ -14,7 +14,7 @@ Future<void> _pump(
   ThemeData theme, {
   required String name,
   required int color,
-  double radius = 12,
+  double radius = 16,
   double textScale = 1,
 }) async {
   await tester.pumpWidget(
@@ -95,12 +95,19 @@ void main() {
   // check pass no matter what the avatar's geometry is, and a strict
   // inner-diameter check fail on correct code. Both are worthless.
   //
-  // So this file asserts only what is font-independent: the box size, the
-  // ring width, the 11px font floor, the text-scale cap, and that nothing
-  // throws. Real glyph fit is a visual-QA gate (`docs/specs/design-
-  // language.md`, definition of visual done: light + dark at text scale 1.0
-  // and 2.0 on a Pixel-class emulator), and the arithmetic behind radius 12
-  // is recorded in the plan's R2.
+  // So the WIDGET tests in this file assert only what is font-independent:
+  // the box size, the ring width, the 11px font floor, the text-scale cap,
+  // and that nothing throws.
+  //
+  // Glyph fit itself is covered instead by the arithmetic test at the bottom
+  // of this file, which compares the REAL Inter-SemiBold ink geometry --
+  // read out of the shipped TTF's own tables by `tool/measure_avatar_font.py`
+  // rather than rendered -- against MemberAvatar's exported ring and
+  // font-size formulas. That is an analytical bound, not a render: it knows
+  // nothing about hinting, anti-aliasing or sub-pixel rounding, so a look at
+  // a real screen is still the closing gate (`docs/specs/design-language.md`,
+  // definition of visual done: light + dark at text scale 1.0 and 2.0 on a
+  // Pixel-class emulator).
 
   const stored = 0xFFD98E73; // renders 0xFFB96A4C light / 0xFFF0AF95 dark
 
@@ -217,25 +224,26 @@ void main() {
     // 66px sheet preview (design: 3px ring).
     await _pump(tester, appLightTheme, name: 'Mia', color: stored, radius: 33);
     expect((_decoration(tester).border! as Border).top.width, 3);
-    // 24px chore tile (radius 12, the default): thinner, so the two letters
-    // still have room. Left implicit because `--fatal-infos` rejects
-    // `radius: 12` as redundant against the helper's own default.
+    // 32px chore tile (radius 16, the default): thinner than the 21/33 rows
+    // above, and the smallest ring the two letters still clear (G-16). Left
+    // implicit because `--fatal-infos` rejects `radius: 16` as redundant
+    // against the helper's own default.
     await _pump(tester, appLightTheme, name: 'Mia', color: stored);
-    expect((_decoration(tester).border! as Border).top.width, 1.5);
+    expect((_decoration(tester).border! as Border).top.width, 2);
   });
 
   testWidgets('the smallest avatar renders two letters without throwing', (
     tester,
   ) async {
-    // R2 sized the default radius at 12 (a 24px box) so two glyphs fit with
-    // margin -- ~15px of Inter inside 21px of room. That margin is NOT
-    // asserted here; see the note at the top of this file for why it cannot
-    // be. What IS asserted is font-independent: the widest two-letter pair
-    // lays out without an exception, the box is the size R2 specified, and
-    // the glyphs never drop below the legibility floor.
+    // G-16 sized the default radius at 16 (a 32px box); the margin that
+    // buys is asserted arithmetically at the bottom of this file, not here,
+    // for the reason in the note at the top. What IS asserted here is
+    // font-independent: the widest two-letter pair lays out without an
+    // exception, the box is the size G-16 specified, and the glyphs never
+    // drop below the legibility floor.
     await _pump(tester, appLightTheme, name: 'Wm', color: stored);
     expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(MemberAvatar)), const Size(24, 24));
+    expect(tester.getSize(find.byType(MemberAvatar)), const Size(32, 32));
     expect(
       tester.widget<Text>(find.text('WM')).style!.fontSize,
       greaterThanOrEqualTo(11),
@@ -248,7 +256,7 @@ void main() {
   ) async {
     await _pump(tester, appLightTheme, name: 'Mia', color: stored);
     final base = tester.getSize(find.byType(MemberAvatar));
-    expect(base.width, 24);
+    expect(base.width, 32);
 
     await _pump(
       tester,
@@ -261,17 +269,21 @@ void main() {
     final scaled = tester.getSize(find.byType(MemberAvatar));
     expect(
       scaled.width,
-      closeTo(24 * 1.6, 0.01),
+      closeTo(32 * 1.6, 0.01),
       reason:
           'text scale 2.0 clamps to 1.6 -- the initials must keep pace with '
           'surrounding text, without bursting ListTile leading slots',
     );
-    // The glyphs grew too, and still fit.
+    // NOT re-asserted here: that the glyphs still fit. A Text is laid out
+    // inside the ring, so its reported width is its own constraint and the
+    // check passes at any geometry -- one of the four tests wave 6 found
+    // could not fail. Fit is the arithmetic test at the bottom of this file.
+    // What this test can honestly add is that the RING grew with the box,
+    // so the glyphs are not being asked to clear a stroke sized for an
+    // unscaled avatar.
     expect(
-      tester.getSize(find.text('MI')).width,
-      lessThan(
-        scaled.width - 2 * (_decoration(tester).border! as Border).top.width,
-      ),
+      (_decoration(tester).border! as Border).top.width,
+      memberAvatarRingWidth(scaled.width / 2),
     );
   });
 
