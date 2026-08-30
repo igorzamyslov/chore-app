@@ -78,6 +78,61 @@ Full argument in F1. The short form, because it is the second-order consequence 
 
 ---
 
+## Task 0 — refresh pass against the merged tree (2026-08-30, implementation)
+
+Everything below the original heading was verified against `28c9c99`. Slices 1–3 have
+since merged into `integration/wave-7` (`96933dd`). Every citation was re-grepped
+against that tree. **Four things changed; two of them are plan bugs, and one of those
+was a test that could not pass.**
+
+1. **F2 is WRONG and is corrected below.** Slice 1 landed **one** window setter,
+   `setQuietHours({required int startMinutes, required int endMinutes})`, not the
+   two this plan extrapolated. That is deliberate and closed: the window is one
+   fact, and two setters let a UI briefly persist a half-updated window that the
+   debounced recompute can read between the writes. Every call site in Tasks 2 and
+   5 is rewritten below. `start == end` is accepted by the setter; each end is
+   validated to `0..1439` before any write, so a rejected call leaves the stored
+   window untouched.
+2. **Task 6's "One group" assertion was a test that could not pass.**
+   `expect(find.text('Daily summary'), findsNothing)` is unsatisfiable:
+   `settingsDigestToggleTitle` **is** the string `"Daily summary"` — it is the
+   digest toggle ROW's own label (`app_localizations_en.dart:809`), not only the
+   orphan section key. The assertion would have gone red on a correct
+   implementation. Replaced below with the property actually meant: all eight ids
+   are descendants of **one** `SettingsGroup`, plus a guard on the uppercased
+   header text `SettingsGroup` would actually render (`'DAILY SUMMARY'`).
+3. **F3's open question is ANSWERED: the gate exists.**
+   `lib/application/digest_plan_builder.dart:100` passes
+   `enabled: settings.eveningReminderEnabled` into `planEveningSlots`, which
+   returns `eveningHorizonSlots` nulls when off so `applyPlans` cancels rather than
+   arms. Task 7 is therefore a confirmation, not a discovery — still run, because
+   it proves the gate end to end from the settings row, which slice 2's own tests
+   do not.
+4. **Task 3's Step 5 target moved slightly.** `applyQuietHours`
+   (`reminder_planner.dart:112-146`) validates both ends first, then computes an
+   `inside` local across lines 120–131. The delegation must replace the
+   `!enabled || start == end` early return **and** the `inside` computation, and
+   must **keep** the two `_validateMinuteOfDay` calls above them — they are
+   `applyQuietHours`'s contract, not the predicate's.
+
+Re-verified TRUE against the merged tree, so nobody re-checks them: F1 (no
+"Daily summary" section; `grep -rn settingsDigestSectionTitle lib test e2e` outside
+`lib/l10n/` returns nothing; the digest rows are at `settings_screen.dart:106-134`
+inside `l10n.settingsPreferencesSectionTitle`), F1b (`digestDoneActionLabel` does
+not exist anywhere; `notificationActionDone` is at `app_en.arb:98`), and all of
+F1c. `testChoreApp` still registers `addTearDown(tester.view.resetPhysicalSize)`
+(`pump_app.dart:138`), `openSettingsTab` is still in `settings_test_utils.dart`,
+`SettingsRow`'s at-most-one-trailing assertion still ignores `sublabel`, and
+`digest_reschedule_test.dart` still exposes `_awaitBootstrap` / `_disposeAndClose` /
+`digestRescheduleDebounce`.
+
+`ProjectedOccurrence` gained `choreId` / `choreTitle` (required) and
+`reminderMinutes` (optional). No task in this plan hand-builds one — Task 7 seeds
+through `ChoreService.createChore` and Task 3 touches no occurrence — so nothing
+here breaks on it.
+
+---
+
 ## Findings you must know before you start
 
 These were verified against the tree at `28c9c99` by reading the files, not from memory.
@@ -149,11 +204,44 @@ And these `DeviceSettings` fields, which drift derives mechanically from §8.1's
 
 **If slice 1 landed different names, only the call sites in Tasks 1, 2, 4 and 5 change — one argument each.** Check `lib/data/repositories/settings_repository.dart` and the generated `DeviceSettings` before starting Task 1, and adjust in place.
 
+> **CORRECTED 2026-08-30 (Task 0).** It did. The two window setters above **do not
+> exist and will not be added.** What landed is:
+>
+> ```dart
+> Future<void> setQuietHours({required int startMinutes, required int endMinutes});
+> ```
+>
+> One setter, both ends together, because the window is **one fact**: two setters
+> let a UI briefly persist a half-updated window that the 500 ms-debounced
+> recompute can read between the two writes. The other three setters and all five
+> `DeviceSettings` fields landed exactly as written above.
+>
+> The consequence for this plan is confined to the two From/To call sites and to
+> the tests that drive them: **pass the unchanged end alongside the changed one.**
+> The rows stay presentational — each still takes a plain `ValueChanged<int>` —
+> and `settings_screen.dart` composes the pair, reading the other end from the
+> same `settingsAsync.when(data:)` snapshot the row was built from. Every affected
+> snippet in Tasks 2 and 5 is already rewritten below.
+>
+> `startMinutes == endMinutes` is **accepted** (§6: it means the window is off),
+> which is what makes OD2's sub-line reachable at all rather than a state the
+> picker refuses. Each end is validated to `0..1439` before any write.
+
 ### F3 — Assumed slice-2/3 interfaces
 
 - `applyQuietHours({required DateTime candidate, required bool enabled, required int startMinutes, required int endMinutes}) -> DateTime` in `lib/domain/reminder_planner.dart` (spec §6).
 - `eveningNotificationIdBase = 3001`, `eveningHorizonSlots = 7` in the same file (spec §3.1).
 - `buildNotificationPlans` gates the evening slots on `settings.eveningReminderEnabled` — implied by §8.1's "changes the behaviour of exactly zero installs until someone opens Settings" and by the parallel with `planDigestSlot(enabled:)`, but **not written as a sentence anywhere in the spec**. Task 7 is the test that proves it; if it turns out the gate is missing, that is a slice-2 defect to **report**, not to patch in the UI.
+
+  > **ANSWERED 2026-08-30 (Task 0): the gate is there.**
+  > `lib/application/digest_plan_builder.dart:100` passes
+  > `enabled: settings.eveningReminderEnabled` into `planEveningSlots`, which
+  > returns exactly `eveningHorizonSlots` nulls when it is false, so `applyPlans`
+  > cancels those seven ids instead of arming them
+  > (`reminder_planner.dart:393-397`). Task 7 therefore starts green and stays a
+  > verification task — it is worth running because it proves the path **from the
+  > settings row to the plugin**, which slice 2's own unit tests do not, and its
+  > Step 3 inversion is what turns the gate from an assumption into a proof.
 
 ### F4 — Time formatting: there is no window label to format
 
@@ -510,7 +598,7 @@ no existing install changes behaviour."
 - Modify: `test/features/settings/quiet_hours_section_test.dart`
 
 **Interfaces:**
-- Consumes: Task 1's `QuietHoursToggleTile`; `SettingsRepository.setQuietHoursStart(int)` / `setQuietHoursEnd(int)`; `DeviceSettings.quietStartMinutes` / `quietEndMinutes`.
+- Consumes: Task 1's `QuietHoursToggleTile`; `SettingsRepository.setQuietHours({required int startMinutes, required int endMinutes})` (**corrected, see F2**); `DeviceSettings.quietStartMinutes` / `quietEndMinutes`.
 - Produces: `SettingsTimeRow({required String semanticId, required IconData icon, required String label, required int minutesSinceMidnight, required ValueChanged<int> onChanged, String? sublabel, Key? key})`; `QuietHoursStartTile` / `QuietHoursEndTile`, each `({required int minutesSinceMidnight, required ValueChanged<int> onChanged, Key? key})`, ids `settings.quietHours.start` / `settings.quietHours.end`. Second cycle also widens `QuietHoursToggleTile` to `({required bool value, required ValueChanged<bool> onChanged, bool emptyWindow = false, Key? key})`.
 
 **Two TDD cycles, two commits.** Steps 1–11 are the From/To rows. Steps 12–19 are the empty-window sub-line (OD2), which reads the pair those rows introduce and therefore belongs to the same reviewer gate.
@@ -616,8 +704,10 @@ Append to `test/features/settings/quiet_hours_section_test.dart`, inside `main()
 
       final row = await database.select(database.settings).getSingle();
       expect(row.quietEndMinutes, 9 * 60 + 30);
-      // The start row must NOT have moved -- this is what proves the two
-      // rows are wired to different setters rather than to one.
+      // The start must NOT have moved. With slice 1's single-setter API
+      // (F2) this is the assertion that proves the End row passes the
+      // UNCHANGED start alongside its own new value, rather than writing
+      // the picked minute into both ends.
       expect(row.quietStartMinutes, 1320);
 
       handle.dispose();
@@ -865,11 +955,23 @@ In `settings_screen.dart`, replace the `QuietHoursToggleTile(...)` entry added i
                   if (settings.quietHoursEnabled) ...[
                     QuietHoursStartTile(
                       minutesSinceMidnight: settings.quietStartMinutes,
-                      onChanged: settingsRepository.setQuietHoursStart,
+                      // One setter, both ends together (F2): the window is
+                      // one fact, so the row that did not move passes its
+                      // unchanged value through rather than leaving a
+                      // half-updated window visible to the debounced
+                      // recompute. `settings` is the same snapshot this row
+                      // was built from, so the pair is always consistent.
+                      onChanged: (minutes) => settingsRepository.setQuietHours(
+                        startMinutes: minutes,
+                        endMinutes: settings.quietEndMinutes,
+                      ),
                     ),
                     QuietHoursEndTile(
                       minutesSinceMidnight: settings.quietEndMinutes,
-                      onChanged: settingsRepository.setQuietHoursEnd,
+                      onChanged: (minutes) => settingsRepository.setQuietHours(
+                        startMinutes: settings.quietStartMinutes,
+                        endMinutes: minutes,
+                      ),
                     ),
                   ],
 ```
@@ -888,8 +990,10 @@ Two inversions, run after each:
 
 1. In `settings_screen.dart`, drop the `if (settings.quietHoursEnabled)` guard so the two rows always render.
    Expected: **"the window rows are hidden while quiet hours are off…" FAILS at the first `findsNothing`** with "Found 1 widget". Restore.
-2. Point `QuietHoursEndTile`'s `onChanged` at `settingsRepository.setQuietHoursStart`.
-   Expected: **"picking a quiet-hours end persists it independently of the start" FAILS at `expect(row.quietEndMinutes, 570)`** with `Actual: <420>`. Restore and re-run to green.
+2. In `QuietHoursEndTile`'s `onChanged`, pass the picked minute into **both** ends
+   (`startMinutes: minutes, endMinutes: minutes`) — the mistake the single-setter
+   API actually invites.
+   Expected: **"picking a quiet-hours end persists it independently of the start" FAILS at `expect(row.quietStartMinutes, 1320)`** with `Actual: <570>`. Restore and re-run to green.
 
 - [ ] **Step 11: Format, analyze, commit**
 
@@ -952,7 +1056,7 @@ Append to `test/features/settings/quiet_hours_section_test.dart`, inside `main()
       await settings.setQuietHoursEnabled(enabled: true);
       // Spec §6: start == end is OFF, not a 24-hour window. The switch
       // would otherwise sit in ON with nothing ever deferred.
-      await settings.setQuietHoursEnd(1320);
+      await settings.setQuietHours(startMinutes: 1320, endMinutes: 1320);
       await tester.pumpAndSettle();
 
       expect(
@@ -963,9 +1067,9 @@ Append to `test/features/settings/quiet_hours_section_test.dart`, inside `main()
         findsOneWidget,
       );
 
-      // Move ONLY the end. A pure projection of the two times: nothing
-      // stored, nothing to dismiss.
-      await settings.setQuietHoursEnd(420);
+      // Move ONLY the end, back to the shipped 07:00. A pure projection of
+      // the two times: nothing stored, nothing to dismiss.
+      await settings.setQuietHours(startMinutes: 1320, endMinutes: 420);
       await tester.pumpAndSettle();
 
       expect(find.text(emptyWindowSubline), findsNothing);
@@ -985,7 +1089,7 @@ Append to `test/features/settings/quiet_hours_section_test.dart`, inside `main()
       // Set the equal times while the feature is ON so the rows exist to
       // write through, then turn it off -- the stored times persist.
       await settings.setQuietHoursEnabled(enabled: true);
-      await settings.setQuietHoursEnd(1320);
+      await settings.setQuietHours(startMinutes: 1320, endMinutes: 1320);
       await tester.pumpAndSettle();
       // Guard: the sub-line must be present BEFORE the switch goes off, or
       // the findsNothing below proves nothing about the disabled case.
@@ -1333,7 +1437,7 @@ Replace the stub's body:
 
 - [ ] **Step 5: Make `applyQuietHours` delegate**
 
-In the same file, find the membership test at the top of `applyQuietHours` (slice 2's "return `candidate` unchanged when quiet hours are off or `candidate` falls outside the window") and replace **only that test** with a call:
+In the same file, find the membership test at the top of `applyQuietHours` — as landed (`reminder_planner.dart:120-131`) that is the `if (!enabled || startMinutes == endMinutes) return candidate;` early return, the `minuteOfDay` local, the `inside` ternary, and the `if (!inside) return candidate;` — and replace **only those** with a call. **Keep the two `_validateMinuteOfDay` calls above them**: range validation is `applyQuietHours`'s own contract (§6 says it throws), not the predicate's, and the predicate is fed from already-validated settings columns.
 
 ```dart
   if (!isWithinQuietHours(
@@ -1691,7 +1795,7 @@ no first-run hint, per B-5."
 - Modify: `test/features/settings/evening_section_test.dart`
 
 **Interfaces:**
-- Consumes: Task 2's `SettingsTimeRow`, Task 3's `isWithinQuietHours`, `SettingsRepository.setEveningReminderTime(int)`, `DeviceSettings.eveningReminderMinutes` / `quietHoursEnabled` / `quietStartMinutes` / `quietEndMinutes`.
+- Consumes: Task 2's `SettingsTimeRow`, Task 3's `isWithinQuietHours`, `SettingsRepository.setEveningReminderTime(int)` and `setQuietHours({startMinutes, endMinutes})` (**corrected, see F2** — the test helper only), `DeviceSettings.eveningReminderMinutes` / `quietHoursEnabled` / `quietStartMinutes` / `quietEndMinutes`.
 - Produces: `EveningTimeTile({required int minutesSinceMidnight, required ValueChanged<int> onChanged, bool insideQuietHours = false, Key? key})`, semantic id `settings.evening.time`.
 
 **This is the task that stops quiet hours silently swallowing the evening re-reminder.** D7 drops (never defers) an evening slot inside the quiet window, so a user with quiet hours from 21:00 and an evening time of 21:30 would otherwise get nothing at all with no indication why. §6 requires a factual sub-line, computed as a pure projection of the two settings — no stored flag, always current, self-clearing the instant either time moves. The `insideQuietHours` bool is computed in `settings_screen.dart` from `isWithinQuietHours` and passed down, mirroring how `DigestToggleTile` takes `permissionDenied`.
@@ -1721,8 +1825,7 @@ Append to `test/features/settings/evening_section_test.dart`, inside `main()` (t
     await settings.setEveningReminderEnabled(enabled: true);
     await settings.setEveningReminderTime(eveningMinutes);
     await settings.setQuietHoursEnabled(enabled: quietEnabled);
-    await settings.setQuietHoursStart(start);
-    await settings.setQuietHoursEnd(end);
+    await settings.setQuietHours(startMinutes: start, endMinutes: end);
     await tester.pumpAndSettle();
   }
 
@@ -1851,10 +1954,13 @@ Append to `test/features/settings/evening_section_test.dart`, inside `main()` (t
         findsOneWidget,
       );
 
-      // Move ONLY the quiet-hours start, to 22:00. The sub-line is a pure
-      // projection of the two settings -- no stored flag -- so it must
-      // vanish with no other change and nothing to dismiss.
-      await SettingsRepository(database).setQuietHoursStart(1320);
+      // Move ONLY the quiet-hours start, to 22:00 (the end stays at the
+      // 07:00 `configure` left it at). The sub-line is a pure projection of
+      // the two settings -- no stored flag -- so it must vanish with no
+      // other change and nothing to dismiss.
+      await SettingsRepository(
+        database,
+      ).setQuietHours(startMinutes: 1320, endMinutes: 420);
       await tester.pumpAndSettle();
 
       expect(find.text(collisionSubline), findsNothing);
@@ -2101,6 +2207,7 @@ Create `test/features/settings/settings_row_order_test.dart`:
 ```dart
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -2160,9 +2267,31 @@ void main() {
         );
       }
 
-      // One group, not two: §12 forbids a second section header, and the
-      // orphan "Daily summary" string must not come back as one.
-      expect(find.text('Daily summary'), findsNothing);
+      // One group, not two (§12 forbids a second section header).
+      //
+      // CORRECTED (Task 0): this was `expect(find.text('Daily summary'),
+      // findsNothing)`, which is a test that CANNOT PASS -- "Daily summary"
+      // is also `settingsDigestToggleTitle`, the digest toggle ROW's own
+      // label, so it is on screen in every correct implementation. What
+      // §12 actually forbids is a second GROUP, so assert that instead:
+      // all eight rows share one `SettingsGroup`...
+      final group = find.ancestor(
+        of: find.bySemanticsIdentifier('settings.digest.toggle'),
+        matching: find.byType(SettingsGroup),
+      );
+      expect(group, findsOneWidget);
+      for (final id in ids) {
+        expect(
+          find.descendant(of: group, matching: find.bySemanticsIdentifier(id)),
+          findsOneWidget,
+          reason: '$id must be in the SAME group as the digest toggle',
+        );
+      }
+      // ...and the orphan `settingsDigestSectionTitle` has not been revived
+      // to found one. `SettingsGroup` uppercases its own label, so the
+      // header a revival would render is 'DAILY SUMMARY' -- which, unlike
+      // the natural-case string, appears nowhere today.
+      expect(find.text('DAILY SUMMARY'), findsNothing);
 
       handle.dispose();
     },
