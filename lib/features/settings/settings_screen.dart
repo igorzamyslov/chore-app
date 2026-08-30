@@ -181,7 +181,12 @@ class SettingsScreen extends ConsumerWidget {
                       // would otherwise silently deliver nothing. Read
                       // through the SAME predicate the scheduler's shift
                       // delegates to, so the two cannot disagree.
-                      insideQuietHours: false,
+                      insideQuietHours: isWithinQuietHours(
+                        minuteOfDay: settings.eveningReminderMinutes,
+                        enabled: false,
+                        startMinutes: settings.quietStartMinutes,
+                        endMinutes: settings.quietEndMinutes,
+                      ),
                       onChanged: settingsRepository.setEveningReminderTime,
                     ),
                   // Widened from `digestEnabled` alone: slice 6 creates a
