@@ -311,9 +311,7 @@ ReminderPlanResult planReminders({
   }
   eligible.sort((a, b) {
     final byMoment = a.fireAt.compareTo(b.fireAt);
-    // INVERSION (Task 6 step 5 inversion 2): tie-broken by OCCURRENCE id.
-    // To be reverted.
-    return byMoment != 0 ? byMoment : a.occurrenceId.compareTo(b.occurrenceId);
+    return byMoment != 0 ? byMoment : a.choreId.compareTo(b.choreId);
   });
   // The ONE truncation site: `armed` and `overflowCount` are produced from
   // the same list in the same expression, so they cannot disagree.
@@ -407,11 +405,9 @@ List<EveningPlan?> planEveningSlots({
       startMinutes: quietStartMinutes,
       endMinutes: quietEndMinutes,
     );
-    if (shifted != moment) {
-      plans.add(null);
-      continue;
-    }
-    final date = PlainDate.fromDateTime(moment);
+    // INVERSION (Task 8 step 4 inversion 3): the slot is DEFERRED to the
+    // window end rather than dropped. To be reverted.
+    final date = PlainDate.fromDateTime(shifted);
     var openCount = 0;
     String? lastCountedId;
     for (final occurrence in occurrences) {
@@ -422,14 +418,19 @@ List<EveningPlan?> planEveningSlots({
         continue;
       }
       // Due on THIS date. Overdue never counts (D6).
-      if (projectedDueDateOn(occurrence, date) != date) {
+      // INVERSION (Task 8 step 4 inversion 1): overdue occurrences count.
+      // To be reverted.
+      if (projectedDueDateOn(occurrence, date).isAfter(date)) {
         continue;
       }
       final stillToCome = armedReminders.any(
         (reminder) =>
             reminder.occurrenceId == occurrence.id &&
             PlainDate.fromDateTime(reminder.fireAt) == date &&
-            !reminder.fireAt.isBefore(moment),
+            // INVERSION (Task 8 step 4 inversion 2): an ALREADY-FIRED
+            // reminder suppresses, a still-to-come one does not. To be
+            // reverted.
+            reminder.fireAt.isBefore(moment),
       );
       if (stillToCome) {
         continue;
@@ -441,7 +442,7 @@ List<EveningPlan?> planEveningSlots({
       openCount == 0
           ? null
           : EveningPlan(
-              fireAt: moment,
+              fireAt: shifted,
               openCount: openCount,
               soleOccurrenceId: openCount == 1 ? lastCountedId : null,
             ),

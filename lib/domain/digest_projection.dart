@@ -230,9 +230,11 @@ DigestCounts projectDigestCounts({
     // onto a date the occurrence is already OVERDUE on, and the rule must
     // follow the reminder rather than the due date. That is why §2.4 states
     // the general form rather than only the due-bucket case.
-    if (armedReminderDates[occurrence.id] == date) {
-      continue;
-    }
+    // INVERSION (Task 7 step 4 inversion 1): the skip deleted, the
+    // parameter kept so it still compiles. To be reverted.
+    // if (armedReminderDates[occurrence.id] == date) {
+    //   continue;
+    // }
     final projected = projectedDueDateOn(occurrence, date);
     if (projected == date) {
       dueCount++;
