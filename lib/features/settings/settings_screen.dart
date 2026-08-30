@@ -148,7 +148,12 @@ class SettingsScreen extends ConsumerWidget {
                       // would otherwise silently deliver nothing. Read
                       // through the SAME predicate the scheduler's shift
                       // delegates to, so the two cannot disagree.
-                      insideQuietHours: true,
+                      insideQuietHours: isWithinQuietHours(
+                        minuteOfDay: 0,
+                        enabled: true,
+                        startMinutes: 0,
+                        endMinutes: 1,
+                      ),
                       onChanged: settingsRepository.setEveningReminderTime,
                     ),
                   QuietHoursToggleTile(
