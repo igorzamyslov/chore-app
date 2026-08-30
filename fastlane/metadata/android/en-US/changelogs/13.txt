@@ -1,0 +1,5 @@
+Setting up a repeating chore now reads as a sentence you complete — "every 2 weeks on Tuesday" — instead of a column of separate fields, and it shows the next three dates as you change it. You can finally pick a day of the month, including the last day.
+
+Nine more category icons, and the colour palette grows from eight to twelve.
+
+Members now show as a coloured ring with two initials, so people are easier to tell apart, and everyone in a household gets their own colour.
