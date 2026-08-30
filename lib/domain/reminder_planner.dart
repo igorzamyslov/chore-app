@@ -320,12 +320,7 @@ ReminderPlanResult planReminders({
       : eligible.sublist(0, reminderCeiling);
   return ReminderPlanResult(
     armed: List<ReminderPlan>.unmodifiable(armed),
-    // INVERSION (BLOCKING, Task 6 step 5 inversion 3): the plausible wrong
-    // implementation -- "every reminder-enabled chore minus the armed
-    // ones". To be reverted.
-    overflowCount:
-        occurrences.where((o) => o.reminderMinutes != null).length -
-        armed.length,
+    overflowCount: eligible.length - armed.length,
   );
 }
 

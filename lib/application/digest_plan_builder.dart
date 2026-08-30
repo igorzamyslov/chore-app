@@ -83,6 +83,17 @@ NotificationPlanSet buildNotificationPlans({
 }) {
   final occurrences = _projected(pending);
 
+  // INVERSION (BLOCKING, Task 9 step 4 inversion 1): the pass reordered to
+  // digest -> reminders -> evening, so Rule D reads an armed set that does
+  // not exist yet. To be reverted.
+  final digest = _digestPlans(
+    now: now,
+    settings: settings,
+    occurrences: occurrences,
+    recipientMemberId: recipientMemberId,
+    armedReminderDates: const {},
+  );
+
   // 1. Reminders first -- everything below reads the armed set.
   final reminderResult = planReminders(
     now: now,
@@ -113,18 +124,6 @@ NotificationPlanSet buildNotificationPlans({
   // date: a quiet-hours deferral moves the reminder onto the following
   // calendar date, and Rule D must follow the reminder or the two channels
   // desynchronise (§2.4).
-  final armedReminderDates = <String, PlainDate>{
-    for (final plan in reminderResult.armed)
-      plan.occurrenceId: PlainDate.fromDateTime(plan.fireAt),
-  };
-  final digest = _digestPlans(
-    now: now,
-    settings: settings,
-    occurrences: occurrences,
-    recipientMemberId: recipientMemberId,
-    armedReminderDates: armedReminderDates,
-  );
-
   return NotificationPlanSet(
     digest: digest,
     reminders: List<ReminderPlan?>.unmodifiable([
