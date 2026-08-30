@@ -27,6 +27,97 @@ implementation or its CI) and using those real numbers in a pure-Dart
 dependencies. No schema change (still v12; the next migration is v13 and
 belongs to another workstream — do not touch it).
 
+## Task 0 corrections (refresh pass, 2026-08-30, before any code changed)
+
+Every citation below was re-checked against the branch's actual code, and the
+font was re-measured from scratch rather than trusted. Six corrections; five
+of them change what ships.
+
+**C1 — G-15's diagnosis is right but understates the defect.** A `Wrap` does
+not merely fail to stretch: its column count is a function of the available
+width. It fits `n` tiles where `56n - 8 <= W`. At the shared widget-test
+surface (`test/test_utils/pump_app.dart:135`, 800 logical px, content width
+768) that is **13 tiles per row**, not six. So "six across" was never true in
+any widget test, at any point — it is true only in the narrow band
+`328 <= W < 384`, i.e. sheet widths 360-415dp. Igor's ~412dp phone sits at the
+top of that band, which is why he saw six across *and* a gap. Task 1 asserts
+both properties, and the column-count one needs no view pinning.
+
+**C2 — `'WM'` is NOT the worst two-letter pair; `'WW'` is.** The plan argued
+"`'W'` is the widest capital, `'M'` the second widest, therefore `'WM'` is the
+worst pair". A pair may repeat a glyph, so the worst pair is `'WW'`. Measured
+reach: `'WW'` **1.05998 em** vs `'WM'` **1.01426 em**. The pre-existing test
+case `'Wm'` inherited the same mistake. Separately, `'M'` is not even the
+second-widest capital once extended Latin is counted: `Œ` (2076) and `Æ` (2075)
+both beat `M` (1889).
+
+**C3 — the horizontal half-extent was computed wrong.** The plan used
+ink-width / 2 (0.9224 em for `'WM'`). The ink is not centred in the advance
+run — `'W'` has a 50-unit left bearing and `'M'` a 150-unit right bearing — so
+the correct quantity is `max(centre - xMinInk, xMaxInk - centre)`, which is
+0.94678 em for `'WM'`. The plan's own text flagged this as "a second-order
+effect"; it is not, at a margin measured in fractions of a pixel.
+
+**C4 — the plan's ink-height claim is false for characters this app will
+actually see.** "Every plain capital's ink is `yMin=0, yMax=1490` — no
+descenders" holds for `W M Æ Œ` but not for `O`/`Q` (overshoot to 1510, `Q`'s
+tail to −129) and not for any accented capital: `Ö` reaches `yMax=1939`. This
+app ships a German locale; `'ÖW'` (reach 1.04393 em) is a realistic pair, not a
+curiosity. The vertical half-extent the plan used (capHeight / 2) is
+nevertheless correct *for unaccented capitals* — but only by a coincidence the
+plan did not verify and this pass did: Inter SemiBold's `ascender - descender`
+is `1984 - 494 = 1490`, exactly its `sCapHeight`, so with `height: null` a
+plain capital's ink is exactly centred in the paragraph box.
+
+**C5 — the combined constant, and therefore the fix, changes.**
+`cornerReachPerFontSize` is **1.05998**, not 0.99150 (+6.9%). Consequences:
+the radius-12 default overflows by **1.160px**, not 0.407px; and the plan's
+chosen radius 14 leaves **+0.590px** — less than one logical pixel, which is
+not "real optical padding" and would still read as touching. The new default is
+**16**, not 14; see the rewritten diagnosis below for why 16 rather than 15.
+
+**C6 — the plan's own fit test could not have caught a regression.** Its Step 2
+says outright that the test "computes purely from the formulas above using
+literal `14.0`, independent of what `MemberAvatar`'s constructor default
+currently is". A test that hard-codes the value it is supposed to be guarding
+would pass unchanged if someone put the default back to 12. That is a fifth
+unfalsifiable test in this family. Fixed: the test reads the default off
+`const MemberAvatar(...).radius`.
+
+**C7 — a defect this plan did not know about, and cannot fix: the two
+`FilterChip` avatars.** Material lays a chip's avatar out with
+`BoxConstraints.tightFor(contentSize)`
+(`packages/flutter/lib/src/material/chip.dart:1883-1885`), where `contentSize`
+is `max(_kChipHeight - padding.vertical + labelPadding.vertical, labelHeight +
+labelPadding.vertical)` ~ **24px** at text scale 1. So at
+`assignment_fields.dart:117` and `:233` the `radius` argument has **no effect
+on the rendered box at all** — and `centerLayout`'s
+`assert(sizes.content >= boxSize.height)` (chip.dart:1958) makes it impossible
+to hand the avatar a taller box. Two glyphs at the 11px legibility floor need
+an outer diameter of at least `2 * (1.05998 * 11 + 1.5)` = **26.32px**; a
+Material chip gives 24. No radius fixes this, and the remedies that would (drop
+the avatar from the chip — the member's full name is already the chip's label;
+one letter in chips only; a hand-rolled chip) are product decisions outside
+G-16's scope. This plan therefore pins those two sites to an explicit
+`radius: 12` so they render **exactly** as they do today (the new default would
+only thicken the ring inside the same forced 24px box, making them 0.75px
+worse), documents the exclusion at the call site and in the fit test, and files
+a new backlog row.
+
+**C8 — the bound needs `letterSpacing` pinned to be a guarantee.**
+`MemberAvatar`'s `TextStyle` sets only size/weight/colour, so `letterSpacing`
+is inherited from whatever ambient `DefaultTextStyle` the avatar lands in — and
+this theme ships roles from −1.5 to +1.2 (`labelSmall`). Flutter adds
+letterSpacing after *every* glyph, so an ambient +1.2 would eat 1.2px of a
+1.789px margin. `MemberAvatar` now pins `letterSpacing: 0`. (`height` needed no
+pinning: no role in `lib/app/theme.dart` sets one — checked.)
+
+Not a correction, but recorded: the plan's Task 1 Step 5 inversion (revert to
+`Wrap`) is valid, but at the 800px test surface the reverted `Wrap` gives
+13-across, so the inversion is demonstrated inside the method body as the
+execution rules require.
+
+
 ## Global Constraints
 
 - **Never run `flutter`, `dart`, `supabase`, or `docker` commands** outside
@@ -130,144 +221,128 @@ existing test does; Task 1 adds one that does, at a real Android width.
 
 ### G-16 — measured, not asserted, against the real shipped font
 
-**What was measured, and how.** `docs/backlog.md` row G-14 (and
-`test/features/members/member_avatar_test.dart:74-103`) already establishes
-that `flutter test` draws the Ahem-style `FlutterTest` font — a "square whose
-size equals the font size" — never the real Inter, so no widget test in this
-repo can measure a real glyph's advance or ink extent. What **can** measure
-it: the actual font files are already committed at `assets/fonts/Inter-*.ttf`
-and declared under pubspec `fonts:` (`pubspec.yaml:112-122`) — `MemberAvatar`
-renders its initials at `FontWeight.w600`, i.e. `Inter-SemiBold.ttf`. A TrueType
-font's own binary tables (`head`, `hhea`, `OS/2`, `cmap`, `hmtx`, `glyf`) state
-its real units-per-em, ascent/descent, and — critically — each glyph's exact
-advance width and ink bounding box. Reading those tables needs no Flutter
-text-layout pipeline at all, so it sidesteps G-14 entirely rather than working
-around it.
+*(Rewritten by the Task 0 refresh pass; see corrections C2-C8 above. The
+original text's method was right and its numbers were not.)*
 
-This plan's diagnosis pass read `assets/fonts/Inter-SemiBold.ttf` with a
-~150-line offline Python script (`struct`-based sfnt/cmap/glyf parsing, no
-third-party font library — none is installed in this environment) run via
-plain `python3`, not `flutter`/`dart` — it never touches the shared SDK lock
-this plan is otherwise barred from. The script and its raw output are not
-part of the implementation; the **numbers** below are, and every one was
-read directly off the shipped font, not assumed:
+**What was measured, and how.** `docs/backlog.md` row G-14 establishes that
+`flutter test` draws the Ahem-style `FlutterTest` font, so no widget test in
+this repo can measure a real glyph's advance or ink extent. What can: the
+shipped font files themselves, `assets/fonts/Inter-*.ttf`, declared under
+pubspec `fonts:` (`pubspec.yaml:112-122`). `MemberAvatar` draws at
+`FontWeight.w600`, i.e. `Inter-SemiBold.ttf`. A TrueType file's own binary
+tables (`head`, `hhea`, `OS/2`, `cmap`, `hmtx`, `loca`, `glyf`) state its
+units-per-em, its vertical metrics, and every glyph's exact advance width and
+ink bounding box. Reading them needs no Flutter text pipeline, so it sidesteps
+G-14 rather than working around it. This pass re-read the font with a
+`struct`-based sfnt parser under plain `python3` (no third-party font library
+is installed; `python3` does not touch the shared Flutter SDK lock), and
+brute-forced every ordered pair over A-Z, 0-9 and the Latin-1/Latin-Extended
+capitals the `cmap` covers, rather than reasoning about which pair "must" be
+worst.
 
 | fact | value |
 | --- | --- |
 | `unitsPerEm` | 2048 |
-| every plain capital's ink | `yMin=0`, `yMax=1490` (cap height 1490/2048 = **0.727539 em**) — no descenders |
-| widest capital (advance) | `'W'` = 2089 units (**1.0200 em**) |
-| 2nd-widest capital (advance) | `'M'` = 1889 units (**0.9224 em**) |
-| `'WM'` combined ink span | x = 50 → 3828 of a 3978-unit two-glyph advance run → ink width 3778/2048 = **1.844726 em** |
+| `hhea` ascender / descender / lineGap | 1984 / −494 / 0 |
+| `OS/2` sTypo\*, usWin\*, and `fsSelection` bit 7 (USE_TYPO_METRICS) | identical values, bit set — every metric source agrees |
+| `OS/2` `sCapHeight` | 1490 |
+| paragraph box height with `height: null` | (1984+494)/2048 = **1.20996 em** |
+| box centre above the baseline | (1984−494)/2 = 745 units = **0.36377 em** |
+| widest advances | `W` 2089, `Œ` 2076, `Æ` 2075, `M` 1889 |
+| **worst ordered pair** | **`'WW'`** — reach **1.05998 em** (half-width 0.99561, half-height 0.36377) |
+| runners-up | `'ÆW'` 1.05677, `'ŒŒ'` 1.02977, `'ÖW'` 1.04393, `'WM'` 1.01426 |
 
-`'W'` and `'M'` are the two widest capitals Inter SemiBold ships (checked
-against all 26 advance widths, not assumed) — confirming
-`test/features/members/member_avatar_test.dart:236` ("the widest two-letter
-pair") already picked the objectively-worst case, `'Wm' → 'WM'`, for the
-right reason.
+Because `ascender − descender` (1490) equals `sCapHeight` exactly, an
+unaccented capital's ink is precisely vertically centred in a `height: null`
+paragraph box — so for `'WW'` the half-height is `capHeight / 2`. That is a
+measured coincidence of this font, not a general truth, and it does **not**
+hold for accented capitals (`Ö` reaches 1939, giving half-height 0.57715 em);
+`'ÖW'` is nevertheless still below `'WW'`.
 
-**The geometric quantity that actually matters, and why the original
-arithmetic missed it.** `docs/plans/2026-08-18-palette-and-ring-avatars.md:
-344-373` (R2) modelled fit as a 1-D comparison: an assumed
-`1.35 × fontSize` glyph width against `0.9 × (2·radius − 2·ringWidth)`
-"usable width." Two independent problems, found by using the real numbers:
+**The geometric quantity that matters.** `MemberAvatar`'s root is a `Container`
+whose `BoxDecoration` border contributes `EdgeInsets.all(ringWidth)` of
+padding, so the `Text` is laid out and centred inside a box concentric with the
+avatar. The ink's farthest point from that shared centre is the corner of its
+bounding box, `sqrt(a² + b²)`, and the ring's inner edge is a **circle** at
+`scaledRadius − ringWidth`. `docs/plans/2026-08-18-palette-and-ring-avatars.md`
+(R2) compared an assumed `1.35 × fontSize` glyph width against a per-axis
+"usable width" of a rectangle, and so never checked the diagonal at all.
 
-1. The assumed `1.35×` ratio is for the *pair*, but "usable width" was
-   compared against a **rectangle**, when the ring is a **circle** — a text
-   box's farthest visible pixels from the avatar's centre are at its
-   *corners*, not its edge midpoints, and a corner reaches further than
-   either half-width or half-height alone (`√(a²+b²) > max(a,b)`). Nothing
-   in R2's table checked the diagonal.
-2. Using the real measured ink box (1.844726 em wide × 0.727539 em tall for
-   `'WM'`), the corner-to-centre distance works out to a strikingly clean
-   `fontSize × √((1.844726/2)² + (0.727539/2)²) ≈ 0.99150 × fontSize` — i.e.
-   the worst-case pair's farthest ink reaches almost exactly one `fontSize`
-   from the avatar's centre. That is the number to compare against the
-   ring's **inner radius** (`scaledRadius − ringWidth`), not against R2's
-   per-axis "usable width."
-
-**Applying `cornerReach = 0.9915 × fontSize` against `innerRadius =
-scaledRadius − ringWidth(scaledRadius)` at every real call site.** Every
-`MemberAvatar(...)` construction in `lib/` was enumerated
-(`grep -rn "MemberAvatar("`): the unnamed default (`chore_occurrence_tile.dart:
-353`, `assignment_fields.dart:117,233,288`, `stats_share_card.dart:131`,
-`chore_history_screen.dart:87` — radius 12 today), `radius: 14`
-(`mark_done_for_sheet.dart:52`, `acting_member_sheet.dart:53,66,110`),
-`radius: 16` (`join_flow_steps.dart:181`), `radius: 21`
-(`manage_members_screen.dart:145`), `radius: 33`
-(`member_edit_sheet.dart:280-284`). `MemberAvatar`'s own formulas
-(`lib/features/members/member_avatar.dart:117-129`) are:
+`MemberAvatar`'s own formulas (`lib/features/members/member_avatar.dart`):
 
 ```
 scaledRadius = radius × clamp(textScale, 1.0, 1.6)
 ringWidth    = clamp(scaledRadius / 8, 1.5, 3.0)
 fontSize     = clamp(scaledRadius × 0.72, 11.0, ∞)
 innerRadius  = scaledRadius − ringWidth
+cornerReach  = 1.05998 × fontSize
 ```
 
-Margin (`innerRadius − cornerReach`) is monotonically non-decreasing in
-`textScale` for every fixed `radius`: `innerRadius` grows with `scaledRadius`
-at a rate (0.875×, or faster once `ringWidth` hits its 3.0 cap) that is
-always ≥ the rate `cornerReach` grows once `fontSize` is off its 11px floor
-(0.9915 × 0.72 ≈ 0.714×), and `cornerReach` doesn't move at all while
-`fontSize` is still floored — so checking the two ends of the scale range,
-1.0 and 1.6 (`MemberAvatar._maxTextScale`), bounds the whole range:
+Margin (`innerRadius − cornerReach`) is monotonically non-decreasing in text
+scale for every fixed radius (verified numerically over the whole 1.0-1.6 range
+at 0.001 steps, not argued), so the two ends bound it:
 
-| radius | scale | fontSize | ringWidth | innerRadius | cornerReach | margin |
-| --- | --- | --- | --- | --- | --- | --- |
-| **12 (today's default)** | **1.0** | 11 (floored) | 1.5 | 10.5 | 10.907 | **−0.407 — OVERFLOW** |
-| 12 | 1.6 | 13.824 | 2.4 | 16.8 | 13.706 | +3.09 |
-| **14** | **1.0** | 11 (floored) | 1.75 | 12.25 | 10.907 | **+1.343** |
-| 14 | 1.6 | 16.128 | 2.8 | 19.6 | 15.99 | +3.61 |
-| 16 | 1.0 | 11.52 | 2.0 | 14.0 | 11.424 | +2.576 |
-| 21 | 1.0 | 15.12 | 2.625 | 18.375 | 14.991 | +3.384 |
-| 33 | 1.0 | 23.76 | 3.0 (capped) | 30.0 | 23.559 | +6.441 |
+| radius | scale | fontSize | ringWidth | innerRadius | cornerReach | margin | margin / innerRadius |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **12 — today's default** | **1.0** | 11 (floored) | 1.5 | 10.500 | 11.660 | **−1.160 OVERFLOW** | −11.0% |
+| 12 | 1.6 | 13.824 | 2.4 | 16.800 | 14.653 | +2.147 | 12.8% |
+| 14 — the original plan's choice | 1.0 | 11 (floored) | 1.75 | 12.250 | 11.660 | **+0.590** | 4.8% |
+| 15 | 1.0 | 11 (floored) | 1.875 | 13.125 | 11.660 | +1.465 | 11.2% |
+| **16 — the new default** | **1.0** | 11.52 | 2.0 | 14.000 | 12.211 | **+1.789** | **12.8%** |
+| 16 | 1.6 | 18.432 | 3.0 | 22.600 | 19.538 | +3.062 | 13.6% |
+| 21 | 1.0 | 15.12 | 2.625 | 18.375 | 16.027 | +2.348 | 12.8% |
+| 33 | 1.0 | 23.76 | 3.0 | 30.000 | 25.185 | +4.815 | 16.0% |
 
-**Exactly one real, shipped configuration overflows: the default (radius 12)
-at ordinary, unscaled text** — the opposite end of the range from where the
-wave-6 obligation looked ("a legibility check at 16px and text scale 2.0";
-scale 2.0/1.6 is in fact the *safest* end of the range for this shape, since
-margin only grows with scale). This matches the report precisely: found on
-an ordinary device look, not under accessibility text scaling, at the
-smallest/most common avatar. Every other shipped radius already has real
-margin — most tightly `radius: 14` at unscaled text, +1.343px — which is
-useful: it's an already-shipped, already-live size.
+**Exactly one shipped configuration overflows: the default radius at ordinary,
+unscaled text.** That matches the report precisely — found on an ordinary
+device look, at the smallest and most common avatar, *not* under accessibility
+scaling. Text scale 2.0, the end of the range the wave-6 obligation was written
+around, is in fact the safest end for this shape: margin only grows with scale.
+The obligation was pointed at the wrong end of the range, which is a second
+reason the check that "passed" told nobody anything.
 
-**Decision: (a) — two letters ship, given real optical padding, by growing
-the default radius from 12 to 14.** This is not a font shrink (the standing
-rule against that is respected: `fontSize` stays floored at 11px, unchanged);
-it enlarges the ring, and it does so by reusing a radius the codebase already
-ships and tests pass at (`mark_done_for_sheet.dart`, `acting_member_sheet.dart`
-already draw `radius: 14` avatars in production). No other call site needs
-to change — 16/21/33 already had margin and match the design canvas's
-explicit 42px/66px pixel values for the two named frames (1b), which this
-plan does not alter.
+**Decision: two letters ship, and the default radius goes 12 → 16.** Not 14,
+and not 15, for a reason that comes out of the code's own formulas rather than
+a threshold picked by hand. `fontSize` is clamped up to its 11px floor for
+every `scaledRadius < 11/0.72 = 15.28`. While that clamp is active the glyphs
+are *larger than the design's own size relationship asks for* — which is the
+entire mechanism behind G-16. Radius 16 is the smallest integer radius at which
+nothing is clamped, and at that point the headroom falls out automatically at
+`1 − 1.05998×0.72/0.875` = **12.8% of the inner radius — exactly the headroom
+the 42px (radius 21) and 66px (radius 33) avatars already have**, the two sizes
+the design canvas pins and that shipped without complaint. So "does it look
+right" transfers from sizes Igor has already accepted, rather than resting on a
+number this plan invented. Radius 15 would clear the ring (+1.465px), but only
+while still sitting on the clamp, i.e. still in the regime that produced the
+bug.
 
-**Why not (b), one letter.** The overflow is small (0.407px, i.e. under a
-device pixel at most real-world 2×+ DPRs) and is fully closed by growing the
-ring to an already-shipped, already-tested size at zero legibility or
-accessibility cost — R2's argument for two letters (Anna/Alex collide at one
-letter; initials are the *only* channel separating members for a colour-blind
-viewer, since `#6B57B0`/`#7A5AA8` sit at only ΔE 7.8) is untouched by this
-fix and remains fully valid. One letter would only be the right call if no
-safe growth were available or acceptable; here one plainly is.
+The 11px floor is **not** lowered (`docs/specs/design-language.md` /
+G-4 / R2: two uppercase glyphs stop being legible below it), and R2's argument
+for two letters is untouched — the initials remain the only channel separating
+members for a colour-blind viewer, and the closest palette pair sits at ΔE 7.8.
+One letter would have been the right call only if no safe growth existed. One
+does.
 
-**What this plan's tests can and cannot prove, stated plainly (the standing
-instruction from G-14).** The new arithmetic test in Task 2 proves, by
-direct computation against `MemberAvatar`'s own formulas and the real Inter
-metrics above, that the worst-case two-letter pair's ink corner stays inside
-the ring's inner radius at every currently-shipped `(radius, scale)`
-combination, with a stated margin. It is an **analytical bound**, not a
-render: it does not know about anti-aliasing, hinting, sub-pixel rounding, or
-whether Skia's actual text-layout algorithm centres the ink exactly the way
-this plan's idealised model assumes (it doesn't correct for the ~0.03em
-left/right bearing asymmetry of `'W'`/`'M'`, for instance — a second-order
-effect against a ≥1.3px margin). It **can** fail — see each task's inversion
-step — and it is reproducible by anyone who re-runs the same TTF-table read
-against `assets/fonts/Inter-SemiBold.ttf`. It cannot replace an actual look
-at a real screen; that remains `docs/specs/design-language.md`'s "Definition
-of visual done" gate, unchanged by this plan, and is the one thing here that
-stays device-only.
+**What the chip sites cost, stated plainly (correction C7).** At
+`assignment_fields.dart:117` and `:233` the avatar is a `FilterChip`'s `avatar:`
+and Material force-sizes it to ~24px whatever `radius` says. Two glyphs at the
+11px floor need 26.32px. Those two sites are therefore **outside the fit
+guarantee this task establishes**: they are pinned to `radius: 12` so they keep
+rendering exactly as they do today, the exclusion is named at the call site and
+in the test, and a new backlog row records the remedy as a product decision.
+The user-visible cost is real but bounded: in those two chips the member's full
+name is the chip's own label, so identity does not rest on the initials there.
+
+**What this plan's tests prove, and what they do not.** The fit test is an
+analytical bound computed from `MemberAvatar`'s own exported formulas and the
+real Inter metrics; it knows nothing about anti-aliasing, hinting, sub-pixel
+rounding, or Skia's exact centring. It is reproducible by anyone re-running the
+same table read against `assets/fonts/Inter-SemiBold.ttf`. It can fail — the
+shipped test contains a configuration that *does* fail the fit inequality (the
+chip-forced radius 12), asserted as such, so the test demonstrates its own
+discrimination in every CI run rather than only under a temporary inversion.
+It cannot replace a look at a real screen; that stays
+`docs/specs/design-language.md`'s "Definition of visual done" gate.
 
 ---
 
@@ -531,455 +606,51 @@ git commit -m "Make the category icon grid span the sheet width (G-15)"
 
 ---
 
-## Task 2: G-16 — two-letter initials fit inside the ring at every real avatar size
+## Task 2: G-16 — two-letter initials fit inside the ring at every avatar size the widget controls
+
+*(Rewritten by the Task 0 refresh pass. Superseded: the old Step 1-9, which
+bumped the default to 14 on the strength of the 0.99150 constant, hard-coded
+that 14 in the test, and did not know about the chip constraint.)*
 
 **Files:**
-- Modify: `lib/features/members/member_avatar.dart` (extract two pure
-  geometry functions; bump the default `radius`; update doc comments)
-- Modify: `lib/features/chores/mark_done_for_sheet.dart:52`,
-  `lib/features/chores/acting_member_sheet.dart:53,66,110` (drop the
-  now-redundant explicit `radius: 14`)
-- Modify: `docs/specs/members-management.md` (record the second size bump)
-- Test: `test/features/members/member_avatar_test.dart`
+- Modify `lib/features/members/member_avatar.dart` — export the two geometry
+  formulas as pure functions, pin `letterSpacing: 0`, bump the default
+  `radius` 12 → 16, update the doc comments.
+- Modify `lib/features/chores/mark_done_for_sheet.dart`,
+  `lib/features/chores/acting_member_sheet.dart` (x3),
+  `lib/features/settings/join_flow_steps.dart` — drop the explicit `radius`
+  arguments that `avoid_redundant_argument_values` now rejects (`14` in the
+  first two files, `16` in the third — the plan's original list missed
+  `join_flow_steps.dart`, which becomes redundant at the new default).
+- Modify `lib/features/chores/chore_form/assignment_fields.dart` — pin the two
+  `FilterChip` avatars to an explicit `radius: 12` (correction C7): status quo,
+  with the reason at the call site.
+- Modify `docs/specs/members-management.md`, `docs/backlog.md`.
+- Test: `test/features/members/member_avatar_test.dart`.
 
-**Interfaces:**
-- Consumes: `categoryTone(BuildContext, int)` (`lib/app/theme.dart`,
-  unchanged), `memberInitials(String)` (unchanged), `previewMember(...)`
-  (unchanged).
-- Produces: two new top-level functions in `member_avatar.dart`,
-  `double memberAvatarRingWidth(double scaledRadius)` and
-  `double memberAvatarFontSize(double scaledRadius)` — pure, no
-  `BuildContext`, used by `MemberAvatar.build()` and by the new test in this
-  task. `MemberAvatar`'s public constructor signature is unchanged except
-  its `radius` default, `12` → `14`; every existing caller that already
-  passes an explicit `radius` is unaffected except the four listed above,
-  where `14` is now the default and must be dropped (see Global Constraints
-  — `avoid_redundant_argument_values`).
+**Interfaces produced:** `double memberAvatarRingWidth(double scaledRadius)`
+and `double memberAvatarFontSize(double scaledRadius)` — pure, no
+`BuildContext`, called by `MemberAvatar.build` and by the fit test.
+`MemberAvatar`'s constructor signature is unchanged apart from its `radius`
+default. No `semantic()` id is added, removed or moved by this task.
 
-- [ ] **Step 1: Extract the two geometry formulas as pure functions, and
-      write the failing analytical fit test against today's default (12)**
+- [ ] **Step 1 (RED).** Extract the two formulas; add the analytical fit test.
+  The test must (a) read the default off `const MemberAvatar(...).radius`
+  rather than hard-coding it, (b) enumerate every radius `lib/` uses where the
+  widget controls its own box, at scale 1.0 and 1.6, (c) carry the chip-forced
+  radius 12 as an explicitly-asserted **failing** configuration, so the shipped
+  test demonstrates it can discriminate. Push; CI must go red with
+  `radius 16.0 at scale 1.0 ... reaches 12.211 ... inner edge is only 10.500px`
+  — i.e. the default is still 12 and the enumeration is driven by it.
 
-In `lib/features/members/member_avatar.dart`, replace lines 121-129 (the
-`ringWidth`/`fontSize` computation inside `build()`, from the `// radius / 8
-reproduces...` comment through `final fontSize = ...;`) with:
+- [ ] **Step 2 (GREEN).** Bump the default to 16, pin `letterSpacing: 0`, fix
+  the call sites listed above, update the four widget tests that hard-code the
+  24px box / 1.5px ring, update the spec and the backlog. Push; CI green.
 
-```dart
-    final ringWidth = memberAvatarRingWidth(scaledRadius);
-    final fontSize = memberAvatarFontSize(scaledRadius);
-```
-
-And add these two top-level functions in the same file, directly above
-`class MemberAvatar` (i.e. after `memberInitials`'s closing `}` and before
-the `MemberAvatar` doc comment at line 75):
-
-```dart
-/// The avatar's ring stroke width for an already text-scale-adjusted
-/// [scaledRadius]: `scaledRadius / 8` reproduces the design's own two
-/// stated ring widths — 2.6 at its 42px row avatar (radius 21, drawn 2.5)
-/// and 3.0 at its 66px preview (radius 33, drawn 3) — floored at 1.5 so the
-/// ring never gets so thin it disappears at the smallest sizes.
-double memberAvatarRingWidth(double scaledRadius) =>
-    (scaledRadius / 8).clamp(1.5, 3.0);
-
-/// The avatar's initials font size for an already text-scale-adjusted
-/// [scaledRadius]: `scaledRadius * 0.72` lands on the design's 15px and
-/// 23px at radius 21/33, floored at 11px — Material's smallest label size,
-/// below which two uppercase glyphs stop being legible (G-4/R2). Never
-/// lower this floor to make two letters fit a smaller ring; grow the ring
-/// instead (G-16) — a smaller glyph at the same border position trades one
-/// defect for another wearing a different hat.
-double memberAvatarFontSize(double scaledRadius) =>
-    (scaledRadius * 0.72).clamp(11.0, double.infinity);
-```
-
-Then, in `test/features/members/member_avatar_test.dart`, add this test
-(a plain `test(...)`, not `testWidgets` — it calls no Flutter text-layout
-code at all, so `flutter_test`'s Ahem substitution, backlog G-14, never
-applies to it) after the existing `'the initials rule counts graphemes...'`
-test:
-
-```dart
-  test(
-    'two-letter initials stay inside the ring at every avatar size the app '
-    'actually uses, measured against the real shipped font (G-16)',
-    () {
-      // Real glyph geometry for Inter SemiBold (FontWeight.w600, the
-      // avatar's weight), read directly from assets/fonts/Inter-
-      // SemiBold.ttf's own binary tables (head/hhea/OS2/cmap/hmtx/glyf) --
-      // NOT from a widget test, which draws flutter_test's Ahem-style font
-      // and cannot measure this (G-14).
-      //
-      // 'W' (advance 2089/2048=1.0200em) is the widest capital Inter
-      // SemiBold ships, 'M' (1889/2048=0.9224em) the second-widest --
-      // checked against all 26 capitals, confirming 'WM' below (matching
-      // this file's own 'Wm' test case) really is the worst two-letter
-      // pair, not merely assumed to be.
-      //
-      // The pair's combined ink spans x=50..3828 of a 3978-unit two-glyph
-      // advance run: ink width 3778/2048 = 1.844726 em. Every plain
-      // capital's ink in this font has yMin=0, yMax=1490 (cap height
-      // 1490/2048 = 0.727539 em) -- no descenders, so that is also the
-      // pair's ink height. The distance from the ink box's centre to its
-      // farthest corner -- the quantity that matters against a CIRCULAR
-      // ring, not a same-width rectangle's "usable width" -- is therefore:
-      const cornerReachPerFontSize = 0.99150; // sqrt((1.844726/2)^2 + (0.727539/2)^2)
-
-      // Every MemberAvatar(...) construction in lib/, enumerated by
-      // `grep -rn "MemberAvatar("`: the shared default (chore_occurrence_
-      // tile.dart, assignment_fields.dart x3, stats_share_card.dart,
-      // chore_history_screen.dart), radius 16 (join_flow_steps.dart), 21
-      // (manage_members_screen.dart), 33 (member_edit_sheet.dart). Text
-      // scale 1.0 and 1.6 (MemberAvatar._maxTextScale) bound the whole
-      // range: margin is monotonically non-decreasing in scale for every
-      // fixed radius here, since innerRadius always grows at least as fast
-      // as cornerReach as scaledRadius grows (0.875x once ringWidth is off
-      // its floor and unclamped, faster still once ringWidth caps at 3.0,
-      // against cornerReach's 0.9915*0.72=0.714x once fontSize is off its
-      // 11px floor -- and cornerReach doesn't move at all while fontSize
-      // is still floored).
-      const defaultRadius = 14.0; // the shared MemberAvatar() default
-      for (final testCase in <(double radius, double scale)>[
-        (defaultRadius, 1),
-        (defaultRadius, 1.6),
-        (16, 1),
-        (16, 1.6),
-        (21, 1),
-        (21, 1.6),
-        (33, 1),
-        (33, 1.6),
-      ]) {
-        final scaledRadius = testCase.radius * testCase.scale;
-        final ringWidth = memberAvatarRingWidth(scaledRadius);
-        final fontSize = memberAvatarFontSize(scaledRadius);
-        final innerRadius = scaledRadius - ringWidth;
-        final cornerReach = cornerReachPerFontSize * fontSize;
-        expect(
-          cornerReach,
-          lessThan(innerRadius),
-          reason:
-              'radius ${testCase.radius} at scale ${testCase.scale}: the '
-              "widest real pair ('WM') reaches "
-              '${cornerReach.toStringAsFixed(3)} logical px from the '
-              "avatar's centre, but the ring's inner edge is only "
-              '${innerRadius.toStringAsFixed(3)}px out -- the initials '
-              'would touch or cross the ring',
-        );
-      }
-    },
-  );
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/members/member_avatar_test.dart`
-
-Expected: **FAIL** on the new test, at the `(14.0, 1)` case reading
-`radius 14.0 at scale 1.0` — wait, this is Step 1: `defaultRadius` is
-declared as `14.0` in the test but `MemberAvatar`'s actual default is still
-`12` at this point in the plan (not yet changed) — so this step's failure
-is expected to name whichever value is inconsistent. Run it exactly as
-written above (with `defaultRadius = 14.0`, matching the value Step 3 is
-about to ship) and confirm it currently **FAILS at the `(14.0, 1)` case**
-with `cornerReach=10.907` NOT `lessThan` `innerRadius=12.25` — no: `10.907 <
-12.25` is TRUE, so `(14.0, 1)` alone would already pass even before Step 3's
-production change, because this test computes purely from the formulas
-above using literal `14.0`, independent of what `MemberAvatar`'s
-constructor default currently is. To make this step a genuine, currently-
-failing RED (proving the test can fail, per the standing instruction),
-temporarily change the test's `defaultRadius` constant to `12.0` (today's
-real, unfixed default) before running it the first time:
-
-```dart
-      const defaultRadius = 12.0; // TEMPORARY for this step only
-```
-
-Then run the same command. Expected: **FAIL**, reason string reporting
-`radius 12.0 at scale 1.0: ... reaches 10.907 ... but the ring's inner edge
-is only 10.500px out`. This confirms the test genuinely detects the measured
-G-16 overflow against the code as it stands today. Change `defaultRadius`
-back to `14.0` before continuing to Step 3 (this is the value the shipped
-test asserts against — Step 3 makes it true in `lib/`, not the other way
-around).
-
-- [ ] **Step 3: Bump the default radius, and drop the callers that become
-      redundant**
-
-In `lib/features/members/member_avatar.dart`:
-
-Replace line 92:
-```dart
-  const MemberAvatar({required this.member, this.radius = 12, super.key});
-```
-with:
-```dart
-  const MemberAvatar({required this.member, this.radius = 14, super.key});
-```
-
-Replace the doc comment at lines 79-89 (from `/// A ring rather than a fill`
-through the closing `/// 33-radius preview).`) with:
-
-```dart
-/// A ring rather than a fill so the same avatar is legible at 28px in a
-/// chore tile and 66px in the member edit sheet: the initials always sit on
-/// `surfaceContainerHigh` against `categoryTone`, a pairing the tone table
-/// guarantees at >= 3:1 in both themes (`test/app/palette_test.dart`),
-/// instead of on a fill whose legibility varied with the color.
-///
-/// [radius] defaults to 14 (the chore tile's compact inline size -- 28px;
-/// measured against the real shipped Inter font, G-16, at which two
-/// glyphs fit inside the ring with margin — the previous default, 12,
-/// measurably did not); pass a larger value for a more prominent context
-/// (the join chooser at 16, the members list at 21, the acting-member
-/// app-bar button, the switcher sheet, the edit sheet's 33-radius preview).
-```
-
-And replace the now-stale comment at (originally) lines 121-124, i.e. the
-`// radius / 8 reproduces...` block just deleted in Step 1 — already
-replaced by the call to `memberAvatarRingWidth`/`memberAvatarFontSize`
-above, whose own doc comments carry this explanation now; no further edit
-needed here.
-
-Then, since `radius: 14` is now identical to the default and therefore
-flagged by `avoid_redundant_argument_values` under `--fatal-infos`, remove
-the now-redundant explicit argument at:
-
-`lib/features/chores/mark_done_for_sheet.dart:52`, replace:
-```dart
-                      leading: MemberAvatar(member: member, radius: 14),
-```
-with:
-```dart
-                      leading: MemberAvatar(member: member),
-```
-
-`lib/features/chores/acting_member_sheet.dart:53`, replace:
-```dart
-          child: Center(child: MemberAvatar(member: member, radius: 14)),
-```
-with:
-```dart
-          child: Center(child: MemberAvatar(member: member)),
-```
-
-`lib/features/chores/acting_member_sheet.dart:66`, replace:
-```dart
-            : MemberAvatar(member: member, radius: 14),
-```
-with:
-```dart
-            : MemberAvatar(member: member),
-```
-
-`lib/features/chores/acting_member_sheet.dart:110`, replace:
-```dart
-                  leading: MemberAvatar(member: member, radius: 14),
-```
-with:
-```dart
-                  leading: MemberAvatar(member: member),
-```
-
-- [ ] **Step 4: Update the existing widget tests' hard-coded numbers**
-
-`test/features/members/member_avatar_test.dart` has three places that
-hard-code the *old* default (12 → a 24px box, 1.5 ring width). Update them
-to the new default (14 → a 28px box, 1.75 ring width):
-
-The file's top doc comment, line 3: replace `legible from the 24px chore
-tile to the 66px` with `legible from the 28px chore tile to the 66px`.
-
-`_pump`'s own default, line 17: replace
-```dart
-  double radius = 12,
-```
-with
-```dart
-  double radius = 14,
-```
-(this mirrors production exactly, the same way it already did at 12 — see
-the "left implicit" comment at the old lines 220-222, which the next edit
-updates).
-
-The `'ring width tracks radius and reproduces the design values'` test
-(around line 220-224): replace
-```dart
-    // 24px chore tile (radius 12, the default): thinner, so the two letters
-    // still have room. Left implicit because `--fatal-infos` rejects
-    // `radius: 12` as redundant against the helper's own default.
-    await _pump(tester, appLightTheme, name: 'Mia', color: stored);
-    expect((_decoration(tester).border! as Border).top.width, 1.5);
-```
-with
-```dart
-    // 28px chore tile (radius 14, the default): thinner than the 21/33
-    // rows above, so the two letters still have room (G-16). Left implicit
-    // because `--fatal-infos` rejects `radius: 14` as redundant against the
-    // helper's own default.
-    await _pump(tester, appLightTheme, name: 'Mia', color: stored);
-    expect((_decoration(tester).border! as Border).top.width, 1.75);
-```
-
-The `'the smallest avatar renders two letters without throwing'` test
-(around line 227-244): replace
-```dart
-    // R2 sized the default radius at 12 (a 24px box) so two glyphs fit with
-    // margin -- ~15px of Inter inside 21px of room. That margin is NOT
-    // asserted here; see the note at the top of this file for why it cannot
-    // be. What IS asserted is font-independent: the widest two-letter pair
-    // lays out without an exception, the box is the size R2 specified, and
-    // the glyphs never drop below the legibility floor.
-    await _pump(tester, appLightTheme, name: 'Wm', color: stored);
-    expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(MemberAvatar)), const Size(24, 24));
-```
-with
-```dart
-    // G-16 sized the default radius at 14 (a 28px box) so two glyphs fit
-    // with real margin, measured against the actual shipped Inter font --
-    // see 'two-letter initials stay inside the ring...' below, and the
-    // plan's diagnosis, for the arithmetic. That margin is not re-asserted
-    // here; this test only checks what is font-independent regardless: the
-    // widest two-letter pair lays out without an exception, the box is the
-    // size G-16 specified, and the glyphs never drop below the legibility
-    // floor.
-    await _pump(tester, appLightTheme, name: 'Wm', color: stored);
-    expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(MemberAvatar)), const Size(28, 28));
-```
-
-The `'the whole avatar grows with text scale, capped at 1.6x'` test (around
-line 246-268): replace
-```dart
-    await _pump(tester, appLightTheme, name: 'Mia', color: stored);
-    final base = tester.getSize(find.byType(MemberAvatar));
-    expect(base.width, 24);
-```
-with
-```dart
-    await _pump(tester, appLightTheme, name: 'Mia', color: stored);
-    final base = tester.getSize(find.byType(MemberAvatar));
-    expect(base.width, 28);
-```
-and replace
-```dart
-    expect(
-      scaled.width,
-      closeTo(24 * 1.6, 0.01),
-```
-with
-```dart
-    expect(
-      scaled.width,
-      closeTo(28 * 1.6, 0.01),
-```
-
-- [ ] **Step 5: Run the test to verify it passes**
-
-Run: `flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= test/features/members/member_avatar_test.dart`
-
-Expected: **PASS**, every test in the file — including the new analytical
-fit test (now with `defaultRadius = 14.0` matching the real, just-changed
-production default) and the four updated widget tests.
-
-- [ ] **Step 6: Invert to confirm the new test can fail on purpose**
-
-Temporarily change `memberAvatarFontSize`'s floor from `11.0` to `12.5` (a
-stand-in for "someone raised the legibility floor without growing the ring
-to match" — the exact class of regression this test exists to catch) and
-rerun the same command.
-
-Expected: **FAIL** on the new analytical test, at the `(14.0, 1)` case (new
-`fontSize=12.5`, `cornerReach=12.394`, `innerRadius` still `12.25` →
-overflow) — confirming the test is not vacuous at the `flutter test` step.
-Then revert the floor to `11.0` and confirm Step 5's PASS again.
-
-- [ ] **Step 7: Run the wider regression sweep**
-
-The default-radius change touches every call site that doesn't pass an
-explicit `radius`. Run the existing test files that render one, to confirm
-no `RenderFlex` overflow or other layout regression from the box growing
-24px → 28px (Flutter surfaces an overflow as an uncaught `FlutterError`
-during the test, which fails it — no new assertions are needed, only that
-these still pass):
-
-```bash
-flutter test --dart-define=SUPABASE_URL= --dart-define=SUPABASE_ANON_KEY= \
-  test/features/members/member_avatar_test.dart \
-  test/features/chores/tile_redesign_test.dart \
-  test/features/chores/chore_form_avatars_test.dart \
-  test/features/chores/mark_done_for_test.dart \
-  test/features/chores/acting_member_widget_test.dart \
-  test/features/chores/acting_member_pinning_test.dart \
-  test/features/settings/members_screen_test.dart \
-  test/features/settings/join_household_sheet_test.dart \
-  test/features/stats/stats_screen_test.dart \
-  test/features/stats/chore_history_screen_test.dart
-```
-
-Expected: **PASS**, all files. If any fails with an overflow, that call
-site's surrounding layout (e.g. a `ListTile` leading-slot width assumption)
-needs its own fix before this task can land — investigate that specific
-failure against its own file rather than reverting the radius change, since
-the alternative (staying at radius 12) is the measured G-16 defect.
-
-- [ ] **Step 8: Record the second size bump in the spec**
-
-In `docs/specs/members-management.md`, replace the sentence at (originally)
-line 73-74:
-```
-  Two characters rather than one because for a color-blind viewer the
-  initials are the only channel that separates members. The chore-tile
-  avatar was enlarged from 20px to 24px to fit them; the rule was not
-  weakened to fit the old size.
-```
-with:
-```
-  Two characters rather than one because for a color-blind viewer the
-  initials are the only channel that separates members. The chore-tile
-  avatar was enlarged from 20px to 24px to fit them (G-4), and again to
-  28px (G-16) after a real Android device showed the initials still
-  touching the ring at 24px — measured against the actual shipped Inter
-  font (`test/features/members/member_avatar_test.dart`), not re-asserted
-  by eye; the rule was not weakened to fit either old size.
-```
-
-- [ ] **Step 9: Update the backlog and commit**
-
-In `docs/backlog.md`, mark both rows resolved in place, following this
-file's existing convention (see e.g. the A-2b row) — strike the title,
-add a `DONE 2026-08-30` note naming this plan and its key facts, keep the
-`Was:`/original text and the Files/Size columns:
-
-- **G-15** row: prefix the title cell with `~~The icon picker grid does not
-  fill the screen width on Android~~ **CLOSED 2026-08-30**`, and prepend to
-  the notes cell: `**DONE 2026-08-30** (docs/plans/2026-08-30-icon-grid-and-
-  initials.md): _IconGrid now lays tiles out with Row+Expanded (six equal
-  flexible columns, matching ColorSwatchPicker and the design canvas's
-  \`repeat(6,1fr)\`) instead of a fixed-size Wrap, which could fit six tiles
-  but never stretch them to the sheet's actual width. Proven by a widget
-  test pinned to a 412dp-wide Android reference device — the shared 800px
-  test-bootstrap width hid the gap. Was:` followed by the original text.
-- **G-16** row: prefix the title cell with `~~Two-letter initials touch the
-  avatar border at small sizes~~ **CLOSED 2026-08-30**`, and prepend to the
-  notes cell: `**DONE 2026-08-30** (docs/plans/2026-08-30-icon-grid-and-
-  initials.md): measured the real shipped Inter-SemiBold.ttf directly
-  (advance widths + glyf ink bounding boxes, not a widget test — G-14 rules
-  those out) and found exactly one overflow, 0.4px, at the default radius-12
-  avatar and ordinary (unscaled) text, not at text scale 2.0 as the original
-  obligation assumed — margin only grows with scale for this shape. Fixed
-  by growing the default radius 12 → 14, an already-shipped size elsewhere
-  in the app, giving +1.3px of real margin; two letters kept, no font
-  shrink. Was:` followed by the original text.
-
-```bash
-git add lib/features/members/member_avatar.dart \
-  lib/features/chores/mark_done_for_sheet.dart \
-  lib/features/chores/acting_member_sheet.dart \
-  test/features/members/member_avatar_test.dart \
-  docs/specs/members-management.md \
-  docs/backlog.md
-git commit -m "Fix two-letter initials touching the avatar ring (G-16)"
-```
+- [ ] **Step 3 (inversion).** Raise `memberAvatarFontSize`'s floor from 11.0 to
+  12.5 inside the function body — a stand-in for "someone raised the legibility
+  floor without growing the ring". CI must fail at the *test* step on the
+  `(16, 1.0)` case. Revert; CI green again.
 
 ---
 
