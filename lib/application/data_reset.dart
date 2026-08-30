@@ -5,8 +5,8 @@ library;
 import 'package:chore_app/data/db/app_database.dart';
 
 /// Deletes every row from every table, in one transaction, in the FK-safe
-/// order the spec spells out: occurrences, assignees, chores, shopping
-/// items, categories, members, settings, households.
+/// order the spec spells out: reminder snoozes, occurrences, assignees,
+/// chores, shopping items, categories, members, settings, households.
 ///
 /// Leaves the database schema itself untouched -- only rows are removed.
 /// Wiping the `households` table flips `householdGateProvider`'s stream to
@@ -28,6 +28,12 @@ import 'package:chore_app/data/db/app_database.dart';
 /// or `NotificationScheduler` fake.
 Future<void> resetAppData(AppDatabase database) {
   return database.transaction(() async {
+    // Before `chore_occurrences`, whose cascade would take these rows out
+    // anyway (spec `docs/specs/notifications-n2.md` §4.2) -- explicit
+    // because "the wipe deletes every table" is the guarantee this
+    // function's own test asserts, and a reader should not have to reason
+    // about FK cascades to see that it holds.
+    await database.delete(database.reminderSnoozes).go();
     await database.delete(database.choreOccurrences).go();
     await database.delete(database.choreAssignees).go();
     await database.delete(database.chores).go();

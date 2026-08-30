@@ -1166,7 +1166,7 @@ abstract class AppLocalizations {
   /// **'Open settings'**
   String get settingsDigestPermissionAction;
 
-  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet.
+  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness.
   ///
   /// In en, this message translates to:
   /// **'Export data'**
