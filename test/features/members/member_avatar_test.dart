@@ -333,13 +333,13 @@ void main() {
       // margin is monotonically non-decreasing in scale for every fixed
       // radius here, checked numerically across the whole range by
       // tool/measure_avatar_font.py, so the ends bound the middle.
-      for (final testCase in <(double radius, double scale)>[
-        (defaultRadius, 1),
-        (defaultRadius, 1.6),
-        (21, 1),
-        (21, 1.6),
-        (33, 1),
-        (33, 1.6),
+      for (final testCase in <({double radius, double scale})>[
+        (radius: defaultRadius, scale: 1),
+        (radius: defaultRadius, scale: 1.6),
+        (radius: 21, scale: 1),
+        (radius: 21, scale: 1.6),
+        (radius: 33, scale: 1),
+        (radius: 33, scale: 1.6),
       ]) {
         final inner = innerRadiusAt(testCase.radius, testCase.scale);
         final reach = cornerReachAt(testCase.radius, testCase.scale);
