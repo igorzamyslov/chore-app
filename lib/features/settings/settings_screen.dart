@@ -114,6 +114,9 @@ class SettingsScreen extends ConsumerWidget {
                   DigestToggleTile(
                     value: settings.digestEnabled,
                     permissionDenied: !permissionGranted,
+                    reminderOverflowCount: ref.watch(
+                      reminderOverflowCountProvider,
+                    ),
                     onChanged: (enabled) =>
                         settingsRepository.setDigestEnabled(enabled: enabled),
                   ),
