@@ -225,12 +225,19 @@ void main() {
       'title verbatim',
       () {
         final result = _plan([
-          _occ(id: 'o1', dueDate: PlainDate(2026, 8, 30), choreTitle: 'Bins'),
+          _occ(
+            id: 'o1',
+            dueDate: PlainDate(2026, 8, 30),
+            // Deliberately not the helper's default: the notification's
+            // title is the chore title VERBATIM (§11), so the assertion has
+            // to be able to tell the two apart.
+            choreTitle: 'Take the bins out',
+          ),
         ]);
         expect(result.armed, hasLength(1));
         expect(result.armed.single.fireAt, DateTime(2026, 8, 30, 18));
         expect(result.armed.single.occurrenceId, 'o1');
-        expect(result.armed.single.choreTitle, 'Bins');
+        expect(result.armed.single.choreTitle, 'Take the bins out');
         expect(result.armed.single.dueDate, PlainDate(2026, 8, 30));
       },
     );

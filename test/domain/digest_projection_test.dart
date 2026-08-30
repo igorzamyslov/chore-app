@@ -569,6 +569,10 @@ void main() {
             ],
             date: PlainDate(2026, 8, 30),
             recipientMemberId: null,
+            // Passed explicitly even though it matches the default: that
+            // the default IS this value is the whole assertion, and an
+            // implicit one would leave nothing here to read.
+            // ignore: avoid_redundant_argument_values
             armedReminderDates: const {},
           );
           expect(withMap.dueCount, 1);
