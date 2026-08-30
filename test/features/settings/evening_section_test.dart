@@ -172,9 +172,13 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
-      await SettingsRepository(
-        database,
-      ).setEveningReminderEnabled(enabled: true);
+      final settings = SettingsRepository(database);
+      await settings.setEveningReminderEnabled(enabled: true);
+      // A MORNING seed, for the reason quiet_hours_section_test.dart spells
+      // out: the picker's AM/PM segment inherits the row's current period,
+      // so typing "9"/"30" on the shipped 20:00 evening time would yield
+      // 21:30 -- whose 12h and 24h renders share no substring to assert on.
+      await settings.setEveningReminderTime(480);
       await tester.pumpAndSettle();
 
       await tester.tap(find.bySemanticsIdentifier('settings.evening.time'));

@@ -249,6 +249,25 @@ The ticket flags 24h-vs-12h as a real l10n problem for a time-window label. **§
 
 **The test consequence, which is a real trap:** widget tests pump with no locale override, so the host resolves to a 12-hour locale in CI — `1320` renders "10:00 PM", not "22:00". **Never assert a default time's digits.** Assert persistence against the database instead, and where a test must prove the row re-rendered, pick 9:30 (`570`), whose 12h render ("9:30 AM") and 24h render ("09:30") both contain the substring `9:30`. This is exactly the trick `test/features/settings/digest_section_test.dart:249` already uses.
 
+> **F4 was incomplete, and CI found the missing half (2026-08-30, implementation).**
+> There is a *second* consequence of the 12-hour locale that this finding missed
+> and that both time-picker tests below tripped over on their first green run:
+> **in `TimePickerEntryMode.input` the AM/PM segment inherits the row's CURRENT
+> period.** `digest_section_test.dart` gets away with typing "9" and "30" only
+> because the digest's default is 08:00, which is AM. On the quiet-hours *start*
+> (default 22:00) and the evening time (default 20:00) the same keystrokes
+> produce **21:30, not 09:30** — CI reported `Expected: <570> / Actual: <1290>`
+> for both — and 21:30 has no substring shared between its 12h render ("9:30 PM")
+> and its 24h one ("21:30"), so there is nothing safe left to assert on either.
+>
+> The fix, applied to both tests: **seed a morning time through the repository
+> before opening the picker.** From a morning value the two locales agree on
+> 09:30, and the assertion is sound again without any conditional on which
+> locale CI resolved to. The quiet-hours *end* row needed no change — its 07:00
+> default is already AM, which is why that one test passed while its sibling
+> failed, and is a neat demonstration that the two rows really are wired
+> separately.
+
 ### F5 — Deliberately NOT in this plan: a Maestro flow
 
 Spec §13.3 says E2E "can and should" cover these settings surfaces — permissive, not binding; §13.2's *required* coverage is widget tests, which Tasks 1–6 provide. No flow in `e2e/flows/` uses `scrollUntilVisible` (grepped: zero hits), and these rows sit below a Preferences group whose height varies with `AccountSectionBody`. Introducing an unverifiable scroll idiom into a suite whose only gate is GitHub CI costs more than it proves. Recorded here as a deliberate deferral for the wave's E2E pass, not an oversight.

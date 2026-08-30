@@ -190,7 +190,16 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  if (settings.digestEnabled && !permissionGranted)
+                  // Widened from `digestEnabled` alone: slice 6 creates a
+                  // state that never existed before -- a notification that
+                  // can be ON while the digest is OFF -- and without this
+                  // the group carries no permission signal at all for a
+                  // user whose only notification is the evening
+                  // re-reminder. The hint's copy is already
+                  // feature-neutral. It stays LAST, per spec §12.
+                  if ((settings.digestEnabled ||
+                          settings.eveningReminderEnabled) &&
+                      !permissionGranted)
                     const DigestPermissionHint(onOpenSettings: openAppSettings),
                 ],
                 loading: () => const [

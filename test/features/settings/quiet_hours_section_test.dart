@@ -128,7 +128,15 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
-      await SettingsRepository(database).setQuietHoursEnabled(enabled: true);
+      final settings = SettingsRepository(database);
+      await settings.setQuietHoursEnabled(enabled: true);
+      // Seed a MORNING start (08:00) before opening the picker. In input
+      // mode the AM/PM segment inherits the row's current period, so typing
+      // "9" and "30" on the shipped 22:00 start yields 21:30, not 09:30 --
+      // and 21:30's 12h render ("9:30 PM") and 24h render ("21:30") share
+      // no substring, so there would be nothing safe to assert. From a
+      // morning start both locales agree on 09:30.
+      await settings.setQuietHours(startMinutes: 480, endMinutes: 420);
       await tester.pumpAndSettle();
 
       await tester.tap(find.bySemanticsIdentifier('settings.quietHours.start'));
