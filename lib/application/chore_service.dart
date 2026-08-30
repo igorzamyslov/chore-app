@@ -12,7 +12,6 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/domain/recurrence/recurrence_engine.dart';
-import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/domain/rotation.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
@@ -80,7 +79,7 @@ class ChoreService {
         notes: notes,
         categoryId: categoryId,
         recurrence: recurrence,
-        reminderMinutes: reminderMinutes ?? defaultReminderMinutes,
+        reminderMinutes: reminderMinutes,
         assigneeMemberIds: assigneeMemberIds,
         createdBy: createdBy,
       );
