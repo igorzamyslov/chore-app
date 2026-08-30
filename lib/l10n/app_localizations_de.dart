@@ -828,6 +828,33 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDigestPermissionAction => 'Einstellungen öffnen';
 
   @override
+  String get settingsEveningToggle => 'Abends noch mal erinnern';
+
+  @override
+  String get settingsEveningToggleSubtitle =>
+      'Nur wenn heute noch etwas offen ist';
+
+  @override
+  String get settingsEveningTime => 'Abends um';
+
+  @override
+  String get settingsEveningInQuietHoursHint =>
+      'Liegt in deinen Ruhezeiten — wird nicht zugestellt';
+
+  @override
+  String get settingsQuietHoursToggle => 'Ruhezeiten';
+
+  @override
+  String get settingsQuietHoursFrom => 'Von';
+
+  @override
+  String get settingsQuietHoursTo => 'Bis';
+
+  @override
+  String get settingsQuietHoursEmptyWindowHint =>
+      'Anfang und Ende sind gleich — keine Ruhezeit';
+
+  @override
   String get settingsExportEntry => 'Daten exportieren';
 
   @override

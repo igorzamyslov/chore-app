@@ -865,4 +865,120 @@ void main() {
       expect(slots.first, isNull);
     });
   });
+
+  group('isWithinQuietHours (spec notifications-n2.md §6)', () {
+    /// Every minute-of-day for which the predicate is true, given a window.
+    List<int> insideSet({
+      required bool enabled,
+      required int startMinutes,
+      required int endMinutes,
+    }) => [
+      for (var m = 0; m < 1440; m++)
+        if (isWithinQuietHours(
+          minuteOfDay: m,
+          enabled: enabled,
+          startMinutes: startMinutes,
+          endMinutes: endMinutes,
+        ))
+          m,
+    ];
+
+    test('a window that wraps midnight covers exactly its two arcs', () {
+      // The shipped default, 22:00-07:00: {0..419} U {1320..1439}.
+      final inside = insideSet(
+        enabled: true,
+        startMinutes: 1320,
+        endMinutes: 420,
+      );
+      // The number that kills "suppress everything" (1440), "suppress
+      // nothing" (0), a non-wrapping-only comparison (0) and an
+      // inclusive-at-both-ends one (541) in a single assertion.
+      expect(inside, hasLength(540));
+      expect(inside.first, 0);
+      expect(inside.last, 1439);
+      // Boundaries, per spec §13.1: exactly at `start` is inside, exactly
+      // at `end` is outside.
+      expect(inside.contains(1320), isTrue);
+      expect(inside.contains(1319), isFalse);
+      expect(inside.contains(420), isFalse);
+      expect(inside.contains(419), isTrue);
+      // The far side of the wrap -- 06:00 is inside a 22:00-07:00 window
+      // even though 360 < 1320. This is the assertion a naive
+      // `start <= m && m <= end` fails.
+      expect(inside.contains(360), isTrue);
+    });
+
+    test('a window that does not wrap covers exactly one arc', () {
+      final inside = insideSet(
+        enabled: true,
+        startMinutes: 540,
+        endMinutes: 1020,
+      );
+      expect(inside, hasLength(480));
+      expect(inside.first, 540);
+      expect(inside.last, 1019);
+      expect(inside.contains(1020), isFalse);
+      expect(inside.contains(539), isFalse);
+    });
+
+    test('start == end is OFF, never a 24-hour window', () {
+      expect(
+        insideSet(enabled: true, startMinutes: 600, endMinutes: 600),
+        isEmpty,
+      );
+      expect(insideSet(enabled: true, startMinutes: 0, endMinutes: 0), isEmpty);
+    });
+
+    test('disabled quiet hours are never inside, whatever the window', () {
+      expect(
+        insideSet(enabled: false, startMinutes: 1320, endMinutes: 420),
+        isEmpty,
+      );
+    });
+
+    // The anti-divergence guard: the settings UI's predicate and the
+    // scheduler's shift must agree on every minute of the day, or a user
+    // sees "Inside your quiet hours -- not delivering" on a notification
+    // that delivers (or the reverse). `applyQuietHours` returns its
+    // candidate UNCHANGED exactly when the candidate is outside, so the
+    // biconditional below is total.
+    test(
+      'applyQuietHours defers exactly the minutes this predicate '
+      'reports as inside, for every minute of the day',
+      () {
+        // A mid-January reference date: no DST transition exists on it in
+        // any zone CI might run in, so every one of the 1440 wall-clock
+        // times below is real and unambiguous. The date is irrelevant to
+        // the predicate, which reads only minute-of-day.
+        for (final window in const [
+          (start: 1320, end: 420), // wrapping, the shipped default
+          (start: 540, end: 1020), // non-wrapping
+          (start: 0, end: 1), // one-minute window at midnight
+          (start: 1439, end: 0), // one-minute window at 23:59
+        ]) {
+          for (var m = 0; m < 1440; m++) {
+            final candidate = DateTime(2026, 1, 15, m ~/ 60, m % 60);
+            final shifted = applyQuietHours(
+              candidate: candidate,
+              enabled: true,
+              startMinutes: window.start,
+              endMinutes: window.end,
+            );
+            expect(
+              shifted != candidate,
+              isWithinQuietHours(
+                minuteOfDay: m,
+                enabled: true,
+                startMinutes: window.start,
+                endMinutes: window.end,
+              ),
+              reason:
+                  'minute $m, window ${window.start}-${window.end}: '
+                  'applyQuietHours returned $shifted',
+            );
+          }
+        }
+      },
+    );
+  });
 }

@@ -215,6 +215,15 @@
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
 
+  "settingsEveningToggle": "Abends noch mal erinnern",
+  "settingsEveningToggleSubtitle": "Nur wenn heute noch etwas offen ist",
+  "settingsEveningTime": "Abends um",
+  "settingsEveningInQuietHoursHint": "Liegt in deinen Ruhezeiten — wird nicht zugestellt",
+  "settingsQuietHoursToggle": "Ruhezeiten",
+  "settingsQuietHoursFrom": "Von",
+  "settingsQuietHoursTo": "Bis",
+  "settingsQuietHoursEmptyWindowHint": "Anfang und Ende sind gleich — keine Ruhezeit",
+
   "settingsExportEntry": "Daten exportieren",
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
 
