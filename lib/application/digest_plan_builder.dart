@@ -113,11 +113,9 @@ NotificationPlanSet buildNotificationPlans({
   // date: a quiet-hours deferral moves the reminder onto the following
   // calendar date, and Rule D must follow the reminder or the two channels
   // desynchronise (§2.4).
-  // INVERSION (BLOCKING, Task 9 step 4 inversion 3): keyed on the
-  // occurrence's DUE date rather than the reminder's fire date, so a
-  // quiet-hours deferral omits it from the wrong slot. To be reverted.
   final armedReminderDates = <String, PlainDate>{
-    for (final plan in reminderResult.armed) plan.occurrenceId: plan.dueDate,
+    for (final plan in reminderResult.armed)
+      plan.occurrenceId: PlainDate.fromDateTime(plan.fireAt),
   };
   final digest = _digestPlans(
     now: now,

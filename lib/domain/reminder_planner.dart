@@ -123,9 +123,12 @@ DateTime applyQuietHours({
   final minuteOfDay = candidate.hour * 60 + candidate.minute;
   final inside = startMinutes < endMinutes
       // A non-wrapping window: [start, end).
-      ? minuteOfDay >= startMinutes && minuteOfDay < endMinutes
+      // INVERSION (Task 5 step 4 inversions 1 and 2): both boundaries
+      // flipped -- `> start` excludes a candidate exactly at the start,
+      // `<= end` includes one exactly at the end. To be reverted.
+      ? minuteOfDay > startMinutes && minuteOfDay <= endMinutes
       // A wrapping window: [start, midnight) union [midnight, end).
-      : minuteOfDay >= startMinutes || minuteOfDay < endMinutes;
+      : minuteOfDay > startMinutes || minuteOfDay <= endMinutes;
   if (!inside) {
     return candidate;
   }
@@ -273,7 +276,9 @@ ReminderPlanResult planReminders({
         assignee != recipientMemberId) {
       continue;
     }
-    final armDate = projectedDueDateOn(occurrence, today);
+    // INVERSION (Task 6 step 5 inversion 1): the occurrence's own due date
+    // instead of the projected roll-forward. To be reverted.
+    final armDate = occurrence.dueDate;
     // Calendar components, never `add(Duration(days:))` -- the same DST
     // reason `nextDigestSlot` documents.
     var armAt = DateTime(
@@ -283,16 +288,19 @@ ReminderPlanResult planReminders({
       reminderMinutes ~/ 60,
       reminderMinutes % 60,
     );
-    final snoozedUntil = snoozedUntilByOccurrenceId[occurrence.id]?.toLocal();
-    if (snoozedUntil != null && snoozedUntil.isAfter(now)) {
-      armAt = snoozedUntil;
-    }
+    // INVERSION (Task 6 step 5 inversion 4): the shift applied BEFORE the
+    // snooze override, so a snoozed moment never goes through it. To be
+    // reverted.
     armAt = applyQuietHours(
       candidate: armAt,
       enabled: quietHoursEnabled,
       startMinutes: quietStartMinutes,
       endMinutes: quietEndMinutes,
     );
+    final snoozedUntil = snoozedUntilByOccurrenceId[occurrence.id]?.toLocal();
+    if (snoozedUntil != null && snoozedUntil.isAfter(now)) {
+      armAt = snoozedUntil;
+    }
     if (!armAt.isAfter(now)) {
       continue; // Already past: overdue is the digest's job (D8).
     }
@@ -311,7 +319,9 @@ ReminderPlanResult planReminders({
   }
   eligible.sort((a, b) {
     final byMoment = a.fireAt.compareTo(b.fireAt);
-    return byMoment != 0 ? byMoment : a.choreId.compareTo(b.choreId);
+    // INVERSION (Task 6 step 5 inversion 2): tie-broken by OCCURRENCE id.
+    // To be reverted.
+    return byMoment != 0 ? byMoment : a.occurrenceId.compareTo(b.occurrenceId);
   });
   // The ONE truncation site: `armed` and `overflowCount` are produced from
   // the same list in the same expression, so they cannot disagree.
@@ -320,12 +330,7 @@ ReminderPlanResult planReminders({
       : eligible.sublist(0, reminderCeiling);
   return ReminderPlanResult(
     armed: List<ReminderPlan>.unmodifiable(armed),
-    // INVERSION (BLOCKING, Task 6 step 5 inversion 3): the plausible wrong
-    // implementation -- "every reminder-enabled chore minus the armed
-    // ones". To be reverted.
-    overflowCount:
-        occurrences.where((o) => o.reminderMinutes != null).length -
-        armed.length,
+    overflowCount: eligible.length - armed.length,
   );
 }
 
