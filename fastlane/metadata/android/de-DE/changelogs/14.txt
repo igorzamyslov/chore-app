@@ -1,0 +1,3 @@
+Aufgaben können dich jetzt einzeln erinnern, zu ihrer eigenen Zeit. Stell für den Müll eine Erinnerung ein, und sie kommt am Dienstagabend statt in der Morgenübersicht — und diese Aufgabe taucht dann nicht mehr in der Übersicht auf, damit nichts doppelt gemeldet wird.
+
+Zwei neue Einstellungen, beide zunächst aus: Ruhezeiten, damit nichts zur Unzeit kommt, und "Abends noch mal erinnern" für alles, was heute noch offen ist.

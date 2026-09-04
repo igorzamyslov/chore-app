@@ -1,0 +1,5 @@
+Chores can now remind you individually, at their own time. Set a reminder on the bins and it arrives Tuesday evening instead of in the morning summary — and that chore stays out of the summary, so nothing is announced twice.
+
+Two new settings, both off to start: quiet hours, so nothing arrives at a useless time, and "Remind me again in the evening" for anything still open today.
+
+The icon picker now fills the width, and initials sit clear of their ring.
