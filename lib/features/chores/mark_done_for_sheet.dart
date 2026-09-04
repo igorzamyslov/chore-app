@@ -49,7 +49,7 @@ Future<Member?> showMarkDoneForSheet(
                   semantic(
                     'chores.markDoneFor.row.${member.id}',
                     child: ListTile(
-                      leading: MemberAvatar(member: member, radius: 14),
+                      leading: MemberAvatar(member: member),
                       title: Text(member.name),
                       onTap: () => Navigator.pop(sheetContext, member),
                     ),

@@ -58,6 +58,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
+import 'package:chore_app/data/repositories/reminder_snooze_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/data/repositories/stats_repository.dart';
@@ -194,6 +195,17 @@ final shoppingRepositoryProvider = Provider<ShoppingRepository>((ref) {
 /// The settings repository, built on [appDatabaseProvider].
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return SettingsRepository(ref.watch(appDatabaseProvider));
+});
+
+/// The reminder-snooze repository, built on [appDatabaseProvider] (spec
+/// `docs/specs/notifications-n2.md` §4.2).
+///
+/// Device-scoped and unsynced, so unlike the synced repositories above it
+/// takes no household id and does no `syncDirty` bookkeeping.
+final reminderSnoozeRepositoryProvider = Provider<ReminderSnoozeRepository>((
+  ref,
+) {
+  return ReminderSnoozeRepository(ref.watch(appDatabaseProvider));
 });
 
 /// The device settings singleton row, kept in sync with the database.
@@ -1114,6 +1126,48 @@ final actingMemberProvider = Provider<Member?>((ref) {
   );
 });
 
+/// How many reminder-enabled chores did not fit under `reminderCeiling`
+/// (spec `docs/specs/notifications-n2.md` §3.2), for the Settings ceiling
+/// sub-line.
+///
+/// Reads the count [buildNotificationPlans] already produced while sorting
+/// and truncating the candidates — deliberately NOT a second traversal
+/// applying §2.3's arming rule again. Two implementations of that rule
+/// could disagree, and a sub-line that lies about a set it did not compute
+/// is worse than no sub-line (plan OPD-1, closed as Option A; Option B is
+/// exactly the traversal this must never become).
+///
+/// A pure projection with no state of its own: it recomputes whenever the
+/// settings row or the pending-occurrence set changes, which is every
+/// input the ceiling depends on except one.
+///
+/// **The exception, stated because it is a real gap and not a rounding
+/// error:** [buildNotificationPlans] also takes
+/// `snoozedUntilByOccurrenceId`, and this provider cannot supply it --
+/// `ReminderSnoozeRepository.activeSnoozes()` is a `Future` and this is a
+/// synchronous read -- so that parameter falls back to its `const {}`
+/// default. A snooze can only move a reminder LATER, so the only way it
+/// changes this number is by carrying a candidate across §2.3 step 5's
+/// past-drop or its 14-day window; the error is bounded by the number of
+/// snoozed chores. Today that is always zero, because nothing writes
+/// `reminder_snoozes` until slice 7 adds the notification action. When it
+/// does, this provider should be handed the same snooze map
+/// `DigestRescheduleController._recompute` reads -- never a second answer
+/// to "which reminders are armed".
+final reminderOverflowCountProvider = Provider<int>((ref) {
+  final settings = ref.watch(settingsProvider).valueOrNull;
+  final pending = ref.watch(pendingOccurrencesProvider).valueOrNull;
+  if (settings == null || pending == null) {
+    return 0;
+  }
+  return buildNotificationPlans(
+    now: ref.watch(clockProvider).now(),
+    settings: settings,
+    pending: pending,
+    recipientMemberId: ref.watch(actingMemberProvider)?.id,
+  ).reminderOverflowCount;
+});
+
 /// Debounce delay collapsing bursts of digest-affecting mutations into a
 /// single reschedule (spec `docs/specs/notifications.md` architecture #2).
 const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
@@ -1125,15 +1179,26 @@ const Duration digestRescheduleDebounce = Duration(milliseconds: 500);
 /// occurrence/chore/settings mutation shows up through one of those two),
 /// and to [bootstrapProvider] resolving once. [digestRescheduleDebounce]
 /// after the last relevant change, rebuilds the digest's whole scheduling
-/// horizon (`buildDigestPlans`, scoped to [actingMemberProvider]) for the
-/// current [clockProvider] time and pushes all [digestHorizonSlots] slots
-/// of it to [notificationSchedulerProvider] at once — scheduling the slots
-/// that have something to say and cancelling the ones that don't. The
-/// horizon is
+/// notification plan (`buildNotificationPlans`, scoped to
+/// [actingMemberProvider]) for the current [clockProvider] time and pushes
+/// ALL THREE id ranges — the digest horizon, the individual reminders and
+/// the evening re-reminder horizon — to [notificationSchedulerProvider] in
+/// ONE apply, scheduling the entries that have something to say and
+/// cancelling the ones that don't. One apply rather than three, because
+/// Rule D couples the digest's counts to the reminders' arming (spec
+/// `docs/specs/notifications-n2.md` §9.2, D9). The horizon is
 /// what makes the digest survive the app simply not being opened (spec
 /// `docs/specs/notifications.md` architecture #2): every trigger this class
 /// listens to requires a running app, so a single-slot schedule went
 /// silent the morning after it fired.
+///
+/// The mutation set that triggers it is unchanged (spec
+/// `docs/specs/notifications-n2.md` §9.3): [settingsProvider] watches the
+/// whole settings row, so the five schema-v13 columns are already covered,
+/// and `reminder_snoozes` reaches it via the explicit [triggerRecompute]
+/// slice 7's action handler will add — until then only through the ordinary
+/// triggers. Each pass garbage-collects the snooze table before planning,
+/// so no plan ever reads a snooze whose occurrence is gone.
 ///
 /// [triggerRecompute] is also called directly by `main.dart`'s app-resume
 /// observer: an OS lifecycle transition isn't itself a Riverpod-watchable
@@ -1305,12 +1370,22 @@ class DigestRescheduleController {
     }
 
     final actingMemberId = _ref.read(actingMemberProvider)?.id;
-    await scheduler.applyDigestPlans(
-      buildDigestPlans(
+    final snoozeRepository = _ref.read(reminderSnoozeRepositoryProvider);
+    // Garbage-collect FIRST, so the plan pass never reads a snooze whose
+    // occurrence is gone or whose moment has passed (spec
+    // `docs/specs/notifications-n2.md` §4.2). Cheap, and it means the table
+    // never grows.
+    await snoozeRepository.collectGarbage(
+      pendingOccurrenceIds: {for (final row in pending) row.occurrence.id},
+      nowUtc: DateTime.now().toUtc(),
+    );
+    await scheduler.applyPlans(
+      buildNotificationPlans(
         now: _ref.read(clockProvider).now(),
         settings: settings,
         pending: pending,
         recipientMemberId: actingMemberId,
+        snoozedUntilByOccurrenceId: await snoozeRepository.activeSnoozes(),
       ),
       // Carried into each actionable slot's payload so the background isolate
       // never has to re-derive it -- it could not do so correctly (no auth

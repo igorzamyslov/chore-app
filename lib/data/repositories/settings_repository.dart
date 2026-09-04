@@ -27,8 +27,12 @@ class SettingsRepository {
   /// Returns the current UTC time, used for `created_at` / `updated_at`.
   final DateTime Function() nowUtc;
 
-  /// Returns the settings row, inserting it with schema defaults
-  /// (`digestEnabled: true`, `digestMinutes: 480`) if it doesn't exist yet.
+  /// Returns the settings row, inserting it with schema defaults if it
+  /// doesn't exist yet: `digestEnabled: true`, `digestMinutes: 480`, and
+  /// -- since schemaVersion 13 (spec `docs/specs/notifications-n2.md` §8.1)
+  /// -- quiet hours OFF at 22:00-07:00 and the evening re-reminder OFF at
+  /// 20:00. Both N2 features ship off, so a fresh install and an upgraded
+  /// one behave identically until someone opens Settings.
   ///
   /// Idempotent and race-safe, mirroring
   /// `HouseholdRepository.createLocalHousehold`.
@@ -52,11 +56,21 @@ class SettingsRepository {
               updatedAt: now,
             ),
           );
+      // Hand-built rather than re-selected, so the insert stays a single
+      // write. Every non-nullable column is a REQUIRED parameter here, and
+      // that is what stops this literal silently drifting from the schema's
+      // own defaults: adding a defaulted column to `Settings` breaks this
+      // line until someone restates the same default here, deliberately.
       return DeviceSettings(
         id: deviceId,
         digestEnabled: true,
         digestMinutes: 480,
         membershipRevoked: false,
+        quietHoursEnabled: false,
+        quietStartMinutes: 1320,
+        quietEndMinutes: 420,
+        eveningReminderEnabled: false,
+        eveningReminderMinutes: 1200,
         createdAt: now,
         updatedAt: now,
       );
@@ -105,6 +119,100 @@ class SettingsRepository {
         updatedAt: Value(_isoNow()),
       ),
     );
+  }
+
+  /// Enables or disables quiet hours (spec
+  /// `docs/specs/notifications-n2.md` §6).
+  ///
+  /// The window itself lives in [setQuietHours]; this is the switch that
+  /// makes it apply at all, which is why `start == end` is a legal window
+  /// rather than a way to express "off".
+  Future<void> setQuietHoursEnabled({required bool enabled}) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        quietHoursEnabled: Value(enabled),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Sets the quiet-hours window, both ends at once, as minutes since local
+  /// midnight (spec `docs/specs/notifications-n2.md` §6).
+  ///
+  /// Written together deliberately: the window is one fact, and a UI that
+  /// wrote the ends separately would briefly persist a half-updated window
+  /// that a concurrent recompute could read.
+  ///
+  /// `startMinutes == endMinutes` is ACCEPTED and means the window is off
+  /// (§6) -- it is [setQuietHoursEnabled] that turns the feature off, and
+  /// rejecting an equal pair here would make the value unreachable from a
+  /// pair of time pickers. Throws [ArgumentError] if either value is
+  /// outside `0..1439`; validation happens before any write, so a rejected
+  /// call leaves the stored window untouched rather than half-applied.
+  Future<void> setQuietHours({
+    required int startMinutes,
+    required int endMinutes,
+  }) async {
+    _validateMinuteOfDay(startMinutes, 'startMinutes');
+    _validateMinuteOfDay(endMinutes, 'endMinutes');
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        quietStartMinutes: Value(startMinutes),
+        quietEndMinutes: Value(endMinutes),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Enables or disables the evening re-reminder (spec
+  /// `docs/specs/notifications-n2.md` §5). Ships disabled (D12).
+  Future<void> setEveningReminderEnabled({required bool enabled}) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        eveningReminderEnabled: Value(enabled),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Sets the evening re-reminder's fire time, as minutes since local
+  /// midnight (spec `docs/specs/notifications-n2.md` §5).
+  ///
+  /// Throws [ArgumentError] if outside `0..1439`. A time inside the
+  /// quiet-hours window is deliberately NOT rejected: §6 drops such a slot
+  /// rather than deferring it, and the settings UI states that factually on
+  /// the row instead of refusing the write -- a picker that silently
+  /// refused would be worse than one that explains.
+  Future<void> setEveningReminderTime(int minutesSinceMidnight) async {
+    _validateMinuteOfDay(minutesSinceMidnight, 'minutesSinceMidnight');
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        eveningReminderMinutes: Value(minutesSinceMidnight),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  void _validateMinuteOfDay(int value, String name) {
+    if (value < 0 || value > 1439) {
+      throw ArgumentError.value(
+        value,
+        name,
+        'Must be in 0..1439 (minutes since local midnight)',
+      );
+    }
   }
 
   /// Sets the acting member (spec `docs/specs/members-management.md` §2):

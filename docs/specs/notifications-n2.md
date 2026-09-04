@@ -760,9 +760,13 @@ Notification copy:
   Settings; see §9.3 for the id-versioning constraint they inherit.
 - `reminderSnoozeActionLabel` — "Tomorrow" / "Morgen". It names the outcome
   rather than the mechanism, which is what a two-word notification button should
-  do. The existing `digestDoneActionLabel` is **reused** for all three Done
-  actions rather than duplicated per surface; amend its `@`-description to say
-  so.
+  do. The existing **`notificationActionDone`** ("Done", `app_en.arb`) is
+  **reused** for all three Done actions rather than duplicated per surface;
+  amend its `@`-description to say so. (Corrected 2026-08-30: this section
+  previously named the key `digestDoneActionLabel`, which does not exist. The
+  shipped key is `notificationActionDone`, threaded to the platform as
+  `NotificationScheduler.initialize({required String doneActionTitle})`. The
+  intent — one key, three surfaces — is unchanged.)
 
 Settings and chore-form copy: `settingsQuietHoursToggle`,
 `settingsQuietHoursFrom`, `settingsQuietHoursTo`, `settingsEveningTime`,
@@ -782,8 +786,10 @@ thing that will lead the person who wants it to it. "Evening re-reminder" is the
 name of the feature in this document and must not become the name of the row.
 
 There is deliberately **no `settingsRemindersSectionTitle`**: the evening and
-quiet-hours rows join the existing digest section rather than founding a second
-one (§5.1, §12).
+quiet-hours rows join the existing **Preferences** group, where the digest rows
+already live, rather than founding a second one (§5.1, §12 — and see §12's
+2026-08-30 correction: there is no "Daily summary" section, and none must be
+created).
 
 ## 12. UI surfaces and semantic ids
 
@@ -798,7 +804,9 @@ Every interactive widget gets a stable id via
 
 **The Settings row order is binding** (D12, §5.1), because it is the whole of the
 evening re-reminder's discoverability and a later tidy-up must not undo it. One
-group — the existing "Daily summary" section — in exactly this order:
+group — the existing **Preferences** group (`settingsPreferencesSectionTitle`),
+which is where `settings_screen.dart` actually renders the digest rows — in
+exactly this order:
 
 1. `settings.digest.toggle` (existing)
 2. `settings.digest.time` (existing)
@@ -810,9 +818,37 @@ group — the existing "Daily summary" section — in exactly this order:
 
 No new section header, no "Advanced" area, no second screen. Someone whose
 notification "arrives, then is gone" opens the one group that holds the
-notification they already know about and finds the answer two rows down. The
-section header's own copy (`settingsDigestSectionTitle`) may be widened from
-"Daily summary" to cover all three features, but the rows must not be split.
+notification they already know about and finds the answer two rows down.
+
+**Correction, 2026-08-30 (planning of slices 5-6).** This section previously
+said the digest rows lived in a "Daily summary" section whose header copy
+(`settingsDigestSectionTitle`) could be widened. **Neither is true, and the
+error is load-bearing enough to record rather than silently fix.** theme-v2
+merged the digest rows into the **Preferences** group, and
+`settingsDigestSectionTitle` ("Daily summary") is an **orphan key**: it exists
+in both ARBs and in all three generated `app_localizations*.dart`, and is
+referenced by no widget (`grep -rn settingsDigestSectionTitle lib test e2e`
+returns only `lib/l10n/`). There is therefore no header naming the digest rows
+and nothing to widen.
+
+**Do not create a section to satisfy this spec.** Promoting a notifications
+section and moving the shipped digest rows into it would make the text above
+literally true at the cost of the thing it exists to protect: §5.1's
+discoverability argument is anchored to "the one group that already holds the
+notification they know about", and since theme-v2 that group has been
+Preferences. Moving the landmark in the same release that asks users to find a
+new row beside it inverts D12. The rows must not be split, and they must not be
+relocated either. `settingsDigestSectionTitle` may be deleted as dead code at
+some future tidy-up; it must not be revived to found a section.
+
+One further consequence, for whoever writes a test against this section: the
+string "Daily summary" is **also `settingsDigestToggleTitle`**, the digest
+toggle ROW's own label. An assertion of the form `find.text('Daily summary')`
+`findsNothing` therefore cannot pass, and is not a way to check that no second
+section exists. `test/features/settings/settings_row_order_test.dart` asserts
+the property directly instead — all eight rows are descendants of one
+`SettingsGroup` — plus a guard on `'DAILY SUMMARY'`, which is what
+`SettingsGroup` would actually render, since it uppercases its own label.
 
 The ceiling sub-line (§3.2) and the quiet-hours sub-line (§6) are not
 interactive and take no ids; they are sub-lines on rows that already have them,
@@ -994,3 +1030,28 @@ evening re-reminder inside the quiet window is dropped rather than deferred
 user who is looking at the row's factual "Inside your quiet hours — not
 delivering" sub-line as they create it — and the shipped defaults (20:00 evening,
 22:00 quiet-hours start) do not collide.
+
+### 16.1 A note on this spec's own error class (added 2026-08-30)
+
+Planning slices 5 and 6 verified every claim this document makes about
+shipped code, and found two false: §12's "existing 'Daily summary' section"
+(there is none; the digest rows are in **Preferences**, and
+`settingsDigestSectionTitle` is an orphan key) and §11's
+`digestDoneActionLabel` (the shipped key is `notificationActionDone`). Both
+are corrected in place above.
+
+**What is worth recording is the pattern, because it has now recurred in
+every planning round of this project: the claims about INTENT held, and the
+claims about SHIPPED CODE did not.** Every decision in §1, every rule in
+§2-§7, the partition in §0.1, the id budget in §3 and all the binding copy
+survived contact with the tree unchanged. What did not survive was the
+incidental scaffolding — a section name, a key name — written from memory
+of the codebase rather than from a grep, in passages whose actual subject
+was something else entirely.
+
+That asymmetry is not an accident, and it is not a reason to trust specs
+less. It is a reason to treat a spec's *design* as authoritative and its
+*citations* as hypotheses: cheap to check, and the check is a grep. The next
+author of a spec in this repo should assume the same about their own draft,
+and the next planner should verify before building on one — which is how
+both of these were caught before they reached code, rather than after.

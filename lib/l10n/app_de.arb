@@ -6,6 +6,13 @@
 
   "notificationChannelDigestName": "Tägliche Zusammenfassung",
   "notificationChannelDigestDescription": "Die einmal täglich versendete Aufgaben-Zusammenfassung.",
+  "notificationChannelRemindersName": "Aufgaben-Erinnerungen",
+  "notificationChannelRemindersDescription": "Erinnerungen an einzelne Aufgaben zur von dir gewählten Zeit.",
+  "notificationChannelEveningName": "Abend-Erinnerung",
+  "notificationChannelEveningDescription": "Ein Hinweis am Abend, wenn heute noch Aufgaben offen sind.",
+  "reminderBodyDueToday": "Heute fällig",
+  "reminderBodyStillOpen": "Noch offen",
+  "eveningReminderBody": "{count, plural, one{1 Aufgabe ist heute noch offen} other{{count} Aufgaben sind heute noch offen}}",
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
@@ -177,6 +184,10 @@
 
   "choreFormStartDateLabel": "Startdatum",
 
+  "choreFormReminderToggle": "An diese Aufgabe erinnern",
+  "choreFormReminderTime": "Erinnerungszeit",
+  "choreFormReminderHint": "Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf",
+
   "shoppingEmptyState": "Die Einkaufsliste ist leer",
   "shoppingErrorMessage": "Deine Einkaufsliste konnte nicht geladen werden.",
 
@@ -204,9 +215,19 @@
   "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleDeniedHint": "Wird nicht zugestellt — Benachrichtigungen sind aus",
+  "settingsRemindersCeilingHint": "{count, plural, one{1 Aufgabe bleibt in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.} other{{count} Aufgaben bleiben in der täglichen Zusammenfassung — dieses Gerät kann {limit} Erinnerungen gleichzeitig vormerken.}}",
   "settingsDigestTimeLabel": "Benachrichtigungszeit",
   "settingsDigestPermissionHint": "Erlaube Benachrichtigungen in den Systemeinstellungen.",
   "settingsDigestPermissionAction": "Einstellungen öffnen",
+
+  "settingsEveningToggle": "Abends noch mal erinnern",
+  "settingsEveningToggleSubtitle": "Nur wenn heute noch etwas offen ist",
+  "settingsEveningTime": "Abends um",
+  "settingsEveningInQuietHoursHint": "Liegt in deinen Ruhezeiten — wird nicht zugestellt",
+  "settingsQuietHoursToggle": "Ruhezeiten",
+  "settingsQuietHoursFrom": "Von",
+  "settingsQuietHoursTo": "Bis",
+  "settingsQuietHoursEmptyWindowHint": "Anfang und Ende sind gleich — keine Ruhezeit",
 
   "settingsExportEntry": "Daten exportieren",
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",

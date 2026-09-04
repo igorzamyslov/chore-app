@@ -80,6 +80,16 @@ Future<void> _seed(AppDatabase db) async {
         ),
       );
   await db
+      .into(db.reminderSnoozes)
+      .insert(
+        ReminderSnoozesCompanion.insert(
+          occurrenceId: 'occ1',
+          snoozedUntil: '2026-07-26T18:00:00.000Z',
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await db
       .into(db.shoppingItems)
       .insert(
         ShoppingItemsCompanion.insert(
@@ -122,6 +132,7 @@ void main() {
     expect(await db.select(db.choreOccurrences).get(), hasLength(1));
     expect(await db.select(db.shoppingItems).get(), hasLength(1));
     expect(await db.select(db.settings).get(), hasLength(1));
+    expect(await db.select(db.reminderSnoozes).get(), hasLength(1));
 
     await resetAppData(db);
 
@@ -133,6 +144,11 @@ void main() {
     expect(await db.select(db.choreOccurrences).get(), isEmpty);
     expect(await db.select(db.shoppingItems).get(), isEmpty);
     expect(await db.select(db.settings).get(), isEmpty);
+    // Deleted explicitly rather than left to `chore_occurrences`' cascade
+    // (spec `docs/specs/notifications-n2.md` §4.2): "the wipe deletes every
+    // table" is the guarantee this test asserts, and a reader should not
+    // have to reason about FK cascades to see that it holds.
+    expect(await db.select(db.reminderSnoozes).get(), isEmpty);
   });
 
   test('resetAppData is safe to call on an already-empty database', () async {

@@ -1,0 +1,18 @@
+-- Per-chore individual reminders (spec docs/specs/notifications-n2.md
+-- §8.2, D1): minutes since local midnight, NULL = no individual reminder.
+--
+-- No RLS change: the column sits inside a row whose access is already
+-- decided by household_id (chores_select/insert/update in the initial
+-- schema). No grant change either: `chores` carries a TABLE-level
+-- `grant select, insert, update ... to authenticated`, so a new column is
+-- covered automatically -- unlike `members`, whose column-scoped UPDATE
+-- grant is what forces `ignoreDuplicates: true` on that table's upsert.
+-- The sync engine's `upsertRows('chores', ...)` therefore needs no change.
+--
+-- Nullable and undefaulted on purpose: a device still on client schema v12
+-- pushes a chore row without this key, and the mixed-version cost §8.2
+-- point 3 accepts is that such a push clears the reminder. A server-side
+-- default would not change that (the key is present-and-null on a v13
+-- push, absent on a v12 one) and would make "no reminder" mean two
+-- different things.
+alter table public.chores add column reminder_minutes integer;

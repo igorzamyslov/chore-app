@@ -10,6 +10,7 @@ import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
+import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -53,6 +54,7 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
     required String title,
     required String body,
     required DateTime fireAt,
+    required String channelId,
     required String channelName,
     required String channelDescription,
     String? payload,
@@ -67,6 +69,7 @@ class _PausingPlugin extends FakeDigestNotificationPlugin {
       title: title,
       body: body,
       fireAt: fireAt,
+      channelId: channelId,
       channelName: channelName,
       channelDescription: channelDescription,
       payload: payload,
@@ -1232,6 +1235,199 @@ void main() {
       expect(laterSlot.payload, null);
 
       await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  testWidgets(
+    'a recompute that changes BOTH reminders and the digest costs exactly '
+    'ONE apply -- D9: two writes with a gap between them is a window in '
+    'which a chore is announced twice or not at all',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      final plugin = FakeDigestNotificationPlugin();
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(
+            Clock.fixed(DateTime(2026, 7, 24, 7)),
+          ),
+          digestNotificationPluginProvider.overrideWithValue(plugin),
+        ],
+      );
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+
+      container.read(digestRescheduleControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await tester.pump(digestRescheduleDebounce);
+
+      final today = PlainDate.fromDateTime(container.read(clockProvider).now());
+      final service = container.read(choreServiceProvider);
+      final withReminder = await service.createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: today,
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await service.createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: today,
+        assignmentMode: AssignmentMode.anyone,
+      );
+      // `ChoreService.createChore` has no reminderMinutes parameter -- the
+      // chore form is slice 4 -- so the repository is the seam here. 18:00
+      // is still ahead of the fixed 07:00 clock, so this really does arm a
+      // reminder rather than being dropped as past.
+      await container
+          .read(choreRepositoryProvider)
+          .updateChore(
+            withReminder.id,
+            reminderMinutes: const Value(defaultReminderMinutes),
+          );
+
+      await tester.pump(digestRescheduleDebounce);
+      plugin.scheduledCalls.clear();
+      final cancelsBefore = plugin.cancelCallCount;
+
+      // Force exactly one more recompute and count what it costs.
+      container.read(digestRescheduleControllerProvider).triggerRecompute();
+      await tester.pump(digestRescheduleDebounce);
+      await tester.pump(const Duration(milliseconds: 5));
+
+      final touched = [for (final call in plugin.scheduledCalls) call.id];
+      expect(
+        plugin.scheduledCalls.length + (plugin.cancelCallCount - cancelsBefore),
+        digestHorizonSlots + reminderCeiling + eveningHorizonSlots,
+        reason:
+            'exactly one write over all three ranges; two applies would be '
+            'twice this',
+      );
+      expect(
+        touched.toSet(),
+        hasLength(touched.length),
+        reason: 'no id is scheduled twice in one apply',
+      );
+      // ...and the reminder really is armed, so this is not counting a
+      // recompute that had nothing to do.
+      expect(plugin.pending[reminderNotificationIdBase]!.title, 'Bins');
+
+      await _disposeAndClose(tester, container, database);
+    },
+  );
+
+  group(
+    'the evening re-reminder (spec notifications-n2.md §5, decision D12)',
+    () {
+      /// The ids reserved for the evening horizon (spec §3.1).
+      bool isEveningId(int id) =>
+          id >= eveningNotificationIdBase &&
+          id < eveningNotificationIdBase + eveningHorizonSlots;
+
+      testWidgets(
+        'ships OFF: a chore due today schedules nothing in the evening id '
+        'range',
+        (tester) async {
+          final database = AppDatabase(NativeDatabase.memory());
+          final plugin = FakeDigestNotificationPlugin();
+          final container = ProviderContainer(
+            overrides: [
+              appDatabaseProvider.overrideWithValue(database),
+              // 07:00, so the default 20:00 evening slot is still ahead of
+              // "now" today and would be armed if the feature were on.
+              clockProvider.overrideWithValue(
+                Clock.fixed(DateTime(2026, 7, 24, 7)),
+              ),
+              digestNotificationPluginProvider.overrideWithValue(plugin),
+            ],
+          );
+          await container
+              .read(householdRepositoryProvider)
+              .createLocalHousehold('Me');
+
+          container.read(digestRescheduleControllerProvider);
+          final householdId = await _awaitBootstrap(tester, container);
+          await tester.pump(digestRescheduleDebounce);
+
+          await container
+              .read(choreServiceProvider)
+              .createChore(
+                householdId: householdId,
+                title: 'Water the plants',
+                startDate: PlainDate.fromDateTime(
+                  container.read(clockProvider).now(),
+                ),
+                assignmentMode: AssignmentMode.anyone,
+              );
+          await tester.pump(digestRescheduleDebounce);
+
+          // The digest fired (there IS something to say), so this is not a
+          // vacuously-empty recompute -- which is what makes the evening
+          // assertion below mean something.
+          expect(plugin.scheduledCalls, isNotEmpty);
+          expect(
+            plugin.scheduledCalls.where((call) => isEveningId(call.id)),
+            isEmpty,
+          );
+
+          await _disposeAndClose(tester, container, database);
+        },
+      );
+
+      testWidgets(
+        'turned on, a chore due today arms at least one evening slot',
+        (
+          tester,
+        ) async {
+          final database = AppDatabase(NativeDatabase.memory());
+          final plugin = FakeDigestNotificationPlugin();
+          final container = ProviderContainer(
+            overrides: [
+              appDatabaseProvider.overrideWithValue(database),
+              clockProvider.overrideWithValue(
+                Clock.fixed(DateTime(2026, 7, 24, 7)),
+              ),
+              digestNotificationPluginProvider.overrideWithValue(plugin),
+            ],
+          );
+          await container
+              .read(householdRepositoryProvider)
+              .createLocalHousehold('Me');
+
+          container.read(digestRescheduleControllerProvider);
+          final householdId = await _awaitBootstrap(tester, container);
+          await tester.pump(digestRescheduleDebounce);
+
+          await container
+              .read(choreServiceProvider)
+              .createChore(
+                householdId: householdId,
+                title: 'Water the plants',
+                startDate: PlainDate.fromDateTime(
+                  container.read(clockProvider).now(),
+                ),
+                assignmentMode: AssignmentMode.anyone,
+              );
+          await tester.pump(digestRescheduleDebounce);
+          plugin.scheduledCalls.clear();
+
+          // The settings row of slice 6 is the only thing in the app that can
+          // write this column; the repository is the same seam it writes
+          // through.
+          await container
+              .read(settingsRepositoryProvider)
+              .setEveningReminderEnabled(enabled: true);
+          await tester.pump(digestRescheduleDebounce);
+
+          expect(
+            plugin.scheduledCalls.where((call) => isEveningId(call.id)),
+            isNotEmpty,
+          );
+
+          await _disposeAndClose(tester, container, database);
+        },
+      );
     },
   );
 }

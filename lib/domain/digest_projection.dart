@@ -42,10 +42,13 @@ class ProjectedOccurrence {
   /// Creates a projection input.
   const ProjectedOccurrence({
     required this.id,
+    required this.choreId,
+    required this.choreTitle,
     required this.dueDate,
     required this.startDate,
     required this.recurrence,
     required this.assignedMemberId,
+    this.reminderMinutes,
   });
 
   /// The occurrence row's id.
@@ -54,9 +57,39 @@ class ProjectedOccurrence {
   /// .soleOccurrenceId] — the notification-action payload's `occ` (spec
   /// `docs/specs/notifications.md` N2). **Required, not optional:** an
   /// optional id would let a future caller silently produce a
-  /// never-actionable digest by forgetting it, and there are only two
+  /// never-actionable digest by forgetting it, and there are only three
   /// construction sites in the tree.
   final String id;
+
+  /// The owning chore's id.
+  ///
+  /// **Required, not optional**, for the reason [id]'s own doc comment
+  /// gives: D4's ceiling tiebreak in `lib/domain/reminder_planner.dart` is
+  /// "lowest CHORE id", and an optional field would let a future
+  /// construction site silently fall back to a different, unstable
+  /// ordering. Distinct from [id], which is the OCCURRENCE's -- an
+  /// occurrence id changes every time the chore regenerates, so it is the
+  /// wrong thing to break a tie with.
+  final String choreId;
+
+  /// The owning chore's title, carried verbatim.
+  ///
+  /// A per-chore reminder's TITLE is the chore title, unlocalized user data
+  /// -- that is what makes it actionable and it is the whole of AC1 (spec
+  /// `docs/specs/notifications-n2.md` §11). Carried here rather than joined
+  /// on later so the pure planner produces a complete `ReminderPlan` and no
+  /// application-layer step can attach the wrong title to a
+  /// position-relative id.
+  final String choreTitle;
+
+  /// The owning chore's `reminder_minutes`, or `null` for "no individual
+  /// reminder" (spec `docs/specs/notifications-n2.md` D1).
+  ///
+  /// Optional (defaulting to `null`) unlike [choreId]/[choreTitle], because
+  /// `null` is a meaningful, common and safe value here -- it is what every
+  /// chore has until someone turns the switch on -- whereas a defaulted
+  /// chore id would be a silently wrong ordering key.
+  final int? reminderMinutes;
 
   /// The occurrence's current due date.
   final PlainDate dueDate;
@@ -157,10 +190,25 @@ PlainDate projectedDueDateOn(ProjectedOccurrence occurrence, PlainDate date) {
 ///
 /// Also reports [DigestCounts.soleOccurrenceId] when exactly one occurrence
 /// was counted — see that field for why this is its only correct home.
+///
+/// [armedReminderDates] is `occurrence id -> the calendar date an
+/// individual reminder is armed to fire on`, as produced by `planReminders`
+/// (`lib/domain/reminder_planner.dart`). Rule D (spec
+/// `docs/specs/notifications-n2.md` §2.4, D2) omits an occurrence from this
+/// slot entirely when its entry equals [date]: being told twice on one day
+/// is precisely the annoyance a per-chore reminder exists to cure. An empty
+/// map — the default — means "no reminders", which is what every pre-N2
+/// caller means and why they all keep compiling unchanged.
+///
+/// The caller must pass the map produced by the SAME planning pass whose
+/// reminders it will arm. §0.1's partition is a property of one pass's
+/// answers, not of two: a map from an earlier pass can omit an occurrence
+/// no reminder will actually announce.
 DigestCounts projectDigestCounts({
   required Iterable<ProjectedOccurrence> occurrences,
   required PlainDate date,
   required String? recipientMemberId,
+  Map<String, PlainDate> armedReminderDates = const {},
 }) {
   var dueCount = 0;
   var overdueCount = 0;
@@ -170,6 +218,19 @@ DigestCounts projectDigestCounts({
     if (recipientMemberId != null &&
         assignee != null &&
         assignee != recipientMemberId) {
+      continue;
+    }
+    // Rule D (spec `docs/specs/notifications-n2.md` §2.4, D2): this slot
+    // omits an occurrence iff an individual reminder for it is armed to
+    // fire on THIS slot's own calendar date.
+    //
+    // Keyed on the ARMED date, not the due date, so a quiet-hours deferral
+    // cannot desynchronise the two channels -- and applied BEFORE the
+    // bucketing below for the same reason: a deferral can move the reminder
+    // onto a date the occurrence is already OVERDUE on, and the rule must
+    // follow the reminder rather than the due date. That is why §2.4 states
+    // the general form rather than only the due-bucket case.
+    if (armedReminderDates[occurrence.id] == date) {
       continue;
     }
     final projected = projectedDueDateOn(occurrence, date);

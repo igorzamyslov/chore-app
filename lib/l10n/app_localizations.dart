@@ -128,6 +128,48 @@ abstract class AppLocalizations {
   /// **'The once-a-day chores digest notification.'**
   String get notificationChannelDigestDescription;
 
+  /// Android notification channel name for per-chore reminders (spec docs/specs/notifications-n2.md §9.3), shown in system Settings -> Apps -> Notifications. Android caches this at channel-creation time and cannot rename it later, which is why remindersChannelId is versioned (_v1). Any change to this copy must mint a new channel id AND delete the one it replaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore reminders'**
+  String get notificationChannelRemindersName;
+
+  /// Android notification channel description for per-chore reminders, shown under notificationChannelRemindersName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders for individual chores at the time you chose.'**
+  String get notificationChannelRemindersDescription;
+
+  /// Android notification channel name for the evening re-reminder (spec docs/specs/notifications-n2.md §9.3). Same channel-id versioning constraint as notificationChannelRemindersName.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening reminder'**
+  String get notificationChannelEveningName;
+
+  /// Android notification channel description for the evening re-reminder, shown under notificationChannelEveningName in system Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'An evening nudge when chores are still open today.'**
+  String get notificationChannelEveningDescription;
+
+  /// Body of a per-chore reminder notification whose armed date IS the chore's due date (spec docs/specs/notifications-n2.md §11). The notification's TITLE is the chore title verbatim (user data, not localized) -- that is what makes it actionable. Keep this short: it sits under the chore's own name.
+  ///
+  /// In en, this message translates to:
+  /// **'Due today'**
+  String get reminderBodyDueToday;
+
+  /// Body of a per-chore reminder notification whose armed date is LATER than the due date -- a snooze, or a quiet-hours deferral. Deliberately a second plain key rather than date arithmetic inside one string.
+  ///
+  /// In en, this message translates to:
+  /// **'Still open'**
+  String get reminderBodyStillOpen;
+
+  /// Body of the evening re-reminder notification (spec docs/specs/notifications-n2.md §11). count >= 1 by construction (a slot counting nothing is never scheduled), hence no zero branch -- and CLDR has no distinct zero category in en or de anyway.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore still open today} other{{count} chores still open today}}'**
+  String eveningReminderBody(int count);
+
   /// Daily digest notification body when there are due-today occurrences but nothing overdue.
   ///
   /// In en, this message translates to:
@@ -1028,6 +1070,24 @@ abstract class AppLocalizations {
   /// **'Start date'**
   String get choreFormStartDateLabel;
 
+  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me about this chore'**
+  String get choreFormReminderToggle;
+
+  /// Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder time'**
+  String get choreFormReminderTime;
+
+  /// Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding.
+  ///
+  /// In en, this message translates to:
+  /// **'This chore won\'t be counted in the daily summary'**
+  String get choreFormReminderHint;
+
   /// Shopping list empty-state message, shown when there are no items at all.
   ///
   /// In en, this message translates to:
@@ -1148,6 +1208,12 @@ abstract class AppLocalizations {
   /// **'Not delivering — notifications are off'**
   String get settingsDigestToggleDeniedHint;
 
+  /// Sub-line under the daily-summary toggle, shown only while more chores have a reminder than the device can arm (spec docs/specs/notifications-n2.md §3.2, decision D4). A pure projection of current state: no stored flag, nothing to dismiss, nothing that can go stale. States the outcome factually and non-alarmingly, because the ceiling costs cadence and never coverage -- the chores it names are still announced, by the daily summary, on their own date. 'stays in the daily summary' matches settingsDigestToggleTitle's own label one line above it. No zero branch: the string is only rendered when count >= 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 chore stays in the daily summary — this device can hold {limit} reminders at once.} other{{count} chores stay in the daily summary — this device can hold {limit} reminders at once.}}'**
+  String settingsRemindersCeilingHint(int count, int limit);
+
   /// Title of the settings screen's digest time row, which shows the chosen time as trailing text and opens a time picker on tap.
   ///
   /// In en, this message translates to:
@@ -1166,7 +1232,55 @@ abstract class AppLocalizations {
   /// **'Open settings'**
   String get settingsDigestPermissionAction;
 
-  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a full JSON backup of every table via the OS share sheet.
+  /// BINDING COPY -- spec docs/specs/notifications-n2.md §5.1 and §11 fix this string verbatim; do not reword without amending the spec. Title of the settings switch that turns on a second daily notification in the evening. It ships OFF (decision D12), so this label is the only thing that leads the person it exists for to it -- someone whose notification 'arrives, then it's gone'. It therefore names their problem, never our mechanism: 'Evening re-reminder' is the feature's name in the spec and must not become the name of the row.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me again in the evening'**
+  String get settingsEveningToggle;
+
+  /// BINDING COPY -- spec docs/specs/notifications-n2.md §5.1 and §11 fix this string verbatim. Permanent sub-line under settingsEveningToggle, shown whether the switch is on or off, stating the condition in the same register as the label: the evening notification only fires when at least one chore is due TODAY and still open (overdue ones never count, decision D6, which is what makes it impossible to receive two evenings running about the same chore).
+  ///
+  /// In en, this message translates to:
+  /// **'Only if something is still open today'**
+  String get settingsEveningToggleSubtitle;
+
+  /// Title of the settings row holding the evening re-reminder's fire time, revealed under settingsEveningToggle. Shows the chosen time as trailing text via TimeOfDay.format and opens a time picker on tap. Default 20:00, which sits an hour clear of the 22:00 quiet-hours default so the shipped combination does not collide.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening time'**
+  String get settingsEveningTime;
+
+  /// BINDING COPY -- spec docs/specs/notifications-n2.md §6 and §5.1 fix this string verbatim. Factual sub-line on the evening time row, shown only while the chosen evening time falls inside the quiet-hours window. Unlike the digest and per-chore reminders, an evening re-reminder inside the window is DROPPED rather than deferred (decision D7) -- an 'evening' notification delivered at 07:00 has a false premise and would collide with the 08:00 digest -- so without this line the feature would silently do nothing. A pure projection of the two times: no stored flag, always current, self-clearing the moment either one moves. Same pattern as settingsDigestToggleDeniedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside your quiet hours — not delivering'**
+  String get settingsEveningInQuietHoursHint;
+
+  /// Title of the settings screen's quiet-hours on/off switch row, directly below the evening re-reminder rows in the Preferences group (spec docs/specs/notifications-n2.md §12). While on, the digest and per-chore reminders that would fall inside the window are deferred to its end rather than dropped (§6).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours'**
+  String get settingsQuietHoursToggle;
+
+  /// Title of the settings row holding the START of the quiet-hours window, revealed under the quiet-hours switch. A bare preposition on purpose: the row shows the chosen time as trailing text via TimeOfDay.format, so the label must not repeat the word 'time' or try to compose a '22:00-07:00' range -- the window is two independent rows precisely so no locale-sensitive range string ever has to be built (spec docs/specs/notifications-n2.md §12).
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get settingsQuietHoursFrom;
+
+  /// Title of the settings row holding the END of the quiet-hours window, directly below settingsQuietHoursFrom. See that key for why it is a bare preposition. The window wraps midnight in the normal case (22:00 to 07:00).
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get settingsQuietHoursTo;
+
+  /// Sub-line under the settings screen's quiet-hours toggle, shown only while the switch is ON and the start and end times are equal. Spec docs/specs/notifications-n2.md §6 treats start == end as OFF rather than as a 24-hour window (the latter would mean 'never notify', which is what the toggle is for), so without this line the switch would sit in its ON position while nothing is ever deferred -- the same dishonesty settingsDigestToggleDeniedHint exists to remove. Leads with the thing the user can change, follows with the consequence, matching the register of the other two sub-lines in this group. A pure projection of the two stored times: no flag, always current, self-clearing the moment either one moves.
+  ///
+  /// In en, this message translates to:
+  /// **'Start and end are the same — no quiet time'**
+  String get settingsQuietHoursEmptyWindowHint;
+
+  /// Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness.
   ///
   /// In en, this message translates to:
   /// **'Export data'**

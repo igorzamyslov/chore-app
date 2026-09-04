@@ -56,10 +56,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// fresh-install state post-onboarding-v2, not a silently re-bootstrapped
 /// household.
 ///
-/// Steps 1 and 2 are individually best-effort ([_cancelDigest]/[_signOut]):
-/// a network hiccup signing out, or an OS plugin hiccup cancelling a
-/// notification, must never block the wipe — the double-confirmed delete is
-/// the one promise in this flow that must always be kept. **Do not reorder
+/// Steps 1 and 2 are individually best-effort
+/// ([_cancelNotifications]/[_signOut]): a network hiccup signing out, or an
+/// OS plugin hiccup cancelling a notification, must never block the wipe —
+/// the double-confirmed delete is the one promise in this flow that must
+/// always be kept. **Do not reorder
 /// them after the wipe and do not let either throw.**
 ///
 /// If [resetAppData] itself throws, this shows
@@ -105,7 +106,7 @@ Future<void> confirmAndResetAppData(
   // resetAppData wipes (spec docs/feedback/2026-08-08-prerelease-audit.md
   // P3). Both run BEFORE the wipe and are individually best-effort -- see
   // this function's doc comment.
-  await _cancelDigest(ref);
+  await _cancelNotifications(ref);
   await _signOut(ref);
 
   final database = ref.read(appDatabaseProvider);
@@ -128,9 +129,16 @@ Future<void> confirmAndResetAppData(
   ref.invalidate(settingsProvider);
 }
 
-/// Cancels the scheduled digest notification, if any. Best-effort: see
+/// Cancels EVERY scheduled notification -- the digest horizon, every
+/// per-chore reminder and every evening slot (spec
+/// `docs/specs/notifications-n2.md` §9.2). Best-effort: see
 /// [confirmAndResetAppData]'s doc comment on why a failure here must never
 /// block the wipe that follows.
+///
+/// Widened from the digest alone at schema v13, and the reason is worth
+/// stating: a wipe that leaves per-chore reminders armed is strictly worse
+/// than the digest case G-12 fixed, because a reminder NAMES a chore that
+/// no longer exists.
 ///
 /// Catches [Object], not just [Exception], and this breadth is load-bearing
 /// rather than lazy: the failure mode actually observed here is
@@ -140,19 +148,19 @@ Future<void> confirmAndResetAppData(
 /// exactly that escape and takes the wipe down with it, which is the one
 /// outcome this flow may never produce.
 ///
-/// Since backlog G-12 this may WAIT: `cancelDigest()` rides the scheduler's
-/// serialized digest-write queue, so if a recompute or the notification
+/// Since backlog G-12 this may WAIT: `cancelAll()` rides the scheduler's
+/// serialized notification-write queue, so if a recompute or the notification
 /// action's horizon rewrite is mid-loop, the cancel queues behind it. That
 /// is the point — without it the apply could re-arm slots this cancel had
 /// already cleared, leaving a wiped app still notifying. The wait does not
 /// weaken the "never block the wipe" promise beyond what was already true:
-/// `cancelDigest()` has always awaited `ensureInitialized()`, i.e. a
+/// `cancelAll()` has always awaited `ensureInitialized()`, i.e. a
 /// `plugin.initialize()` platform call, so this path already depended on
 /// the plugin's calls returning, and the [Object] guard below was always
 /// about a throw rather than a hang.
-Future<void> _cancelDigest(WidgetRef ref) async {
+Future<void> _cancelNotifications(WidgetRef ref) async {
   try {
-    await ref.read(notificationSchedulerProvider).cancelDigest();
+    await ref.read(notificationSchedulerProvider).cancelAll();
   } on Object {
     // Best-effort -- see doc comment above.
   }
@@ -163,7 +171,8 @@ Future<void> _cancelDigest(WidgetRef ref) async {
 /// is a no-op; `SupabaseAuthGateway.signOut()` is wrapped the same way
 /// regardless). Best-effort: see [confirmAndResetAppData]'s doc comment on
 /// why a failure here must never block the wipe that follows. Catches
-/// [Object] for the same reason [_cancelDigest] does: the guarantee is about
+/// [Object] for the same reason [_cancelNotifications] does: the guarantee is
+/// about
 /// the wipe surviving, and an [Error] thrown out of a plugin or transport
 /// blocks it just as effectively as an [Exception] would.
 Future<void> _signOut(WidgetRef ref) async {

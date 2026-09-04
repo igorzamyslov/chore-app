@@ -151,6 +151,17 @@ void main() {
       await _openHistory(tester, choreId);
 
       expect(find.text('52 chores done'), findsOneWidget);
+      // The line sits below fifty rows in a lazy `ListView`, so scroll to it
+      // rather than asserting it happens to be built. It used to be, purely
+      // because a 24px avatar made the rows short enough to fall inside the
+      // sliver's cache extent on this tall test surface; G-16 grew the
+      // avatar to 32px and the accident stopped holding. Nothing about the
+      // line changed -- this asserts the same thing the way a user reaches
+      // it.
+      await tester.scrollUntilVisible(
+        find.bySemanticsIdentifier('stats.history.truncated'),
+        400,
+      );
       expect(
         find.bySemanticsIdentifier('stats.history.truncated'),
         findsOneWidget,

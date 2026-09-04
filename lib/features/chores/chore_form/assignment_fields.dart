@@ -114,7 +114,15 @@ class AssignmentFields extends StatelessWidget {
                     // picked; the chip's own selected styling already
                     // conveys the state without it.
                     showCheckmark: false,
-                    avatar: MemberAvatar(member: member),
+                    // Material lays a chip's avatar out with
+                    // BoxConstraints.tightFor(contentSize) -- ~24px -- so
+                    // MemberAvatar's default radius would have no effect on
+                    // the box here, only a thicker ring inside the same
+                    // one. Pinned to the radius that matches the box the
+                    // chip will actually give it. These two chips are the
+                    // one place the G-16 fit guarantee does not reach; see
+                    // docs/backlog.md G-17.
+                    avatar: MemberAvatar(member: member, radius: 12),
                     label: Text(member.name),
                     selected: selectedMemberIds.contains(member.id),
                     onSelected: (_) => onMemberTap(member.id),
@@ -230,7 +238,15 @@ class _RotationAssigneeControls extends StatelessWidget {
               semantic(
                 'chore_form.assignee.${member.id}',
                 child: FilterChip(
-                  avatar: MemberAvatar(member: member),
+                  // Material lays a chip's avatar out with
+                  // BoxConstraints.tightFor(contentSize) -- ~24px -- so
+                  // MemberAvatar's default radius would have no effect on
+                  // the box here, only a thicker ring inside the same
+                  // one. Pinned to the radius that matches the box the
+                  // chip will actually give it. These two chips are the
+                  // one place the G-16 fit guarantee does not reach; see
+                  // docs/backlog.md G-17.
+                  avatar: MemberAvatar(member: member, radius: 12),
                   label: Text(member.name),
                   onSelected: (_) => onMemberTap(member.id),
                 ),

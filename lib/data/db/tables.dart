@@ -312,6 +312,49 @@ class Settings extends Table {
   /// household). Added in schemaVersion 12; see `AppDatabase.migration`.
   TextColumn get pendingJoinCode => text().nullable()();
 
+  /// Whether quiet hours are active (spec `docs/specs/notifications-n2.md`
+  /// §6). Default `false`, so upgrading to schemaVersion 13 changes the
+  /// behaviour of exactly zero installs until someone opens Settings.
+  /// Added in schemaVersion 13; see `AppDatabase.migration`.
+  BoolColumn get quietHoursEnabled =>
+      boolean().withDefault(const Constant(false))();
+
+  /// The start of the quiet-hours window, as minutes since local midnight
+  /// (default `1320` = 22:00).
+  ///
+  /// The window WRAPS midnight in the normal case and must be evaluated as
+  /// a wrapping interval, never as a numeric range;
+  /// `quietStartMinutes == quietEndMinutes` is treated as OFF, not as a
+  /// 24-hour window (spec `docs/specs/notifications-n2.md` §6) -- the
+  /// latter would mean "never notify", which is what [quietHoursEnabled] is
+  /// for. The single implementation of that rule is `applyQuietHours` in
+  /// `lib/domain/reminder_planner.dart`. Added in schemaVersion 13.
+  IntColumn get quietStartMinutes =>
+      integer().withDefault(const Constant(1320))();
+
+  /// The end of the quiet-hours window, as minutes since local midnight
+  /// (default `420` = 07:00) -- see [quietStartMinutes]. Added in
+  /// schemaVersion 13.
+  IntColumn get quietEndMinutes => integer().withDefault(const Constant(420))();
+
+  /// Whether the evening re-reminder is enabled (spec
+  /// `docs/specs/notifications-n2.md` §5).
+  ///
+  /// **Ships OFF** (D12): the governing principle is digest by default,
+  /// never nag, and defaulting a second daily notification to on would
+  /// impose a behaviour change on every existing user who never asked for
+  /// one. Added in schemaVersion 13.
+  BoolColumn get eveningReminderEnabled =>
+      boolean().withDefault(const Constant(false))();
+
+  /// The evening re-reminder's fire time, as minutes since local midnight
+  /// (default `1200` = 20:00 -- an hour clear of the 22:00 quiet-hours
+  /// default, so a user turning the feature on with defaults gets a working
+  /// feature, spec `docs/specs/notifications-n2.md` §5.1). Added in
+  /// schemaVersion 13.
+  IntColumn get eveningReminderMinutes =>
+      integer().withDefault(const Constant(1200))();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 
@@ -355,6 +398,23 @@ class Chores extends Table with SyncDirtyColumn {
 
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   TextColumn get pausedAt => text().nullable()();
+
+  /// The per-chore individual reminder's fire time, as minutes since local
+  /// midnight, or `NULL` for "no individual reminder" (spec
+  /// `docs/specs/notifications-n2.md` D1, §2.1).
+  ///
+  /// **One nullable column, deliberately, rather than a boolean beside a
+  /// time:** the opt-in and the time are one fact, so they cannot disagree.
+  /// Turning the switch off writes `NULL`, so there is no state in which
+  /// the app holds a reminder time it is not using.
+  ///
+  /// **This is household data and it SYNCS** (§8.2) -- `DESIGN.md` §1 lists
+  /// "reminder overrides" as a field of the chore definition, and "the bins
+  /// go out Tuesday evening" is a fact about the bins, not about a phone. It
+  /// replicating does NOT mean both partners are reminded: the recipient
+  /// predicate in `projectDigestCounts` decides whose device rings (§2.2).
+  /// Added in schemaVersion 13; see `AppDatabase.migration`.
+  IntColumn get reminderMinutes => integer().nullable()();
 
   /// The member who created this chore, if known.
   TextColumn get createdBy => text().nullable().references(Members, #id)();
@@ -489,4 +549,57 @@ class ShoppingItems extends Table with SyncDirtyColumn {
 
   @override
   Set<Column<Object>> get primaryKey => {id};
+}
+
+/// A device-local deferral of ONE occurrence's individual reminder (spec
+/// `docs/specs/notifications-n2.md` §4.2, D5).
+///
+/// **Device-scoped and NOT synced**, and that is the whole point: snoozing
+/// is a personal act about a personal notification -- the same scope
+/// `DESIGN.md` §3 gives every other notification setting. One partner
+/// pressing Snooze must not silence the other's reminder. It also keeps the
+/// entire N2 surface off the sync path except `chores.reminderMinutes`,
+/// which means no Supabase migration, no mappers and no LWW semantics to
+/// argue about for this table.
+///
+/// **Snooze moves nothing.** A row here defers a NOTIFICATION and leaves
+/// `chore_occurrences.due_date`, `status`, `assigned_member_id`, rotation
+/// position and stats exactly as they were (D5). `skipOccurrence` is the
+/// wrong primitive and must never appear in this feature: it closes the
+/// occurrence as `skipped`, advances the recurrence and advances rotation.
+///
+/// Rows are garbage-collected on every plan pass (see
+/// `ReminderSnoozeRepository.collectGarbage`), so the table never grows.
+///
+/// Deliberately does NOT mix in [SyncDirtyColumn] -- there is nothing to
+/// push. Added in schemaVersion 13; see `AppDatabase.migration`.
+@DataClassName('ReminderSnooze')
+class ReminderSnoozes extends Table {
+  /// The deferred occurrence. Primary key: one live snooze per occurrence.
+  ///
+  /// **The cascade delete is load-bearing, not decoration.**
+  /// `ChoreService.pauseChore` HARD-DELETES the pending occurrence, and
+  /// foreign keys are ON (`AppDatabase.migration`'s `beforeOpen` sets
+  /// `PRAGMA foreign_keys = ON`), so without `onDelete: KeyAction.cascade`
+  /// a snoozed chore could not be paused at all.
+  TextColumn get occurrenceId =>
+      text().references(ChoreOccurrences, #id, onDelete: KeyAction.cascade)();
+
+  /// The instant the reminder should be re-armed for, as an ISO-8601 UTC
+  /// string -- the convention every other timestamp column in this file
+  /// uses.
+  ///
+  /// Stores INTENT, not deliverability: the quiet-hours shift is applied at
+  /// plan time (§2.3 step 4), never at write time, so exactly one code path
+  /// decides when a reminder may fire.
+  TextColumn get snoozedUntil => text()();
+
+  /// ISO-8601 UTC creation timestamp.
+  TextColumn get createdAt => text()();
+
+  /// ISO-8601 UTC timestamp of the last update.
+  TextColumn get updatedAt => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {occurrenceId};
 }
