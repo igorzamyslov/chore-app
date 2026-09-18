@@ -9,6 +9,11 @@
 -- `user_id`, so every push of a dirty CLAIMED member row was rejected 403
 -- and pull-to-refresh reported "Couldn't reach the household".
 --
+-- Note the timestamps are passed as `timestamptz`, not text: the server's
+-- `created_at`/`updated_at` are `timestamptz` while the local drift columns
+-- are ISO-8601 TEXT. The client never notices because PostgREST coerces the
+-- JSON string on the way in; raw SQL here does not get that for free.
+--
 -- The trap worth pinning: `on conflict do nothing` does NOT rescue it.
 -- Postgres applies the INSERT `with check` to the proposed tuple whether or
 -- not a conflict later skips it, so a row already present server-side is
@@ -43,7 +48,7 @@ select lives_ok(
       (id, household_id, name, color, role, created_at, updated_at, deleted_at)
     values ('20000000-0000-0000-0000-0000000000d2'::uuid,
             '10000000-0000-0000-0000-0000000000d1'::uuid,
-            'Partner', 4278190081, 'member', now()::text, now()::text, null)
+            'Partner', 4278190081, 'member', now(), now(), null)
     on conflict do nothing$$,
   'the client push shape (no user_id) is accepted for a new member');
 
@@ -54,7 +59,7 @@ select lives_ok(
       (id, household_id, name, color, role, created_at, updated_at, deleted_at)
     values ('20000000-0000-0000-0000-0000000000d1'::uuid,
             '10000000-0000-0000-0000-0000000000d1'::uuid,
-            'Dana', 4278190080, 'admin', now()::text, now()::text, null)
+            'Dana', 4278190080, 'admin', now(), now(), null)
     on conflict do nothing$$,
   're-pushing an EXISTING member row is a no-op, not a violation');
 
@@ -67,7 +72,7 @@ select throws_ok(
             '10000000-0000-0000-0000-0000000000d1'::uuid,
             'Dana', 4278190080, 'admin',
             '00000000-0000-0000-0000-0000000000d1'::uuid,
-            now()::text, now()::text)
+            now(), now())
     on conflict do nothing$$,
   '42501',
   'new row violates row-level security policy for table "members"',
