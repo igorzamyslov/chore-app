@@ -35,7 +35,6 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/db/tables.dart';
 import 'package:chore_app/data/sync/row_mappers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
