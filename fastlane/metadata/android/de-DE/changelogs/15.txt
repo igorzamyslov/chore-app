@@ -1,0 +1,3 @@
+Behebt einen Fehler beim Synchronisieren zwischen Geräten.
+
+Wenn beim Herunterziehen "Haushalt nicht erreichbar" erschien: genau das ist behoben. Verloren gegangen ist nichts — deine Änderungen waren die ganze Zeit auf dem Gerät gespeichert, sie kamen nur nicht mehr bei den anderen an.
