@@ -390,6 +390,14 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       // upsert of full member rows is rejected outright (42501). DO
       // NOTHING needs no UPDATE privilege and keeps the retry semantics
       // this method promises: a re-run skips already-uploaded rows.
+      //
+      // That reasoning is about PRIVILEGE and does not cover POLICY:
+      // `members_insert` additionally requires `user_id is null`, and DO
+      // NOTHING does not rescue that either (Postgres applies the INSERT
+      // `with check` to the proposed tuple whether or not a conflict
+      // skips it). `memberRow` therefore omits `user_id` entirely -- see
+      // its doc comment; dropping that omission re-breaks sync with a
+      // 403, not a 42501.
       await _client.from('members').upsert([
         for (final member in snapshot.members) row_mappers.memberRow(member),
       ], ignoreDuplicates: true);

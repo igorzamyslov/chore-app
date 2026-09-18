@@ -33,13 +33,40 @@ import 'package:chore_app/data/db/converters.dart';
 /// `color`/`role` (spec `docs/specs/sync-backend.md` §8.3) -- carrying it
 /// on push is what lets a local soft-delete (`MemberService.deleteMember`)
 /// actually propagate as a tombstone.
+///
+/// **Deliberately OMITS `user_id`, and that omission is load-bearing.**
+/// Both push sites send this row through
+/// `.upsert(..., ignoreDuplicates: true)`, and the server's policy is
+///
+/// ```sql
+/// create policy members_insert on public.members
+///   for insert with check (
+///     public.is_household_member(household_id) and user_id is null
+///   );
+/// ```
+///
+/// so a row carrying a non-null `user_id` is rejected outright (403).
+/// Claiming a profile belongs exclusively to the claim RPCs -- `user_id`
+/// is not even UPDATE-granted -- so [Member.userId] is a local cache of
+/// server-owned state and must never travel back. `ON CONFLICT DO NOTHING`
+/// does NOT make it safe: Postgres applies the INSERT `with check` to the
+/// proposed tuple whether or not a conflict later skips it, so even
+/// re-pushing a row the server already has is rejected.
+///
+/// Shipped as a bug until 2026-09-18, where it surfaced as
+/// `POST /rest/v1/members -> 403` on every sync once the acting member's
+/// own row was dirty -- and therefore as "Couldn't reach the household",
+/// because `SupabaseSyncEngine.refreshNow` pushes before it pulls and
+/// catches everything, so the rejected push aborted a refresh whose pull
+/// would have succeeded. Pinned by
+/// `test/data/sync/member_push_shape_test.dart` and, against the real
+/// policy, by `supabase/tests/004_members_push_shape_test.sql`.
 Map<String, Object?> memberRow(Member member) => {
   'id': member.id,
   'household_id': member.householdId,
   'name': member.name,
   'color': member.color,
   'role': member.role.name,
-  'user_id': member.userId,
   'created_at': member.createdAt,
   'updated_at': member.updatedAt,
   'deleted_at': member.deletedAt,
