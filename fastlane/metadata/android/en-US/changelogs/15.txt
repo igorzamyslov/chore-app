@@ -1,0 +1,3 @@
+Fixes syncing between devices.
+
+If you saw "Couldn't reach the household" when pulling to refresh, this is the fix. Nothing was ever lost — your changes were saved on the device the whole time — but they had stopped reaching everyone else.
