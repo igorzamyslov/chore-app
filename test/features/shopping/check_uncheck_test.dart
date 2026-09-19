@@ -33,7 +33,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.item-1.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       // Checking moved it to the checked section, without opening the edit
       // sheet (the checkbox tap must not fall through to the tile's onTap).
@@ -52,7 +52,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.item-1.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(
         find.bySemanticsIdentifier('shopping.checked.header'),

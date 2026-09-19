@@ -30,7 +30,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(find.text('In the cart (1)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('shopping.empty'), findsOneWidget);
@@ -62,7 +62,7 @@ void main() {
       await expandCartSection(tester, 'In the cart (1)');
 
       await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(
         find.bySemanticsIdentifier('shopping.checked.header'),

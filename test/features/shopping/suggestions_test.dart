@@ -561,7 +561,7 @@ void main() {
       // target inherits it rather than reaching the repository by a second
       // path that forgot to.
       await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(
         find.bySemanticsIdentifier('shopping.suggestion.0'),

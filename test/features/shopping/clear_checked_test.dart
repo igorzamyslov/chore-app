@@ -26,7 +26,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${milk.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(find.bySemanticsIdentifier('shopping.clear'), findsOneWidget);
 
@@ -65,11 +65,11 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${milk.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${eggs.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       await tester.tap(find.bySemanticsIdentifier('shopping.clear'));
       await tester.pumpAndSettle();
@@ -118,7 +118,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${first.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
       await tester.tap(find.bySemanticsIdentifier('shopping.clear'));
       await tester.pumpAndSettle();
       // 'Flour' is cleared and its undo snackbar is showing, but nobody
@@ -131,7 +131,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${second.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
       await tester.tap(find.bySemanticsIdentifier('shopping.clear'));
       await tester.pumpAndSettle();
 

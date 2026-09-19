@@ -1,6 +1,7 @@
 /// Shared helper for shopping widget tests.
 library;
 
+import 'package:chore_app/features/shopping/shopping_list_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Selects the Shopping tab in the already-pumped app shell.
@@ -41,5 +42,24 @@ Future<void> openItemMenu(WidgetTester tester, String label) async {
 /// are only reachable through this header.
 Future<void> expandCartSection(WidgetTester tester, String label) async {
   await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
+/// Settles the tick beat: a row that was just ticked or unticked stays in
+/// the section it was already in for [shoppingCheckedMoveDelay] before it
+/// moves (field report 2026-09-19).
+///
+/// Use this, not a bare `pumpAndSettle`, after any tap that toggles an item
+/// when the assertion that follows depends on the row having MOVED.
+/// `pumpAndSettle` only keeps pumping while a frame is scheduled, so whether
+/// it happens to outlast the beat depends on how long the tapped `InkWell`'s
+/// ink splash animates — which is a `ThemeData.splashFactory` detail and no
+/// business of these tests. Waiting the beat out explicitly makes the
+/// outcome depend on the beat and nothing else.
+Future<void> settleTickBeat(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(
+    shoppingCheckedMoveDelay + const Duration(milliseconds: 50),
+  );
   await tester.pumpAndSettle();
 }

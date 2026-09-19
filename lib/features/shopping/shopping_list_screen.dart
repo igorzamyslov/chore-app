@@ -56,6 +56,78 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   /// items left) — its next appearance always starts collapsed, by design.
   bool _cartExpanded = false;
 
+  /// Rows whose MOVE between the aisle list and the cart section is being
+  /// held back for [shoppingCheckedMoveDelay], keyed by item id, valued by
+  /// the section the row is currently drawn in (`true` = the cart).
+  ///
+  /// Field report 2026-09-19: ticking an item felt like it "just
+  /// disappears", because the write landed and the row was re-parented into
+  /// the collapsed cart section in the same frame -- the filled ring and the
+  /// strikethrough were never on screen long enough to be seen.
+  ///
+  /// **The write is NOT delayed, and that is the whole design.** It goes
+  /// through at gesture time exactly as before, so a tick cannot be lost by
+  /// a beat that never runs -- not if the screen is disposed mid-beat, not
+  /// if the app is backgrounded, not if the process is killed. What is
+  /// delayed is purely where the row is DRAWN: for the length of the beat it
+  /// keeps the bucket it already had, while its own contents (ring,
+  /// strikethrough) update immediately from the real database state. So the
+  /// tick is visible first and the row moves second, which is what was
+  /// asked for, without putting a user action behind a timer.
+  ///
+  /// The alternative -- an optimistic tick with the write behind the timer
+  /// -- was rejected for that reason. It would have needed a flush on
+  /// disposal, an `on Object` net around a database write running during
+  /// teardown, and a correctness argument for every path that can unmount
+  /// the screen. This needs none of them: the worst a lost beat can do is
+  /// skip an animation.
+  final Map<String, Timer> _heldMoves = {};
+  final Map<String, bool> _heldBuckets = {};
+
+  @override
+  void dispose() {
+    // Cancelled, not flushed: there is nothing to flush. Also what keeps
+    // `flutter_test`'s pending-timer check quiet -- it runs after the
+    // binding unmounts the tree, so a timer released on disposal is fine
+    // (backlog A-2b); what it catches is a timer nothing owns.
+    for (final timer in _heldMoves.values) {
+      timer.cancel();
+    }
+    _heldMoves.clear();
+    _heldBuckets.clear();
+    super.dispose();
+  }
+
+  /// Holds the row for [id] in the section it is drawn in right now, for
+  /// [shoppingCheckedMoveDelay], while its checked state flips underneath.
+  ///
+  /// [checked] is the value just written. A second tap inside the beat is
+  /// handled rather than ignored: the row's drawn bucket is whatever the
+  /// live hold says, or -- with no hold -- the state the item is coming
+  /// FROM, since this is a toggle. If that bucket now matches where the item
+  /// belongs, the pending move has cancelled itself out and the hold is
+  /// dropped, so a tick-then-untick inside the beat makes the row stay
+  /// exactly where it is rather than take a round trip to the cart.
+  void _holdInPlace(String id, {required bool checked}) {
+    final drawnInCart = _heldBuckets[id] ?? !checked;
+    _heldMoves.remove(id)?.cancel();
+    if (drawnInCart == checked) {
+      setState(() => _heldBuckets.remove(id));
+      return;
+    }
+    setState(() {
+      _heldBuckets[id] = drawnInCart;
+      _heldMoves[id] = Timer(shoppingCheckedMoveDelay, () {
+        _heldMoves.remove(id);
+        if (!mounted) {
+          _heldBuckets.remove(id);
+          return;
+        }
+        setState(() => _heldBuckets.remove(id));
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(shoppingItemsProvider);
@@ -107,8 +179,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               },
               child: itemsAsync.when(
                 data: (items) {
+                  // Drawn bucket, not database state: while a row is held
+                  // in its aisle the cart section must not appear yet, or
+                  // the count would name an item the user can still see
+                  // above it.
                   final hasChecked = items.any(
-                    (item) => item.item.checkedAt != null,
+                    (item) =>
+                        _heldBuckets[item.item.id] ??
+                        (item.item.checkedAt != null),
                   );
                   if (!hasChecked && _cartExpanded) {
                     // The section only mounts while ≥1 item is checked;
@@ -118,6 +196,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
                   final body = _Body(
                     items: items,
+                    heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
                         setState(() => _cartExpanded = value),
@@ -125,6 +204,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       // Bug 3: checking/unchecking an item is also "working
                       // the list" — dismiss the suggestions the same way.
                       FocusManager.instance.primaryFocus?.unfocus();
+                      // Registered BEFORE the write is even started, so the
+                      // hold is always in place by the time the repository
+                      // stream emits the new state. The write itself is
+                      // untouched.
+                      _holdInPlace(id, checked: checked);
                       unawaited(_setChecked(ref, id, checked: checked));
                     },
                     // Long-press opens the item's menu -- the edit sheet --
@@ -268,6 +352,7 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) async {
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
+    required this.heldBuckets,
     required this.cartExpanded,
     required this.onCartExpansionChanged,
     required this.onCheckedChanged,
@@ -277,6 +362,12 @@ class _Body extends StatelessWidget {
   });
 
   final List<ShoppingItemWithCategory> items;
+
+  /// Item ids whose row is held in a section that no longer matches their
+  /// database state, valued by the section they are drawn in (`true` = the
+  /// cart) -- see `_ShoppingListScreenState._heldMoves`.
+  final Map<String, bool> heldBuckets;
+
   final bool cartExpanded;
   final ValueChanged<bool> onCartExpansionChanged;
   final void Function(String id, {required bool checked}) onCheckedChanged;
@@ -286,13 +377,20 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Bucketed by where each row is DRAWN, which is its database state
+    // except for the length of the tick beat. The row's own contents still
+    // come straight from the database, so a held row shows its new ticked
+    // state while it waits in its old section.
+    bool drawnInCart(ShoppingItemWithCategory item) =>
+        heldBuckets[item.item.id] ?? (item.item.checkedAt != null);
+
     final unchecked = [
       for (final item in items)
-        if (item.item.checkedAt == null) item,
+        if (!drawnInCart(item)) item,
     ];
     final checked = [
       for (final item in items)
-        if (item.item.checkedAt != null) item,
+        if (drawnInCart(item)) item,
     ];
 
     if (unchecked.isEmpty && checked.isEmpty) {
