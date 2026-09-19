@@ -1,16 +1,36 @@
 # Shell navigation: swipe left/right between the three tabs (backlog D-1,
 # field feedback 2026-08-07 B3).
 #
-# The suite's FIRST flow to use `swipe:` — see README convention 9. Two
-# things are deliberate here:
-#   * both endpoints sit well inside the screen (20%/80%), so the gesture
-#     can never be mistaken for iOS's left-edge interactive-pop or an
-#     Android system edge gesture (same danger class as README convention 3);
-#   * the shopping list is left EMPTY. Once
-#     docs/plans/2026-08-08-shopping-gestures.md lands, a horizontal drag
-#     starting on a shopping ROW is claimed by that row's Dismissible, not
-#     by the page (spec docs/specs/ui-shopping.md). Swiping over an empty
-#     list keeps this flow correct whichever order the two land in.
+# Two halves, and the SECOND is the one that matters:
+#
+#   1. Paging over an EMPTY shopping list — the original flow. Covers the
+#      three-tab walk and the no-wrap-around edge.
+#   2. Paging over a POPULATED shopping list. This half is the direct
+#      regression guard for the 2026-09-19 field report: shopping rows used
+#      to carry a `Dismissible` (backlog D-2) which won the horizontal
+#      gesture arena against the tab `PageView`, so a drag starting on a row
+#      never reached the pager. Half 1 alone could not see that — it kept
+#      the list empty ON PURPOSE to dodge it, and that dodge is why the bug
+#      shipped to a real phone. The `Dismissible` is gone
+#      (`docs/specs/ui-shopping.md` §"Amendment 2026-09-19"); this half
+#      pins that it stays gone.
+#
+# Both endpoints of every horizontal swipe sit well inside the screen
+# (20%/80%), so the gesture can never be mistaken for iOS's left-edge
+# interactive-pop or an Android system edge gesture (README convention 9,
+# same danger class as convention 3).
+#
+# WHY SIXTEEN ITEMS, and why the number is not arbitrary: the swipes start
+# at y=45%, so half 2 is only worth anything if a ROW is actually under that
+# point — otherwise it silently degrades into a second copy of half 1. On
+# the pinned CI emulator (pixel_7, 411x914dp) the list viewport is roughly
+# 914 - 24 status - 56 app bar - ~76 quick-add - ~80 nav bar = ~678dp, and
+# the content is one 40dp category header plus n rows of 48dp + a 1dp
+# hairline. Sixteen rows is 824dp, which OVERFLOWS the viewport, so every
+# point inside the list area — 45% of 914dp = 411dp certainly included — is
+# over a row. Fourteen is break-even; sixteen leaves margin for layout
+# drift and for the shorter viewports iOS runs on. If you cut this list
+# down, redo that arithmetic first.
 #
 # Android back (D-6) is intentionally NOT covered here: README convention 7
 # bans Maestro's bare `back`, and `pressKey: Back` is Android-only while
@@ -31,6 +51,10 @@ tags:
 - runFlow: ../../common/onboard_fresh.yaml
 - assertVisible:
     id: "chores.add"
+
+# ---------------------------------------------------------------------
+# Half 1: paging over an EMPTY shopping list.
+# ---------------------------------------------------------------------
 # Chores -> Shopping.
 - swipe:
     start: "80%, 45%"
@@ -60,3 +84,86 @@ tags:
     end: "80%, 45%"
 - assertVisible:
     id: "chores.add"
+
+# ---------------------------------------------------------------------
+# Half 2: paging over a POPULATED shopping list.
+# ---------------------------------------------------------------------
+- tapOn:
+    id: "shell.tab.shopping"
+- assertVisible:
+    id: "shopping.empty"
+# Focus the quick-add field ONCE: it keeps focus after each submit, for
+# exactly this rapid-entry case (spec docs/specs/ui-shopping.md §1), so the
+# sixteen adds below are two steps each rather than three. `pressKey: Enter`
+# rather than tapping the submit button, per README convention 3.
+- tapOn:
+    id: "shopping.add.input"
+# Distinct names: adding the same name twice is de-duplicated (ux-round-2
+# B3), so a repeated one would leave the list one row long.
+- inputText: "It01"
+- pressKey: Enter
+- inputText: "It02"
+- pressKey: Enter
+- inputText: "It03"
+- pressKey: Enter
+- inputText: "It04"
+- pressKey: Enter
+- inputText: "It05"
+- pressKey: Enter
+- inputText: "It06"
+- pressKey: Enter
+- inputText: "It07"
+- pressKey: Enter
+- inputText: "It08"
+- pressKey: Enter
+- inputText: "It09"
+- pressKey: Enter
+- inputText: "It10"
+- pressKey: Enter
+- inputText: "It11"
+- pressKey: Enter
+- inputText: "It12"
+- pressKey: Enter
+- inputText: "It13"
+- pressKey: Enter
+- inputText: "It14"
+- pressKey: Enter
+- inputText: "It15"
+- pressKey: Enter
+- inputText: "It16"
+- pressKey: Enter
+- assertNotVisible:
+    id: "shopping.empty"
+# A short VERTICAL drag on the list. Two jobs, neither cosmetic: it blurs
+# the quick-add field (bug 3's unfocus-on-scroll), which also drops the soft
+# keyboard, and it demonstrates the list really is scrollable — i.e. that
+# the arithmetic in this file's header held and rows genuinely cover the
+# point the horizontal swipes below start from.
+- swipe:
+    start: "50%, 60%"
+    end: "50%, 40%"
+- assertVisible: "It08"
+
+# Shopping -> Settings, with the drag starting ON a row.
+- swipe:
+    start: "80%, 45%"
+    end: "20%, 45%"
+- assertVisible:
+    id: "settings.categories"
+# ...and back, also starting on a row.
+- swipe:
+    start: "20%, 45%"
+    end: "80%, 45%"
+- assertVisible:
+    id: "shopping.add.input"
+- swipe:
+    start: "20%, 45%"
+    end: "80%, 45%"
+- assertVisible:
+    id: "chores.add"
+# Nothing was deleted on the way past: a horizontal drag on a row is now
+# inert as far as the row is concerned, because there is no swipe-to-delete
+# left to fire.
+- tapOn:
+    id: "shell.tab.shopping"
+- assertVisible: "It08"
