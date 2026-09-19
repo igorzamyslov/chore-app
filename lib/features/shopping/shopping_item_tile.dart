@@ -69,58 +69,63 @@ class ShoppingItemTile extends StatelessWidget {
     final quantityNote = shoppingItem.quantityNote;
     final mutedColor = theme.colorScheme.onSurfaceVariant;
 
-    return semantic(
-      'shopping.item.${shoppingItem.id}',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          // The row's tap IS the tick (field report 2026-09-19): it is the
-          // thing a user does dozens of times per shop, so it gets the
-          // cheapest gesture and the largest target. Editing, which is
-          // rare, moved to the long-press below.
-          onTap: () => onCheckedChanged(!checked),
-          onLongPress: onLongPress,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                _CheckRing(
-                  identifier: 'shopping.item.${shoppingItem.id}.check',
-                  checked: checked,
-                  onChanged: onCheckedChanged,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          shoppingItem.name,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            decoration: checked
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: checked ? mutedColor : null,
-                          ),
-                        ),
-                        if (quantityNote != null && quantityNote.isNotEmpty)
+    return GestureDetector(
+      // INVERSION 1a: put a horizontal-drag claim back on the row, the way
+      // the removed `Dismissible` did. Nothing else changes.
+      onHorizontalDragStart: (_) {},
+      child: semantic(
+        'shopping.item.${shoppingItem.id}',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            // The row's tap IS the tick (field report 2026-09-19): it is the
+            // thing a user does dozens of times per shop, so it gets the
+            // cheapest gesture and the largest target. Editing, which is
+            // rare, moved to the long-press below.
+            onTap: () => onCheckedChanged(!checked),
+            onLongPress: onLongPress,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  _CheckRing(
+                    identifier: 'shopping.item.${shoppingItem.id}.check',
+                    checked: checked,
+                    onChanged: onCheckedChanged,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            quantityNote,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: mutedColor,
+                            shoppingItem.name,
+                            style: theme.textTheme.titleSmall?.copyWith(
                               decoration: checked
                                   ? TextDecoration.lineThrough
                                   : null,
+                              color: checked ? mutedColor : null,
                             ),
                           ),
-                      ],
+                          if (quantityNote != null && quantityNote.isNotEmpty)
+                            Text(
+                              quantityNote,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: mutedColor,
+                                decoration: checked
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

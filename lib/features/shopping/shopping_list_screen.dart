@@ -90,9 +90,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // `flutter_test`'s pending-timer check quiet -- it runs after the
     // binding unmounts the tree, so a timer released on disposal is fine
     // (backlog A-2b); what it catches is a timer nothing owns.
-    for (final timer in _heldMoves.values) {
-      timer.cancel();
-    }
+    // INVERSION 1b: dispose() no longer cancels the beat's timers.
     _heldMoves.clear();
     _heldBuckets.clear();
     super.dispose();
