@@ -1,0 +1,7 @@
+Shopping list, after a round of real use:
+
+Tapping an item now ticks it off. Long-press an item to rename it, change the quantity or delete it.
+
+Swiping left and right between tabs works everywhere again — shopping rows used to swallow that gesture.
+
+A ticked item now stays put for a moment so you can see it tick, instead of vanishing the instant you touch it.
