@@ -34,8 +34,7 @@ void main() {
 
       await openShoppingTab(tester);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
 
       // The affordance sits alongside the edit sheet's chips.
       expect(
@@ -111,8 +110,7 @@ void main() {
 
       await openShoppingTab(tester);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
       await tester.tap(
         find.bySemanticsIdentifier('shopping.edit.category.${produce.id}'),
       );

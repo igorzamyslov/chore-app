@@ -12,9 +12,7 @@ import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
-import 'package:chore_app/features/shopping/shopping_delete.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
-import 'package:chore_app/features/shopping/shopping_item_action_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
@@ -22,6 +20,15 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// How long a just-ticked (or just-unticked) row is held in the section it
+/// was already in, so the tick is visible before the row moves.
+///
+/// Field report 2026-09-19: *"it would be nice if the ticking action would
+/// be seen for a brief moment, before the item is moved (right now I click
+/// on it and it feels that it just disappears)"*. The WRITE is not delayed —
+/// only the move is.
+const shoppingCheckedMoveDelay = Duration(milliseconds: 350);
 
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
@@ -48,6 +55,78 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   /// `false` in [build] whenever the section itself unmounts (no checked
   /// items left) — its next appearance always starts collapsed, by design.
   bool _cartExpanded = false;
+
+  /// Rows whose MOVE between the aisle list and the cart section is being
+  /// held back for [shoppingCheckedMoveDelay], keyed by item id, valued by
+  /// the section the row is currently drawn in (`true` = the cart).
+  ///
+  /// Field report 2026-09-19: ticking an item felt like it "just
+  /// disappears", because the write landed and the row was re-parented into
+  /// the collapsed cart section in the same frame -- the filled ring and the
+  /// strikethrough were never on screen long enough to be seen.
+  ///
+  /// **The write is NOT delayed, and that is the whole design.** It goes
+  /// through at gesture time exactly as before, so a tick cannot be lost by
+  /// a beat that never runs -- not if the screen is disposed mid-beat, not
+  /// if the app is backgrounded, not if the process is killed. What is
+  /// delayed is purely where the row is DRAWN: for the length of the beat it
+  /// keeps the bucket it already had, while its own contents (ring,
+  /// strikethrough) update immediately from the real database state. So the
+  /// tick is visible first and the row moves second, which is what was
+  /// asked for, without putting a user action behind a timer.
+  ///
+  /// The alternative -- an optimistic tick with the write behind the timer
+  /// -- was rejected for that reason. It would have needed a flush on
+  /// disposal, an `on Object` net around a database write running during
+  /// teardown, and a correctness argument for every path that can unmount
+  /// the screen. This needs none of them: the worst a lost beat can do is
+  /// skip an animation.
+  final Map<String, Timer> _heldMoves = {};
+  final Map<String, bool> _heldBuckets = {};
+
+  @override
+  void dispose() {
+    // Cancelled, not flushed: there is nothing to flush. Also what keeps
+    // `flutter_test`'s pending-timer check quiet -- it runs after the
+    // binding unmounts the tree, so a timer released on disposal is fine
+    // (backlog A-2b); what it catches is a timer nothing owns.
+    for (final timer in _heldMoves.values) {
+      timer.cancel();
+    }
+    _heldMoves.clear();
+    _heldBuckets.clear();
+    super.dispose();
+  }
+
+  /// Holds the row for [id] in the section it is drawn in right now, for
+  /// [shoppingCheckedMoveDelay], while its checked state flips underneath.
+  ///
+  /// [checked] is the value just written. A second tap inside the beat is
+  /// handled rather than ignored: the row's drawn bucket is whatever the
+  /// live hold says, or -- with no hold -- the state the item is coming
+  /// FROM, since this is a toggle. If that bucket now matches where the item
+  /// belongs, the pending move has cancelled itself out and the hold is
+  /// dropped, so a tick-then-untick inside the beat makes the row stay
+  /// exactly where it is rather than take a round trip to the cart.
+  void _holdInPlace(String id, {required bool checked}) {
+    final drawnInCart = _heldBuckets[id] ?? !checked;
+    _heldMoves.remove(id)?.cancel();
+    if (drawnInCart == checked) {
+      setState(() => _heldBuckets.remove(id));
+      return;
+    }
+    setState(() {
+      _heldBuckets[id] = drawnInCart;
+      _heldMoves[id] = Timer(shoppingCheckedMoveDelay, () {
+        _heldMoves.remove(id);
+        if (!mounted) {
+          _heldBuckets.remove(id);
+          return;
+        }
+        setState(() => _heldBuckets.remove(id));
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,8 +179,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
               },
               child: itemsAsync.when(
                 data: (items) {
+                  // Drawn bucket, not database state: while a row is held
+                  // in its aisle the cart section must not appear yet, or
+                  // the count would name an item the user can still see
+                  // above it.
                   final hasChecked = items.any(
-                    (item) => item.item.checkedAt != null,
+                    (item) =>
+                        _heldBuckets[item.item.id] ??
+                        (item.item.checkedAt != null),
                   );
                   if (!hasChecked && _cartExpanded) {
                     // The section only mounts while ≥1 item is checked;
@@ -111,6 +196,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
                   final body = _Body(
                     items: items,
+                    heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
                         setState(() => _cartExpanded = value),
@@ -118,29 +204,20 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                       // Bug 3: checking/unchecking an item is also "working
                       // the list" — dismiss the suggestions the same way.
                       FocusManager.instance.primaryFocus?.unfocus();
+                      // Registered BEFORE the write is even started, so the
+                      // hold is always in place by the time the repository
+                      // stream emits the new state. The write itself is
+                      // untouched.
+                      _holdInPlace(id, checked: checked);
                       unawaited(_setChecked(ref, id, checked: checked));
                     },
-                    onTapItem: (item) {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      unawaited(showShoppingEditSheet(context, item: item));
-                    },
-                    // Both new gestures (D-2/D-3) unfocus for the same Bug 3
-                    // reason as the two callbacks above: swiping a row away
-                    // and long-pressing one are 'working the list', so the
-                    // suggestion list must not stay open over a list being
-                    // edited. The swipe's unfocus lands when the dismiss
-                    // animation finishes rather than when the drag starts,
-                    // which folds it into the same reflow as the row
-                    // disappearing instead of causing a second one.
+                    // Long-press opens the item's menu -- the edit sheet --
+                    // and unfocuses for the same Bug 3 reason as the
+                    // callback above: editing a row is 'working the list',
+                    // so the suggestion list must not stay open over it.
                     onLongPressItem: (item) {
                       FocusManager.instance.primaryFocus?.unfocus();
-                      unawaited(_openMenu(item));
-                    },
-                    onSwipeDeleteItem: (id) {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      unawaited(
-                        deleteShoppingItemWithUndo(context, ref, itemId: id),
-                      );
+                      unawaited(showShoppingEditSheet(context, item: item));
                     },
                     onClear: () => unawaited(
                       _clearChecked(
@@ -227,24 +304,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
   }
-
-  /// Opens the long-press action sheet for [item] and acts on the chosen
-  /// [ShoppingItemMenuAction] (backlog D-3) -- currently just Delete,
-  /// reusing the same `deleteShoppingItemWithUndo` every other delete path
-  /// calls (see `shopping_delete.dart`). Takes no explicit `context`/`ref`
-  /// params -- uses the State's own ambient values, matching
-  /// `chores_list_screen.dart`'s `_openMenu(OccurrenceWithChore occurrence)`
-  /// precedent exactly.
-  Future<void> _openMenu(ShoppingItemWithCategory item) async {
-    final action = await showShoppingItemActionSheet(context);
-    if (!mounted || action == null) {
-      return;
-    }
-    switch (action) {
-      case ShoppingItemMenuAction.delete:
-        await deleteShoppingItemWithUndo(context, ref, itemId: item.item.id);
-    }
-  }
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
@@ -293,35 +352,45 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) async {
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
+    required this.heldBuckets,
     required this.cartExpanded,
     required this.onCartExpansionChanged,
     required this.onCheckedChanged,
-    required this.onTapItem,
     required this.onLongPressItem,
-    required this.onSwipeDeleteItem,
     required this.onClear,
     required this.onUncheckAll,
   });
 
   final List<ShoppingItemWithCategory> items;
+
+  /// Item ids whose row is held in a section that no longer matches their
+  /// database state, valued by the section they are drawn in (`true` = the
+  /// cart) -- see `_ShoppingListScreenState._heldMoves`.
+  final Map<String, bool> heldBuckets;
+
   final bool cartExpanded;
   final ValueChanged<bool> onCartExpansionChanged;
   final void Function(String id, {required bool checked}) onCheckedChanged;
-  final ValueChanged<ShoppingItemWithCategory> onTapItem;
   final ValueChanged<ShoppingItemWithCategory> onLongPressItem;
-  final ValueChanged<String> onSwipeDeleteItem;
   final VoidCallback onClear;
   final VoidCallback onUncheckAll;
 
   @override
   Widget build(BuildContext context) {
+    // Bucketed by where each row is DRAWN, which is its database state
+    // except for the length of the tick beat. The row's own contents still
+    // come straight from the database, so a held row shows its new ticked
+    // state while it waits in its old section.
+    bool drawnInCart(ShoppingItemWithCategory item) =>
+        heldBuckets[item.item.id] ?? (item.item.checkedAt != null);
+
     final unchecked = [
       for (final item in items)
-        if (item.item.checkedAt == null) item,
+        if (!drawnInCart(item)) item,
     ];
     final checked = [
       for (final item in items)
-        if (item.item.checkedAt != null) item,
+        if (drawnInCart(item)) item,
     ];
 
     if (unchecked.isEmpty && checked.isEmpty) {
@@ -407,9 +476,7 @@ class _Body extends StatelessWidget {
       item: item,
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
-      onTap: () => onTapItem(item),
       onLongPress: () => onLongPressItem(item),
-      onSwipeDelete: () => onSwipeDeleteItem(item.item.id),
     );
   }
 }

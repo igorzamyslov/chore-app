@@ -520,13 +520,15 @@ void main() {
     },
   );
 
-  // The two gestures added by backlog D-2/D-3 are 'working the list' in
-  // exactly the sense bug 3 means, so they owe the same unfocus the check
-  // control and a scroll drag already do -- otherwise the suggestion list
-  // sits open above a list the user is actively editing, which is the
-  // reported bug.
+  // Both row gestures are 'working the list' in exactly the sense bug 3
+  // means, so they owe the same unfocus the check control and a scroll drag
+  // already do -- otherwise the suggestion list sits open above a list the
+  // user is actively editing, which is the reported bug. The pair used to be
+  // swipe-to-delete and the long-press delete menu (backlog D-2/D-3); the
+  // 2026-09-19 field report replaced them with tap-to-tick and
+  // long-press-to-edit, and the obligation carried straight across.
   testChoreApp(
-    'swiping an item away hides the suggestions (bug 3, field feedback '
+    'tapping a row to tick it hides the suggestions (bug 3, field feedback '
     'round 2)',
     today: today,
     (tester, database) async {
@@ -537,7 +539,7 @@ void main() {
         database,
         newId: () => 'item-${nextId++}',
       );
-      final milk = await repo.addItem(householdId, name: 'Milk');
+      await repo.addItem(householdId, name: 'Milk');
       final bread = await repo.addItem(householdId, name: 'Bread');
       await repo.setChecked(bread.id, checked: true);
       await repo.deleteItem(bread.id); // an eligible focus-suggestion
@@ -554,16 +556,23 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.drag(
-        find.bySemanticsIdentifier('shopping.item.${milk.id}'),
-        const Offset(-500, 0),
-      );
-      await tester.pumpAndSettle();
+      // The row BODY, not the check ring: the ring's own unfocus is already
+      // covered above, and this case exists to prove the row's new tap
+      // target inherits it rather than reaching the repository by a second
+      // path that forgot to.
+      await tester.tap(find.text('Milk'));
+      await settleTickBeat(tester);
 
       expect(
         find.bySemanticsIdentifier('shopping.suggestion.0'),
         findsNothing,
       );
+      // Asserted together with the unfocus on purpose: the OLD row tap also
+      // unfocused (it opened the edit sheet, equally 'working the list'), so
+      // the suggestion assertion ALONE could not fail against the old code
+      // and would have been a test that cannot fail. Pinning that the tap
+      // also ticked the item is what makes this case load-bearing.
+      expect(find.text('In the cart (1)'), findsOneWidget);
 
       handle.dispose();
     },
@@ -602,8 +611,8 @@ void main() {
         find.bySemanticsIdentifier('shopping.item.${milk.id}'),
       );
       await tester.pumpAndSettle();
-      // Asserted after backing out of the menu, so the assertion can't be
-      // confused by whether a modal route hides the routes below it from
+      // Asserted after backing out of the edit sheet, so the assertion can't
+      // be confused by whether a modal route hides the routes below it from
       // the semantics tree. The unfocus happened at long-press time either
       // way, and nothing refocuses the field on the way back.
       await tester.tapAt(const Offset(20, 20));

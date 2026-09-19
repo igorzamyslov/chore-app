@@ -1,0 +1,7 @@
+Die Einkaufsliste, nach einer Runde im echten Einsatz:
+
+Ein Tippen hakt einen Eintrag jetzt ab. Lange drücken öffnet ihn zum Umbenennen, für die Menge oder zum Löschen.
+
+Zwischen den Tabs kannst du wieder überall nach links und rechts wischen — die Zeilen haben diese Geste vorher geschluckt.
+
+Ein abgehakter Eintrag bleibt kurz stehen, statt sofort zu verschwinden.

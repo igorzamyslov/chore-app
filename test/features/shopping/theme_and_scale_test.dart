@@ -55,10 +55,10 @@ void main() {
       );
 
       final handle = tester.ensureSemantics();
-      await tester.tap(
-        find.text('A shopping item with a reasonably long descriptive name'),
+      await openItemMenu(
+        tester,
+        'A shopping item with a reasonably long descriptive name',
       );
-      await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
       expect(find.bySemanticsIdentifier('shopping.edit.save'), findsOneWidget);

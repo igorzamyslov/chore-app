@@ -175,9 +175,11 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
     // disappears from view, so the undo mirrors the chores undo tone (spec
     // `docs/specs/polish-round-1.md` C3): soft delete makes UNDO a plain
     // restore, clearing `deleted_at`. The logic itself lives in
-    // `shopping_delete.dart`, shared with swipe-to-delete (D-2) and the
-    // long-press menu's Delete row (D-3) — this button is one of three
-    // doors into exactly one behavior.
+    // `shopping_delete.dart`. Since the 2026-09-19 field report retired
+    // swipe-to-delete (D-2) and the one-row long-press menu (D-3), this
+    // button is the ONLY door into it — which is why this sheet must stay
+    // reachable by long-press from both the aisle list and the cart
+    // section.
     await deleteShoppingItemWithUndo(
       context,
       ref,

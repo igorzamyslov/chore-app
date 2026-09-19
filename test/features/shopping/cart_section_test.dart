@@ -43,7 +43,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${first.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(find.text('In the cart (1)'), findsOneWidget);
       // Still expanded: the remaining checked tile is visible without
@@ -90,7 +90,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${first.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
       expect(
         find.bySemanticsIdentifier('shopping.checked.header'),
         findsNothing,
@@ -101,7 +101,7 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('shopping.item.${second.id}.check'),
       );
-      await tester.pumpAndSettle();
+      await settleTickBeat(tester);
 
       expect(find.text('In the cart (1)'), findsOneWidget);
       expect(find.text('Bread'), findsNothing);

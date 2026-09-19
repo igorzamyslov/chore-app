@@ -67,11 +67,21 @@ Run with `tool/e2e.sh ios` / `tool/e2e.sh android` (builds with the pinned
    endpoints well inside the screen (20%/80% is the suite's default): a
    gesture starting at a screen edge is an iOS interactive-pop or an
    Android system edge gesture, not your swipe — the same failure class as
-   convention 3's `hideKeyboard`. And remember that a horizontal drag
-   starting on a shopping ITEM row belongs to that row's `Dismissible`, not
-   to the page (spec `docs/specs/ui-shopping.md`), so flows that swipe on
-   the Shopping tab must do it over an empty list or over the quick-add
-   row / a category header.
+   convention 3's `hideKeyboard`.
+
+   **A horizontal drag starting on a shopping ITEM row reaches the pager,
+   and must keep doing so.** It did not use to: the row carried a
+   swipe-to-delete `Dismissible` (backlog D-2) that won the gesture arena,
+   and `tab_swipe.yaml` worked around it by keeping the shopping list
+   EMPTY. That workaround is why the cost reached a real phone unnoticed —
+   Igor reported it on v0.10.1 and the `Dismissible` was removed (spec
+   `docs/specs/ui-shopping.md` §"Amendment 2026-09-19"). `tab_swipe.yaml`
+   now pages over a POPULATED list as well as an empty one, and its header
+   carries the arithmetic showing a row really is under the swipe's start
+   point. The general lesson outlives this particular row: **a flow that
+   sidesteps a known conflict is not coverage of it.** When you write the
+   sidestep, write the flow that meets the conflict head-on too — otherwise
+   the sidestep is the reason nobody notices.
 
    **The trap that will silently poison this whole suite:
    `PageView.allowImplicitScrolling`.** It is `false` in
