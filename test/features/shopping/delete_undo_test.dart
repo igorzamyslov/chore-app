@@ -22,8 +22,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openShoppingTab(tester);
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.delete'));
       await tester.pumpAndSettle();
 
@@ -49,8 +48,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await openShoppingTab(tester);
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.delete'));
       await tester.pumpAndSettle();
 
@@ -81,14 +79,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await openShoppingTab(tester);
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.delete'));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsOneWidget);
 
-      await tester.tap(find.text('Eggs'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Eggs');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.delete'));
       await tester.pumpAndSettle();
 

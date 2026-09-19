@@ -41,8 +41,7 @@ void main() {
       );
 
       // Open, prefilled from the existing item.
-      await tester.tap(find.text('Milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Milk');
       expect(
         find.descendant(
           of: find.bySemanticsIdentifier('shopping.edit.name'),
@@ -76,8 +75,7 @@ void main() {
       expect(find.text('PRODUCE'), findsOneWidget);
 
       // Re-open: quantity is prefilled; clear it back to null.
-      await tester.tap(find.text('Oat milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Oat milk');
       expect(
         find.descendant(
           of: find.bySemanticsIdentifier('shopping.edit.quantity'),
@@ -93,8 +91,7 @@ void main() {
       expect(find.text('Oat milk'), findsOneWidget);
 
       // Empty-name error, then recovery.
-      await tester.tap(find.text('Oat milk'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Oat milk');
       await tester.enterText(nameField, '');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.save'));
       await tester.pumpAndSettle();
@@ -111,8 +108,7 @@ void main() {
       expect(find.text('Oat milk again'), findsOneWidget);
 
       // Delete: immediate, no confirmation.
-      await tester.tap(find.text('Oat milk again'));
-      await tester.pumpAndSettle();
+      await openItemMenu(tester, 'Oat milk again');
       await tester.tap(find.bySemanticsIdentifier('shopping.edit.delete'));
       await tester.pumpAndSettle();
 
