@@ -28,7 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// be seen for a brief moment, before the item is moved (right now I click
 /// on it and it feels that it just disappears)"*. The WRITE is not delayed —
 /// only the move is.
-const shoppingCheckedMoveDelay = Duration.zero; // INVERSION 2c
+const Duration shoppingCheckedMoveDelay = Duration.zero; // INVERSION 2c
 
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
