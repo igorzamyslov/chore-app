@@ -21,6 +21,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// How long a just-ticked (or just-unticked) row is held in the section it
+/// was already in, so the tick is visible before the row moves.
+///
+/// Field report 2026-09-19: *"it would be nice if the ticking action would
+/// be seen for a brief moment, before the item is moved (right now I click
+/// on it and it feels that it just disappears)"*. The WRITE is not delayed —
+/// only the move is.
+const shoppingCheckedMoveDelay = Duration(milliseconds: 350);
+
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
 /// collapsed-by-default checked section.
