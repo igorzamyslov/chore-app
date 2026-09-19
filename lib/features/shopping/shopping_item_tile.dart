@@ -78,8 +78,10 @@ class ShoppingItemTile extends StatelessWidget {
           // thing a user does dozens of times per shop, so it gets the
           // cheapest gesture and the largest target. Editing, which is
           // rare, moved to the long-press below.
-          onTap: () => onCheckedChanged(!checked),
-          onLongPress: onLongPress,
+          // INVERSION 2a / 2b: the row's tap no longer ticks, and its
+          // long-press no longer opens the item menu.
+          onTap: () {},
+          onLongPress: () {},
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
