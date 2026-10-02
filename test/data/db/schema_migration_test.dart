@@ -66,7 +66,7 @@ Future<void> _dropMembershipRevokedColumn(AppDatabase seed) async {
 /// `IF NOT EXISTS` form), which is exactly right in production -- no
 /// install at any shipped version 1..10 can have this index, so a
 /// collision would be a genuine bug worth throwing on. But [seed] always
-/// opens at the *current* (v13) schema first, so `onCreate` has already
+/// opens at the *current* (v14) schema first, so `onCreate` has already
 /// created the index, and rewinding `user_version` alone does not remove
 /// it. Without this drop, a test rewound below 11 would hit "index ...
 /// already exists" -- an artifact of the harness, not of the migration.
@@ -79,7 +79,7 @@ Future<void> _dropStatusClosedOnIndex(AppDatabase seed) async {
 /// Drops `pending_join_code` (schema v12, spec
 /// `docs/specs/onboarding-v2.md` §1) from `settings` on [seed] -- mirrors
 /// `_dropMembershipRevokedColumn`'s reasoning for the same collateral-drop
-/// pattern: [seed] always opens at the *current* (now v13) schema first, so
+/// pattern: [seed] always opens at the *current* (now v14) schema first, so
 /// every test below that simulates a pre-v12 install needs this, or the
 /// later `onUpgrade` would try to `ADD COLUMN pending_join_code` on a
 /// column that's already there.
@@ -125,6 +125,16 @@ Future<void> _dropChoreReminderMinutesColumn(AppDatabase seed) async {
 /// `createTable` would then throw "table reminder_snoozes already exists".
 Future<void> _dropReminderSnoozesTable(AppDatabase seed) async {
   await seed.customStatement('DROP TABLE reminder_snoozes');
+}
+
+/// Drops the `ui_state` table (schema v14, spec
+/// `docs/specs/last-tab-restore.md` §2) on [seed] -- the same
+/// collateral-drop pattern as `_dropReminderSnoozesTable`: [seed] always
+/// opens at the *current* (v14) schema first, so `onCreate` has already
+/// created this table, and `onUpgrade`'s plain `createTable` would then throw
+/// "table ui_state already exists".
+Future<void> _dropUiStateTable(AppDatabase seed) async {
+  await seed.customStatement('DROP TABLE ui_state');
 }
 
 /// Every `settings` column added by a migration AFTER the table itself
@@ -194,7 +204,7 @@ void main() {
 
       // Simulate a pre-existing v1 install without hand-copying v1's
       // CREATE TABLE SQL (which would drift out of sync with tables.dart
-      // over time): open the *current* (v13) schema once against a real
+      // over time): open the *current* (v14) schema once against a real
       // file so `onCreate` materializes every table, including the v2-only
       // `settings` table, then drop that table (plus `syncDirty` from
       // every OTHER table -- see `_dropSyncDirtyColumns`, added at v8 --
@@ -212,6 +222,7 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
@@ -376,6 +387,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
@@ -438,7 +450,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v2 install: open the *current* (v13) schema
+      // Simulate a pre-existing v2 install: open the *current* (v14) schema
       // once so `onCreate` materializes every table with its full v13
       // column set, insert a settings row, then drop every column newer
       // than v2 (plus `syncDirty` from every other table -- see
@@ -490,6 +502,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
@@ -537,7 +550,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v5 install: open the *current* (v13) schema
+      // Simulate a pre-existing v5 install: open the *current* (v14) schema
       // once so `onCreate` materializes every table with its full v13
       // column set, insert a settings row with a non-NULL actingMemberId
       // (so the upgrade's "existing row survives" guarantee is actually
@@ -579,6 +592,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
@@ -635,7 +649,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v6 install: open the *current* (v13) schema
+      // Simulate a pre-existing v6 install: open the *current* (v14) schema
       // once so `onCreate` materializes every table with its full v13
       // column set, insert a settings row with a non-NULL actingMemberId
       // and a non-NULL syncHouseholdId (so the upgrade's "existing row
@@ -673,6 +687,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
@@ -726,7 +741,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v7 install: open the *current* (v13) schema
+      // Simulate a pre-existing v7 install: open the *current* (v14) schema
       // once so `onCreate` materializes every table with its full v13
       // column set, insert one row into every synced table (so the
       // upgrade's "existing rows survive, syncDirty defaults to false"
@@ -840,6 +855,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
@@ -942,7 +958,7 @@ void main() {
       });
       final file = File('${dir.path}/test.sqlite');
 
-      // Simulate a pre-existing v8 install: open the *current* (v13) schema
+      // Simulate a pre-existing v8 install: open the *current* (v14) schema
       // once so `onCreate` materializes every table with its full v13
       // column set -- `settings` included, even though this test never
       // inserts a row into it, so its `membership_revoked` column (added
@@ -986,6 +1002,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
@@ -1068,6 +1085,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 9');
       await seed.close();
 
@@ -1132,6 +1150,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 10');
       await seed.close();
 
@@ -1202,6 +1221,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 11');
       await seed.close();
 
@@ -1290,7 +1310,7 @@ void main() {
       final file = File('${dir.path}/test.sqlite');
 
       // Simulate a pre-existing v12 install -- the schema every shipped
-      // build (0.8.0) is actually running: open the *current* (v13) schema
+      // build (0.8.0) is actually running: open the *current* (v14) schema
       // once so `onCreate` materializes every table at full v13 width,
       // insert a settings row with non-NULL actingMemberId/syncHouseholdId
       // (so the "existing row survives" guarantee is exercised), then drop
@@ -1312,6 +1332,7 @@ void main() {
       await _dropN2SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
+      await _dropUiStateTable(seed);
       await seed.customStatement('PRAGMA user_version = 12');
       await seed.close();
 
@@ -1382,6 +1403,48 @@ void main() {
       expect(fks.single.read<String>('from'), 'occurrence_id');
       expect(fks.single.read<String>('to'), 'id');
       expect(fks.single.read<String>('on_delete'), 'CASCADE');
+    },
+  );
+
+  test(
+    'a 13 -> 14 upgrade creates the ui_state table, empty, and leaves '
+    'existing data alone',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v14_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v13 install: the current schema minus the v14 table, with
+      // `user_version` rolled back to 13. Nothing else is dropped: at
+      // `from == 13` no earlier branch runs.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+            ),
+          );
+      await _dropUiStateTable(seed);
+      await seed.customStatement('PRAGMA user_version = 13');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(await _columnNames(upgraded, 'ui_state'), {'id', 'last_tab'});
+      expect(await upgraded.select(upgraded.uiState).get(), isEmpty);
+      final settings = await upgraded.select(upgraded.settings).getSingle();
+      expect(settings.actingMemberId, 'member-1');
     },
   );
 }

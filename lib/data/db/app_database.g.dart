@@ -6034,6 +6034,225 @@ class ReminderSnoozesCompanion extends UpdateCompanion<ReminderSnooze> {
   }
 }
 
+class $UiStateTable extends UiState with TableInfo<$UiStateTable, UiStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UiStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastTabMeta = const VerificationMeta(
+    'lastTab',
+  );
+  @override
+  late final GeneratedColumn<String> lastTab = GeneratedColumn<String>(
+    'last_tab',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, lastTab];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ui_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UiStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('last_tab')) {
+      context.handle(
+        _lastTabMeta,
+        lastTab.isAcceptableOrUnknown(data['last_tab']!, _lastTabMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  UiStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UiStateRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      lastTab: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_tab'],
+      ),
+    );
+  }
+
+  @override
+  $UiStateTable createAlias(String alias) {
+    return $UiStateTable(attachedDatabase, alias);
+  }
+}
+
+class UiStateRow extends DataClass implements Insertable<UiStateRow> {
+  /// Constant primary key `'device'`; exactly one row ever exists.
+  final String id;
+
+  /// The `name` of the last-visible shell tab, or `NULL` for the default
+  /// (Chores). An unrecognized value is treated as the default at read time.
+  final String? lastTab;
+  const UiStateRow({required this.id, this.lastTab});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || lastTab != null) {
+      map['last_tab'] = Variable<String>(lastTab);
+    }
+    return map;
+  }
+
+  UiStateCompanion toCompanion(bool nullToAbsent) {
+    return UiStateCompanion(
+      id: Value(id),
+      lastTab: lastTab == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastTab),
+    );
+  }
+
+  factory UiStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UiStateRow(
+      id: serializer.fromJson<String>(json['id']),
+      lastTab: serializer.fromJson<String?>(json['lastTab']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'lastTab': serializer.toJson<String?>(lastTab),
+    };
+  }
+
+  UiStateRow copyWith({
+    String? id,
+    Value<String?> lastTab = const Value.absent(),
+  }) => UiStateRow(
+    id: id ?? this.id,
+    lastTab: lastTab.present ? lastTab.value : this.lastTab,
+  );
+  UiStateRow copyWithCompanion(UiStateCompanion data) {
+    return UiStateRow(
+      id: data.id.present ? data.id.value : this.id,
+      lastTab: data.lastTab.present ? data.lastTab.value : this.lastTab,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UiStateRow(')
+          ..write('id: $id, ')
+          ..write('lastTab: $lastTab')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, lastTab);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UiStateRow &&
+          other.id == this.id &&
+          other.lastTab == this.lastTab);
+}
+
+class UiStateCompanion extends UpdateCompanion<UiStateRow> {
+  final Value<String> id;
+  final Value<String?> lastTab;
+  final Value<int> rowid;
+  const UiStateCompanion({
+    this.id = const Value.absent(),
+    this.lastTab = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UiStateCompanion.insert({
+    required String id,
+    this.lastTab = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id);
+  static Insertable<UiStateRow> custom({
+    Expression<String>? id,
+    Expression<String>? lastTab,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (lastTab != null) 'last_tab': lastTab,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UiStateCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? lastTab,
+    Value<int>? rowid,
+  }) {
+    return UiStateCompanion(
+      id: id ?? this.id,
+      lastTab: lastTab ?? this.lastTab,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (lastTab.present) {
+      map['last_tab'] = Variable<String>(lastTab.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UiStateCompanion(')
+          ..write('id: $id, ')
+          ..write('lastTab: $lastTab, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6050,6 +6269,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ReminderSnoozesTable reminderSnoozes = $ReminderSnoozesTable(
     this,
   );
+  late final $UiStateTable uiState = $UiStateTable(this);
   late final Index choreOccurrencesChoreStatusIdx = Index(
     'chore_occurrences_chore_status_idx',
     'CREATE INDEX chore_occurrences_chore_status_idx ON chore_occurrences (chore_id, status)',
@@ -6076,6 +6296,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     shoppingItems,
     settings,
     reminderSnoozes,
+    uiState,
     choreOccurrencesChoreStatusIdx,
     choreOccurrencesStatusDueDateIdx,
     choreOccurrencesStatusClosedOnIdx,
@@ -11452,6 +11673,142 @@ typedef $$ReminderSnoozesTableProcessedTableManager =
       ReminderSnooze,
       PrefetchHooks Function({bool occurrenceId})
     >;
+typedef $$UiStateTableCreateCompanionBuilder =
+    UiStateCompanion Function({
+      required String id,
+      Value<String?> lastTab,
+      Value<int> rowid,
+    });
+typedef $$UiStateTableUpdateCompanionBuilder =
+    UiStateCompanion Function({
+      Value<String> id,
+      Value<String?> lastTab,
+      Value<int> rowid,
+    });
+
+class $$UiStateTableFilterComposer
+    extends Composer<_$AppDatabase, $UiStateTable> {
+  $$UiStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastTab => $composableBuilder(
+    column: $table.lastTab,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$UiStateTableOrderingComposer
+    extends Composer<_$AppDatabase, $UiStateTable> {
+  $$UiStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastTab => $composableBuilder(
+    column: $table.lastTab,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$UiStateTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UiStateTable> {
+  $$UiStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get lastTab =>
+      $composableBuilder(column: $table.lastTab, builder: (column) => column);
+}
+
+class $$UiStateTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $UiStateTable,
+          UiStateRow,
+          $$UiStateTableFilterComposer,
+          $$UiStateTableOrderingComposer,
+          $$UiStateTableAnnotationComposer,
+          $$UiStateTableCreateCompanionBuilder,
+          $$UiStateTableUpdateCompanionBuilder,
+          (
+            UiStateRow,
+            BaseReferences<_$AppDatabase, $UiStateTable, UiStateRow>,
+          ),
+          UiStateRow,
+          PrefetchHooks Function()
+        > {
+  $$UiStateTableTableManager(_$AppDatabase db, $UiStateTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UiStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UiStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$UiStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> lastTab = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UiStateCompanion(id: id, lastTab: lastTab, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> lastTab = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UiStateCompanion.insert(
+                id: id,
+                lastTab: lastTab,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$UiStateTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $UiStateTable,
+      UiStateRow,
+      $$UiStateTableFilterComposer,
+      $$UiStateTableOrderingComposer,
+      $$UiStateTableAnnotationComposer,
+      $$UiStateTableCreateCompanionBuilder,
+      $$UiStateTableUpdateCompanionBuilder,
+      (UiStateRow, BaseReferences<_$AppDatabase, $UiStateTable, UiStateRow>),
+      UiStateRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11474,4 +11831,6 @@ class $AppDatabaseManager {
       $$SettingsTableTableManager(_db, _db.settings);
   $$ReminderSnoozesTableTableManager get reminderSnoozes =>
       $$ReminderSnoozesTableTableManager(_db, _db.reminderSnoozes);
+  $$UiStateTableTableManager get uiState =>
+      $$UiStateTableTableManager(_db, _db.uiState);
 }

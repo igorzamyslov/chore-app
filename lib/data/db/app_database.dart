@@ -42,6 +42,7 @@ part 'app_database.g.dart';
     ShoppingItems,
     Settings,
     ReminderSnoozes,
+    UiState,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -54,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -229,6 +230,15 @@ class AppDatabase extends _$AppDatabase {
         // upgrade path itself is wrong -- which is worth finding out. Same
         // reasoning as the `from < 11` index above.
         await migrator.createTable(reminderSnoozes);
+      }
+      if (from < 14) {
+        // v13 -> v14 (spec `docs/specs/last-tab-restore.md` §2): the
+        // device-scoped, unsynced single-row `ui_state` table remembering the
+        // last tab -- no data rewrite. Flat and unconditional: the table is
+        // introduced HERE, so no install at any shipped version 1..13 can
+        // already carry it and a plain `createTable` is correct. Same
+        // reasoning as `reminder_snoozes` above.
+        await migrator.createTable(uiState);
       }
     },
     beforeOpen: (details) async {

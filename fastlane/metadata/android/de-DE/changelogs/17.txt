@@ -1,0 +1,3 @@
+Famdo öffnet sich jetzt dort, wo du aufgehört hast.
+
+Wenn du zuletzt die Einkaufsliste offen hattest, siehst du beim nächsten Start genau die. Genauso bei Aufgaben und Einstellungen.

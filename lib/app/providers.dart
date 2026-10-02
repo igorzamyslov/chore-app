@@ -63,6 +63,7 @@ import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/data/repositories/stats_repository.dart';
 import 'package:chore_app/data/repositories/sync_repository.dart';
+import 'package:chore_app/data/repositories/ui_state_repository.dart';
 import 'package:chore_app/domain/digest_planner.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/sync_health.dart';
@@ -207,6 +208,29 @@ final reminderSnoozeRepositoryProvider = Provider<ReminderSnoozeRepository>((
 ) {
   return ReminderSnoozeRepository(ref.watch(appDatabaseProvider));
 });
+
+/// The UI-state repository, built on [appDatabaseProvider] (spec
+/// `docs/specs/last-tab-restore.md` §2).
+final uiStateRepositoryProvider = Provider<UiStateRepository>((ref) {
+  return UiStateRepository(ref.watch(appDatabaseProvider));
+});
+
+/// The last-visible shell tab's stored name, read ONCE (spec
+/// `docs/specs/last-tab-restore.md` §3).
+///
+/// A [FutureProvider] and not a stream, deliberately: `AppShell` writes this
+/// value on every tab change, and a stream would feed each write straight
+/// back into a rebuild of the very shell that produced it. The shell takes
+/// its initial tab from this in `initState` and owns the value afterwards.
+///
+/// `autoDispose` so a data reset cannot leave a stale value behind: the reset
+/// flips the household gate to the welcome screen, which unmounts
+/// `_Bootstrapped` (the only watcher), and the next bootstrap re-reads the
+/// cleared row.
+final AutoDisposeFutureProvider<String?> lastTabProvider =
+    FutureProvider.autoDispose<String?>((ref) {
+      return ref.watch(uiStateRepositoryProvider).readLastTab();
+    });
 
 /// The device settings singleton row, kept in sync with the database.
 ///

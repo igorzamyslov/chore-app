@@ -6,7 +6,9 @@ import 'package:chore_app/data/db/app_database.dart';
 
 /// Deletes every row from every table, in one transaction, in the FK-safe
 /// order the spec spells out: reminder snoozes, occurrences, assignees,
-/// chores, shopping items, categories, members, settings, households.
+/// chores, shopping items, categories, members, settings, ui state (the
+/// remembered last tab, spec `docs/specs/last-tab-restore.md` §2),
+/// households.
 ///
 /// Leaves the database schema itself untouched -- only rows are removed.
 /// Wiping the `households` table flips `householdGateProvider`'s stream to
@@ -41,6 +43,7 @@ Future<void> resetAppData(AppDatabase database) {
     await database.delete(database.categories).go();
     await database.delete(database.members).go();
     await database.delete(database.settings).go();
+    await database.delete(database.uiState).go();
     await database.delete(database.households).go();
   });
 }

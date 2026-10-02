@@ -1,0 +1,45 @@
+# Last-tab restore (spec docs/specs/last-tab-restore.md): the app reopens on
+# the top-level tab the user was last on. Open Shopping, kill the process,
+# relaunch WITHOUT clearing state, and the shell must come up on Shopping --
+# not Chores.
+#
+# The relaunch's first-frame settle waits on a SHOPPING-screen-only element,
+# deliberately not on `shell.tab.chores` as the other warm-relaunch flows do
+# (README convention 8): the bottom bar is present on every tab, so waiting
+# on it would pass while the app was still showing (or had wrongly landed
+# on) the wrong tab. Waiting on `shopping.add.input` makes the wait itself
+# the restore assertion's first half.
+#
+# `stopApp` first so the relaunch is a genuine cold start of a fresh process
+# reading the persisted row, not a foreground of the still-running one.
+appId: ${APP_ID}
+tags:
+  - happy
+---
+- launchApp:
+    clearState: true
+# First-frame settle (README convention 8).
+- extendedWaitUntil:
+    visible:
+      id: "welcome.create"
+    timeout: 60000
+- runFlow: ../../common/onboard_fresh.yaml
+- assertVisible:
+    id: "chores.add"
+- tapOn:
+    id: "shell.tab.shopping"
+- assertVisible:
+    id: "shopping.add.input"
+- stopApp
+# Restart WITHOUT clearState: the shell must reopen on Shopping.
+- launchApp
+# Warm-relaunch first-frame settle (README convention 8), on an element only
+# the Shopping screen has.
+- extendedWaitUntil:
+    visible:
+      id: "shopping.add.input"
+    timeout: 60000
+- assertVisible:
+    id: "shopping.add.input"
+- assertNotVisible:
+    id: "chores.add"
