@@ -603,3 +603,28 @@ class ReminderSnoozes extends Table {
   @override
   Set<Column<Object>> get primaryKey => {occurrenceId};
 }
+
+/// Device-local UI state: the single row remembering which top-level tab the
+/// app was last on, so a cold start reopens there (spec
+/// `docs/specs/last-tab-restore.md`).
+///
+/// Deliberately NOT a column on [Settings]: `DigestRescheduleController`
+/// recomputes every scheduled notification on any `settingsProvider`
+/// emission, and a write on every tab switch must not trigger that. Nothing
+/// streams this table -- it is written blind and read once at startup.
+///
+/// Device-scoped and never synced, so it has no `householdId` and does not
+/// mix in [SyncDirtyColumn]. Not part of the data export, and wiped by
+/// `resetAppData`. Added in schemaVersion 14; see `AppDatabase.migration`.
+@DataClassName('UiStateRow')
+class UiState extends Table {
+  /// Constant primary key `'device'`; exactly one row ever exists.
+  TextColumn get id => text()();
+
+  /// The `name` of the last-visible shell tab, or `NULL` for the default
+  /// (Chores). An unrecognized value is treated as the default at read time.
+  TextColumn get lastTab => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}

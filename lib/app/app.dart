@@ -60,8 +60,16 @@ class _Bootstrapped extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bootstrap = ref.watch(bootstrapProvider);
+    // Spec `docs/specs/last-tab-restore.md` §3: the shell takes its initial
+    // tab from this one-shot read in `initState`, so it must have resolved
+    // before the shell is built or the first frame would paint Chores and
+    // jump. An ERROR here deliberately does not reach `_ErrorScaffold`: a
+    // lost remembered tab is never worth blocking startup, and the shell
+    // falls back to Chores when there is no value.
+    final lastTab = ref.watch(lastTabProvider);
     return bootstrap.when(
-      data: (_) => const AppShell(),
+      data: (_) =>
+          lastTab.isLoading ? const _LoadingScaffold() : const AppShell(),
       loading: () => const _LoadingScaffold(),
       error: (error, stackTrace) => _ErrorScaffold(
         error: error,

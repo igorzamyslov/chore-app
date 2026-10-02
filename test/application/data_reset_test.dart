@@ -1,6 +1,7 @@
 import 'package:chore_app/application/data_reset.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -109,6 +110,11 @@ Future<void> _seed(AppDatabase db) async {
           updatedAt: 't0',
         ),
       );
+  await db
+      .into(db.uiState)
+      .insert(
+        UiStateCompanion.insert(id: 'device', lastTab: const Value('shopping')),
+      );
 }
 
 void main() {
@@ -133,6 +139,7 @@ void main() {
     expect(await db.select(db.shoppingItems).get(), hasLength(1));
     expect(await db.select(db.settings).get(), hasLength(1));
     expect(await db.select(db.reminderSnoozes).get(), hasLength(1));
+    expect(await db.select(db.uiState).get(), hasLength(1));
 
     await resetAppData(db);
 
@@ -149,6 +156,9 @@ void main() {
     // table" is the guarantee this test asserts, and a reader should not
     // have to reason about FK cascades to see that it holds.
     expect(await db.select(db.reminderSnoozes).get(), isEmpty);
+    // The remembered last tab (spec `docs/specs/last-tab-restore.md` §2): a
+    // reset must reopen on Chores.
+    expect(await db.select(db.uiState).get(), isEmpty);
   });
 
   test('resetAppData is safe to call on an already-empty database', () async {

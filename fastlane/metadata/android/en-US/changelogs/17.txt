@@ -1,0 +1,3 @@
+Famdo now opens where you left off.
+
+If the shopping list was the last thing you had open, that's what you'll see next time you start the app. Same for chores and settings.

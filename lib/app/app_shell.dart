@@ -63,15 +63,15 @@ String _tabLabel(BuildContext context, _AppTab tab) {
 /// that collapses a nested `Semantics(identifier: ...)` into the merged
 /// node, silently dropping the very identifier E2E/widget tests need to
 /// select a tab by.
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   /// Creates the shell.
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   _AppTab _selected = _AppTab.chores;
 
   /// Drives the content [PageView].
@@ -83,7 +83,7 @@ class _AppShellState extends State<AppShell> {
   /// `docs/specs/testing-strategy.md` §2.4). Only a user's own drag animates,
   /// and then it is `PageScrollPhysics`' standard settle — no custom
   /// animation code, so `docs/specs/design-language.md`'s Motion rule holds.
-  final _pageController = PageController();
+  late final PageController _pageController;
 
   /// One scroll controller per tab, published into that tab's subtree by
   /// [_KeepAlivePage] via [PrimaryScrollController].
@@ -105,6 +105,20 @@ class _AppShellState extends State<AppShell> {
   /// state directly (it has no `BuildContext` of its own to look up via
   /// `ScaffoldMessenger.of`).
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Spec `docs/specs/last-tab-restore.md` §3: open on the remembered tab,
+    // already on the first frame. `_Bootstrapped` waits for this provider to
+    // resolve before building the shell. A missing, errored or unrecognized
+    // value (a tab renamed or removed in a later build) falls back to Chores.
+    final stored = ref.read(lastTabProvider).valueOrNull;
+    _selected =
+        _AppTab.values.where((tab) => tab.name == stored).firstOrNull ??
+        _AppTab.chores;
+    _pageController = PageController(initialPage: _selected.index);
+  }
 
   @override
   void dispose() {
@@ -229,7 +243,13 @@ class _AppShellState extends State<AppShell> {
   /// it, never reaches here, and so keeps its snackbar.
   void _onPageChanged(int index) {
     _messengerKey.currentState?.clearSnackBars();
-    setState(() => _selected = _AppTab.values[index]);
+    final tab = _AppTab.values[index];
+    setState(() => _selected = tab);
+    // Spec `docs/specs/last-tab-restore.md` §1: remember the visible tab, by
+    // whatever path it changed. Fire-and-forget: a failed write only loses
+    // the remembered tab. `onPageChanged` fires only on a real change, so
+    // re-tapping the active tab never writes.
+    unawaited(ref.read(uiStateRepositoryProvider).setLastTab(tab.name));
   }
 }
 
