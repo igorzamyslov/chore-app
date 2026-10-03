@@ -24,6 +24,7 @@ import 'package:chore_app/features/chores/chore_progress_card.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
 import 'package:chore_app/features/chores/chores_filter_bar.dart';
 import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
+import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
@@ -696,7 +697,11 @@ class _Body extends StatelessWidget {
         else
           for (final section in ChoreSection.values)
             if (bySection[section] case final tiles? when tiles.isNotEmpty) ...[
-              _SectionHeader(section: section, count: tiles.length),
+              _SectionHeader(
+                section: section,
+                count: tiles.length,
+                tone: _sectionTone(tiles, today),
+              ),
               for (final occurrence in tiles)
                 ChoreOccurrenceTile(
                   occurrence: occurrence,
@@ -746,26 +751,40 @@ class _ScrollableEmptyState extends StatelessWidget {
   }
 }
 
+/// The most severe [DueTone] among one section's [tiles] -- all tiles in a
+/// section share a tone except under Overdue, which mixes warning and
+/// error tiles.
+DueTone _sectionTone(List<OccurrenceWithChore> tiles, PlainDate today) {
+  return tiles
+      .map((tile) => dueTone(today: today, dueDate: tile.occurrence.dueDate))
+      .reduce((a, b) => a.index >= b.index ? a : b);
+}
+
 /// A due-date section's header (spec `docs/specs/theme-v2.md` §4.1 item 2,
 /// amending `docs/specs/design-language.md`'s whitespace-only header):
-/// `labelSmall` uppercase in `onSurfaceVariant` (`error` for Overdue) --
+/// `labelSmall` uppercase in `onSurfaceVariant` (or the [tone]'s accent:
+/// success for Today, the most severe tile's tone for Overdue) --
 /// produced by the widget via `.toUpperCase()`, never by an already-
 /// uppercase ARB string, so German capitalization stays natural in the
 /// translator's source -- a 1px `outlineVariant` hairline rule filling the
 /// remaining width, then the section's item [count] in `labelMedium`.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.section, required this.count});
+  const _SectionHeader({
+    required this.section,
+    required this.count,
+    required this.tone,
+  });
 
   final ChoreSection section;
   final int count;
+  final DueTone tone;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isOverdue = section == ChoreSection.overdue;
-    final labelColor = isOverdue
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurfaceVariant;
+    final labelColor =
+        dueToneColors(context, tone)?.accent ??
+        theme.colorScheme.onSurfaceVariant;
 
     final label = section.label(AppLocalizations.of(context));
 

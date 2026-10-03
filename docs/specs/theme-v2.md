@@ -74,8 +74,16 @@ global constant — that would break the light/dark switch.
 | Field | Light | Dark | Used by |
 | --- | --- | --- | --- |
 | `primaryOutline` | `#B9D8D0` | `#2C544C` | accent-bordered cards, selected chips |
-| `errorOutline` | `#EBD2C6` | `#43291D` | overdue tile border |
-| `errorChip` | `#F4DDD3` | `#3A241A` | overdue due-chip ground |
+| `errorOutline` | `#EBD2C6` | `#43291D` | tile border, overdue ≥ 7 days |
+| `errorChip` | `#F4DDD3` | `#3A241A` | due-chip ground, overdue ≥ 7 days |
+| `success` | `#3D7531` | `#9CC77D` | accent (left edge, header), due today |
+| `successContainer` | `#EEF4E6` | `#161E12` | tile ground, due today |
+| `successOutline` | `#D2E2C3` | `#2D4123` | tile border, due today |
+| `successChip` | `#DDEAD0` | `#22301A` | success due-chip ground (unused: Today hides the chip) |
+| `warning` | `#8C5A0C` | `#E2B062` | accent + chip ink, overdue < 7 days |
+| `warningContainer` | `#FBF2E1` | `#231C10` | tile ground, overdue < 7 days |
+| `warningOutline` | `#EEDDB9` | `#46361A` | tile border, overdue < 7 days |
+| `warningChip` | `#F5E5C4` | `#3A2D15` | due-chip ground, overdue < 7 days |
 | `onMemberColor` | `#FFFFFF` | `#1A1612` | initials on a member avatar |
 | `navBarBackground` | `#F1EBE1` | `#1B1714` | bottom tab bar |
 | `categoryTones` | see §1.3 | see §1.3 | category + member colors |
@@ -270,20 +278,34 @@ and must survive; ids marked *(new)* are to be added.
      card carries a screen-reader label of the same sentence (including
      the filter-active line, when shown).
 2. **Section headers** — `labelSmall` uppercase in `onSurfaceVariant`
-   (`error` for Overdue), a 1px `outlineVariant` rule filling the
+   (the section's tone accent instead: `success` for Today, and for
+   Overdue the most severe tile's tone — `error` if any tile is ≥ 7 days
+   late, else `warning`; see item 4), a 1px `outlineVariant` rule filling the
    remaining width, then the item count. Replaces the current
    whitespace-only header.
 3. **Occurrence tile** — the complete control becomes a **26dp ring inside
    a 48dp tap target** (`outline` border when open; filled `primary` with
    an `onPrimary` check when done), keeping id
-   `chores.occurrence.<id>.complete`. Metadata row: a 7dp category dot +
-   category name in `categoryTone`, then the member avatar + first name.
+   `chores.occurrence.<id>.complete`. Metadata row: the member avatar +
+   first name, then a 7dp category dot + category name in `categoryTone`
+   (assignee first since 0.12.0: who a chore belongs to is what a scan of
+   the list looks for).
    Due text moves to a trailing **chip** (`surfaceContainerHigh` /
    `onSurfaceVariant`). The note line stays. `more_vert` keeps id
    `chores.occurrence.<id>.menu`.
-4. **Overdue treatment (design option C)** — tile ground
-   `errorContainer`, border `errorOutline`, a 3dp `error` left edge, and
-   the due chip in `errorChip`/`error`. The text still says how late it
+4. **Status treatment (design option C, toned since 0.12.0)** — a tile
+   due today or overdue gets a tone container ground, a tone outline
+   border, a 3dp tone-accent left edge, and (overdue only) the due chip in
+   the tone's chip ground / accent ink. Tone by days overdue
+   (`lib/features/chores/due_tone.dart`):
+   - due today → **success** (`successContainer` / `successOutline` /
+     `success`);
+   - overdue 1–6 days → **warning** (`warningContainer` /
+     `warningOutline` / `warningChip` / `warning`);
+   - overdue ≥ 7 days → **error** (`errorContainer` / `errorOutline` /
+     `errorChip` / `error`);
+   - future → default surface, no edge.
+   The section header names the day and the chip text says how late it
    is: color is never the only signal.
 5. **Paused / Done today** — `surfaceContainerHigh` rows with a leading
    icon, a count in the header, and a chevron; expanded children are

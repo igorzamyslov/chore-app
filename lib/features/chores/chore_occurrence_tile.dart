@@ -2,13 +2,13 @@
 library;
 
 import 'package:chore_app/app/depth_card.dart';
-import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/chore_section.dart';
+import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -58,14 +58,16 @@ String overdueDueText(
 /// `docs/specs/ux-round-2.md` A1): a leading 26dp complete ring inside a
 /// 48dp tap target, vertically centered against a text block of the chore's
 /// title (titleMedium), a metadata row (bodySmall, onSurfaceVariant) showing
-/// the category dot + name, the assignee's avatar + first name (when
-/// assigned), and the due text as a trailing chip — shown on every tile
-/// where it adds information, in the theme's error colors when overdue —
+/// the assignee's avatar + first name (when assigned), the category dot +
+/// name, and the due text as a trailing chip — shown on every tile
+/// where it adds information, in the tile's [DueTone] colors when overdue —
 /// and, only when the chore has a note, a one-line ellipsized note row.
-/// Overdue tiles additionally tint their container (design option C): an
-/// `errorContainer` ground, an `errorOutline` border, and a 3dp `error` left
-/// edge. Tapping the trailing menu button or long-pressing anywhere on the
-/// tile opens the skip/edit/pause/delete action sheet via [onOpenMenu].
+/// Tiles due today or overdue additionally tint their container (design
+/// option C, see [dueTone]): a container ground, an outline border, and a
+/// 3dp accent left edge -- success when due today, warning when overdue by
+/// fewer than 7 days, error from 7 days on. Tapping the trailing menu
+/// button or long-pressing anywhere on the tile opens the
+/// skip/edit/pause/delete action sheet via [onOpenMenu].
 class ChoreOccurrenceTile extends StatelessWidget {
   /// Creates a tile for [occurrence].
   const ChoreOccurrenceTile({
@@ -84,10 +86,10 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// compute the tile's relative due text.
   final PlainDate today;
 
-  /// The list section this tile is rendered under. Drives overdue styling
-  /// and whether the due text is shown at all: under Today/Tomorrow the
-  /// header already states the due day, so repeating it on the tile is
-  /// noise (user feedback, see ux-round-2.md A1).
+  /// The list section this tile is rendered under. Drives whether the due
+  /// text is shown at all: under Today/Tomorrow the header already states
+  /// the due day, so repeating it on the tile is noise (user feedback, see
+  /// ux-round-2.md A1).
   final ChoreSection section;
 
   /// Called when the leading complete button is tapped.
@@ -103,13 +105,16 @@ class ChoreOccurrenceTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final notes = chore.notes;
-    final isOverdue = section == ChoreSection.overdue;
+    final toneColors = dueToneColors(
+      context,
+      dueTone(today: today, dueDate: occurrence.occurrence.dueDate),
+    );
 
-    // Overdue treatment (spec §4.1 item 4, design option C): a 3dp error
+    // Status treatment (spec §4.1 item 4, design option C): a 3dp accent
     // left edge, added as a plain leading sibling in the tile's own Row
     // (rather than wrapping the whole tile in another Row/Expanded layer)
     // so the InkWell/IconButton semantics subtree below keeps the exact
-    // same shape as the non-overdue tile.
+    // same shape as the neutral tile.
     final tile = semantic(
       'chores.occurrence.${chore.id}',
       child: InkWell(
@@ -118,13 +123,13 @@ class ChoreOccurrenceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
             children: [
-              if (isOverdue)
+              if (toneColors != null)
                 Padding(
                   padding: const EdgeInsets.only(right: 4, top: 4, bottom: 4),
                   child: Container(
                     width: 3,
                     constraints: const BoxConstraints(minHeight: 48),
-                    color: theme.colorScheme.error,
+                    color: toneColors.accent,
                   ),
                 ),
               semantic(
@@ -148,6 +153,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
                         occurrence: occurrence,
                         today: today,
                         section: section,
+                        toneColors: toneColors,
                       ),
                       if (notes != null && notes.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -171,16 +177,16 @@ class ChoreOccurrenceTile extends StatelessWidget {
       ),
     );
 
-    if (!isOverdue) {
+    if (toneColors == null) {
       return DepthCard(child: tile);
     }
 
-    // errorContainer ground + errorOutline border; color is never the only
-    // signal -- the due chip's text still spells out how late it is (see
-    // _DueChip).
+    // Tone container ground + outline border; color is never the only
+    // signal -- the section header names the day, and an overdue tile's due
+    // chip still spells out how late it is (see _DueChip).
     return DepthCard(
-      color: theme.colorScheme.errorContainer,
-      borderColor: famdoColors(context).errorOutline,
+      color: toneColors.container,
+      borderColor: toneColors.outline,
       child: tile,
     );
   }
@@ -211,8 +217,8 @@ class _CompleteRing extends StatelessWidget {
   }
 }
 
-/// The metadata row: a category dot + name (if categorized), the assignee
-/// avatar + first name (if assigned), and a trailing due chip — only under
+/// The metadata row: the assignee avatar + first name (if assigned), a
+/// category dot + name (if categorized), and a trailing due chip — only under
 /// sections where it adds information beyond the section header
 /// (Overdue/This week/This month/Later; hidden under Today/Tomorrow).
 class _MetadataRow extends StatelessWidget {
@@ -220,11 +226,13 @@ class _MetadataRow extends StatelessWidget {
     required this.occurrence,
     required this.today,
     required this.section,
+    required this.toneColors,
   });
 
   final OccurrenceWithChore occurrence;
   final PlainDate today;
   final ChoreSection section;
+  final DueToneColors? toneColors;
 
   bool get _showsDueText => switch (section) {
     ChoreSection.today || ChoreSection.tomorrow => false,
@@ -253,8 +261,10 @@ class _MetadataRow extends StatelessWidget {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          if (category != null) _CategoryDotName(category: category),
+          // Assignee first: "whose is this" is what a scan of the list
+          // looks for, so it sits at a fixed left position on every tile.
           if (assignee != null) _MemberAvatarName(member: assignee),
+          if (category != null) _CategoryDotName(category: category),
           if (_showsDueText)
             _DueChip(
               text: isOverdue
@@ -265,7 +275,7 @@ class _MetadataRow extends StatelessWidget {
                       today: today,
                       dueDate: dueDate,
                     ),
-              isOverdue: isOverdue,
+              toneColors: toneColors,
             ),
         ],
       ),
@@ -302,24 +312,20 @@ class _CategoryDotName extends StatelessWidget {
 
 /// The due text's trailing chip (spec `docs/specs/theme-v2.md` §4.1 item 3):
 /// `surfaceContainerHigh` ground, `onSurfaceVariant` ink, `labelMedium`,
-/// radius 8. An overdue tile swaps in `FamdoColors.errorChip`/`error` (item
-/// 4) -- the chip's own text still states how late it is, so color is never
-/// the only signal.
+/// radius 8. An overdue tile swaps in its tone's chip ground and accent ink
+/// ([toneColors], item 4) -- the chip's own text still states how late it
+/// is, so color is never the only signal.
 class _DueChip extends StatelessWidget {
-  const _DueChip({required this.text, required this.isOverdue});
+  const _DueChip({required this.text, required this.toneColors});
 
   final String text;
-  final bool isOverdue;
+  final DueToneColors? toneColors;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ink = isOverdue
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurfaceVariant;
-    final ground = isOverdue
-        ? famdoColors(context).errorChip
-        : theme.colorScheme.surfaceContainerHigh;
+    final ink = toneColors?.accent ?? theme.colorScheme.onSurfaceVariant;
+    final ground = toneColors?.chip ?? theme.colorScheme.surfaceContainerHigh;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
