@@ -496,12 +496,89 @@ provider `syncEngineProvider` re-evaluates on the linked state
 
 ### 8.5 Known limitations (P3, accepted)
 
-- `chore_assignees` has no tombstones (no `deleted_at` locally or on the
-  server, a P1 schema decision): removing an assignee deletes the local
-  row, which the push path cannot propagate — only inserts/replacements
-  sync. Practical impact is small (assignee edits regenerate the full
-  set, and the next full edit from any device converges it), but precise
-  removal propagation needs a schema change; revisit with P4.
+- ~~`chore_assignees` has no tombstones~~ — superseded by §8.6 (the
+  server columns existed all along; only the client never used them).
 - `households` and `members` push via UPDATE/insert-ignore respectively
   (their fail-closed grants forbid literal upserts) — an extension of
   §7.2's members reasoning, applied engine-wide.
+
+### 8.6 Hard-delete tombstones (client schema v15) — binding
+
+**The bug this fixes (found 2026-10-03).** Three local writes HARD-delete
+synced rows, and a hard delete has no row left to mark dirty, so the push
+path never saw it: the server copy stayed live forever, and every other
+device kept it.
+
+| Site (`ChoreRepository`) | Deletes | Reached from |
+|---|---|---|
+| `softDeleteChore` | the chore's pending occurrence | chore delete |
+| `deletePendingOccurrences` | the chore's pending occurrence(s) | pause, schedule edit (`ChoreService.updateChore`), reopen |
+| `updateChore` (assignee rewrite) | every `chore_assignees` row of the chore, then re-inserts the new set | chore edit |
+
+Visible effect on the OTHER device: after a pause→resume, a schedule edit
+or a reopen there are TWO pending occurrences of one chore (the ghost plus
+the new one) — a chore card that "was deleted" still shows, and
+`ChoreRepository.pendingOccurrenceOf` (`getSingleOrNull`) throws, which
+breaks `catchUpOverdue` on that device. Removed assignees resurrect on
+every device that pulls them. (A soft-deleted *chore* itself did sync —
+its `deleted_at` is pushed — and its leftover pending occurrence is hidden
+by the `chores.deleted_at IS NULL` display filters, but it is still a
+ghost row on the server.)
+
+The server already has `deleted_at` on `chore_occurrences` and
+`chore_assignees` (initial schema) and grants UPDATE on both. **No server
+migration.** Locally these two tables keep their hard-delete semantics —
+no `deletedAt` column, no query changes; a tombstone is an outbox entry.
+
+1. **Outbox table `SyncTombstones`** (schema v14→v15, `createTable`):
+   `id` integer autoincrement PK, `entity` text (`'chore_occurrences'` |
+   `'chore_assignees'`), `rowId` text (occurrence id, or the assignee's
+   `chore_id`), `memberId` nullable text (assignees only), `deletedAt`
+   text (ISO UTC, the same `_isoNow()` clock as the delete). Not a synced
+   table: no `syncDirty`, never pulled, never uploaded by adopt.
+2. **Recording.** The three sites above insert one tombstone per row they
+   actually delete, in the same transaction as the delete (select the
+   victims first, then delete). `updateChore`'s assignee rewrite
+   tombstones only members in old-set minus new-set — a member kept
+   across the edit is re-inserted dirty and needs no tombstone.
+   Local WIPES are not deletions and record nothing: `data_reset.dart`
+   and `HouseholdJoinService`'s replace both also clear `SyncTombstones`.
+3. **Push** (`_pushTombstones`, runs LAST in `_pushAll`, after
+   `_pushShoppingItems`): for each tombstone, oldest first — if a local
+   row with that key exists again (assignee re-added), drop the tombstone
+   without a network call; else `SyncTransport.markDeleted(entity, key,
+   deletedAt)` → PostgREST `update({'deleted_at': ...})` matched on the
+   key (`id`, or `chore_id`+`member_id`) — never an upsert (a tombstone
+   carries no full row). An UPDATE matching zero rows (never pushed) is
+   success. Then delete exactly that tombstone row by `id`. Throws like
+   every other push step.
+4. **Resurrection on push.** `choreAssigneeRow` and `choreOccurrenceRow`
+   send `'deleted_at': null`, so re-adding a previously removed assignee
+   (same composite key) un-tombstones the server row.
+5. **Pull.** A pulled `chore_occurrences`/`chore_assignees` row with
+   non-null `deleted_at` is applied as a local hard delete of that key —
+   unless the local row exists and is `syncDirty` (local dirty wins, the
+   same LWW rule as §8.3; the dirty row's push then sends
+   `deleted_at: null`). The P2 full download (`downloadHousehold`, used by
+   join/reconnect) skips such rows entirely.
+6. **Ghost repair** (the rows the old client already orphaned). Inside
+   the pull transaction, after applying, for every chore of the household
+   with MORE THAN ONE pending occurrence: keep the one with the greatest
+   `updatedAt` (tie: greater `dueDate`, then greater `id`), hard-delete
+   the others through the same tombstone-recording path as §8.6.2. The
+   product invariant is "at most one pending occurrence per chore"
+   (`occurrence-lifecycle.md`), so a second one can only be a ghost; the
+   latest-`updatedAt` survivor is the one a schedule edit, resume or
+   reopen just wrote. Converges: the device that already has one pending
+   pulls the tombstone as a no-op.
+7. **Trigger.** The engine's write listener also watches `SyncTombstones`.
+8. **Testing.** Engine tests with the fake transport (push sends
+   `markDeleted` and clears the outbox; re-added assignee drops its
+   tombstone with no call; pull of a tombstoned occurrence deletes the
+   clean local row and keeps a dirty one; ghost repair keeps the right
+   survivor and records a tombstone); repository tests for the three
+   recording sites; a v14→v15 migration test; and a live test
+   (`test_live/`, real `SupabaseSyncTransport` against the local stack in
+   `db.yml`) proving `markDeleted` really sets `deleted_at` under RLS and
+   that a second client's `pullTable` sees it.
+

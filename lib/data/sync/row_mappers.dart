@@ -177,6 +177,10 @@ Map<String, Object?> choreAssigneeRow(
   'member_id': assignee.memberId,
   'household_id': choreHouseholdIds[assignee.choreId],
   'position': assignee.position,
+  // Always explicit, so re-adding a previously removed assignee (same
+  // composite key) un-tombstones the server row (spec
+  // `docs/specs/sync-backend.md` §8.6.4).
+  'deleted_at': null,
 };
 
 /// Maps a server `chore_assignees` row to a local [ChoreAssignee] (pull),
@@ -205,6 +209,8 @@ Map<String, Object?> choreOccurrenceRow(
   'closed_on': occurrence.closedOn?.toIso8601(),
   'created_at': occurrence.createdAt,
   'updated_at': occurrence.updatedAt,
+  // Explicit for symmetry with `choreAssigneeRow` (spec §8.6.4).
+  'deleted_at': null,
 };
 
 /// Maps a server `chore_occurrences` row to a local [ChoreOccurrence]

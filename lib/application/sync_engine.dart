@@ -185,6 +185,19 @@ abstract class SyncTransport {
   /// it out for members.
   Future<void> updateHousehold(String id, Map<String, Object?> columns);
 
+  /// Sets `deleted_at` to [deletedAt] on the [table] row(s) matching
+  /// [match] (column to value: `{'id': ...}` for an occurrence,
+  /// `{'chore_id': ..., 'member_id': ...}` for an assignee) -- the push half
+  /// of a local HARD delete (spec `docs/specs/sync-backend.md` §8.6.3).
+  ///
+  /// An UPDATE, never an upsert: a tombstone carries no full row. Matching
+  /// zero rows (the row was never pushed) is success, not an error.
+  Future<void> markDeleted(
+    String table,
+    Map<String, Object?> match,
+    String deletedAt,
+  );
+
   /// One realtime subscription for [householdId]: emits an event (payload
   /// ignored -- data always comes from [pullTable], spec §8.3d) on any
   /// change to a row scoped to [householdId], across every synced table.
@@ -278,6 +291,7 @@ class SupabaseSyncEngine implements SyncEngine {
             db.choreAssignees,
             db.choreOccurrences,
             db.shoppingItems,
+            db.syncTombstones,
           ]),
         )
         .listen((_) => _scheduleDebouncedPush());
@@ -390,6 +404,7 @@ class SupabaseSyncEngine implements SyncEngine {
     await _pushChoreAssignees();
     await _pushChoreOccurrences();
     await _pushShoppingItems();
+    await _pushTombstones();
   }
 
   @override
@@ -520,14 +535,34 @@ class SupabaseSyncEngine implements SyncEngine {
         await _sync.applyPulledChore(choreFromRow(row));
       }
       for (final row in assigneeRows) {
-        await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
+        // A tombstoned row is a local hard delete, not an apply (spec
+        // `docs/specs/sync-backend.md` §8.6.5).
+        if (row['deleted_at'] != null) {
+          await _sync.applyPulledAssigneeDeletion(
+            row['chore_id']! as String,
+            row['member_id']! as String,
+          );
+        } else {
+          await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
+        }
       }
       for (final row in occurrenceRows) {
-        await _sync.applyPulledChoreOccurrence(choreOccurrenceFromRow(row));
+        if (row['deleted_at'] != null) {
+          await _sync.applyPulledOccurrenceDeletion(row['id']! as String);
+        } else {
+          await _sync.applyPulledChoreOccurrence(choreOccurrenceFromRow(row));
+        }
       }
       for (final row in itemRows) {
         await _sync.applyPulledShoppingItem(shoppingItemFromRow(row));
       }
+      // Ghost repair (spec §8.6.6): last, so it sees the final applied
+      // state. Records tombstones for what it deletes; they ride the next
+      // push.
+      await _sync.repairGhostOccurrences(
+        householdId,
+        DateTime.now().toUtc().toIso8601String(),
+      );
     });
 
     // Cursor stored only after the transaction above commits (spec §8.3).
@@ -672,6 +707,32 @@ class SupabaseSyncEngine implements SyncEngine {
     }
   }
 
+  /// Pushes the hard-delete outbox (spec `docs/specs/sync-backend.md`
+  /// §8.6.3), oldest first. An assignee that was removed and then re-added
+  /// has a local row again: its tombstone is dropped with no network call
+  /// (the re-added row's own push already sends `deleted_at: null`).
+  /// Otherwise [SyncTransport.markDeleted], then delete exactly that
+  /// tombstone. Throws like every other push step.
+  Future<void> _pushTombstones() async {
+    for (final tombstone in await _sync.pendingTombstones()) {
+      final memberId = tombstone.memberId;
+      final isAssignee = tombstone.entity == 'chore_assignees';
+      final readded = isAssignee
+          ? await _sync.assigneeExists(tombstone.rowId, memberId!)
+          : await _sync.occurrenceExists(tombstone.rowId);
+      if (!readded) {
+        await transport.markDeleted(
+          tombstone.entity,
+          isAssignee
+              ? {'chore_id': tombstone.rowId, 'member_id': memberId}
+              : {'id': tombstone.rowId},
+          tombstone.deletedAt,
+        );
+      }
+      await _sync.deleteTombstone(tombstone.id);
+    }
+  }
+
   /// Failure posture (spec §8.3): every engine error is swallowed into a
   /// silent retry-later; the app never surfaces sync errors in P3. This is
   /// the one place that happens, so both [pushDirty] and [pullSince] read
@@ -752,6 +813,17 @@ class SupabaseSyncTransport implements SyncTransport {
   @override
   Future<void> updateHousehold(String id, Map<String, Object?> columns) async {
     await _client.from('households').update(columns).eq('id', id);
+  }
+
+  @override
+  Future<void> markDeleted(
+    String table,
+    Map<String, Object?> match,
+    String deletedAt,
+  ) async {
+    await _client.from(table).update({'deleted_at': deletedAt}).match({
+      for (final entry in match.entries) entry.key: entry.value!,
+    });
   }
 
   @override

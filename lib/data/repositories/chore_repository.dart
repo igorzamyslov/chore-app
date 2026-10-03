@@ -3,6 +3,7 @@ library;
 
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
+import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:drift/drift.dart';
@@ -227,6 +228,27 @@ class ChoreRepository {
       );
 
       if (assigneeMemberIds != null) {
+        // Select the victims first and tombstone only members in (old set -
+        // new set) (spec `docs/specs/sync-backend.md` §8.6.2): a member
+        // KEPT across the edit is re-inserted dirty below and needs no
+        // tombstone -- its server row is simply upserted again.
+        final old = await (db.select(
+          db.choreAssignees,
+        )..where((tbl) => tbl.choreId.equals(id))).get();
+        final keep = assigneeMemberIds.toSet();
+        final now = _isoNow();
+        for (final row in old.where((row) => !keep.contains(row.memberId))) {
+          await db
+              .into(db.syncTombstones)
+              .insert(
+                SyncTombstonesCompanion.insert(
+                  entity: 'chore_assignees',
+                  rowId: row.choreId,
+                  memberId: Value(row.memberId),
+                  deletedAt: now,
+                ),
+              );
+        }
         await (db.delete(
           db.choreAssignees,
         )..where((tbl) => tbl.choreId.equals(id))).go();
@@ -248,12 +270,7 @@ class ChoreRepository {
           syncDirty: syncDirtyOnWrite,
         ),
       );
-      await (db.delete(db.choreOccurrences)..where(
-            (tbl) =>
-                tbl.choreId.equals(id) &
-                tbl.status.equalsValue(OccurrenceStatus.pending),
-          ))
-          .go();
+      await _deletePendingOccurrences(id, now);
     });
   }
 
@@ -453,14 +470,25 @@ class ChoreRepository {
         );
   }
 
-  /// Hard-deletes every pending occurrence of [choreId].
-  Future<void> deletePendingOccurrences(String choreId) async {
-    await (db.delete(db.choreOccurrences)..where(
-          (tbl) =>
-              tbl.choreId.equals(choreId) &
-              tbl.status.equalsValue(OccurrenceStatus.pending),
-        ))
-        .go();
+  /// Hard-deletes every pending occurrence of [choreId], recording a
+  /// tombstone per deleted row so the server copy is marked deleted too
+  /// (spec `docs/specs/sync-backend.md` §8.6).
+  Future<void> deletePendingOccurrences(String choreId) => db.transaction(
+    () => _deletePendingOccurrences(choreId, _isoNow()),
+  );
+
+  /// The shared "select victims, tombstone, delete" step behind
+  /// [softDeleteChore] and [deletePendingOccurrences]; must run inside a
+  /// transaction (both callers open one).
+  Future<void> _deletePendingOccurrences(String choreId, String now) async {
+    final victims =
+        await (db.select(db.choreOccurrences)..where(
+              (tbl) =>
+                  tbl.choreId.equals(choreId) &
+                  tbl.status.equalsValue(OccurrenceStatus.pending),
+            ))
+            .get();
+    await SyncRepository(db).deleteOccurrencesRecordingTombstones(victims, now);
   }
 
   /// Returns the most recently closed (done/skipped/missed) occurrence of

@@ -873,4 +873,300 @@ void main() {
       },
     );
   });
+
+  group('SupabaseSyncEngine hard-delete tombstones (spec §8.6)', () {
+    late AppDatabase db;
+    late HouseholdRepository households;
+    late ChoreRepository chores;
+    late Household household;
+    late FakeSyncTransport transport;
+    late SupabaseSyncEngine engine;
+    late String owner;
+
+    setUp(() async {
+      db = AppDatabase(NativeDatabase.memory());
+      households = HouseholdRepository(db);
+      chores = ChoreRepository(db);
+      household = await households.createLocalHousehold('Me');
+      owner = (await db.select(db.members).getSingle()).id;
+      transport = FakeSyncTransport();
+      engine = SupabaseSyncEngine(
+        db: db,
+        transport: transport,
+        settings: SettingsRepository(db),
+        householdId: household.id,
+      );
+    });
+
+    tearDown(() async {
+      engine.stop();
+      await db.close();
+    });
+
+    Future<Chore> fixedChore() => chores.createChore(
+      householdId: household.id,
+      title: 'T',
+      startDate: PlainDate(2026, 1, 1),
+      assignmentMode: AssignmentMode.fixed,
+      assigneeMemberIds: [owner],
+    );
+
+    Future<List<SyncTombstone>> outbox() => db.select(db.syncTombstones).get();
+
+    /// Makes the fake server's `updated_at` newer than the pull cursor the
+    /// push left behind, so the next pull sees a row changed on the server.
+    void serverTouched(Map<String, Object?> row, {required String? deletedAt}) {
+      transport.now = DateTime.utc(2026, 2);
+      row['deleted_at'] = deletedAt;
+      row['updated_at'] = transport.now.toIso8601String();
+    }
+
+    test(
+      'pushed assignee and occurrence rows carry deleted_at: null',
+      () async {
+        final chore = await fixedChore();
+        await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+
+        await engine.pushDirty();
+
+        for (final table in const ['chore_assignees', 'chore_occurrences']) {
+          final row = transport.serverRows[table]!.single;
+          expect(row.containsKey('deleted_at'), isTrue, reason: table);
+          expect(row['deleted_at'], isNull, reason: table);
+        }
+      },
+    );
+
+    test('push marks a deleted occurrence on the server and empties the '
+        'outbox', () async {
+      final chore = await fixedChore();
+      final occurrence = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 5),
+      );
+      await engine.pushDirty();
+
+      await chores.softDeleteChore(chore.id);
+      expect(await outbox(), hasLength(1));
+      transport.now = DateTime.utc(2026, 3);
+      await engine.pushDirty();
+
+      expect(transport.markDeletedCalls, hasLength(1));
+      final call = transport.markDeletedCalls.single;
+      expect(call.table, 'chore_occurrences');
+      expect(call.match, {'id': occurrence.id});
+      final serverRow = transport.serverRows['chore_occurrences']!.single;
+      expect(serverRow['deleted_at'], call.deletedAt);
+      expect(serverRow['updated_at'], DateTime.utc(2026, 3).toIso8601String());
+      expect(await outbox(), isEmpty);
+    });
+
+    test('push marks a removed assignee by its composite key', () async {
+      final other = await households.addMember(
+        household.id,
+        name: 'Jo',
+        color: 1,
+      );
+      final third = await households.addMember(
+        household.id,
+        name: 'T3',
+        color: 2,
+      );
+      final chore = await chores.createChore(
+        householdId: household.id,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.rotation,
+        assigneeMemberIds: [owner, other.id, third.id],
+      );
+      await engine.pushDirty();
+
+      await chores.updateChore(chore.id, assigneeMemberIds: [owner, third.id]);
+      await engine.pushDirty();
+
+      expect(transport.markDeletedCalls, hasLength(1));
+      expect(transport.markDeletedCalls.single.table, 'chore_assignees');
+      expect(transport.markDeletedCalls.single.match, {
+        'chore_id': chore.id,
+        'member_id': other.id,
+      });
+      final removed = transport.serverRows['chore_assignees']!.singleWhere(
+        (row) => row['member_id'] == other.id,
+      );
+      expect(removed['deleted_at'], isNotNull);
+      expect(await outbox(), isEmpty);
+    });
+
+    test(
+      'a tombstone for a never-pushed row is harmless (zero matches)',
+      () async {
+        final chore = await fixedChore();
+        await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await chores.softDeleteChore(chore.id);
+
+        await engine.pushDirty();
+
+        expect(transport.markDeletedCalls, hasLength(1));
+        expect(transport.serverRows['chore_occurrences'], isEmpty);
+        expect(await outbox(), isEmpty);
+      },
+    );
+
+    test(
+      'a re-added assignee drops its tombstone with no network call',
+      () async {
+        final b = await households.addMember(household.id, name: 'B', color: 1);
+        final c = await households.addMember(household.id, name: 'C', color: 2);
+        final chore = await chores.createChore(
+          householdId: household.id,
+          title: 'T',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          assigneeMemberIds: [owner, b.id],
+        );
+        await engine.pushDirty();
+
+        await chores.updateChore(chore.id, assigneeMemberIds: [owner, c.id]);
+        await chores.updateChore(chore.id, assigneeMemberIds: [owner, b.id]);
+        // Tombstones: b (first edit), c (second edit). b is back locally.
+        expect(await outbox(), hasLength(2));
+
+        await engine.pushDirty();
+
+        expect(transport.markDeletedCalls, hasLength(1));
+        expect(transport.markDeletedCalls.single.match['member_id'], c.id);
+        expect(await outbox(), isEmpty);
+        final reAdded = transport.serverRows['chore_assignees']!.singleWhere(
+          (row) => row['member_id'] == b.id,
+        );
+        expect(reAdded['deleted_at'], isNull);
+      },
+    );
+
+    test(
+      'pull of a tombstoned occurrence deletes the clean local row',
+      () async {
+        final chore = await fixedChore();
+        final occurrence = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await engine.pushDirty();
+        serverTouched(
+          transport.serverRows['chore_occurrences']!.single,
+          deletedAt: '2026-02-01T00:00:00.000Z',
+        );
+
+        await engine.pullSince();
+
+        expect(await chores.getOccurrence(occurrence.id), isNull);
+        expect(await outbox(), isEmpty);
+      },
+    );
+
+    test('pull of a tombstoned occurrence keeps a locally dirty row', () async {
+      final chore = await fixedChore();
+      final occurrence = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 5),
+      );
+      await engine.pushDirty();
+      await (db.update(db.choreOccurrences)
+            ..where((tbl) => tbl.id.equals(occurrence.id)))
+          .write(const ChoreOccurrencesCompanion(syncDirty: Value(true)));
+      serverTouched(
+        transport.serverRows['chore_occurrences']!.single,
+        deletedAt: '2026-02-01T00:00:00.000Z',
+      );
+
+      await engine.pullSince();
+
+      expect(await chores.getOccurrence(occurrence.id), isNotNull);
+    });
+
+    test('pull of a tombstoned assignee deletes it locally', () async {
+      final b = await households.addMember(household.id, name: 'B', color: 1);
+      final chore = await chores.createChore(
+        householdId: household.id,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.rotation,
+        assigneeMemberIds: [owner, b.id],
+      );
+      await engine.pushDirty();
+      serverTouched(
+        transport.serverRows['chore_assignees']!.singleWhere(
+          (row) => row['member_id'] == b.id,
+        ),
+        deletedAt: '2026-02-01T00:00:00.000Z',
+      );
+
+      await engine.pullSince();
+
+      final left = await (db.select(
+        db.choreAssignees,
+      )..where((tbl) => tbl.choreId.equals(chore.id))).get();
+      expect(left.map((row) => row.memberId), [owner]);
+    });
+
+    test('ghost repair keeps the latest-updated pending occurrence and '
+        'tombstones the rest', () async {
+      final chore = await fixedChore();
+      final ghost = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 3, 1),
+      );
+      final survivor = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 1),
+      );
+      Future<void> stamp(String id, String updatedAt) =>
+          (db.update(db.choreOccurrences)..where((tbl) => tbl.id.equals(id)))
+              .write(ChoreOccurrencesCompanion(updatedAt: Value(updatedAt)));
+      await stamp(ghost.id, '2026-01-01T00:00:00.000Z');
+      await stamp(survivor.id, '2026-01-02T00:00:00.000Z');
+
+      await engine.pullSince();
+
+      final pending = await chores.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, survivor.id);
+      final rows = await outbox();
+      expect(rows, hasLength(1));
+      expect(rows.single.entity, 'chore_occurrences');
+      expect(rows.single.rowId, ghost.id);
+    });
+
+    test(
+      'ghost repair breaks an updatedAt tie by the later due date',
+      () async {
+        final chore = await fixedChore();
+        final early = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 1),
+        );
+        final later = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 3, 1),
+        );
+        await db
+            .update(db.choreOccurrences)
+            .write(
+              const ChoreOccurrencesCompanion(
+                updatedAt: Value('2026-01-01T00:00:00.000Z'),
+              ),
+            );
+
+        await engine.pullSince();
+
+        expect((await chores.pendingOccurrenceOf(chore.id))!.id, later.id);
+        expect((await outbox()).single.rowId, early.id);
+      },
+    );
+  });
 }

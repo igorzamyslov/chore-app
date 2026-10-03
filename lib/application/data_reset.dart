@@ -44,6 +44,10 @@ Future<void> resetAppData(AppDatabase database) {
     await database.delete(database.members).go();
     await database.delete(database.settings).go();
     await database.delete(database.uiState).go();
+    // A wipe is not a deletion: pending hard-delete tombstones (spec
+    // `docs/specs/sync-backend.md` §8.6) describe a household that no longer
+    // exists locally.
+    await database.delete(database.syncTombstones).go();
     await database.delete(database.households).go();
   });
 }

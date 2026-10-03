@@ -439,6 +439,10 @@ class HouseholdJoinService {
   /// locally (only the server denormalizes it, per spec §2) so they're
   /// scoped via their chore's id instead.
   Future<void> _deleteHousehold(String householdId) async {
+    // A replace is a wipe, not a deletion: queued hard-delete tombstones
+    // (spec `docs/specs/sync-backend.md` §8.6) belong to the household being
+    // replaced and must not be pushed against the new one.
+    await database.delete(database.syncTombstones).go();
     final choreRows = await (database.select(
       database.chores,
     )..where((tbl) => tbl.householdId.equals(householdId))).get();
