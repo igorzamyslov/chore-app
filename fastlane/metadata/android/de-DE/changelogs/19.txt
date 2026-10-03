@@ -1,0 +1,3 @@
+Doppelte Aufgaben auf dem zweiten Handy behoben.
+
+Wurde eine Aufgabe auf einem Handy bearbeitet, pausiert oder wieder geöffnet, konnte das andere Handy die alte Version neben der neuen weiter anzeigen. Auch entfernte Zuständige konnten zurückkommen. Vorhandene Duplikate verschwinden nach dem nächsten Sync, sobald beide Handys aktualisiert sind.

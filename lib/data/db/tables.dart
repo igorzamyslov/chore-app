@@ -628,3 +628,36 @@ class UiState extends Table {
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
+
+/// Local outbox of HARD deletes of synced rows that the server has yet to
+/// hear about (spec `docs/specs/sync-backend.md` §8.6).
+///
+/// `chore_occurrences` and `chore_assignees` keep hard-delete semantics
+/// locally (no `deletedAt` column), and a hard delete leaves no row to mark
+/// `syncDirty`, so the push path never saw it and the server copy stayed
+/// live forever. One row here per such delete tells the engine to set
+/// `deleted_at` on the server copy (`SyncTransport.markDeleted`), after
+/// which the entry is removed.
+///
+/// Device-scoped and never synced itself: no `syncDirty`, never pulled,
+/// never uploaded by adopt. Local WIPES (`resetAppData`, the join replace)
+/// are not deletions and clear this table instead of recording into it.
+/// Added in schemaVersion 15; see `AppDatabase.migration`.
+@DataClassName('SyncTombstone')
+class SyncTombstones extends Table {
+  /// Autoincrement primary key; push order is ascending `id`.
+  IntColumn get id => integer().autoIncrement()();
+
+  /// The server table the deleted row lived in: `'chore_occurrences'` or
+  /// `'chore_assignees'`.
+  TextColumn get entity => text()();
+
+  /// The occurrence id, or (for an assignee) its `chore_id`.
+  TextColumn get rowId => text()();
+
+  /// The assignee's `member_id`; `NULL` for occurrences.
+  TextColumn get memberId => text().nullable()();
+
+  /// ISO-8601 UTC timestamp of the delete (the repository's `_isoNow()`).
+  TextColumn get deletedAt => text()();
+}

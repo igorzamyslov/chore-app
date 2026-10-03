@@ -855,4 +855,111 @@ void main() {
       expect(emissions.last, 1);
     });
   });
+
+  group('hard-delete tombstones (spec sync-backend.md §8.6.2)', () {
+    Future<List<SyncTombstone>> tombstones() => (db.select(
+      db.syncTombstones,
+    )..orderBy([(tbl) => OrderingTerm(expression: tbl.id)])).get();
+
+    Future<Chore> rotationChore(List<String> members) => repo.createChore(
+      householdId: householdId,
+      title: 'T',
+      startDate: PlainDate(2026, 1, 1),
+      assignmentMode: AssignmentMode.rotation,
+      assigneeMemberIds: members,
+    );
+
+    test('softDeleteChore tombstones the pending occurrence only', () async {
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 5),
+      );
+      final closed = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2025, 12, 20),
+      );
+      await repo.closeOccurrence(
+        closed.id,
+        status: OccurrenceStatus.done,
+        closedOn: PlainDate(2025, 12, 20),
+      );
+
+      await repo.softDeleteChore(chore.id);
+
+      final rows = await tombstones();
+      expect(rows, hasLength(1));
+      expect(rows.single.entity, 'chore_occurrences');
+      expect(rows.single.rowId, pending.id);
+      expect(rows.single.memberId, isNull);
+      expect(rows.single.deletedAt, DateTime.utc(2026).toIso8601String());
+    });
+
+    test('deletePendingOccurrences tombstones each deleted row', () async {
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final a = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 5),
+      );
+      final b = await repo.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 2, 5),
+      );
+
+      await repo.deletePendingOccurrences(chore.id);
+
+      expect((await tombstones()).map((t) => t.rowId), {a.id, b.id});
+    });
+
+    test(
+      'deletePendingOccurrences with nothing pending records nothing',
+      () async {
+        final chore = await repo.createChore(
+          householdId: householdId,
+          title: 'T',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.deletePendingOccurrences(chore.id);
+        expect(await tombstones(), isEmpty);
+      },
+    );
+
+    test('updateChore tombstones only the members that were removed', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final m3 = await _insertMember(db, 'm3', householdId);
+      final chore = await rotationChore([m1, m2]);
+
+      // m2 is kept (and moves position); m1 is removed; m3 is new.
+      await repo.updateChore(chore.id, assigneeMemberIds: [m2, m3]);
+
+      final rows = await tombstones();
+      expect(rows, hasLength(1));
+      expect(rows.single.entity, 'chore_assignees');
+      expect(rows.single.rowId, chore.id);
+      expect(rows.single.memberId, m1);
+    });
+
+    test('updateChore keeping every assignee records no tombstone', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final chore = await rotationChore([m1, m2]);
+
+      await repo.updateChore(chore.id, assigneeMemberIds: [m2, m1]);
+      await repo.updateChore(chore.id, title: 'Renamed');
+
+      expect(await tombstones(), isEmpty);
+    });
+  });
 }

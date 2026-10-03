@@ -280,6 +280,124 @@ class SyncRepository {
     write: () => db.into(db.shoppingItems).insertOnConflictUpdate(pulled),
   );
 
+  // ---------------------------------------------------------------------
+  // Hard-delete tombstones (spec `docs/specs/sync-backend.md` §8.6).
+
+  /// Hard-deletes [victims] (occurrences) and records one tombstone per
+  /// row, stamped [deletedAt], in one transaction. THE single code path for
+  /// "delete an occurrence and tell the server": the three repository
+  /// sites and the pull-side ghost repair all go through it.
+  Future<void> deleteOccurrencesRecordingTombstones(
+    List<ChoreOccurrence> victims,
+    String deletedAt,
+  ) => db.transaction(() async {
+    for (final victim in victims) {
+      await db
+          .into(db.syncTombstones)
+          .insert(
+            SyncTombstonesCompanion.insert(
+              entity: 'chore_occurrences',
+              rowId: victim.id,
+              deletedAt: deletedAt,
+            ),
+          );
+      await (db.delete(
+        db.choreOccurrences,
+      )..where((tbl) => tbl.id.equals(victim.id))).go();
+    }
+  });
+
+  /// Every pending tombstone, oldest first (ascending `id`).
+  Future<List<SyncTombstone>> pendingTombstones() => (db.select(
+    db.syncTombstones,
+  )..orderBy([(tbl) => OrderingTerm(expression: tbl.id)])).get();
+
+  /// Removes the tombstone [id] -- exactly that row, so one recorded while a
+  /// push was in flight survives.
+  Future<void> deleteTombstone(int id) =>
+      (db.delete(db.syncTombstones)..where((tbl) => tbl.id.equals(id))).go();
+
+  /// Whether a local `chore_occurrences` row with [id] exists.
+  Future<bool> occurrenceExists(String id) async =>
+      await (db.select(
+        db.choreOccurrences,
+      )..where((tbl) => tbl.id.equals(id))).getSingleOrNull() !=
+      null;
+
+  /// Whether a local `chore_assignees` row keyed [choreId] + [memberId]
+  /// exists.
+  Future<bool> assigneeExists(String choreId, String memberId) async =>
+      await (db.select(db.choreAssignees)..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) & tbl.memberId.equals(memberId),
+          ))
+          .getSingleOrNull() !=
+      null;
+
+  /// Applies a pulled tombstone for the `chore_occurrences` row [id]: a
+  /// local hard delete, unless the local row is `syncDirty` (local dirty
+  /// wins, §8.3; its push sends `deleted_at: null`). No tombstone is
+  /// recorded -- the server already knows.
+  Future<void> applyPulledOccurrenceDeletion(String id) => (db.delete(
+    db.choreOccurrences,
+  )..where((tbl) => tbl.id.equals(id) & tbl.syncDirty.equals(false))).go();
+
+  /// Applies a pulled tombstone for the `chore_assignees` row keyed
+  /// [choreId] + [memberId]; same dirty rule as
+  /// [applyPulledOccurrenceDeletion].
+  Future<void> applyPulledAssigneeDeletion(String choreId, String memberId) =>
+      (db.delete(db.choreAssignees)..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.memberId.equals(memberId) &
+                tbl.syncDirty.equals(false),
+          ))
+          .go();
+
+  /// Ghost repair (spec §8.6.6): for every chore of [householdId] with MORE
+  /// THAN ONE pending occurrence, keeps the one with the greatest
+  /// `updatedAt` (tie: greater `dueDate`, then greater `id`) and hard-deletes
+  /// the rest through [deleteOccurrencesRecordingTombstones]. The product
+  /// invariant is "at most one pending occurrence per chore", so any extra
+  /// one is a ghost an older client failed to delete on the server.
+  Future<void> repairGhostOccurrences(
+    String householdId,
+    String deletedAt,
+  ) async {
+    final pending =
+        await (db.select(db.choreOccurrences).join([
+              innerJoin(
+                db.chores,
+                db.chores.id.equalsExp(db.choreOccurrences.choreId),
+              ),
+            ])..where(
+              db.chores.householdId.equals(householdId) &
+                  db.choreOccurrences.status.equalsValue(
+                    OccurrenceStatus.pending,
+                  ),
+            ))
+            .map((row) => row.readTable(db.choreOccurrences))
+            .get();
+    final byChore = <String, List<ChoreOccurrence>>{};
+    for (final occurrence in pending) {
+      byChore.putIfAbsent(occurrence.choreId, () => []).add(occurrence);
+    }
+    for (final group in byChore.values) {
+      if (group.length < 2) {
+        continue;
+      }
+      group.sort((a, b) {
+        final byUpdated = b.updatedAt.compareTo(a.updatedAt);
+        if (byUpdated != 0) {
+          return byUpdated;
+        }
+        final byDue = b.dueDate.toIso8601().compareTo(a.dueDate.toIso8601());
+        return byDue != 0 ? byDue : b.id.compareTo(a.id);
+      });
+      await deleteOccurrencesRecordingTombstones(group.sublist(1), deletedAt);
+    }
+  }
+
   /// Shared "replace unless locally dirty" shape for every `applyPulled*`
   /// method above: reads the current local row (if any) via [existing];
   /// if it exists and [isDirty] says it's dirty, does nothing (local dirty

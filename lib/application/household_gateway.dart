@@ -552,11 +552,19 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
     final choreAssignees = await _client
         .from('chore_assignees')
         .select()
-        .eq('household_id', householdId);
+        .eq('household_id', householdId)
+        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+        // hard-deleted locally and must not be downloaded. `isFilter`, never
+        // `.eq(..., null)`, which renders `= null` and matches nothing.
+        .isFilter('deleted_at', null);
     final choreOccurrences = await _client
         .from('chore_occurrences')
         .select()
-        .eq('household_id', householdId);
+        .eq('household_id', householdId)
+        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+        // hard-deleted locally and must not be downloaded. `isFilter`, never
+        // `.eq(..., null)`, which renders `= null` and matches nothing.
+        .isFilter('deleted_at', null);
     final shoppingItems = await _client
         .from('shopping_items')
         .select()

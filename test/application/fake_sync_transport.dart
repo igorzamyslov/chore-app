@@ -125,6 +125,32 @@ class FakeSyncTransport implements SyncTransport {
     _upsert('households', {'id': id, ...columns}, keyColumns: const ['id']);
   }
 
+  /// Every [markDeleted] call, in order -- `(table, match, deletedAt)`.
+  final List<({String table, Map<String, Object?> match, String deletedAt})>
+  markDeletedCalls = [];
+
+  @override
+  Future<void> markDeleted(
+    String table,
+    Map<String, Object?> match,
+    String deletedAt,
+  ) async {
+    markDeletedCalls.add((table: table, match: match, deletedAt: deletedAt));
+    // An UPDATE: matches zero rows harmlessly, and (like the real
+    // `set_updated_at()` trigger) bumps `updated_at` on the rows it hits.
+    final list = serverRows[table]!;
+    for (var i = 0; i < list.length; i++) {
+      final row = list[i];
+      if (match.entries.every((entry) => row[entry.key] == entry.value)) {
+        list[i] = {
+          ...row,
+          'deleted_at': deletedAt,
+          'updated_at': now.toIso8601String(),
+        };
+      }
+    }
+  }
+
   final StreamController<void> _changesController =
       StreamController<void>.broadcast();
 

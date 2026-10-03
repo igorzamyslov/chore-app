@@ -43,6 +43,7 @@ part 'app_database.g.dart';
     Settings,
     ReminderSnoozes,
     UiState,
+    SyncTombstones,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -55,7 +56,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -239,6 +240,13 @@ class AppDatabase extends _$AppDatabase {
         // already carry it and a plain `createTable` is correct. Same
         // reasoning as `reminder_snoozes` above.
         await migrator.createTable(uiState);
+      }
+      if (from < 15) {
+        // v14 -> v15 (spec `docs/specs/sync-backend.md` §8.6): the local
+        // hard-delete outbox -- no data rewrite. Flat and unconditional: the
+        // table is introduced HERE, so no install at any shipped version
+        // 1..14 can already carry it. Same reasoning as `ui_state` above.
+        await migrator.createTable(syncTombstones);
       }
     },
     beforeOpen: (details) async {
