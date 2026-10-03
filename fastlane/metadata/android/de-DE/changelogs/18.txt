@@ -1,0 +1,3 @@
+Aufgabenkarten zeigen jetzt auf einen Blick, wie dringend sie sind.
+
+Heute fällige Aufgaben sind grün, bis zu einer Woche überfällige gelb und eine Woche oder länger überfällige rot. Außerdem steht auf den Karten zuerst, für wen eine Aufgabe ist, dann die Kategorie, so findest du deine eigenen schneller.

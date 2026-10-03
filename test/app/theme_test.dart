@@ -64,6 +64,14 @@ void main() {
       expect(resolved.primaryOutline, FamdoColors.light.primaryOutline);
       expect(resolved.errorOutline, FamdoColors.light.errorOutline);
       expect(resolved.errorChip, FamdoColors.light.errorChip);
+      expect(resolved.success, FamdoColors.light.success);
+      expect(resolved.successContainer, FamdoColors.light.successContainer);
+      expect(resolved.successOutline, FamdoColors.light.successOutline);
+      expect(resolved.successChip, FamdoColors.light.successChip);
+      expect(resolved.warning, FamdoColors.light.warning);
+      expect(resolved.warningContainer, FamdoColors.light.warningContainer);
+      expect(resolved.warningOutline, FamdoColors.light.warningOutline);
+      expect(resolved.warningChip, FamdoColors.light.warningChip);
       expect(resolved.onMemberColor, FamdoColors.light.onMemberColor);
       expect(resolved.navBarBackground, FamdoColors.light.navBarBackground);
       expect(resolved.lift, FamdoColors.light.lift);
@@ -78,6 +86,8 @@ void main() {
       final resolved = famdoColors(context);
       expect(resolved.primaryOutline, FamdoColors.dark.primaryOutline);
       expect(resolved.navBarBackground, FamdoColors.dark.navBarBackground);
+      expect(resolved.success, FamdoColors.dark.success);
+      expect(resolved.warning, FamdoColors.dark.warning);
       expect(resolved.lift, FamdoColors.dark.lift);
     });
 

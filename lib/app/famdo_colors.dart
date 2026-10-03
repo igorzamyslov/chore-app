@@ -1,5 +1,6 @@
 /// The theme roles Material 3's [ColorScheme] has no slot for (spec
 /// `docs/specs/theme-v2.md` §1.2): accent-outline/error-chip colors, the
+/// success/warning due-tone colors, the
 /// member-avatar initial ink, the bottom tab bar ground, and the three
 /// custom ambient-shadow lists this design uses instead of M3's surface-tint
 /// elevation (spec §7.7).
@@ -22,6 +23,14 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     required this.primaryOutline,
     required this.errorOutline,
     required this.errorChip,
+    required this.success,
+    required this.successContainer,
+    required this.successOutline,
+    required this.successChip,
+    required this.warning,
+    required this.warningContainer,
+    required this.warningOutline,
+    required this.warningChip,
     required this.onMemberColor,
     required this.navBarBackground,
     required this.lift,
@@ -32,11 +41,36 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
   /// Border color for accent-bordered cards and selected chips.
   final Color primaryOutline;
 
-  /// Border color for an overdue occurrence tile.
+  /// Border color for an occurrence tile overdue by 7 or more days.
   final Color errorOutline;
 
-  /// Ground color for an overdue tile's due-chip.
+  /// Ground color for the due-chip of a tile overdue by 7 or more days.
   final Color errorChip;
+
+  /// Accent (left edge, header label) for a tile due today -- the
+  /// success counterpart of `ColorScheme.error`.
+  final Color success;
+
+  /// Ground color for a tile due today.
+  final Color successContainer;
+
+  /// Border color for a tile due today.
+  final Color successOutline;
+
+  /// Ground color for a success-toned due-chip.
+  final Color successChip;
+
+  /// Accent and due-chip ink for a tile overdue by fewer than 7 days.
+  final Color warning;
+
+  /// Ground color for a tile overdue by fewer than 7 days.
+  final Color warningContainer;
+
+  /// Border color for a tile overdue by fewer than 7 days.
+  final Color warningOutline;
+
+  /// Ground color for the due-chip of a tile overdue by fewer than 7 days.
+  final Color warningChip;
 
   /// Ink color for the initial drawn on a member avatar -- paired with
   /// `categoryTone`'s fill so every avatar clears contrast by construction
@@ -63,6 +97,14 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     primaryOutline: Color(0xFFB9D8D0),
     errorOutline: Color(0xFFEBD2C6),
     errorChip: Color(0xFFF4DDD3),
+    success: Color(0xFF3D7531),
+    successContainer: Color(0xFFEEF4E6),
+    successOutline: Color(0xFFD2E2C3),
+    successChip: Color(0xFFDDEAD0),
+    warning: Color(0xFF8C5A0C),
+    warningContainer: Color(0xFFFBF2E1),
+    warningOutline: Color(0xFFEEDDB9),
+    warningChip: Color(0xFFF5E5C4),
     onMemberColor: Color(0xFFFFFFFF),
     navBarBackground: Color(0xFFF1EBE1),
     lift: [
@@ -95,6 +137,14 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     primaryOutline: Color(0xFF2C544C),
     errorOutline: Color(0xFF43291D),
     errorChip: Color(0xFF3A241A),
+    success: Color(0xFF9CC77D),
+    successContainer: Color(0xFF161E12),
+    successOutline: Color(0xFF2D4123),
+    successChip: Color(0xFF22301A),
+    warning: Color(0xFFE2B062),
+    warningContainer: Color(0xFF231C10),
+    warningOutline: Color(0xFF46361A),
+    warningChip: Color(0xFF3A2D15),
     onMemberColor: Color(0xFF1A1612),
     navBarBackground: Color(0xFF1B1714),
     lift: [
@@ -126,6 +176,14 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
     Color? primaryOutline,
     Color? errorOutline,
     Color? errorChip,
+    Color? success,
+    Color? successContainer,
+    Color? successOutline,
+    Color? successChip,
+    Color? warning,
+    Color? warningContainer,
+    Color? warningOutline,
+    Color? warningChip,
     Color? onMemberColor,
     Color? navBarBackground,
     List<BoxShadow>? lift,
@@ -136,6 +194,14 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
       primaryOutline: primaryOutline ?? this.primaryOutline,
       errorOutline: errorOutline ?? this.errorOutline,
       errorChip: errorChip ?? this.errorChip,
+      success: success ?? this.success,
+      successContainer: successContainer ?? this.successContainer,
+      successOutline: successOutline ?? this.successOutline,
+      successChip: successChip ?? this.successChip,
+      warning: warning ?? this.warning,
+      warningContainer: warningContainer ?? this.warningContainer,
+      warningOutline: warningOutline ?? this.warningOutline,
+      warningChip: warningChip ?? this.warningChip,
       onMemberColor: onMemberColor ?? this.onMemberColor,
       navBarBackground: navBarBackground ?? this.navBarBackground,
       lift: lift ?? this.lift,
@@ -153,6 +219,22 @@ class FamdoColors extends ThemeExtension<FamdoColors> {
       primaryOutline: Color.lerp(primaryOutline, other.primaryOutline, t)!,
       errorOutline: Color.lerp(errorOutline, other.errorOutline, t)!,
       errorChip: Color.lerp(errorChip, other.errorChip, t)!,
+      success: Color.lerp(success, other.success, t)!,
+      successContainer: Color.lerp(
+        successContainer,
+        other.successContainer,
+        t,
+      )!,
+      successOutline: Color.lerp(successOutline, other.successOutline, t)!,
+      successChip: Color.lerp(successChip, other.successChip, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      warningContainer: Color.lerp(
+        warningContainer,
+        other.warningContainer,
+        t,
+      )!,
+      warningOutline: Color.lerp(warningOutline, other.warningOutline, t)!,
+      warningChip: Color.lerp(warningChip, other.warningChip, t)!,
       onMemberColor: Color.lerp(onMemberColor, other.onMemberColor, t)!,
       navBarBackground: Color.lerp(
         navBarBackground,

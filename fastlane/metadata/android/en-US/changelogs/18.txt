@@ -1,0 +1,3 @@
+Chore cards now show at a glance how urgent they are.
+
+Chores due today are green, chores up to a week late are amber, and chores a week or more late are red. Cards also list who a chore is for before its category, so it's quicker to find your own.
