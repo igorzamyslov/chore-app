@@ -349,6 +349,12 @@ paste-SQL step in `docs/supabase-setup-checklist.md` for new migrations):
    the MCP recorded so `supabase/migrations/` matches `list_migrations`.
 3. Re-run advisors; check `cron.job`.
 
+**As shipped (2026-10-04):** `apply_migration` was auto-declined in the
+desktop app, so Igor pasted the migration in the SQL editor; Claude verified
+RLS, policies, grants, the cron job and advisors read-only. Steps 1–2 are
+deferred to the first migration that goes through the MCP
+(`docs/supabase-setup-checklist.md` §1).
+
 ## 6. Settings switch
 
 Settings → About, a switch row above the licenses row, using the existing
