@@ -1,11 +1,11 @@
 -- Client error reports (spec docs/specs/client-error-reporting.md §5.1).
 --
--- Write-only for clients: `authenticated` is granted INSERT (plus SELECT on
--- `id` of its own rows alone, see below) and no UPDATE or DELETE -- the operator reads
--- via the dashboard / MCP (service role, postgres). That is also why the
--- client upload is `upsert(..., onConflict: 'id', ignoreDuplicates: true)`
--- with no `.select()`: ON CONFLICT DO NOTHING needs no UPDATE privilege, and
--- a returning select would need SELECT (the members 42501 lesson).
+-- Write-only for clients: `authenticated` may INSERT, and may SELECT only the
+-- `id` of its own rows (what ON CONFLICT needs, see below); no UPDATE or
+-- DELETE. The operator reads via the dashboard / MCP (service role,
+-- postgres). The client upload is `upsert(..., onConflict: 'id',
+-- ignoreDuplicates: true)` with no `.select()`: ON CONFLICT DO NOTHING needs
+-- no UPDATE privilege (the members 42501 lesson).
 --
 -- `household_id` deliberately has no foreign key: error rows must never block
 -- or be cascaded by household lifecycle. `user_id` does cascade on
