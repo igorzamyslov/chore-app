@@ -37,6 +37,36 @@ class AboutVersionTile extends ConsumerWidget {
   }
 }
 
+/// Switch row for `Settings.errorReportsEnabled` (spec
+/// `docs/specs/client-error-reporting.md` §6): whether recorded errors are
+/// uploaded to the sync server. Shown always, also while signed out -- the
+/// value then governs future uploads. Defaults to on until the settings row
+/// has loaded, matching the column's own default.
+class AboutErrorReportsTile extends ConsumerWidget {
+  /// Creates the error-reports switch row.
+  const AboutErrorReportsTile({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final enabled =
+        ref.watch(settingsProvider).valueOrNull?.errorReportsEnabled ?? true;
+
+    return semantic(
+      'settings-error-reports-switch',
+      child: SettingsRow(
+        icon: Icons.bug_report_outlined,
+        label: l10n.settingsErrorReportsTitle,
+        sublabel: l10n.settingsErrorReportsSubtitle,
+        switchValue: enabled,
+        onSwitchChanged: (value) => ref
+            .read(settingsRepositoryProvider)
+            .setErrorReportsEnabled(enabled: value),
+      ),
+    );
+  }
+}
+
 /// Row opening Flutter's built-in [showLicensePage].
 class AboutLicensesTile extends ConsumerWidget {
   /// Creates the licenses row.

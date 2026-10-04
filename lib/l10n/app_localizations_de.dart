@@ -1458,6 +1458,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open-Source-Lizenzen';
 
   @override
+  String get settingsErrorReportsTitle => 'Fehlerberichte senden';
+
+  @override
+  String get settingsErrorReportsSubtitle =>
+      'Sendet technische Fehlerdetails (keine Aufgaben- oder Mitgliederdaten) an den Sync-Server, damit Fehler behoben werden können. Nur wenn du angemeldet bist.';
+
+  @override
   String get settingsAboutDonateTitle => 'Unterstütze die App';
 
   @override

@@ -223,6 +223,7 @@ class SettingsScreen extends ConsumerWidget {
             label: l10n.settingsAboutSectionTitle,
             children: const [
               AboutVersionTile(),
+              AboutErrorReportsTile(),
               AboutLicensesTile(),
               AboutDonateTile(),
             ],

@@ -1449,6 +1449,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open source licenses';
 
   @override
+  String get settingsErrorReportsTitle => 'Send error reports';
+
+  @override
+  String get settingsErrorReportsSubtitle =>
+      'Sends technical error details (no chore or member data) to the sync server to help fix bugs. Only when signed in.';
+
+  @override
   String get settingsAboutDonateTitle => 'Support the app';
 
   @override
