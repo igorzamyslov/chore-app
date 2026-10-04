@@ -83,7 +83,7 @@ jobs:
           # itself, and the Dart that calls it. `household_gateway.dart` is
           # every RPC call site; `household_exit_service.dart` is the ordering
           # around them; `test_live/` and the runner are the smoke itself.
-          if echo "$changed" | grep -qE '^(supabase/|test_live/|tool/live_smoke\.sh$|lib/application/household_gateway\.dart$|lib/application/household_exit_service\.dart$|lib/application/sync_engine\.dart$|lib/data/sync/|\.github/workflows/db\.yml$)'; then
+          if echo "$changed" | grep -qE '^(supabase/|test_live/|tool/live_smoke\.sh$|lib/application/household_gateway\.dart$|lib/application/household_exit_service\.dart$|lib/application/sync_engine\.dart$|lib/application/error_reporter\.dart$|lib/data/sync/|\.github/workflows/db\.yml$)'; then
             echo "database-relevant changes found — running the suite"
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
