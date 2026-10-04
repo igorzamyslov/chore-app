@@ -1,7 +1,7 @@
 -- Client error reports (spec docs/specs/client-error-reporting.md §5.1).
 --
--- Write-only for clients: `authenticated` is granted INSERT and nothing
--- else, so there is no SELECT, UPDATE or DELETE path -- the operator reads
+-- Write-only for clients: `authenticated` is granted INSERT (plus SELECT on
+-- `id` alone, see below) and no SELECT policy, UPDATE or DELETE -- the operator reads
 -- via the dashboard / MCP (service role, postgres). That is also why the
 -- client upload is `upsert(..., onConflict: 'id', ignoreDuplicates: true)`
 -- with no `.select()`: ON CONFLICT DO NOTHING needs no UPDATE privilege, and
@@ -37,6 +37,12 @@ create index client_errors_user_received_idx
 alter table public.client_errors enable row level security;
 revoke all on table public.client_errors from anon, authenticated;
 grant insert on table public.client_errors to authenticated;
+-- `select (id)` only because ON CONFLICT (id) -- which PostgREST always
+-- emits for the client's ignore-duplicates upsert -- needs SELECT on the
+-- conflict-target column (pgTAP 005 caught this). It exposes nothing: there
+-- is no SELECT policy, so RLS hides every row, and no other column is
+-- readable at all.
+grant select (id) on table public.client_errors to authenticated;
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated

@@ -272,6 +272,7 @@ create index client_errors_user_received_idx
 alter table public.client_errors enable row level security;
 revoke all on table public.client_errors from anon, authenticated;
 grant insert on table public.client_errors to authenticated;
+grant select (id) on table public.client_errors to authenticated;  -- ON CONFLICT (id) needs it; RLS still hides all rows
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated
@@ -309,8 +310,9 @@ Same harness as `004` (`test_login`). Assert:
    `user_id = auth.uid()`;
 2. inserting with another user's `user_id` throws `42501`;
 3. re-inserting the same id with `on conflict do nothing` lives;
-4. as authenticated, `select count(*) from client_errors` throws `42501`
-   (no grant), and `update`/`delete` throw too;
+4. as authenticated, `select message from client_errors` throws `42501`,
+   `select count(*)` returns 0 (id-only grant, no SELECT policy), and
+   `update`/`delete` throw;
 5. `anon` cannot insert;
 6. deleting the `auth.users` row cascades the user's error rows;
 7. `prune_client_errors()` (run as postgres) deletes rows with

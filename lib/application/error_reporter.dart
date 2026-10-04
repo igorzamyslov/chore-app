@@ -37,9 +37,10 @@ class SupabaseErrorReportTransport implements ErrorReportTransport {
     // privilege for an ON CONFLICT DO UPDATE at plan time whether or not a
     // conflict happens, so a plain upsert is rejected 42501 outright (the
     // same lesson as `members`, see `SupabaseHouseholdGateway.
-    // uploadHouseholdData`). No `.select()` either: there is no SELECT
-    // grant. `user_id` and `received_at` are deliberately not sent -- the
-    // server fills both.
+    // uploadHouseholdData`). No `.select()` either: SELECT is granted on
+    // `id` alone (ON CONFLICT (id) needs it) and no row is visible.
+    // `user_id` and `received_at` are deliberately not sent -- the server
+    // fills both.
     await supabase.Supabase.instance.client
         .from('client_errors')
         .upsert(rows, onConflict: 'id', ignoreDuplicates: true);

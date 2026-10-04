@@ -1,13 +1,13 @@
 -- pgTAP: client error reports (spec docs/specs/client-error-reporting.md
 -- §5.2). Clients may only INSERT their own rows; nothing else is reachable.
 --
--- A SELECT/UPDATE/DELETE with no table grant fails with 42501 `permission
--- denied for table` BEFORE RLS is consulted, which is why assertion 4 expects
--- an error rather than an empty result.
+-- An UPDATE/DELETE, or a SELECT of any column but `id`, has no grant and fails
+-- with 42501 before RLS is consulted. `id` alone is readable because
+-- ON CONFLICT (id) needs it, but with no SELECT policy RLS returns no rows.
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(12);
+select plan(13);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000e1', 'eve@test.local'),
@@ -57,9 +57,12 @@ select lives_ok(
 
 -- 4. no SELECT / UPDATE / DELETE grant.
 select throws_ok(
-  $$select count(*) from client_errors$$,
+  $$select message from client_errors$$,
   '42501', null,
-  'authenticated cannot select client_errors (no grant)');
+  'authenticated cannot select any content column (no grant)');
+select is(
+  (select count(*) from client_errors), 0::bigint,
+  'the id-only grant exposes no rows: RLS has no SELECT policy');
 select throws_ok(
   $$update client_errors set count = 2$$,
   '42501', null,
