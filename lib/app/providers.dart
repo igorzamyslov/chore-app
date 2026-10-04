@@ -41,9 +41,11 @@ import 'dart:isolate';
 import 'dart:ui' show IsolateNameServer;
 
 import 'package:chore_app/app/supabase_config.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/digest_plan_builder.dart';
+import 'package:chore_app/application/error_reporter.dart';
 import 'package:chore_app/application/household_create_service.dart';
 import 'package:chore_app/application/household_exit_service.dart';
 import 'package:chore_app/application/household_gateway.dart';
@@ -57,6 +59,7 @@ import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/error_log_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/reminder_snooze_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
@@ -1757,4 +1760,113 @@ class SyncEngineController {
 /// be read from inside the widget tree.
 final syncEngineControllerProvider = Provider<SyncEngineController>((ref) {
   return SyncEngineController(ref);
+});
+
+/// The sink [AppLog] routes errors to, built on [appDatabaseProvider]. Read
+/// once from `main.dart` and handed to [AppLog.attach]; never read from the
+/// widget tree.
+final errorLogSinkProvider = Provider<ErrorLogSink>((ref) {
+  return DatabaseErrorLogSink(
+    ref.watch(appDatabaseProvider),
+    nowUtc: () => ref.read(clockProvider).now().toUtc(),
+  );
+});
+
+/// The local error buffer's repository, built on [appDatabaseProvider].
+final errorLogRepositoryProvider = Provider<ErrorLogRepository>((ref) {
+  return ErrorLogRepository(
+    ref.watch(appDatabaseProvider),
+    nowUtc: () => ref.read(clockProvider).now().toUtc(),
+  );
+});
+
+/// The transport [errorReporterProvider] uploads through -- `null` means
+/// "Supabase isn't configured", which keeps the reporter's gate shut.
+///
+/// Mirrors [syncTransportProvider]: a provider rather than a bare
+/// [supabaseConfigured] check so a test can override it with a fake and reach
+/// the reporter's upload path even though that constant is always false
+/// under `flutter test`.
+final errorReportTransportProvider = Provider<ErrorReportTransport?>((ref) {
+  return supabaseConfigured ? const SupabaseErrorReportTransport() : null;
+});
+
+/// Uploads the local error buffer (spec
+/// `docs/specs/client-error-reporting.md` §4.2).
+///
+/// The gate is read with `ref.read` at flush time rather than watched: the
+/// reporter is long-lived and must see the CURRENT sign-in, link and switch
+/// state on every trigger without being rebuilt when any of them changes.
+final errorReporterProvider = Provider<ErrorReporter>((ref) {
+  final transport = ref.watch(errorReportTransportProvider);
+  return ErrorReporter(
+    repository: ref.watch(errorLogRepositoryProvider),
+    transport: transport ?? const _UnconfiguredErrorReportTransport(),
+    nowUtc: () => ref.read(clockProvider).now().toUtc(),
+    gate: () {
+      final settings = ref.read(settingsProvider).valueOrNull;
+      return ErrorReportGate(
+        supabaseConfigured: transport != null,
+        signedIn: ref.read(currentAuthUserProvider).valueOrNull != null,
+        linked: settings?.syncHouseholdId != null,
+        enabled: settings?.errorReportsEnabled ?? false,
+      );
+    },
+  );
+});
+
+/// Placeholder transport for builds without Supabase. Unreachable: the gate
+/// is shut whenever [errorReportTransportProvider] is `null`.
+class _UnconfiguredErrorReportTransport implements ErrorReportTransport {
+  const _UnconfiguredErrorReportTransport();
+
+  @override
+  Future<void> insertErrors(List<Map<String, Object?>> rows) {
+    throw StateError('Supabase is not configured');
+  }
+}
+
+/// Wires the triggers that flush the error buffer (spec
+/// `docs/specs/client-error-reporting.md` §4.1): startup (construction),
+/// app resume ([triggerOnResume], called from `main.dart`'s single resume
+/// observer), and every successful sync pull.
+///
+/// The pull trigger listens to `settings.syncLastPulledAt`, which the sync
+/// engine writes at the end of every successful pull, so the engine itself
+/// needs no change. There is no timer and no backoff: sync's cadence is the
+/// pace. Like [SyncEngineController] it is read once from `main.dart` and
+/// never from the widget tree.
+class ErrorReporterController {
+  /// Starts listening and flushes once immediately.
+  ErrorReporterController(this._ref) {
+    _ref.listen(
+      settingsProvider.select(
+        (settings) => settings.valueOrNull?.syncLastPulledAt,
+      ),
+      (previous, next) {
+        if (next != null && next != previous) {
+          triggerFlush();
+        }
+      },
+    );
+    triggerFlush();
+  }
+
+  final Ref _ref;
+
+  /// Flushes the buffer if the reporter's gate allows it.
+  void triggerFlush() {
+    unawaited(_ref.read(errorReporterProvider).flush());
+  }
+
+  /// Flush trigger for app resume.
+  void triggerOnResume() => triggerFlush();
+}
+
+/// Activates [ErrorReporterController] the moment it's first read, from
+/// `main.dart`, before `runApp`.
+final errorReporterControllerProvider = Provider<ErrorReporterController>((
+  ref,
+) {
+  return ErrorReporterController(ref);
 });
