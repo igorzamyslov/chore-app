@@ -43,6 +43,10 @@ grant insert on table public.client_errors to authenticated;
 -- (pgTAP 005 caught both). Together they expose at most the ids of the
 -- caller's OWN reports: no other column is readable, no other user's row.
 grant select (id) on table public.client_errors to authenticated;
+-- The operator's admin key reads and prunes. Granted explicitly because
+-- newer Supabase stacks no longer give service_role default privileges on
+-- new public tables (the live smoke caught this); it bypasses RLS anyway.
+grant select, delete on table public.client_errors to service_role;
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated

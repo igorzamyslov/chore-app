@@ -273,6 +273,7 @@ alter table public.client_errors enable row level security;
 revoke all on table public.client_errors from anon, authenticated;
 grant insert on table public.client_errors to authenticated;
 grant select (id) on table public.client_errors to authenticated;  -- ON CONFLICT (id) needs it
+grant select, delete on table public.client_errors to service_role;  -- operator; not a default on newer stacks
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated
