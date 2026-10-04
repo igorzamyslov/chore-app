@@ -20,6 +20,7 @@
 /// household is not leaving the app).
 library;
 
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/data_reset.dart';
 import 'package:chore_app/application/household_gateway.dart';
@@ -112,7 +113,8 @@ class HouseholdExitService {
     await gateway.deleteAccount();
     try {
       await auth.signOut();
-    } on Object catch (_) {
+    } on Object catch (e, s) {
+      AppLog.error('app.deleteAccountSignOut', e, s);
       // `on Object`, not `on Exception`, and best-effort. The account is
       // already erased, so the one outcome this may never produce is
       // abandoning the unlink below: an `Error` -- a `StateError` out of a

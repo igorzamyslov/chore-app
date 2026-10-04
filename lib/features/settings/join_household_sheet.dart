@@ -18,6 +18,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/features/settings/join_flow_steps.dart';
@@ -306,7 +307,13 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
         return;
       }
       Navigator.of(context).pop(result.archiveFileName);
-    } on Exception catch (error) {
+    } on Exception catch (error, stackTrace) {
+      // `HouseholdSnapshotUnavailable` is an expected outcome ("removed
+      // while you were away"); anything else is the generic "working
+      // error" and a real failure worth a report.
+      if (error is! HouseholdSnapshotUnavailable) {
+        AppLog.error('ui.joinHouseholdSheet', error, stackTrace);
+      }
       if (!mounted) {
         return;
       }

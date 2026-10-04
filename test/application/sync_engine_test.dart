@@ -6,6 +6,7 @@
 /// FK ordering, and the start()/stop() triggers.
 library;
 
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/member_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -14,6 +15,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/domain/error_scrubber.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -21,6 +23,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../features/settings/fake_household_gateway.dart';
 import 'fake_sync_transport.dart';
+
+/// Collects the sources [AppLog] receives, in order.
+class _RecordingSink implements ErrorLogSink {
+  final List<String> sources = [];
+
+  @override
+  Future<void> record({
+    required String source,
+    required ScrubbedError error,
+  }) async {
+    sources.add(source);
+  }
+}
 
 /// A [FakeSyncTransport] whose [pullTable] throws on [failOnTable] --
 /// simulates a network failure partway through a pull's per-table fetch
@@ -297,6 +312,37 @@ void main() {
 
         final settingsRow = await SettingsRepository(db).ensureSettings();
         expect(settingsRow.syncLastPulledAt, isNull);
+      },
+    );
+
+    test(
+      'a failing push is recorded through AppLog as sync.pushDirty and a '
+      'failing pull as sync.pullSince (spec '
+      'docs/specs/client-error-reporting.md §3.4)',
+      () async {
+        final sink = _RecordingSink();
+        AppLog.attach(sink);
+        addTearDown(AppLog.detach);
+
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+        transport.beforeUpsert = () async {
+          throw Exception('simulated push failure');
+        };
+        await engine.pushDirty();
+        await pumpEventQueue();
+        expect(sink.sources, contains('sync.pushDirty'));
+        expect(sink.sources, isNot(contains('sync.pullSince')));
+
+        final throwingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _ThrowingPullTransport('chores'),
+          settings: SettingsRepository(db),
+          householdId: household.id,
+        );
+        addTearDown(throwingEngine.stop);
+        await throwingEngine.pullSince();
+        await pumpEventQueue();
+        expect(sink.sources, contains('sync.pullSince'));
       },
     );
 
