@@ -355,6 +355,14 @@ class Settings extends Table {
   IntColumn get eveningReminderMinutes =>
       integer().withDefault(const Constant(1200))();
 
+  /// Whether this device uploads its recorded errors to the sync server
+  /// (spec `docs/specs/client-error-reporting.md` §6). Default `true`
+  /// (opt-out). Recording into [ClientErrors] continues either way; this
+  /// only gates the upload. Added in schemaVersion 16; see
+  /// `AppDatabase.migration`.
+  BoolColumn get errorReportsEnabled =>
+      boolean().withDefault(const Constant(true))();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 
@@ -660,4 +668,63 @@ class SyncTombstones extends Table {
 
   /// ISO-8601 UTC timestamp of the delete (the repository's `_isoNow()`).
   TextColumn get deletedAt => text()();
+}
+
+/// The local error ring buffer (spec `docs/specs/client-error-reporting.md`
+/// §3.1): every error the app catches or misses, scrubbed of user content
+/// by `ErrorScrubber` before it lands here.
+///
+/// Device-scoped and never synced: no `syncDirty`, not in the sync engine's
+/// table list, not part of Data export, cleared by `resetAppData`. Rows are
+/// uploaded to the server's `client_errors` table by `ErrorReporter` when
+/// the device is signed in, linked, and the setting is on; `uploadedAt` marks
+/// the ones that were. `id` is the server's primary key too, which is what
+/// makes a re-sent batch idempotent. Capped at 200 rows by
+/// `ErrorLogRepository.record`. Added in schemaVersion 16.
+@DataClassName('ClientError')
+class ClientErrors extends Table {
+  /// Client-generated UUIDv4; also the server row's primary key.
+  TextColumn get id => text()();
+
+  /// Where it happened, e.g. `sync.pushDirty` -- a stable `area.thing`
+  /// identifier, never interpolated with data (it is a server grouping key).
+  TextColumn get source => text()();
+
+  /// The scrubbed runtime type name of the error.
+  TextColumn get errorType => text()();
+
+  /// The scrubbed error message.
+  TextColumn get message => text()();
+
+  /// The truncated stack trace, if one was available.
+  TextColumn get stack => text().nullable()();
+
+  /// A JSON object string of ids / enum names / counts, or `NULL`.
+  TextColumn get context => text().nullable()();
+
+  /// How many times this exact error was merged into the row before it was
+  /// uploaded (spec §3.2).
+  IntColumn get count => integer().withDefault(const Constant(1))();
+
+  /// ISO-8601 UTC moment of the first occurrence merged into this row.
+  TextColumn get firstSeenAt => text()();
+
+  /// ISO-8601 UTC moment of the latest occurrence merged into this row.
+  TextColumn get lastSeenAt => text()();
+
+  /// `'<version>+<build>'` of the app that recorded it.
+  TextColumn get appVersion => text()();
+
+  /// `'<operatingSystem> <operatingSystemVersion>'`, capped at 100 chars.
+  TextColumn get platform => text()();
+
+  /// `Settings.syncHouseholdId` at record time, or `NULL` while unlinked.
+  TextColumn get householdId => text().nullable()();
+
+  /// ISO-8601 UTC moment the row was uploaded, or `NULL` while pending. An
+  /// uploaded row is never re-sent and never merged into again.
+  TextColumn get uploadedAt => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }

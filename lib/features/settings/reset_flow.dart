@@ -21,6 +21,7 @@ library;
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/data_reset.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
@@ -112,7 +113,8 @@ Future<void> confirmAndResetAppData(
   final database = ref.read(appDatabaseProvider);
   try {
     await resetAppData(database);
-  } on Object catch (_) {
+  } on Object catch (e, s) {
+    AppLog.error('ui.resetFlow', e, s);
     // `on Object`, not `on Exception`: a closed or corrupted drift/sqlite3
     // connection surfaces as a `StateError` (package:sqlite3's "This
     // database has already been closed"), which is an Error. The usual

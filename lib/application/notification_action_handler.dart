@@ -51,6 +51,7 @@ import 'dart:async';
 // `IsolateNameServer` lives in `dart:ui`, not `dart:isolate`.
 import 'dart:ui' as ui;
 
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/application/notification_action_processor.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
@@ -147,7 +148,10 @@ Future<void> _run(DigestActionPayload payload) async {
       ),
       actingMemberId: payload.actingMemberId,
     );
-  } on Object catch (_) {
+  } on Object catch (e, s) {
+    // No `AppLog` sink exists in this background isolate, so this only
+    // reaches `debugPrint` -- recording it durably is out of scope here.
+    AppLog.error('app.notificationAction', e, s);
     // `on Object`, not `on Exception`: an Error escaping here has nowhere to go
     // -- there is no UI in this isolate and no user waiting on a result -- and
     // the alternative is an unhandled async error in a background engine,

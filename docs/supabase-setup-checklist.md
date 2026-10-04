@@ -6,6 +6,18 @@ nothing breaks if run twice. ~10 minutes.
 
 ## 1. Apply the schema (paste-SQL workflow)
 
+> **Since 2026-10-04 new migrations are applied by Claude via the Supabase
+> MCP (`apply_migration`)**, each one only after Igor approves the exact SQL
+> in chat; the repo file is then renamed to the version the MCP recorded, so
+> `supabase/migrations/` always matches `supabase_migrations.schema_migrations`
+> (check with the MCP's `list_migrations`). Everything up to and including
+> `20261004120000_client_errors.sql` was pasted by hand (the MCP's
+> `apply_migration` was auto-declined in the desktop app on 2026-10-04 —
+> Supabase's destructive-statement confirmation never surfaced), so prod's
+> history table is still EMPTY: when the first migration does go through
+> the MCP, back-fill those eight versions as applied (all verified live).
+> The steps below remain the path for a fresh self-hosted project.
+
 1. Dashboard → your project → **SQL Editor** → **New query**.
 2. Open `supabase/migrations/20260731120000_initial_schema.sql` from the
    repo, copy the ENTIRE file, paste, **Run**. Then do the same for EACH

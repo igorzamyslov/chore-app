@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/data_export.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -63,7 +64,8 @@ class ExportDataTile extends ConsumerWidget {
           fileNameOverrides: [fileName],
         ),
       );
-    } on Exception catch (_) {
+    } on Exception catch (e, s) {
+      AppLog.error('ui.exportData', e, s);
       // Building the document (a database read) or the share sheet itself
       // can fail for reasons outside our control (disk error, no share
       // target available, ...); the spec's contract is simply "show a

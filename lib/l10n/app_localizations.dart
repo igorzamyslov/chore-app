@@ -2150,6 +2150,18 @@ abstract class AppLocalizations {
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
 
+  /// Title of the About section's switch row that controls whether technical error details are uploaded to the sync server.
+  ///
+  /// In en, this message translates to:
+  /// **'Send error reports'**
+  String get settingsErrorReportsTitle;
+
+  /// Subtitle of the error-reports switch row: what is sent (no chore or member data), where, and that it only happens while signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'Sends technical error details (no chore or member data) to the sync server to help fix bugs. Only when signed in.'**
+  String get settingsErrorReportsSubtitle;
+
   /// Title of the About section's donation/tip-jar row; tapping opens the donate sheet (settingsAboutDonateSheetTitle).
   ///
   /// In en, this message translates to:

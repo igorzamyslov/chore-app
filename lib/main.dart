@@ -3,8 +3,14 @@ import 'dart:async';
 import 'package:chore_app/app/app.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/supabase_config.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:flutter/foundation.dart'
-    show LicenseEntryWithLineBreaks, LicenseRegistry;
+    show
+        FlutterError,
+        LicenseEntryWithLineBreaks,
+        LicenseRegistry,
+        PlatformDispatcher,
+        kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +42,26 @@ Future<void> main() async {
     );
   }
   final container = ProviderContainer();
+  // Spec `docs/specs/client-error-reporting.md` §3.3/§3.4: from here on,
+  // every caught-and-swallowed error (via `AppLog.error`) and every missed
+  // one (the two global handlers below) lands in the local error buffer.
+  // `errorLogSinkProvider` only builds a lazy `DatabaseErrorLogSink`, so
+  // this does not open the database any earlier than before.
+  AppLog.attach(container.read(errorLogSinkProvider));
+  final previousOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    AppLog.error('flutter.framework', details.exception, details.stack);
+    if (kDebugMode) {
+      FlutterError.presentError(details);
+    } else {
+      previousOnError?.call(details);
+    }
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.error('flutter.uncaught', error, stack);
+    // Handled in release; in debug let the debugger and console see it.
+    return !kDebugMode;
+  };
   // Activates the digest reschedule-on-mutation wiring, the chore catch-up
   // resume/day-change wiring, and the P3 sync engine (spec
   // `docs/specs/sync-backend.md` §8.3) immediately, before the widget tree
@@ -48,6 +74,9 @@ Future<void> main() async {
   final digestController = container.read(digestRescheduleControllerProvider);
   final catchUpController = container.read(catchUpControllerProvider);
   final syncEngineController = container.read(syncEngineControllerProvider);
+  final errorReporterController = container.read(
+    errorReporterControllerProvider,
+  );
   // Registers the well-known `IsolateNameServer` port the notification-action
   // background isolate pings (spec `docs/specs/notifications.md` N2). Read for
   // its side effect only and deliberately NOT passed to `_AppResumeObserver`
@@ -60,6 +89,7 @@ Future<void> main() async {
       digestController,
       catchUpController,
       syncEngineController,
+      errorReporterController,
     ),
   );
   runApp(
@@ -80,11 +110,13 @@ class _AppResumeObserver extends WidgetsBindingObserver {
     this._digestController,
     this._catchUpController,
     this._syncEngineController,
+    this._errorReporterController,
   );
 
   final DigestRescheduleController _digestController;
   final CatchUpController _catchUpController;
   final SyncEngineController _syncEngineController;
+  final ErrorReporterController _errorReporterController;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -95,6 +127,7 @@ class _AppResumeObserver extends WidgetsBindingObserver {
       _syncEngineController
         ..triggerOnResume()
         ..resumeBackgroundWork();
+      _errorReporterController.triggerOnResume();
       return;
     }
     // Anything that is not `resumed` means the app is not on screen, so the

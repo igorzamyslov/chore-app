@@ -387,6 +387,8 @@
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
   "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
+  "settingsErrorReportsTitle": "Fehlerberichte senden",
+  "settingsErrorReportsSubtitle": "Sendet technische Fehlerdetails (keine Aufgaben- oder Mitgliederdaten) an den Sync-Server, damit Fehler behoben werden können. Nur wenn du angemeldet bist.",
   "settingsAboutDonateTitle": "Unterstütze die App",
   "settingsAboutDonateSubtitle": "Ko-fi oder PayPal — danke dir!",
   "settingsAboutDonateSheetTitle": "Unterstütze Famdo",

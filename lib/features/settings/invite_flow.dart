@@ -8,6 +8,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/features/settings/invite_code_sheet.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -30,7 +31,8 @@ Future<void> runInviteFlow(
     if (context.mounted) {
       await showInviteCodeSheet(context, code: code);
     }
-  } on Exception catch (_) {
+  } on Exception catch (e, s) {
+    AppLog.error('ui.inviteFlow', e, s);
     if (context.mounted) {
       showAppSnackbar(
         context,

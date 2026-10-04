@@ -15,6 +15,7 @@ library;
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
@@ -221,7 +222,8 @@ class _SignedInTile extends ConsumerWidget {
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     try {
       await ref.read(authGatewayProvider).signOut();
-    } on Exception catch (_) {
+    } on Exception catch (e, s) {
+      AppLog.error('ui.accountSignOut', e, s);
       if (context.mounted) {
         showAppSnackbar(
           context,
@@ -377,7 +379,8 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
       if (mounted) {
         setState(() => _sentToEmail = email);
       }
-    } on Exception catch (_) {
+    } on Exception catch (e, s) {
+      AppLog.error('ui.accountSendMagicLink', e, s);
       if (mounted) {
         showAppSnackbar(
           context,
@@ -581,7 +584,8 @@ class _LeaveRow extends ConsumerWidget {
             householdId: householdId,
             alsoDeleteLocalData: result.alsoDeleteLocalData,
           );
-    } on Object catch (_) {
+    } on Object catch (e, s) {
+      AppLog.error('ui.accountLeaveHousehold', e, s);
       // `on Object`, not `on Exception`. The user has just confirmed a
       // destructive action, so the one outcome this must never produce is
       // silence: an Error -- a `LateInitializationError` out of an
@@ -734,7 +738,8 @@ class _DeleteAccountRow extends ConsumerWidget {
       await ref
           .read(householdExitServiceProvider)
           .deleteAccount(alsoDeleteLocalData: result.alsoDeleteLocalData);
-    } on Object catch (_) {
+    } on Object catch (e, s) {
+      AppLog.error('ui.accountDeleteAccount', e, s);
       // `on Object`, not `on Exception`. Same reasoning as [_LeaveRow] and
       // `reset_flow.dart`: the user has just cleared two gates on an
       // irreversible action, so silence is the one outcome forbidden, and an
@@ -937,7 +942,8 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
       if (mounted) {
         setState(() => _blocked = true);
       }
-    } on Exception catch (_) {
+    } on Exception catch (e, s) {
+      AppLog.error('ui.accountAdopt', e, s);
       if (mounted) {
         setState(() => _failed = true);
       }

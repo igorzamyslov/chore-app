@@ -19,12 +19,12 @@ library;
 
 import 'dart:async';
 
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/data/sync/row_mappers.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 /// The tables the FK order below is derived from (spec §8.3: "per table in
@@ -737,10 +737,12 @@ class SupabaseSyncEngine implements SyncEngine {
   /// silent retry-later; the app never surfaces sync errors in P3. This is
   /// the one place that happens, so both [pushDirty] and [pullSince] read
   /// identically at every call site.
+  ///
+  /// The failure is no longer only a debug print: it is recorded through
+  /// [AppLog] as `sync.<where>` (spec `docs/specs/client-error-reporting.md`
+  /// §3.4), which still prints in debug builds.
   void _logFailure(String where, Object error, StackTrace stackTrace) {
-    if (kDebugMode) {
-      debugPrint('SyncEngine.$where failed (will retry later): $error');
-    }
+    AppLog.error('sync.$where', error, stackTrace);
   }
 }
 
@@ -902,7 +904,12 @@ class SupabaseSyncTransport implements SyncTransport {
             return;
           }
           if (error != null) {
-            debugPrint('SyncTransport.householdChanges($status): $error');
+            AppLog.error(
+              'sync.realtime',
+              error,
+              null,
+              context: {'status': status.name},
+            );
           }
         });
       },

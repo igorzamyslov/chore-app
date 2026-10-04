@@ -23,6 +23,7 @@ import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
@@ -393,7 +394,13 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
         // anything here without this pop.
         Navigator.of(context).pop();
       }
-    } on Exception catch (error) {
+    } on Exception catch (error, stackTrace) {
+      // `HouseholdSnapshotUnavailable` is an expected outcome ("removed
+      // while you were away"); anything else is the generic "working
+      // error" and a real failure worth a report.
+      if (error is! HouseholdSnapshotUnavailable) {
+        AppLog.error('ui.welcomeJoin', error, stackTrace);
+      }
       if (!mounted) {
         return;
       }

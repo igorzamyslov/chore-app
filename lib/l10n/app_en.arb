@@ -1865,6 +1865,14 @@
   "@settingsAboutLicensesEntry": {
     "description": "About section row that opens Flutter's built-in showLicensePage."
   },
+  "settingsErrorReportsTitle": "Send error reports",
+  "@settingsErrorReportsTitle": {
+    "description": "Title of the About section's switch row that controls whether technical error details are uploaded to the sync server."
+  },
+  "settingsErrorReportsSubtitle": "Sends technical error details (no chore or member data) to the sync server to help fix bugs. Only when signed in.",
+  "@settingsErrorReportsSubtitle": {
+    "description": "Subtitle of the error-reports switch row: what is sent (no chore or member data), where, and that it only happens while signed in."
+  },
   "settingsAboutDonateTitle": "Support the app",
   "@settingsAboutDonateTitle": {
     "description": "Title of the About section's donation/tip-jar row; tapping opens the donate sheet (settingsAboutDonateSheetTitle)."
