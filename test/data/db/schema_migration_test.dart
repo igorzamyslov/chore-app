@@ -149,6 +149,23 @@ Future<void> _dropSyncTombstonesTable(AppDatabase seed) async {
 /// Every `settings` column added by a migration AFTER the table itself
 /// arrived at v2 -- which is exactly the set a pre-v12 seed below has to
 /// drop and the upgrade under test has to put back.
+/// Drops the `client_errors` table (schema v16, spec
+/// `docs/specs/client-error-reporting.md` §3.1) on [seed] -- the same
+/// collateral-drop pattern as `_dropSyncTombstonesTable`: [seed] opens at the
+/// *current* schema first, so `onUpgrade`'s plain `createTable` would
+/// otherwise throw "table client_errors already exists".
+Future<void> _dropClientErrorsTable(AppDatabase seed) async {
+  await seed.customStatement('DROP TABLE client_errors');
+}
+
+/// Drops `error_reports_enabled` (schema v16) from `settings` on [seed] --
+/// the same collateral-drop pattern as `_dropN2SettingsColumns`.
+Future<void> _dropErrorReportsEnabledColumn(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE settings DROP COLUMN error_reports_enabled',
+  );
+}
+
 const _settingsColumnsAddedAfterV2 = [
   'acting_member_id', // v3
   'locale', // v4
@@ -165,6 +182,7 @@ const _settingsColumnsAddedAfterV2 = [
   'quiet_end_minutes', // v13
   'evening_reminder_enabled', // v13
   'evening_reminder_minutes', // v13
+  'error_reports_enabled', // v16
 ];
 
 /// The names of the columns [table] actually has on disk, straight from
@@ -233,6 +251,7 @@ void main() {
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
@@ -395,10 +414,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
@@ -511,10 +532,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
@@ -602,10 +625,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
@@ -698,10 +723,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
@@ -867,10 +894,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
@@ -1015,10 +1044,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
@@ -1099,10 +1130,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 9');
       await seed.close();
 
@@ -1165,10 +1198,12 @@ void main() {
       await _dropStatusClosedOnIndex(seed);
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 10');
       await seed.close();
 
@@ -1237,10 +1272,12 @@ void main() {
           );
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 11');
       await seed.close();
 
@@ -1349,10 +1386,12 @@ void main() {
             ),
           );
       await _dropN2SettingsColumns(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
       await seed.customStatement('PRAGMA user_version = 12');
       await seed.close();
 
@@ -1456,6 +1495,8 @@ void main() {
           );
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await seed.customStatement('PRAGMA user_version = 13');
       await seed.close();
 
@@ -1497,6 +1538,8 @@ void main() {
             ),
           );
       await _dropSyncTombstonesTable(seed);
+      await _dropClientErrorsTable(seed);
+      await _dropErrorReportsEnabledColumn(seed);
       await seed.customStatement('PRAGMA user_version = 14');
       await seed.close();
 
@@ -1512,6 +1555,68 @@ void main() {
       });
       expect(await upgraded.select(upgraded.syncTombstones).get(), isEmpty);
       final settings = await upgraded.select(upgraded.settings).getSingle();
+      expect(settings.actingMemberId, 'member-1');
+    },
+  );
+
+  test(
+    'a 15 -> 16 upgrade creates the client_errors buffer, empty, adds '
+    'settings.errorReportsEnabled defaulting to true, and leaves existing '
+    'data alone',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v16_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v15 install: the current schema minus the v16 table and column,
+      // with `user_version` rolled back to 15.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+            ),
+          );
+      await _dropClientErrorsTable(seed);
+      await _dropErrorReportsEnabledColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 15');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(await _columnNames(upgraded, 'client_errors'), {
+        'id',
+        'source',
+        'error_type',
+        'message',
+        'stack',
+        'context',
+        'count',
+        'first_seen_at',
+        'last_seen_at',
+        'app_version',
+        'platform',
+        'household_id',
+        'uploaded_at',
+      });
+      expect(await upgraded.select(upgraded.clientErrors).get(), isEmpty);
+      expect(
+        await _columnNames(upgraded, 'settings'),
+        contains('error_reports_enabled'),
+      );
+      final settings = await upgraded.select(upgraded.settings).getSingle();
+      expect(settings.errorReportsEnabled, isTrue);
       expect(settings.actingMemberId, 'member-1');
     },
   );

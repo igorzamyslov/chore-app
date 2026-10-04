@@ -115,6 +115,20 @@ Future<void> _seed(AppDatabase db) async {
       .insert(
         UiStateCompanion.insert(id: 'device', lastTab: const Value('shopping')),
       );
+  await db
+      .into(db.clientErrors)
+      .insert(
+        ClientErrorsCompanion.insert(
+          id: 'e1',
+          source: 'ui.test',
+          errorType: 'StateError',
+          message: 'boom',
+          firstSeenAt: 't0',
+          lastSeenAt: 't0',
+          appVersion: '0.13.0+20',
+          platform: 'android 14',
+        ),
+      );
 }
 
 void main() {
@@ -140,6 +154,7 @@ void main() {
     expect(await db.select(db.settings).get(), hasLength(1));
     expect(await db.select(db.reminderSnoozes).get(), hasLength(1));
     expect(await db.select(db.uiState).get(), hasLength(1));
+    expect(await db.select(db.clientErrors).get(), hasLength(1));
 
     await resetAppData(db);
 
@@ -159,6 +174,9 @@ void main() {
     // The remembered last tab (spec `docs/specs/last-tab-restore.md` §2): a
     // reset must reopen on Chores.
     expect(await db.select(db.uiState).get(), isEmpty);
+    // The local error buffer is device diagnostics (spec
+    // `docs/specs/client-error-reporting.md` §3.1): a reset clears it.
+    expect(await db.select(db.clientErrors).get(), isEmpty);
   });
 
   test('resetAppData is safe to call on an already-empty database', () async {

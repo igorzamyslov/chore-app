@@ -4566,6 +4566,20 @@ class $SettingsTable extends Settings
     requiredDuringInsert: false,
     defaultValue: const Constant(1200),
   );
+  static const VerificationMeta _errorReportsEnabledMeta =
+      const VerificationMeta('errorReportsEnabled');
+  @override
+  late final GeneratedColumn<bool> errorReportsEnabled = GeneratedColumn<bool>(
+    'error_reports_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("error_reports_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4608,6 +4622,7 @@ class $SettingsTable extends Settings
     quietEndMinutes,
     eveningReminderEnabled,
     eveningReminderMinutes,
+    errorReportsEnabled,
     createdAt,
     updatedAt,
   ];
@@ -4775,6 +4790,15 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('error_reports_enabled')) {
+      context.handle(
+        _errorReportsEnabledMeta,
+        errorReportsEnabled.isAcceptableOrUnknown(
+          data['error_reports_enabled']!,
+          _errorReportsEnabledMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4871,6 +4895,10 @@ class $SettingsTable extends Settings
       eveningReminderMinutes: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}evening_reminder_minutes'],
+      )!,
+      errorReportsEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}error_reports_enabled'],
       )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -5026,6 +5054,13 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// schemaVersion 13.
   final int eveningReminderMinutes;
 
+  /// Whether this device uploads its recorded errors to the sync server
+  /// (spec `docs/specs/client-error-reporting.md` §6). Default `true`
+  /// (opt-out). Recording into [ClientErrors] continues either way; this
+  /// only gates the upload. Added in schemaVersion 16; see
+  /// `AppDatabase.migration`.
+  final bool errorReportsEnabled;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -5050,6 +5085,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     required this.quietEndMinutes,
     required this.eveningReminderEnabled,
     required this.eveningReminderMinutes,
+    required this.errorReportsEnabled,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -5096,6 +5132,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     map['quiet_end_minutes'] = Variable<int>(quietEndMinutes);
     map['evening_reminder_enabled'] = Variable<bool>(eveningReminderEnabled);
     map['evening_reminder_minutes'] = Variable<int>(eveningReminderMinutes);
+    map['error_reports_enabled'] = Variable<bool>(errorReportsEnabled);
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -5140,6 +5177,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       quietEndMinutes: Value(quietEndMinutes),
       eveningReminderEnabled: Value(eveningReminderEnabled),
       eveningReminderMinutes: Value(eveningReminderMinutes),
+      errorReportsEnabled: Value(errorReportsEnabled),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -5177,6 +5215,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       eveningReminderMinutes: serializer.fromJson<int>(
         json['eveningReminderMinutes'],
       ),
+      errorReportsEnabled: serializer.fromJson<bool>(
+        json['errorReportsEnabled'],
+      ),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -5207,6 +5248,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'quietEndMinutes': serializer.toJson<int>(quietEndMinutes),
       'eveningReminderEnabled': serializer.toJson<bool>(eveningReminderEnabled),
       'eveningReminderMinutes': serializer.toJson<int>(eveningReminderMinutes),
+      'errorReportsEnabled': serializer.toJson<bool>(errorReportsEnabled),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -5231,6 +5273,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     int? quietEndMinutes,
     bool? eveningReminderEnabled,
     int? eveningReminderMinutes,
+    bool? errorReportsEnabled,
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -5266,6 +5309,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
         eveningReminderEnabled ?? this.eveningReminderEnabled,
     eveningReminderMinutes:
         eveningReminderMinutes ?? this.eveningReminderMinutes,
+    errorReportsEnabled: errorReportsEnabled ?? this.errorReportsEnabled,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -5319,6 +5363,9 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       eveningReminderMinutes: data.eveningReminderMinutes.present
           ? data.eveningReminderMinutes.value
           : this.eveningReminderMinutes,
+      errorReportsEnabled: data.errorReportsEnabled.present
+          ? data.errorReportsEnabled.value
+          : this.errorReportsEnabled,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -5345,6 +5392,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('quietEndMinutes: $quietEndMinutes, ')
           ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
           ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
+          ..write('errorReportsEnabled: $errorReportsEnabled, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -5352,7 +5400,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     digestEnabled,
     digestMinutes,
@@ -5371,9 +5419,10 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     quietEndMinutes,
     eveningReminderEnabled,
     eveningReminderMinutes,
+    errorReportsEnabled,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5397,6 +5446,7 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.quietEndMinutes == this.quietEndMinutes &&
           other.eveningReminderEnabled == this.eveningReminderEnabled &&
           other.eveningReminderMinutes == this.eveningReminderMinutes &&
+          other.errorReportsEnabled == this.errorReportsEnabled &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -5420,6 +5470,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<int> quietEndMinutes;
   final Value<bool> eveningReminderEnabled;
   final Value<int> eveningReminderMinutes;
+  final Value<bool> errorReportsEnabled;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -5442,6 +5493,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.quietEndMinutes = const Value.absent(),
     this.eveningReminderEnabled = const Value.absent(),
     this.eveningReminderMinutes = const Value.absent(),
+    this.errorReportsEnabled = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5465,6 +5517,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.quietEndMinutes = const Value.absent(),
     this.eveningReminderEnabled = const Value.absent(),
     this.eveningReminderMinutes = const Value.absent(),
+    this.errorReportsEnabled = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -5490,6 +5543,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<int>? quietEndMinutes,
     Expression<bool>? eveningReminderEnabled,
     Expression<int>? eveningReminderMinutes,
+    Expression<bool>? errorReportsEnabled,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -5517,6 +5571,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         'evening_reminder_enabled': eveningReminderEnabled,
       if (eveningReminderMinutes != null)
         'evening_reminder_minutes': eveningReminderMinutes,
+      if (errorReportsEnabled != null)
+        'error_reports_enabled': errorReportsEnabled,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5542,6 +5598,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<int>? quietEndMinutes,
     Value<bool>? eveningReminderEnabled,
     Value<int>? eveningReminderMinutes,
+    Value<bool>? errorReportsEnabled,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -5569,6 +5626,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           eveningReminderEnabled ?? this.eveningReminderEnabled,
       eveningReminderMinutes:
           eveningReminderMinutes ?? this.eveningReminderMinutes,
+      errorReportsEnabled: errorReportsEnabled ?? this.errorReportsEnabled,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5640,6 +5698,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         eveningReminderMinutes.value,
       );
     }
+    if (errorReportsEnabled.present) {
+      map['error_reports_enabled'] = Variable<bool>(errorReportsEnabled.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -5673,6 +5734,7 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('quietEndMinutes: $quietEndMinutes, ')
           ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
           ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
+          ..write('errorReportsEnabled: $errorReportsEnabled, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -6612,6 +6674,801 @@ class SyncTombstonesCompanion extends UpdateCompanion<SyncTombstone> {
   }
 }
 
+class $ClientErrorsTable extends ClientErrors
+    with TableInfo<$ClientErrorsTable, ClientError> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ClientErrorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _errorTypeMeta = const VerificationMeta(
+    'errorType',
+  );
+  @override
+  late final GeneratedColumn<String> errorType = GeneratedColumn<String>(
+    'error_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageMeta = const VerificationMeta(
+    'message',
+  );
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+    'message',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stackMeta = const VerificationMeta('stack');
+  @override
+  late final GeneratedColumn<String> stack = GeneratedColumn<String>(
+    'stack',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contextMeta = const VerificationMeta(
+    'context',
+  );
+  @override
+  late final GeneratedColumn<String> context = GeneratedColumn<String>(
+    'context',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _countMeta = const VerificationMeta('count');
+  @override
+  late final GeneratedColumn<int> count = GeneratedColumn<int>(
+    'count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _firstSeenAtMeta = const VerificationMeta(
+    'firstSeenAt',
+  );
+  @override
+  late final GeneratedColumn<String> firstSeenAt = GeneratedColumn<String>(
+    'first_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<String> lastSeenAt = GeneratedColumn<String>(
+    'last_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appVersionMeta = const VerificationMeta(
+    'appVersion',
+  );
+  @override
+  late final GeneratedColumn<String> appVersion = GeneratedColumn<String>(
+    'app_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _platformMeta = const VerificationMeta(
+    'platform',
+  );
+  @override
+  late final GeneratedColumn<String> platform = GeneratedColumn<String>(
+    'platform',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _uploadedAtMeta = const VerificationMeta(
+    'uploadedAt',
+  );
+  @override
+  late final GeneratedColumn<String> uploadedAt = GeneratedColumn<String>(
+    'uploaded_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    source,
+    errorType,
+    message,
+    stack,
+    context,
+    count,
+    firstSeenAt,
+    lastSeenAt,
+    appVersion,
+    platform,
+    householdId,
+    uploadedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'client_errors';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ClientError> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceMeta);
+    }
+    if (data.containsKey('error_type')) {
+      context.handle(
+        _errorTypeMeta,
+        errorType.isAcceptableOrUnknown(data['error_type']!, _errorTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_errorTypeMeta);
+    }
+    if (data.containsKey('message')) {
+      context.handle(
+        _messageMeta,
+        message.isAcceptableOrUnknown(data['message']!, _messageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageMeta);
+    }
+    if (data.containsKey('stack')) {
+      context.handle(
+        _stackMeta,
+        stack.isAcceptableOrUnknown(data['stack']!, _stackMeta),
+      );
+    }
+    if (data.containsKey('context')) {
+      context.handle(
+        _contextMeta,
+        this.context.isAcceptableOrUnknown(data['context']!, _contextMeta),
+      );
+    }
+    if (data.containsKey('count')) {
+      context.handle(
+        _countMeta,
+        count.isAcceptableOrUnknown(data['count']!, _countMeta),
+      );
+    }
+    if (data.containsKey('first_seen_at')) {
+      context.handle(
+        _firstSeenAtMeta,
+        firstSeenAt.isAcceptableOrUnknown(
+          data['first_seen_at']!,
+          _firstSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_firstSeenAtMeta);
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSeenAtMeta);
+    }
+    if (data.containsKey('app_version')) {
+      context.handle(
+        _appVersionMeta,
+        appVersion.isAcceptableOrUnknown(data['app_version']!, _appVersionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_appVersionMeta);
+    }
+    if (data.containsKey('platform')) {
+      context.handle(
+        _platformMeta,
+        platform.isAcceptableOrUnknown(data['platform']!, _platformMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_platformMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('uploaded_at')) {
+      context.handle(
+        _uploadedAtMeta,
+        uploadedAt.isAcceptableOrUnknown(data['uploaded_at']!, _uploadedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ClientError map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ClientError(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      errorType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_type'],
+      )!,
+      message: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message'],
+      )!,
+      stack: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stack'],
+      ),
+      context: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context'],
+      ),
+      count: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}count'],
+      )!,
+      firstSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_seen_at'],
+      )!,
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_seen_at'],
+      )!,
+      appVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}app_version'],
+      )!,
+      platform: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}platform'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      ),
+      uploadedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}uploaded_at'],
+      ),
+    );
+  }
+
+  @override
+  $ClientErrorsTable createAlias(String alias) {
+    return $ClientErrorsTable(attachedDatabase, alias);
+  }
+}
+
+class ClientError extends DataClass implements Insertable<ClientError> {
+  /// Client-generated UUIDv4; also the server row's primary key.
+  final String id;
+
+  /// Where it happened, e.g. `sync.pushDirty` -- a stable `area.thing`
+  /// identifier, never interpolated with data (it is a server grouping key).
+  final String source;
+
+  /// The scrubbed runtime type name of the error.
+  final String errorType;
+
+  /// The scrubbed error message.
+  final String message;
+
+  /// The truncated stack trace, if one was available.
+  final String? stack;
+
+  /// A JSON object string of ids / enum names / counts, or `NULL`.
+  final String? context;
+
+  /// How many times this exact error was merged into the row before it was
+  /// uploaded (spec §3.2).
+  final int count;
+
+  /// ISO-8601 UTC moment of the first occurrence merged into this row.
+  final String firstSeenAt;
+
+  /// ISO-8601 UTC moment of the latest occurrence merged into this row.
+  final String lastSeenAt;
+
+  /// `'<version>+<build>'` of the app that recorded it.
+  final String appVersion;
+
+  /// `'<operatingSystem> <operatingSystemVersion>'`, capped at 100 chars.
+  final String platform;
+
+  /// `Settings.syncHouseholdId` at record time, or `NULL` while unlinked.
+  final String? householdId;
+
+  /// ISO-8601 UTC moment the row was uploaded, or `NULL` while pending. An
+  /// uploaded row is never re-sent and never merged into again.
+  final String? uploadedAt;
+  const ClientError({
+    required this.id,
+    required this.source,
+    required this.errorType,
+    required this.message,
+    this.stack,
+    this.context,
+    required this.count,
+    required this.firstSeenAt,
+    required this.lastSeenAt,
+    required this.appVersion,
+    required this.platform,
+    this.householdId,
+    this.uploadedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['source'] = Variable<String>(source);
+    map['error_type'] = Variable<String>(errorType);
+    map['message'] = Variable<String>(message);
+    if (!nullToAbsent || stack != null) {
+      map['stack'] = Variable<String>(stack);
+    }
+    if (!nullToAbsent || context != null) {
+      map['context'] = Variable<String>(context);
+    }
+    map['count'] = Variable<int>(count);
+    map['first_seen_at'] = Variable<String>(firstSeenAt);
+    map['last_seen_at'] = Variable<String>(lastSeenAt);
+    map['app_version'] = Variable<String>(appVersion);
+    map['platform'] = Variable<String>(platform);
+    if (!nullToAbsent || householdId != null) {
+      map['household_id'] = Variable<String>(householdId);
+    }
+    if (!nullToAbsent || uploadedAt != null) {
+      map['uploaded_at'] = Variable<String>(uploadedAt);
+    }
+    return map;
+  }
+
+  ClientErrorsCompanion toCompanion(bool nullToAbsent) {
+    return ClientErrorsCompanion(
+      id: Value(id),
+      source: Value(source),
+      errorType: Value(errorType),
+      message: Value(message),
+      stack: stack == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stack),
+      context: context == null && nullToAbsent
+          ? const Value.absent()
+          : Value(context),
+      count: Value(count),
+      firstSeenAt: Value(firstSeenAt),
+      lastSeenAt: Value(lastSeenAt),
+      appVersion: Value(appVersion),
+      platform: Value(platform),
+      householdId: householdId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(householdId),
+      uploadedAt: uploadedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(uploadedAt),
+    );
+  }
+
+  factory ClientError.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ClientError(
+      id: serializer.fromJson<String>(json['id']),
+      source: serializer.fromJson<String>(json['source']),
+      errorType: serializer.fromJson<String>(json['errorType']),
+      message: serializer.fromJson<String>(json['message']),
+      stack: serializer.fromJson<String?>(json['stack']),
+      context: serializer.fromJson<String?>(json['context']),
+      count: serializer.fromJson<int>(json['count']),
+      firstSeenAt: serializer.fromJson<String>(json['firstSeenAt']),
+      lastSeenAt: serializer.fromJson<String>(json['lastSeenAt']),
+      appVersion: serializer.fromJson<String>(json['appVersion']),
+      platform: serializer.fromJson<String>(json['platform']),
+      householdId: serializer.fromJson<String?>(json['householdId']),
+      uploadedAt: serializer.fromJson<String?>(json['uploadedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'source': serializer.toJson<String>(source),
+      'errorType': serializer.toJson<String>(errorType),
+      'message': serializer.toJson<String>(message),
+      'stack': serializer.toJson<String?>(stack),
+      'context': serializer.toJson<String?>(context),
+      'count': serializer.toJson<int>(count),
+      'firstSeenAt': serializer.toJson<String>(firstSeenAt),
+      'lastSeenAt': serializer.toJson<String>(lastSeenAt),
+      'appVersion': serializer.toJson<String>(appVersion),
+      'platform': serializer.toJson<String>(platform),
+      'householdId': serializer.toJson<String?>(householdId),
+      'uploadedAt': serializer.toJson<String?>(uploadedAt),
+    };
+  }
+
+  ClientError copyWith({
+    String? id,
+    String? source,
+    String? errorType,
+    String? message,
+    Value<String?> stack = const Value.absent(),
+    Value<String?> context = const Value.absent(),
+    int? count,
+    String? firstSeenAt,
+    String? lastSeenAt,
+    String? appVersion,
+    String? platform,
+    Value<String?> householdId = const Value.absent(),
+    Value<String?> uploadedAt = const Value.absent(),
+  }) => ClientError(
+    id: id ?? this.id,
+    source: source ?? this.source,
+    errorType: errorType ?? this.errorType,
+    message: message ?? this.message,
+    stack: stack.present ? stack.value : this.stack,
+    context: context.present ? context.value : this.context,
+    count: count ?? this.count,
+    firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+    appVersion: appVersion ?? this.appVersion,
+    platform: platform ?? this.platform,
+    householdId: householdId.present ? householdId.value : this.householdId,
+    uploadedAt: uploadedAt.present ? uploadedAt.value : this.uploadedAt,
+  );
+  ClientError copyWithCompanion(ClientErrorsCompanion data) {
+    return ClientError(
+      id: data.id.present ? data.id.value : this.id,
+      source: data.source.present ? data.source.value : this.source,
+      errorType: data.errorType.present ? data.errorType.value : this.errorType,
+      message: data.message.present ? data.message.value : this.message,
+      stack: data.stack.present ? data.stack.value : this.stack,
+      context: data.context.present ? data.context.value : this.context,
+      count: data.count.present ? data.count.value : this.count,
+      firstSeenAt: data.firstSeenAt.present
+          ? data.firstSeenAt.value
+          : this.firstSeenAt,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+      appVersion: data.appVersion.present
+          ? data.appVersion.value
+          : this.appVersion,
+      platform: data.platform.present ? data.platform.value : this.platform,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      uploadedAt: data.uploadedAt.present
+          ? data.uploadedAt.value
+          : this.uploadedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClientError(')
+          ..write('id: $id, ')
+          ..write('source: $source, ')
+          ..write('errorType: $errorType, ')
+          ..write('message: $message, ')
+          ..write('stack: $stack, ')
+          ..write('context: $context, ')
+          ..write('count: $count, ')
+          ..write('firstSeenAt: $firstSeenAt, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('appVersion: $appVersion, ')
+          ..write('platform: $platform, ')
+          ..write('householdId: $householdId, ')
+          ..write('uploadedAt: $uploadedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    source,
+    errorType,
+    message,
+    stack,
+    context,
+    count,
+    firstSeenAt,
+    lastSeenAt,
+    appVersion,
+    platform,
+    householdId,
+    uploadedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ClientError &&
+          other.id == this.id &&
+          other.source == this.source &&
+          other.errorType == this.errorType &&
+          other.message == this.message &&
+          other.stack == this.stack &&
+          other.context == this.context &&
+          other.count == this.count &&
+          other.firstSeenAt == this.firstSeenAt &&
+          other.lastSeenAt == this.lastSeenAt &&
+          other.appVersion == this.appVersion &&
+          other.platform == this.platform &&
+          other.householdId == this.householdId &&
+          other.uploadedAt == this.uploadedAt);
+}
+
+class ClientErrorsCompanion extends UpdateCompanion<ClientError> {
+  final Value<String> id;
+  final Value<String> source;
+  final Value<String> errorType;
+  final Value<String> message;
+  final Value<String?> stack;
+  final Value<String?> context;
+  final Value<int> count;
+  final Value<String> firstSeenAt;
+  final Value<String> lastSeenAt;
+  final Value<String> appVersion;
+  final Value<String> platform;
+  final Value<String?> householdId;
+  final Value<String?> uploadedAt;
+  final Value<int> rowid;
+  const ClientErrorsCompanion({
+    this.id = const Value.absent(),
+    this.source = const Value.absent(),
+    this.errorType = const Value.absent(),
+    this.message = const Value.absent(),
+    this.stack = const Value.absent(),
+    this.context = const Value.absent(),
+    this.count = const Value.absent(),
+    this.firstSeenAt = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+    this.appVersion = const Value.absent(),
+    this.platform = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.uploadedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ClientErrorsCompanion.insert({
+    required String id,
+    required String source,
+    required String errorType,
+    required String message,
+    this.stack = const Value.absent(),
+    this.context = const Value.absent(),
+    this.count = const Value.absent(),
+    required String firstSeenAt,
+    required String lastSeenAt,
+    required String appVersion,
+    required String platform,
+    this.householdId = const Value.absent(),
+    this.uploadedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       source = Value(source),
+       errorType = Value(errorType),
+       message = Value(message),
+       firstSeenAt = Value(firstSeenAt),
+       lastSeenAt = Value(lastSeenAt),
+       appVersion = Value(appVersion),
+       platform = Value(platform);
+  static Insertable<ClientError> custom({
+    Expression<String>? id,
+    Expression<String>? source,
+    Expression<String>? errorType,
+    Expression<String>? message,
+    Expression<String>? stack,
+    Expression<String>? context,
+    Expression<int>? count,
+    Expression<String>? firstSeenAt,
+    Expression<String>? lastSeenAt,
+    Expression<String>? appVersion,
+    Expression<String>? platform,
+    Expression<String>? householdId,
+    Expression<String>? uploadedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (source != null) 'source': source,
+      if (errorType != null) 'error_type': errorType,
+      if (message != null) 'message': message,
+      if (stack != null) 'stack': stack,
+      if (context != null) 'context': context,
+      if (count != null) 'count': count,
+      if (firstSeenAt != null) 'first_seen_at': firstSeenAt,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (appVersion != null) 'app_version': appVersion,
+      if (platform != null) 'platform': platform,
+      if (householdId != null) 'household_id': householdId,
+      if (uploadedAt != null) 'uploaded_at': uploadedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ClientErrorsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? source,
+    Value<String>? errorType,
+    Value<String>? message,
+    Value<String?>? stack,
+    Value<String?>? context,
+    Value<int>? count,
+    Value<String>? firstSeenAt,
+    Value<String>? lastSeenAt,
+    Value<String>? appVersion,
+    Value<String>? platform,
+    Value<String?>? householdId,
+    Value<String?>? uploadedAt,
+    Value<int>? rowid,
+  }) {
+    return ClientErrorsCompanion(
+      id: id ?? this.id,
+      source: source ?? this.source,
+      errorType: errorType ?? this.errorType,
+      message: message ?? this.message,
+      stack: stack ?? this.stack,
+      context: context ?? this.context,
+      count: count ?? this.count,
+      firstSeenAt: firstSeenAt ?? this.firstSeenAt,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      appVersion: appVersion ?? this.appVersion,
+      platform: platform ?? this.platform,
+      householdId: householdId ?? this.householdId,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (errorType.present) {
+      map['error_type'] = Variable<String>(errorType.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    if (stack.present) {
+      map['stack'] = Variable<String>(stack.value);
+    }
+    if (context.present) {
+      map['context'] = Variable<String>(context.value);
+    }
+    if (count.present) {
+      map['count'] = Variable<int>(count.value);
+    }
+    if (firstSeenAt.present) {
+      map['first_seen_at'] = Variable<String>(firstSeenAt.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<String>(lastSeenAt.value);
+    }
+    if (appVersion.present) {
+      map['app_version'] = Variable<String>(appVersion.value);
+    }
+    if (platform.present) {
+      map['platform'] = Variable<String>(platform.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (uploadedAt.present) {
+      map['uploaded_at'] = Variable<String>(uploadedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClientErrorsCompanion(')
+          ..write('id: $id, ')
+          ..write('source: $source, ')
+          ..write('errorType: $errorType, ')
+          ..write('message: $message, ')
+          ..write('stack: $stack, ')
+          ..write('context: $context, ')
+          ..write('count: $count, ')
+          ..write('firstSeenAt: $firstSeenAt, ')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('appVersion: $appVersion, ')
+          ..write('platform: $platform, ')
+          ..write('householdId: $householdId, ')
+          ..write('uploadedAt: $uploadedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6630,6 +7487,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $UiStateTable uiState = $UiStateTable(this);
   late final $SyncTombstonesTable syncTombstones = $SyncTombstonesTable(this);
+  late final $ClientErrorsTable clientErrors = $ClientErrorsTable(this);
   late final Index choreOccurrencesChoreStatusIdx = Index(
     'chore_occurrences_chore_status_idx',
     'CREATE INDEX chore_occurrences_chore_status_idx ON chore_occurrences (chore_id, status)',
@@ -6658,6 +7516,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     reminderSnoozes,
     uiState,
     syncTombstones,
+    clientErrors,
     choreOccurrencesChoreStatusIdx,
     choreOccurrencesStatusDueDateIdx,
     choreOccurrencesStatusClosedOnIdx,
@@ -11227,6 +12086,7 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<int> quietEndMinutes,
       Value<bool> eveningReminderEnabled,
       Value<int> eveningReminderMinutes,
+      Value<bool> errorReportsEnabled,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -11251,6 +12111,7 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<int> quietEndMinutes,
       Value<bool> eveningReminderEnabled,
       Value<int> eveningReminderMinutes,
+      Value<bool> errorReportsEnabled,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -11352,6 +12213,11 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<int> get eveningReminderMinutes => $composableBuilder(
     column: $table.eveningReminderMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get errorReportsEnabled => $composableBuilder(
+    column: $table.errorReportsEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11465,6 +12331,11 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get errorReportsEnabled => $composableBuilder(
+    column: $table.errorReportsEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -11569,6 +12440,11 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get errorReportsEnabled => $composableBuilder(
+    column: $table.errorReportsEnabled,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -11626,6 +12502,7 @@ class $$SettingsTableTableManager
                 Value<int> quietEndMinutes = const Value.absent(),
                 Value<bool> eveningReminderEnabled = const Value.absent(),
                 Value<int> eveningReminderMinutes = const Value.absent(),
+                Value<bool> errorReportsEnabled = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -11648,6 +12525,7 @@ class $$SettingsTableTableManager
                 quietEndMinutes: quietEndMinutes,
                 eveningReminderEnabled: eveningReminderEnabled,
                 eveningReminderMinutes: eveningReminderMinutes,
+                errorReportsEnabled: errorReportsEnabled,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -11673,6 +12551,7 @@ class $$SettingsTableTableManager
                 Value<int> quietEndMinutes = const Value.absent(),
                 Value<bool> eveningReminderEnabled = const Value.absent(),
                 Value<int> eveningReminderMinutes = const Value.absent(),
+                Value<bool> errorReportsEnabled = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -11695,6 +12574,7 @@ class $$SettingsTableTableManager
                 quietEndMinutes: quietEndMinutes,
                 eveningReminderEnabled: eveningReminderEnabled,
                 eveningReminderMinutes: eveningReminderMinutes,
+                errorReportsEnabled: errorReportsEnabled,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -12366,6 +13246,368 @@ typedef $$SyncTombstonesTableProcessedTableManager =
       SyncTombstone,
       PrefetchHooks Function()
     >;
+typedef $$ClientErrorsTableCreateCompanionBuilder =
+    ClientErrorsCompanion Function({
+      required String id,
+      required String source,
+      required String errorType,
+      required String message,
+      Value<String?> stack,
+      Value<String?> context,
+      Value<int> count,
+      required String firstSeenAt,
+      required String lastSeenAt,
+      required String appVersion,
+      required String platform,
+      Value<String?> householdId,
+      Value<String?> uploadedAt,
+      Value<int> rowid,
+    });
+typedef $$ClientErrorsTableUpdateCompanionBuilder =
+    ClientErrorsCompanion Function({
+      Value<String> id,
+      Value<String> source,
+      Value<String> errorType,
+      Value<String> message,
+      Value<String?> stack,
+      Value<String?> context,
+      Value<int> count,
+      Value<String> firstSeenAt,
+      Value<String> lastSeenAt,
+      Value<String> appVersion,
+      Value<String> platform,
+      Value<String?> householdId,
+      Value<String?> uploadedAt,
+      Value<int> rowid,
+    });
+
+class $$ClientErrorsTableFilterComposer
+    extends Composer<_$AppDatabase, $ClientErrorsTable> {
+  $$ClientErrorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorType => $composableBuilder(
+    column: $table.errorType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stack => $composableBuilder(
+    column: $table.stack,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get count => $composableBuilder(
+    column: $table.count,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appVersion => $composableBuilder(
+    column: $table.appVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get platform => $composableBuilder(
+    column: $table.platform,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ClientErrorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ClientErrorsTable> {
+  $$ClientErrorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorType => $composableBuilder(
+    column: $table.errorType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stack => $composableBuilder(
+    column: $table.stack,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get count => $composableBuilder(
+    column: $table.count,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appVersion => $composableBuilder(
+    column: $table.appVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get platform => $composableBuilder(
+    column: $table.platform,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ClientErrorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ClientErrorsTable> {
+  $$ClientErrorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get errorType =>
+      $composableBuilder(column: $table.errorType, builder: (column) => column);
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+
+  GeneratedColumn<String> get stack =>
+      $composableBuilder(column: $table.stack, builder: (column) => column);
+
+  GeneratedColumn<String> get context =>
+      $composableBuilder(column: $table.context, builder: (column) => column);
+
+  GeneratedColumn<int> get count =>
+      $composableBuilder(column: $table.count, builder: (column) => column);
+
+  GeneratedColumn<String> get firstSeenAt => $composableBuilder(
+    column: $table.firstSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appVersion => $composableBuilder(
+    column: $table.appVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get platform =>
+      $composableBuilder(column: $table.platform, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$ClientErrorsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ClientErrorsTable,
+          ClientError,
+          $$ClientErrorsTableFilterComposer,
+          $$ClientErrorsTableOrderingComposer,
+          $$ClientErrorsTableAnnotationComposer,
+          $$ClientErrorsTableCreateCompanionBuilder,
+          $$ClientErrorsTableUpdateCompanionBuilder,
+          (
+            ClientError,
+            BaseReferences<_$AppDatabase, $ClientErrorsTable, ClientError>,
+          ),
+          ClientError,
+          PrefetchHooks Function()
+        > {
+  $$ClientErrorsTableTableManager(_$AppDatabase db, $ClientErrorsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ClientErrorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ClientErrorsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ClientErrorsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String> errorType = const Value.absent(),
+                Value<String> message = const Value.absent(),
+                Value<String?> stack = const Value.absent(),
+                Value<String?> context = const Value.absent(),
+                Value<int> count = const Value.absent(),
+                Value<String> firstSeenAt = const Value.absent(),
+                Value<String> lastSeenAt = const Value.absent(),
+                Value<String> appVersion = const Value.absent(),
+                Value<String> platform = const Value.absent(),
+                Value<String?> householdId = const Value.absent(),
+                Value<String?> uploadedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ClientErrorsCompanion(
+                id: id,
+                source: source,
+                errorType: errorType,
+                message: message,
+                stack: stack,
+                context: context,
+                count: count,
+                firstSeenAt: firstSeenAt,
+                lastSeenAt: lastSeenAt,
+                appVersion: appVersion,
+                platform: platform,
+                householdId: householdId,
+                uploadedAt: uploadedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String source,
+                required String errorType,
+                required String message,
+                Value<String?> stack = const Value.absent(),
+                Value<String?> context = const Value.absent(),
+                Value<int> count = const Value.absent(),
+                required String firstSeenAt,
+                required String lastSeenAt,
+                required String appVersion,
+                required String platform,
+                Value<String?> householdId = const Value.absent(),
+                Value<String?> uploadedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ClientErrorsCompanion.insert(
+                id: id,
+                source: source,
+                errorType: errorType,
+                message: message,
+                stack: stack,
+                context: context,
+                count: count,
+                firstSeenAt: firstSeenAt,
+                lastSeenAt: lastSeenAt,
+                appVersion: appVersion,
+                platform: platform,
+                householdId: householdId,
+                uploadedAt: uploadedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ClientErrorsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ClientErrorsTable,
+      ClientError,
+      $$ClientErrorsTableFilterComposer,
+      $$ClientErrorsTableOrderingComposer,
+      $$ClientErrorsTableAnnotationComposer,
+      $$ClientErrorsTableCreateCompanionBuilder,
+      $$ClientErrorsTableUpdateCompanionBuilder,
+      (
+        ClientError,
+        BaseReferences<_$AppDatabase, $ClientErrorsTable, ClientError>,
+      ),
+      ClientError,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -12392,4 +13634,6 @@ class $AppDatabaseManager {
       $$UiStateTableTableManager(_db, _db.uiState);
   $$SyncTombstonesTableTableManager get syncTombstones =>
       $$SyncTombstonesTableTableManager(_db, _db.syncTombstones);
+  $$ClientErrorsTableTableManager get clientErrors =>
+      $$ClientErrorsTableTableManager(_db, _db.clientErrors);
 }

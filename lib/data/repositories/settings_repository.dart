@@ -71,6 +71,7 @@ class SettingsRepository {
         quietEndMinutes: 420,
         eveningReminderEnabled: false,
         eveningReminderMinutes: 1200,
+        errorReportsEnabled: true,
         createdAt: now,
         updatedAt: now,
       );
@@ -179,6 +180,21 @@ class SettingsRepository {
     )..where((tbl) => tbl.id.equals(deviceId))).write(
       SettingsCompanion(
         eveningReminderEnabled: Value(enabled),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Turns uploading of recorded errors on or off (spec
+  /// `docs/specs/client-error-reporting.md` §6). Recording into the local
+  /// buffer is unaffected either way.
+  Future<void> setErrorReportsEnabled({required bool enabled}) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        errorReportsEnabled: Value(enabled),
         updatedAt: Value(_isoNow()),
       ),
     );

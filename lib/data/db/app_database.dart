@@ -44,6 +44,7 @@ part 'app_database.g.dart';
     ReminderSnoozes,
     UiState,
     SyncTombstones,
+    ClientErrors,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -56,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -158,6 +159,17 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(settings, settings.eveningReminderEnabled);
           await migrator.addColumn(settings, settings.eveningReminderMinutes);
         }
+        if (from < 16) {
+          // v15 -> v16 (spec `docs/specs/client-error-reporting.md` §3.1):
+          // the `settings.errorReportsEnabled` opt-out switch, defaulting to
+          // `true` -- no data rewrite. Lives here, inside the `else` branch,
+          // for exactly the reason spelled out for `membershipRevoked` and
+          // the N2 columns above: `settings` did not exist before v2, so a
+          // v1 -> v16 jump builds the table at full current width via
+          // [createTable], and a second unconditional `addColumn` for the
+          // same column would throw a duplicate-column error.
+          await migrator.addColumn(settings, settings.errorReportsEnabled);
+        }
       }
       if (from < 8) {
         // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
@@ -247,6 +259,14 @@ class AppDatabase extends _$AppDatabase {
         // table is introduced HERE, so no install at any shipped version
         // 1..14 can already carry it. Same reasoning as `ui_state` above.
         await migrator.createTable(syncTombstones);
+      }
+      if (from < 16) {
+        // v15 -> v16 (spec `docs/specs/client-error-reporting.md` §3.1): the
+        // device-scoped, unsynced local error ring buffer -- no data rewrite.
+        // Flat and unconditional: the table is introduced HERE, so no
+        // install at any shipped version 1..15 can already carry it. Same
+        // reasoning as `sync_tombstones` above.
+        await migrator.createTable(clientErrors);
       }
     },
     beforeOpen: (details) async {

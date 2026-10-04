@@ -7,7 +7,8 @@ import 'package:chore_app/data/db/app_database.dart';
 /// Deletes every row from every table, in one transaction, in the FK-safe
 /// order the spec spells out: reminder snoozes, occurrences, assignees,
 /// chores, shopping items, categories, members, settings, ui state (the
-/// remembered last tab, spec `docs/specs/last-tab-restore.md` §2),
+/// remembered last tab, spec `docs/specs/last-tab-restore.md` §2), sync
+/// tombstones, client errors,
 /// households.
 ///
 /// Leaves the database schema itself untouched -- only rows are removed.
@@ -48,6 +49,10 @@ Future<void> resetAppData(AppDatabase database) {
     // `docs/specs/sync-backend.md` §8.6) describe a household that no longer
     // exists locally.
     await database.delete(database.syncTombstones).go();
+    // The local error buffer is device-scoped diagnostics, and "reset app
+    // data" promises a clean device (spec
+    // `docs/specs/client-error-reporting.md` §3.1).
+    await database.delete(database.clientErrors).go();
     await database.delete(database.households).go();
   });
 }
