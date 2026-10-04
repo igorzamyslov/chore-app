@@ -146,6 +146,46 @@ abstract final class AppLog {
 Add `ui`/`app` sources sparingly and descriptively; list every source you
 add in a table in this section when implementing.
 
+#### Implemented sources
+
+| `source` | Site |
+|---|---|
+| `sync.pushDirty` | `SupabaseSyncEngine._logFailure` (push failures, two call sites) |
+| `sync.pullSince` | `SupabaseSyncEngine._logFailure` (pull failures) |
+| `sync.refreshNow` | `SupabaseSyncEngine._logFailure` (pull-to-refresh failures) |
+| `sync.realtime` | `SupabaseSyncTransport.householdChanges` subscribe callback, context `status` |
+| `flutter.framework` | `FlutterError.onError` in `main.dart` |
+| `flutter.uncaught` | `PlatformDispatcher.instance.onError` in `main.dart` |
+| `ui.inviteFlow` | `invite_flow.dart` |
+| `ui.resetFlow` | `reset_flow.dart` |
+| `ui.accountSignOut` | `account_section.dart` sign-out |
+| `ui.accountSendMagicLink` | `account_section.dart` magic-link send |
+| `ui.accountAdopt` | `account_section.dart` put-household-online (adopt) generic failure |
+| `ui.accountLeaveHousehold` | `account_section.dart` leave household |
+| `ui.accountDeleteAccount` | `account_section.dart` delete account |
+| `ui.exportData` | `export_row.dart` |
+| `ui.joinHouseholdSheet` | `join_household_sheet.dart` join step, any failure except `HouseholdSnapshotUnavailable` (expected outcome) |
+| `ui.welcomeJoin` | `welcome_join_page.dart` join step, same exception |
+| `app.notificationAction` | `notification_action_handler.dart` (background isolate: no sink is attached there, so this only reaches `debugPrint`) |
+| `app.deleteAccountSignOut` | `household_exit_service.dart` best-effort sign-out after account erasure |
+
+Deliberately NOT logged (expected outcomes or errors that are rethrown /
+wrapped rather than swallowed): `ClaimedMemberRemovalFailure`
+(`member_edit_sheet.dart`), the join code-entry step's `PostgrestException`/
+offline mapping (`joinCodeErrorMessage` in `join_household_sheet.dart` and
+`welcome_join_page.dart`), `HouseholdLinkService`'s step-1 classification,
+`MemberService.deleteMember`'s wrap, `SupabaseHouseholdGateway`'s `23505`
+rethrow.
+
+### Deviations
+
+- `PostgrestException` in the pinned `postgrest` 2.8.0 has no HTTP status
+  field, so §2's optional `status=…` is omitted: the message is
+  `postgrest code=<code>`.
+- The About switch's semantic id is `settings-error-reports-switch` exactly
+  as §6 specifies, which departs from the dotted `settings.about.*` ids of
+  the neighbouring rows.
+
 ## 4. Upload
 
 ### 4.1 Triggers

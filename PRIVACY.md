@@ -26,7 +26,12 @@ devices can share it:
 
 - your email address (authentication only),
 - household name, member names and colors,
-- chores, their completion history, and shopping items.
+- chores, their completion history, and shopping items,
+- error reports, unless you turn them off in Settings → About: when an
+  error happens in the app, the time, app version, platform, where in
+  the app it happened and the technical error message. They never
+  contain chore titles, names, shopping items or your email. Reports
+  are deleted after 90 days.
 
 That is the complete list. Settings (language, theme, notification
 preferences) never leave the device.
@@ -57,4 +62,5 @@ Self-hosting instructions: `docs/backend-supabase.md` and
   member profile; household history stays with the household, per the
   design in `docs/specs/sync-backend.md`) ships with the sync feature's
   final phase. Until then, contact the backend operator or delete the
-  rows via your own project if self-hosting.
+  rows via your own project if self-hosting. Deleting your account also
+  deletes its error reports.

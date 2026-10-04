@@ -1,0 +1,3 @@
+Fehlerberichte, die du ausschalten kannst.
+
+Famdo kann jetzt technische Fehlerdetails (keine Aufgaben-, Mitglieder- oder Einkaufsdaten) an den Sync-Server senden, damit Fehler schneller behoben werden. Das passiert nur, wenn du angemeldet bist, und du kannst es mit dem neuen Schalter „Fehlerberichte senden“ unter Einstellungen → Über die App abschalten.
