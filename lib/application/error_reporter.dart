@@ -9,6 +9,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/error_log_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
@@ -129,23 +130,21 @@ class ErrorReporter {
         if (rows.isEmpty) {
           return;
         }
-        await transport.insertErrors([
-          for (final row in rows)
-            {
-              'id': row.id,
-              'source': row.source,
-              'error_type': row.errorType,
-              'message': row.message,
-              'stack': row.stack,
-              'context': row.context == null ? null : jsonDecode(row.context!),
-              'count': row.count,
-              'first_seen_at': row.firstSeenAt,
-              'last_seen_at': row.lastSeenAt,
-              'app_version': row.appVersion,
-              'platform': row.platform,
-              'household_id': row.householdId,
-            },
-        ]);
+        try {
+          await _send(rows);
+        } on supabase.PostgrestException catch (error) {
+          // Class 22 (data exception) / 23 (integrity violation): the server
+          // rejected the ROWS, not the request -- a check constraint, a bad
+          // uuid. Retrying would fail identically forever and, since pending
+          // rows are read oldest first, block every later report behind
+          // them. Drop the batch (marked uploaded) and carry on; anything
+          // else (offline, 401, 5xx) is transient and rethrown to retry.
+          final code = error.code ?? '';
+          if (!code.startsWith('22') && !code.startsWith('23')) {
+            rethrow;
+          }
+          debugPrint('ErrorReporter: dropped a rejected batch ($code)');
+        }
         await repository.markUploaded([for (final r in rows) r.id], nowUtc());
       }
     } on Object catch (error) {
@@ -153,6 +152,26 @@ class ErrorReporter {
     } finally {
       _flushing = false;
     }
+  }
+
+  Future<void> _send(List<ClientError> rows) {
+    return transport.insertErrors([
+      for (final row in rows)
+        {
+          'id': row.id,
+          'source': row.source,
+          'error_type': row.errorType,
+          'message': row.message,
+          'stack': row.stack,
+          'context': row.context == null ? null : jsonDecode(row.context!),
+          'count': row.count,
+          'first_seen_at': row.firstSeenAt,
+          'last_seen_at': row.lastSeenAt,
+          'app_version': row.appVersion,
+          'platform': row.platform,
+          'household_id': row.householdId,
+        },
+    ]);
   }
 }
 

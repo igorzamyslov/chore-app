@@ -95,6 +95,17 @@ abstract final class ErrorScrubber {
       // A throwing `toString` must not defeat the report.
       return 'unprintable error';
     }
+    // sqlite3's `SqliteException.toString` appends the failing SQL and its
+    // bound parameters UNQUOTED ("parameters: Clean Anna's room, ..."), so
+    // the quote rule below cannot catch them. Drop everything from that
+    // marker on -- the result code and message before it are what is
+    // actionable. Matched on the text, not the type, because drift_flutter
+    // runs the database in a background isolate and the exception usually
+    // arrives wrapped (`DriftRemoteException`), carrying the same text.
+    final statement = raw.indexOf('Causing statement');
+    if (statement >= 0) {
+      raw = raw.substring(0, statement).trimRight();
+    }
     // UUIDs are ids, not content, and are what makes a report actionable:
     // lift them out so the digit rule cannot mangle them, put them back
     // after.

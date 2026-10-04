@@ -6,6 +6,7 @@ import 'package:chore_app/data/repositories/error_log_repository.dart';
 import 'package:chore_app/domain/error_scrubber.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 class _FakeTransport implements ErrorReportTransport {
   final List<List<Map<String, Object?>>> batches = [];
@@ -209,6 +210,32 @@ void main() {
     transport.failWith = null;
     await reporter.flush();
     expect(await repo.pending(), isEmpty);
+  });
+
+  test('a batch the server rejects as invalid data is dropped, not '
+      'retried forever', () async {
+    await seed(3);
+    transport.failWith = const PostgrestException(
+      message: 'new row violates check constraint',
+      code: '23514',
+    );
+
+    await reporter.flush();
+
+    expect(transport.batches, hasLength(1));
+    expect(await repo.pending(), isEmpty);
+  });
+
+  test('a PostgrestException outside classes 22/23 still retries', () async {
+    await seed(3);
+    transport.failWith = const PostgrestException(
+      message: 'JWT expired',
+      code: 'PGRST301',
+    );
+
+    await reporter.flush();
+
+    expect(await repo.pending(), hasLength(3));
   });
 
   test('a concurrent flush is dropped by the guard', () async {

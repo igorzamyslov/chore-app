@@ -45,6 +45,10 @@ scrubber is deliberately lossy.
      `details`/`message` NOT at all — they carry row values).
   2. `AuthException`: `'auth status=${e.statusCode} code=${e.code}'`.
   3. Everything else: `error.toString()`, then:
+     - cut everything from `Causing statement` on: sqlite3's
+       `SqliteException` (also when wrapped in `DriftRemoteException`)
+       appends the SQL and its bound parameters **unquoted** — chore titles
+       would otherwise pass the quote rule (found in review);
      - replace every email (`[^\s@]+@[^\s@]+\.[^\s@]+`) with `<email>`;
      - replace every single- or double-quoted span (`'…'`, `"…"`, also
        `«…»`/`“…”`) with `<str>`;
@@ -216,7 +220,11 @@ No timer, no backoff: sync's cadence is the pace.
    default `auth.uid()`) or `received_at`.
 5. On success `markUploaded(ids, now)`; loop to step 3 at most 4 times
    (≤ 200 rows per flush).
-6. Any exception: stop, `debugPrint` only (never `AppLog`), rows stay
+6. A `PostgrestException` of class `22`/`23` (the server rejected the
+   rows' data — retrying fails identically and would block every later
+   report behind them, since pending is read oldest first): drop the
+   batch by marking it uploaded, `debugPrint`, continue.
+7. Any other exception: stop, `debugPrint` only (never `AppLog`), rows stay
    pending for the next trigger.
 
 Row shape sent (snake_case): `id, source, error_type, message, stack,

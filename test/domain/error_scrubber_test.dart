@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:chore_app/domain/error_scrubber.dart';
+import 'package:drift/native.dart' show SqliteException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,6 +19,26 @@ void main() {
 
       expect(scrubbed.errorType, 'PostgrestException');
       expect(scrubbed.message, 'postgrest code=23514');
+      expect(scrubbed.message, isNot(contains('Anna')));
+    });
+
+    test('a SqliteException never carries its statement or parameters', () {
+      final error = SqliteException(
+        extendedResultCode: 2067,
+        message: 'UNIQUE constraint failed: chores.id',
+        causingStatement: 'INSERT INTO chores (id, title) VALUES (?, ?)',
+        parametersToStatement: [
+          '20000000-0000-0000-0000-000000000001',
+          "Clean Anna's room",
+        ],
+      );
+
+      final scrubbed = ErrorScrubber.scrub(error, null);
+
+      expect(
+        scrubbed.message,
+        'SqliteException(2067): UNIQUE constraint failed: chores.id',
+      );
       expect(scrubbed.message, isNot(contains('Anna')));
     });
 
