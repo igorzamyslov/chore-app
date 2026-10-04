@@ -272,11 +272,16 @@ create index client_errors_user_received_idx
 alter table public.client_errors enable row level security;
 revoke all on table public.client_errors from anon, authenticated;
 grant insert on table public.client_errors to authenticated;
-grant select (id) on table public.client_errors to authenticated;  -- ON CONFLICT (id) needs it; RLS still hides all rows
+grant select (id) on table public.client_errors to authenticated;  -- ON CONFLICT (id) needs it
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated
   with check (user_id = (select auth.uid()));
+-- ON CONFLICT also requires the conflicting row to pass a SELECT policy.
+-- With the id-only grant this exposes at most the ids of one's own reports.
+create policy client_errors_select_own on public.client_errors
+  for select to authenticated
+  using (user_id = (select auth.uid()));
 
 create or replace function public.prune_client_errors()
 returns void
@@ -300,7 +305,7 @@ select cron.schedule('prune-client-errors', '17 3 * * *',
 
 `household_id` deliberately has no FK: error rows must never block or be
 cascaded by household lifecycle. Not added to the realtime publication.
-No SELECT/UPDATE/DELETE for clients: the operator reads via MCP/dashboard
+No UPDATE/DELETE for clients, and SELECT only of `id` on their own rows (what ON CONFLICT needs): the operator reads via MCP/dashboard
 (service role / postgres).
 
 ### 5.2 pgTAP `supabase/tests/005_client_errors_test.sql`
@@ -311,7 +316,7 @@ Same harness as `004` (`test_login`). Assert:
 2. inserting with another user's `user_id` throws `42501`;
 3. re-inserting the same id with `on conflict do nothing` lives;
 4. as authenticated, `select message from client_errors` throws `42501`,
-   `select count(*)` returns 0 (id-only grant, no SELECT policy), and
+   `select count(*)` sees only the caller's own rows (id-only grant), and
    `update`/`delete` throw;
 5. `anon` cannot insert;
 6. deleting the `auth.users` row cascades the user's error rows;

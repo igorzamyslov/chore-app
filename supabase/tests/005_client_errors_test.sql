@@ -2,8 +2,8 @@
 -- §5.2). Clients may only INSERT their own rows; nothing else is reachable.
 --
 -- An UPDATE/DELETE, or a SELECT of any column but `id`, has no grant and fails
--- with 42501 before RLS is consulted. `id` alone is readable because
--- ON CONFLICT (id) needs it, but with no SELECT policy RLS returns no rows.
+-- with 42501 before RLS is consulted. `id` alone is readable, and only on the
+-- caller's own rows, because ON CONFLICT (id) needs both.
 begin;
 create extension if not exists pgtap with schema extensions;
 
@@ -61,8 +61,8 @@ select throws_ok(
   '42501', null,
   'authenticated cannot select any content column (no grant)');
 select is(
-  (select count(*) from client_errors), 0::bigint,
-  'the id-only grant exposes no rows: RLS has no SELECT policy');
+  (select count(*) from client_errors), 1::bigint,
+  'the id-only grant exposes only the caller''s own row');
 select throws_ok(
   $$update client_errors set count = 2$$,
   '42501', null,

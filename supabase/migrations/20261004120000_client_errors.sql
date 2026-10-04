@@ -1,7 +1,7 @@
 -- Client error reports (spec docs/specs/client-error-reporting.md §5.1).
 --
 -- Write-only for clients: `authenticated` is granted INSERT (plus SELECT on
--- `id` alone, see below) and no SELECT policy, UPDATE or DELETE -- the operator reads
+-- `id` of its own rows alone, see below) and no UPDATE or DELETE -- the operator reads
 -- via the dashboard / MCP (service role, postgres). That is also why the
 -- client upload is `upsert(..., onConflict: 'id', ignoreDuplicates: true)`
 -- with no `.select()`: ON CONFLICT DO NOTHING needs no UPDATE privilege, and
@@ -39,14 +39,18 @@ revoke all on table public.client_errors from anon, authenticated;
 grant insert on table public.client_errors to authenticated;
 -- `select (id)` only because ON CONFLICT (id) -- which PostgREST always
 -- emits for the client's ignore-duplicates upsert -- needs SELECT on the
--- conflict-target column (pgTAP 005 caught this). It exposes nothing: there
--- is no SELECT policy, so RLS hides every row, and no other column is
--- readable at all.
+-- conflict-target column, and the conflicting row must pass a SELECT policy
+-- (pgTAP 005 caught both). Together they expose at most the ids of the
+-- caller's OWN reports: no other column is readable, no other user's row.
 grant select (id) on table public.client_errors to authenticated;
 
 create policy client_errors_insert on public.client_errors
   for insert to authenticated
   with check (user_id = (select auth.uid()));
+
+create policy client_errors_select_own on public.client_errors
+  for select to authenticated
+  using (user_id = (select auth.uid()));
 
 -- Nightly retention: 90 days, and at most the newest 1000 rows per user.
 create or replace function public.prune_client_errors()

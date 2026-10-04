@@ -38,7 +38,7 @@ class SupabaseErrorReportTransport implements ErrorReportTransport {
     // conflict happens, so a plain upsert is rejected 42501 outright (the
     // same lesson as `members`, see `SupabaseHouseholdGateway.
     // uploadHouseholdData`). No `.select()` either: SELECT is granted on
-    // `id` alone (ON CONFLICT (id) needs it) and no row is visible.
+    // `id` of own rows alone (what ON CONFLICT (id) needs).
     // `user_id` and `received_at` are deliberately not sent -- the server
     // fills both.
     await supabase.Supabase.instance.client
