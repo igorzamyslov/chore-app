@@ -166,6 +166,20 @@ Future<void> _dropErrorReportsEnabledColumn(AppDatabase seed) async {
   );
 }
 
+/// Drops the two Chores-filter columns (schema v17, spec
+/// `docs/specs/last-tab-restore.md` §5.2) from `ui_state` on [seed] -- the
+/// same collateral-drop pattern as `_dropErrorReportsEnabledColumn`. Needed by
+/// every seed that rewinds to 14..16 while KEEPING `ui_state`; a seed that
+/// drops the whole table (`_dropUiStateTable`) has nothing to drop.
+Future<void> _dropChoresFilterColumns(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE ui_state DROP COLUMN chores_member_filter',
+  );
+  await seed.customStatement(
+    'ALTER TABLE ui_state DROP COLUMN chores_category_filter',
+  );
+}
+
 const _settingsColumnsAddedAfterV2 = [
   'acting_member_id', // v3
   'locale', // v4
@@ -1503,7 +1517,14 @@ void main() {
       final upgraded = AppDatabase(NativeDatabase(file));
       addTearDown(upgraded.close);
 
-      expect(await _columnNames(upgraded, 'ui_state'), {'id', 'last_tab'});
+      // `createTable` builds ui_state at full current width, v17 columns
+      // included.
+      expect(await _columnNames(upgraded, 'ui_state'), {
+        'id',
+        'last_tab',
+        'chores_member_filter',
+        'chores_category_filter',
+      });
       expect(await upgraded.select(upgraded.uiState).get(), isEmpty);
       final settings = await upgraded.select(upgraded.settings).getSingle();
       expect(settings.actingMemberId, 'member-1');
@@ -1540,6 +1561,7 @@ void main() {
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropChoresFilterColumns(seed);
       await seed.customStatement('PRAGMA user_version = 14');
       await seed.close();
 
@@ -1589,6 +1611,7 @@ void main() {
           );
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropChoresFilterColumns(seed);
       await seed.customStatement('PRAGMA user_version = 15');
       await seed.close();
 
@@ -1618,6 +1641,53 @@ void main() {
       final settings = await upgraded.select(upgraded.settings).getSingle();
       expect(settings.errorReportsEnabled, isTrue);
       expect(settings.actingMemberId, 'member-1');
+    },
+  );
+
+  test(
+    'a 16 -> 17 upgrade adds the ui_state Chores-filter columns as NULL and '
+    'keeps an existing last_tab',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v17_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v16 install: the current schema minus the two v17 columns, with
+      // `user_version` rolled back to 16 and a remembered tab in place.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.uiState)
+          .insert(
+            UiStateCompanion.insert(
+              id: 'device',
+              lastTab: const Value('shopping'),
+            ),
+          );
+      await _dropChoresFilterColumns(seed);
+      await seed.customStatement('PRAGMA user_version = 16');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(
+        await _columnNames(upgraded, 'ui_state'),
+        containsAll([
+          'last_tab',
+          'chores_member_filter',
+          'chores_category_filter',
+        ]),
+      );
+      final row = await upgraded.select(upgraded.uiState).getSingle();
+      expect(row.lastTab, 'shopping');
+      expect(row.choresMemberFilter, isNull);
+      expect(row.choresCategoryFilter, isNull);
     },
   );
 }

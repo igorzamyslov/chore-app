@@ -7,6 +7,7 @@ import 'package:chore_app/app/famdo_colors.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
+import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -45,11 +46,53 @@ class ChoresListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
+  // The STORED filter ids, seeded from `ui_state` in [initState]. May be
+  // stale (member/category since deleted); `build` derives the effective
+  // values from them (spec `docs/specs/last-tab-restore.md` §5.1).
   String? _memberFilter;
   String? _categoryFilter;
 
   @override
+  void initState() {
+    super.initState();
+    // Spec `docs/specs/last-tab-restore.md` §5.3: `_Bootstrapped` waits for
+    // this one-shot read, so the first frame is already filtered. A missing
+    // or errored read means no filters.
+    final stored = ref.read(uiStateProvider).valueOrNull;
+    _memberFilter = stored?.choresMemberFilter;
+    _categoryFilter = stored?.choresCategoryFilter;
+  }
+
+  /// Writes the current filters to `ui_state`, blind and fire-and-forget.
+  void _persistFilters() {
+    unawaited(
+      ref
+          .read(uiStateRepositoryProvider)
+          .setChoresFilters(
+            memberId: _memberFilter,
+            categoryId: _categoryFilter,
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            AppLog.error('ui.choresFilters', error, stackTrace);
+          }),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Stale stored ids degrade to "All" at read time; nothing is written
+    // back. While members/categories have no value yet the stored id is kept,
+    // so there is no unfiltered flash before they load.
+    final members = ref.watch(membersProvider).value;
+    final categories = ref.watch(choreCategoriesProvider).value;
+    final memberFilter =
+        members != null && !members.any((m) => m.id == _memberFilter)
+        ? null
+        : _memberFilter;
+    final categoryFilter =
+        categories != null && !categories.any((c) => c.id == _categoryFilter)
+        ? null
+        : _categoryFilter;
     final occurrencesAsync = ref.watch(pendingOccurrencesProvider);
     final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
@@ -79,16 +122,16 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // build the sections themselves, so the card's numbers and the list can
     // never disagree -- and when a filter is active, the card says so (see
     // ChoreProgressCard.filterActive).
-    final filterActive = _memberFilter != null || _categoryFilter != null;
+    final filterActive = memberFilter != null || categoryFilter != null;
     final filteredOccurrencesForCount = _filterOccurrences(
       occurrencesAsync.value ?? const [],
-      memberFilter: _memberFilter,
-      categoryFilter: _categoryFilter,
+      memberFilter: memberFilter,
+      categoryFilter: categoryFilter,
     );
     final filteredClosedTodayForCount = _filterClosedToday(
       closedToday ?? const [],
-      memberFilter: _memberFilter,
-      categoryFilter: _categoryFilter,
+      memberFilter: memberFilter,
+      categoryFilter: categoryFilter,
     );
     final completedToday = filteredClosedTodayForCount
         .where(
@@ -105,12 +148,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         title: Text(AppLocalizations.of(context).choresTabLabel),
         actions: [
           MemberFilterButton(
-            selected: _memberFilter,
-            onChanged: (value) => setState(() => _memberFilter = value),
+            selected: memberFilter,
+            onChanged: (value) {
+              setState(() => _memberFilter = value);
+              _persistFilters();
+            },
           ),
           CategoryFilterButton(
-            selected: _categoryFilter,
-            onChanged: (value) => setState(() => _categoryFilter = value),
+            selected: categoryFilter,
+            onChanged: (value) {
+              setState(() => _categoryFilter = value);
+              _persistFilters();
+            },
           ),
         ],
       ),
@@ -136,8 +185,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                   paused: paused ?? const [],
                   hasActiveChores: hasActiveChores,
                   today: today,
-                  memberFilter: _memberFilter,
-                  categoryFilter: _categoryFilter,
+                  memberFilter: memberFilter,
+                  categoryFilter: categoryFilter,
                   onComplete: _complete,
                   onOpenMenu: _openMenu,
                   onReopen: _reopen,
@@ -438,6 +487,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       _memberFilter = null;
       _categoryFilter = null;
     });
+    _persistFilters();
   }
 }
 

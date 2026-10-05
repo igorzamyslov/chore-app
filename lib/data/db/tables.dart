@@ -633,6 +633,16 @@ class UiState extends Table {
   /// (Chores). An unrecognized value is treated as the default at read time.
   TextColumn get lastTab => text().nullable()();
 
+  /// The Chores list's member filter: a member id, or `NULL` for "All".
+  /// A stale id (member since deleted) is treated as "All" at read time, not
+  /// rewritten (spec `docs/specs/last-tab-restore.md` §5). Added in
+  /// schemaVersion 17.
+  TextColumn get choresMemberFilter => text().nullable()();
+
+  /// The Chores list's category filter: a category id, or `NULL` for "All".
+  /// Stale ids degrade like [choresMemberFilter]. Added in schemaVersion 17.
+  TextColumn get choresCategoryFilter => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }

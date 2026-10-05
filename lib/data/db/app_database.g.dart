@@ -6121,8 +6121,35 @@ class $UiStateTable extends UiState with TableInfo<$UiStateTable, UiStateRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _choresMemberFilterMeta =
+      const VerificationMeta('choresMemberFilter');
   @override
-  List<GeneratedColumn> get $columns => [id, lastTab];
+  late final GeneratedColumn<String> choresMemberFilter =
+      GeneratedColumn<String>(
+        'chores_member_filter',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _choresCategoryFilterMeta =
+      const VerificationMeta('choresCategoryFilter');
+  @override
+  late final GeneratedColumn<String> choresCategoryFilter =
+      GeneratedColumn<String>(
+        'chores_category_filter',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    lastTab,
+    choresMemberFilter,
+    choresCategoryFilter,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -6146,6 +6173,24 @@ class $UiStateTable extends UiState with TableInfo<$UiStateTable, UiStateRow> {
         lastTab.isAcceptableOrUnknown(data['last_tab']!, _lastTabMeta),
       );
     }
+    if (data.containsKey('chores_member_filter')) {
+      context.handle(
+        _choresMemberFilterMeta,
+        choresMemberFilter.isAcceptableOrUnknown(
+          data['chores_member_filter']!,
+          _choresMemberFilterMeta,
+        ),
+      );
+    }
+    if (data.containsKey('chores_category_filter')) {
+      context.handle(
+        _choresCategoryFilterMeta,
+        choresCategoryFilter.isAcceptableOrUnknown(
+          data['chores_category_filter']!,
+          _choresCategoryFilterMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -6163,6 +6208,14 @@ class $UiStateTable extends UiState with TableInfo<$UiStateTable, UiStateRow> {
         DriftSqlType.string,
         data['${effectivePrefix}last_tab'],
       ),
+      choresMemberFilter: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chores_member_filter'],
+      ),
+      choresCategoryFilter: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chores_category_filter'],
+      ),
     );
   }
 
@@ -6179,13 +6232,34 @@ class UiStateRow extends DataClass implements Insertable<UiStateRow> {
   /// The `name` of the last-visible shell tab, or `NULL` for the default
   /// (Chores). An unrecognized value is treated as the default at read time.
   final String? lastTab;
-  const UiStateRow({required this.id, this.lastTab});
+
+  /// The Chores list's member filter: a member id, or `NULL` for "All".
+  /// A stale id (member since deleted) is treated as "All" at read time, not
+  /// rewritten (spec `docs/specs/last-tab-restore.md` §5). Added in
+  /// schemaVersion 17.
+  final String? choresMemberFilter;
+
+  /// The Chores list's category filter: a category id, or `NULL` for "All".
+  /// Stale ids degrade like [choresMemberFilter]. Added in schemaVersion 17.
+  final String? choresCategoryFilter;
+  const UiStateRow({
+    required this.id,
+    this.lastTab,
+    this.choresMemberFilter,
+    this.choresCategoryFilter,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     if (!nullToAbsent || lastTab != null) {
       map['last_tab'] = Variable<String>(lastTab);
+    }
+    if (!nullToAbsent || choresMemberFilter != null) {
+      map['chores_member_filter'] = Variable<String>(choresMemberFilter);
+    }
+    if (!nullToAbsent || choresCategoryFilter != null) {
+      map['chores_category_filter'] = Variable<String>(choresCategoryFilter);
     }
     return map;
   }
@@ -6196,6 +6270,12 @@ class UiStateRow extends DataClass implements Insertable<UiStateRow> {
       lastTab: lastTab == null && nullToAbsent
           ? const Value.absent()
           : Value(lastTab),
+      choresMemberFilter: choresMemberFilter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(choresMemberFilter),
+      choresCategoryFilter: choresCategoryFilter == null && nullToAbsent
+          ? const Value.absent()
+          : Value(choresCategoryFilter),
     );
   }
 
@@ -6207,6 +6287,12 @@ class UiStateRow extends DataClass implements Insertable<UiStateRow> {
     return UiStateRow(
       id: serializer.fromJson<String>(json['id']),
       lastTab: serializer.fromJson<String?>(json['lastTab']),
+      choresMemberFilter: serializer.fromJson<String?>(
+        json['choresMemberFilter'],
+      ),
+      choresCategoryFilter: serializer.fromJson<String?>(
+        json['choresCategoryFilter'],
+      ),
     );
   }
   @override
@@ -6215,20 +6301,36 @@ class UiStateRow extends DataClass implements Insertable<UiStateRow> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'lastTab': serializer.toJson<String?>(lastTab),
+      'choresMemberFilter': serializer.toJson<String?>(choresMemberFilter),
+      'choresCategoryFilter': serializer.toJson<String?>(choresCategoryFilter),
     };
   }
 
   UiStateRow copyWith({
     String? id,
     Value<String?> lastTab = const Value.absent(),
+    Value<String?> choresMemberFilter = const Value.absent(),
+    Value<String?> choresCategoryFilter = const Value.absent(),
   }) => UiStateRow(
     id: id ?? this.id,
     lastTab: lastTab.present ? lastTab.value : this.lastTab,
+    choresMemberFilter: choresMemberFilter.present
+        ? choresMemberFilter.value
+        : this.choresMemberFilter,
+    choresCategoryFilter: choresCategoryFilter.present
+        ? choresCategoryFilter.value
+        : this.choresCategoryFilter,
   );
   UiStateRow copyWithCompanion(UiStateCompanion data) {
     return UiStateRow(
       id: data.id.present ? data.id.value : this.id,
       lastTab: data.lastTab.present ? data.lastTab.value : this.lastTab,
+      choresMemberFilter: data.choresMemberFilter.present
+          ? data.choresMemberFilter.value
+          : this.choresMemberFilter,
+      choresCategoryFilter: data.choresCategoryFilter.present
+          ? data.choresCategoryFilter.value
+          : this.choresCategoryFilter,
     );
   }
 
@@ -6236,43 +6338,60 @@ class UiStateRow extends DataClass implements Insertable<UiStateRow> {
   String toString() {
     return (StringBuffer('UiStateRow(')
           ..write('id: $id, ')
-          ..write('lastTab: $lastTab')
+          ..write('lastTab: $lastTab, ')
+          ..write('choresMemberFilter: $choresMemberFilter, ')
+          ..write('choresCategoryFilter: $choresCategoryFilter')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, lastTab);
+  int get hashCode =>
+      Object.hash(id, lastTab, choresMemberFilter, choresCategoryFilter);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is UiStateRow &&
           other.id == this.id &&
-          other.lastTab == this.lastTab);
+          other.lastTab == this.lastTab &&
+          other.choresMemberFilter == this.choresMemberFilter &&
+          other.choresCategoryFilter == this.choresCategoryFilter);
 }
 
 class UiStateCompanion extends UpdateCompanion<UiStateRow> {
   final Value<String> id;
   final Value<String?> lastTab;
+  final Value<String?> choresMemberFilter;
+  final Value<String?> choresCategoryFilter;
   final Value<int> rowid;
   const UiStateCompanion({
     this.id = const Value.absent(),
     this.lastTab = const Value.absent(),
+    this.choresMemberFilter = const Value.absent(),
+    this.choresCategoryFilter = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UiStateCompanion.insert({
     required String id,
     this.lastTab = const Value.absent(),
+    this.choresMemberFilter = const Value.absent(),
+    this.choresCategoryFilter = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id);
   static Insertable<UiStateRow> custom({
     Expression<String>? id,
     Expression<String>? lastTab,
+    Expression<String>? choresMemberFilter,
+    Expression<String>? choresCategoryFilter,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (lastTab != null) 'last_tab': lastTab,
+      if (choresMemberFilter != null)
+        'chores_member_filter': choresMemberFilter,
+      if (choresCategoryFilter != null)
+        'chores_category_filter': choresCategoryFilter,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6280,11 +6399,15 @@ class UiStateCompanion extends UpdateCompanion<UiStateRow> {
   UiStateCompanion copyWith({
     Value<String>? id,
     Value<String?>? lastTab,
+    Value<String?>? choresMemberFilter,
+    Value<String?>? choresCategoryFilter,
     Value<int>? rowid,
   }) {
     return UiStateCompanion(
       id: id ?? this.id,
       lastTab: lastTab ?? this.lastTab,
+      choresMemberFilter: choresMemberFilter ?? this.choresMemberFilter,
+      choresCategoryFilter: choresCategoryFilter ?? this.choresCategoryFilter,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6298,6 +6421,14 @@ class UiStateCompanion extends UpdateCompanion<UiStateRow> {
     if (lastTab.present) {
       map['last_tab'] = Variable<String>(lastTab.value);
     }
+    if (choresMemberFilter.present) {
+      map['chores_member_filter'] = Variable<String>(choresMemberFilter.value);
+    }
+    if (choresCategoryFilter.present) {
+      map['chores_category_filter'] = Variable<String>(
+        choresCategoryFilter.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6309,6 +6440,8 @@ class UiStateCompanion extends UpdateCompanion<UiStateRow> {
     return (StringBuffer('UiStateCompanion(')
           ..write('id: $id, ')
           ..write('lastTab: $lastTab, ')
+          ..write('choresMemberFilter: $choresMemberFilter, ')
+          ..write('choresCategoryFilter: $choresCategoryFilter, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12918,12 +13051,16 @@ typedef $$UiStateTableCreateCompanionBuilder =
     UiStateCompanion Function({
       required String id,
       Value<String?> lastTab,
+      Value<String?> choresMemberFilter,
+      Value<String?> choresCategoryFilter,
       Value<int> rowid,
     });
 typedef $$UiStateTableUpdateCompanionBuilder =
     UiStateCompanion Function({
       Value<String> id,
       Value<String?> lastTab,
+      Value<String?> choresMemberFilter,
+      Value<String?> choresCategoryFilter,
       Value<int> rowid,
     });
 
@@ -12943,6 +13080,16 @@ class $$UiStateTableFilterComposer
 
   ColumnFilters<String> get lastTab => $composableBuilder(
     column: $table.lastTab,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get choresMemberFilter => $composableBuilder(
+    column: $table.choresMemberFilter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get choresCategoryFilter => $composableBuilder(
+    column: $table.choresCategoryFilter,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -12965,6 +13112,16 @@ class $$UiStateTableOrderingComposer
     column: $table.lastTab,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get choresMemberFilter => $composableBuilder(
+    column: $table.choresMemberFilter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get choresCategoryFilter => $composableBuilder(
+    column: $table.choresCategoryFilter,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UiStateTableAnnotationComposer
@@ -12981,6 +13138,16 @@ class $$UiStateTableAnnotationComposer
 
   GeneratedColumn<String> get lastTab =>
       $composableBuilder(column: $table.lastTab, builder: (column) => column);
+
+  GeneratedColumn<String> get choresMemberFilter => $composableBuilder(
+    column: $table.choresMemberFilter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get choresCategoryFilter => $composableBuilder(
+    column: $table.choresCategoryFilter,
+    builder: (column) => column,
+  );
 }
 
 class $$UiStateTableTableManager
@@ -13016,16 +13183,28 @@ class $$UiStateTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String?> lastTab = const Value.absent(),
+                Value<String?> choresMemberFilter = const Value.absent(),
+                Value<String?> choresCategoryFilter = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => UiStateCompanion(id: id, lastTab: lastTab, rowid: rowid),
+              }) => UiStateCompanion(
+                id: id,
+                lastTab: lastTab,
+                choresMemberFilter: choresMemberFilter,
+                choresCategoryFilter: choresCategoryFilter,
+                rowid: rowid,
+              ),
           createCompanionCallback:
               ({
                 required String id,
                 Value<String?> lastTab = const Value.absent(),
+                Value<String?> choresMemberFilter = const Value.absent(),
+                Value<String?> choresCategoryFilter = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UiStateCompanion.insert(
                 id: id,
                 lastTab: lastTab,
+                choresMemberFilter: choresMemberFilter,
+                choresCategoryFilter: choresCategoryFilter,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

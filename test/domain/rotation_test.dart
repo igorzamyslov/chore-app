@@ -73,5 +73,72 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    group('skipMemberId (covering for someone)', () {
+      test('skips the coverer when they would be next', () {
+        // Two people: A covers B's turn -> B again, not A.
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b'],
+            lastAssignedMemberId: 'b',
+            skipMemberId: 'a',
+          ),
+          'b',
+        );
+        // A -> B -> C: A covers C's turn -> B, not A.
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b', 'c'],
+            lastAssignedMemberId: 'c',
+            skipMemberId: 'a',
+          ),
+          'b',
+        );
+      });
+
+      test('changes nothing when the coverer would not be next', () {
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b', 'c'],
+            lastAssignedMemberId: 'b',
+            skipMemberId: 'a',
+          ),
+          'c',
+        );
+      });
+
+      test('changes nothing when the assignee did their own turn', () {
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b', 'c'],
+            lastAssignedMemberId: 'b',
+            skipMemberId: 'b',
+          ),
+          'c',
+        );
+      });
+
+      test('also applies to the null / removed-member fallback', () {
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['a', 'b', 'c'],
+            lastAssignedMemberId: null,
+            skipMemberId: 'a',
+          ),
+          'b',
+        );
+      });
+
+      test('a single-member rotation still returns that member', () {
+        expect(
+          nextRotationAssignee(
+            orderedMemberIds: ['solo'],
+            lastAssignedMemberId: 'solo',
+            skipMemberId: 'solo',
+          ),
+          'solo',
+        );
+      });
+    });
   });
 }

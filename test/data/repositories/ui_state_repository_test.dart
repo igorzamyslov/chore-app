@@ -14,21 +14,58 @@ void main() {
 
   tearDown(() => db.close());
 
-  test('readLastTab is null before the first write', () async {
-    expect(await repository.readLastTab(), isNull);
+  test('readUiState is null before the first write', () async {
+    expect(await repository.readUiState(), isNull);
   });
 
-  test('setLastTab round-trips through readLastTab', () async {
+  test('setLastTab round-trips through readUiState', () async {
     await repository.setLastTab('shopping');
 
-    expect(await repository.readLastTab(), 'shopping');
+    expect((await repository.readUiState())?.lastTab, 'shopping');
   });
 
   test('a second setLastTab overwrites, keeping a single row', () async {
     await repository.setLastTab('shopping');
     await repository.setLastTab('settings');
 
-    expect(await repository.readLastTab(), 'settings');
+    expect((await repository.readUiState())?.lastTab, 'settings');
     expect(await db.select(db.uiState).get(), hasLength(1));
+  });
+
+  test('setChoresFilters round-trips both filters', () async {
+    await repository.setChoresFilters(memberId: 'm1', categoryId: 'c1');
+
+    final row = await repository.readUiState();
+    expect(row?.choresMemberFilter, 'm1');
+    expect(row?.choresCategoryFilter, 'c1');
+  });
+
+  test('setChoresFilters with nulls clears both filters', () async {
+    await repository.setChoresFilters(memberId: 'm1', categoryId: 'c1');
+    await repository.setChoresFilters(memberId: null, categoryId: null);
+
+    final row = await repository.readUiState();
+    expect(row?.choresMemberFilter, isNull);
+    expect(row?.choresCategoryFilter, isNull);
+    expect(await db.select(db.uiState).get(), hasLength(1));
+  });
+
+  test('setChoresFilters leaves last_tab alone', () async {
+    await repository.setLastTab('shopping');
+    await repository.setChoresFilters(memberId: 'm1', categoryId: null);
+
+    final row = await repository.readUiState();
+    expect(row?.lastTab, 'shopping');
+    expect(row?.choresMemberFilter, 'm1');
+  });
+
+  test('setLastTab leaves the filters alone', () async {
+    await repository.setChoresFilters(memberId: 'm1', categoryId: 'c1');
+    await repository.setLastTab('settings');
+
+    final row = await repository.readUiState();
+    expect(row?.lastTab, 'settings');
+    expect(row?.choresMemberFilter, 'm1');
+    expect(row?.choresCategoryFilter, 'c1');
   });
 }

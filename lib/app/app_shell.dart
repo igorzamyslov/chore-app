@@ -113,7 +113,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // already on the first frame. `_Bootstrapped` waits for this provider to
     // resolve before building the shell. A missing, errored or unrecognized
     // value (a tab renamed or removed in a later build) falls back to Chores.
-    final stored = ref.read(lastTabProvider).valueOrNull;
+    final stored = ref.read(uiStateProvider).valueOrNull?.lastTab;
     _selected =
         _AppTab.values.where((tab) => tab.name == stored).firstOrNull ??
         _AppTab.chores;

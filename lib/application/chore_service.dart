@@ -503,6 +503,7 @@ class ChoreService {
         orderedMemberIds: choreDetails.assigneeMemberIds,
         previousAssignee: occurrence.assignedMemberId,
         done: status == OccurrenceStatus.done,
+        completedBy: completedBy,
       );
       await chores.insertOccurrence(
         choreId: chore.id,
@@ -531,12 +532,15 @@ class ChoreService {
   /// always the single assignee; `anyone` is always unassigned; `rotation`
   /// advances on [done] and otherwise sticks to [previousAssignee] (falling
   /// back to the next rotation member if it's `null` or no longer an
-  /// assignee).
+  /// assignee). A done advance never lands on [completedBy] when anyone
+  /// else is in the rotation (spec `docs/specs/occurrence-lifecycle.md` §2
+  /// "Covering for someone").
   String? _nextAssignee({
     required AssignmentMode mode,
     required List<String> orderedMemberIds,
     required String? previousAssignee,
     required bool done,
+    required String? completedBy,
   }) {
     switch (mode) {
       case AssignmentMode.fixed:
@@ -548,6 +552,7 @@ class ChoreService {
           return nextRotationAssignee(
             orderedMemberIds: orderedMemberIds,
             lastAssignedMemberId: previousAssignee,
+            skipMemberId: completedBy,
           );
         }
         if (previousAssignee != null &&
@@ -602,7 +607,9 @@ class ChoreService {
   }
 
   /// The assignee of a freshly (re)generated pending occurrence. Shared by
-  /// [unpauseChore] and [updateChore]; see [_regeneratedDueDate].
+  /// [unpauseChore] and [updateChore]; see [_regeneratedDueDate]. A `done`
+  /// [latestClosed] passes its completer as the rotation's skip, so the
+  /// regenerated turn agrees with what [_closeAndAdvance] handed out.
   String? _regeneratedAssignee({
     required AssignmentMode mode,
     required List<String> orderedMemberIds,
@@ -617,6 +624,9 @@ class ChoreService {
         return nextRotationAssignee(
           orderedMemberIds: orderedMemberIds,
           lastAssignedMemberId: latestClosed?.assignedMemberId,
+          skipMemberId: latestClosed?.status == OccurrenceStatus.done
+              ? latestClosed?.completedBy
+              : null,
         );
     }
   }

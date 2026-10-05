@@ -1,6 +1,6 @@
 # Last-tab restore
 
-**Status:** binding. Implemented in schemaVersion 14.
+**Status:** binding. Implemented in schemaVersion 14 (tab) and 17 (chores filters, §5).
 
 ## 1. Behavior
 
@@ -8,9 +8,10 @@ The app reopens on the top-level tab the user was last on. If the last tab
 was Shopping, the next cold start opens on Shopping; same for Chores and
 Settings.
 
-- **What is remembered:** only the shell tab (`chores` / `shopping` /
-  `settings`). Pushed routes (chore form, manage members, …), sheets, scroll
-  positions and filter state are not restored.
+- **What is remembered:** the shell tab (`chores` / `shopping` /
+  `settings`) and, since schemaVersion 17, the Chores list's member and
+  category filters (§5). Pushed routes (chore form, manage members, …),
+  sheets and scroll positions are not restored.
 - **When it is recorded:** every time the visible tab changes, by any path —
   tab tap, finger swipe, or Android back returning to Chores. Re-tapping the
   active tab (scroll-to-top) changes nothing and writes nothing.
@@ -75,3 +76,64 @@ remembered tab is never worth blocking startup over.
 - Reset: the `ui_state` row is gone after `resetAllData`.
 - E2E (`e2e/flows/shell/last_tab_restore.yaml`): open Shopping, `stopApp`,
   bare `launchApp`, assert the Shopping screen is showing.
+
+## 5. Chores filters (schemaVersion 17)
+
+Field feedback 2026-10-05: "similar to preserve same screen on app re-open,
+preserve the filters that were chosen". The only filters in the app are the
+Chores list's member and category filter buttons
+(`lib/features/chores/chores_filter_bar.dart`).
+
+### 5.1 Behavior
+
+- The chosen member filter and category filter survive a cold start. Each is
+  independent; "All" is stored as `NULL`.
+- **Recorded** on every change: picking an entry in either menu, and the
+  filtered-empty state's "Show everything" (clears both). Written blind,
+  like the tab.
+- **Stale ids degrade to "All"**: a stored member id that is not in the
+  current `membersProvider` list (member deleted, household left/joined,
+  data reset of another kind), or a category id not in
+  `choreCategoriesProvider`, is treated as `null` — the list is unfiltered
+  and the button shows inactive. This is a READ-TIME rule in
+  `ChoresListScreen.build` (nothing is written back). While the
+  members/categories provider has no value yet the stored id is kept as-is,
+  so there is no unfiltered flash before they load.
+- **No flash**: the first frame of the Chores list is already filtered —
+  the value is loaded by the same once-at-startup read `_Bootstrapped`
+  already waits for.
+- No user-visible strings, no setting.
+
+### 5.2 Storage
+
+Two nullable text columns on `ui_state`: `chores_member_filter`,
+`chores_category_filter`.
+
+Migration v16 → v17: `addColumn` for both — **guarded `from >= 14`**,
+because a `from < 14` upgrade creates `ui_state` at full current width via
+`createTable` and a second `addColumn` would throw duplicate-column (the
+same reason the `settings` columns live in their `else` branch).
+
+### 5.3 Startup / API
+
+- `UiStateRepository.readUiState()` returns the whole row (`UiStateRow?`);
+  `readLastTab()` is replaced by it. `setLastTab` stays (it must not touch
+  the filter columns) and `setChoresFilters({memberId, categoryId})` writes
+  BOTH filter columns (not the tab) — an upsert that only sets the columns
+  it owns.
+- `lastTabProvider` becomes `uiStateProvider`
+  (`FutureProvider.autoDispose<UiStateRow?>`), still read once; `_Bootstrapped`
+  waits on it exactly as before; `AppShell` reads `.lastTab` from it;
+  `ChoresListScreen.initState` seeds `_memberFilter`/`_categoryFilter` from
+  it (a load error → no filters, same "never block startup" rule as §3).
+
+### 5.4 Testing
+
+- Repository: filters round-trip; `setChoresFilters` leaves `last_tab`
+  alone and `setLastTab` leaves the filters alone; nulls clear.
+- Migration: 16 → 17 adds both columns, keeps an existing `last_tab`; the
+  existing pre-17 tests keep passing.
+- Widget: DB pre-seeded with a member + category filter opens filtered on
+  the first frame; a stale id opens unfiltered; picking a filter persists it;
+  "Show everything" persists nulls.
+- Reset: covered by the existing `ui_state` delete.

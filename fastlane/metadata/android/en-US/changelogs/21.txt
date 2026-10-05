@@ -1,0 +1,3 @@
+Covering for someone no longer costs you a turn.
+
+If you mark a rotating chore done in someone else's place, the next turn now goes to the next person who isn't you. The chores list also remembers your member and category filters when you reopen the app.
