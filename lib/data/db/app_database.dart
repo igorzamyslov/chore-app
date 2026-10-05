@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -267,6 +267,17 @@ class AppDatabase extends _$AppDatabase {
         // install at any shipped version 1..15 can already carry it. Same
         // reasoning as `sync_tombstones` above.
         await migrator.createTable(clientErrors);
+      }
+      if (from >= 14 && from < 17) {
+        // v16 -> v17 (spec `docs/specs/last-tab-restore.md` §5.2): the two
+        // nullable Chores-filter columns on `ui_state`, defaulting to `NULL`
+        // ("All") -- no data rewrite. Guarded `from >= 14`, for the same
+        // reason the `settings` columns live in their `else` branch: a
+        // `from < 14` upgrade creates `ui_state` via [createTable] at full
+        // current width (these columns included), and a second `addColumn`
+        // would throw a duplicate-column error.
+        await migrator.addColumn(uiState, uiState.choresMemberFilter);
+        await migrator.addColumn(uiState, uiState.choresCategoryFilter);
       }
     },
     beforeOpen: (details) async {

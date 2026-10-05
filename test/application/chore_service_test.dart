@@ -229,6 +229,72 @@ void main() {
       },
     );
 
+    test(
+      'covering for someone never hands the coverer the next turn',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Rotation',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b],
+        );
+        // A does A's own turn -> B.
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: a);
+        final second = await repo.pendingOccurrenceOf(chore.id);
+        expect(second!.assignedMemberId, b);
+
+        // A covers B's turn -> B again, not A.
+        await serviceOn(
+          PlainDate(2026, 1, 2),
+        ).completeOccurrence(second.id, completedBy: a);
+        final third = await repo.pendingOccurrenceOf(chore.id);
+        expect(third!.assignedMemberId, b);
+
+        // An unattributed completion (notification action) advances plainly.
+        await serviceOn(
+          PlainDate(2026, 1, 3),
+        ).completeOccurrence(third.id, completedBy: null);
+        expect((await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId, a);
+      },
+    );
+
+    test(
+      'covering in a 3-member rotation skips only when the coverer is next',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Rotation',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        // A's turn, C covers -> B (C wasn't next anyway).
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: c);
+        final second = await repo.pendingOccurrenceOf(chore.id);
+        expect(second!.assignedMemberId, b);
+
+        // B's turn, C covers -> C would be next, so A.
+        await serviceOn(
+          PlainDate(2026, 1, 2),
+        ).completeOccurrence(second.id, completedBy: c);
+        expect((await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId, a);
+      },
+    );
+
     test('a fixed assignment is unaffected by done or skip', () async {
       final m1 = await _insertMember(db, 'm1', householdId);
       final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
@@ -709,6 +775,33 @@ void main() {
       final resumed = await repo.pendingOccurrenceOf(chore.id);
       expect(resumed!.assignedMemberId, memberB);
     });
+
+    test(
+      'unpause after covering for someone keeps the coverer off the next turn',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Rotation',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b],
+        );
+        // A's turn, B covers -> A again.
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: b);
+        expect((await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId, a);
+
+        // Regenerating from history must agree with that.
+        await serviceOn(PlainDate(2026, 1, 2)).pauseChore(chore.id);
+        await serviceOn(PlainDate(2026, 1, 5)).unpauseChore(chore.id);
+        expect((await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId, a);
+      },
+    );
 
     test(
       'pauseChore/unpauseChore throw for a nonexistent or deleted chore',

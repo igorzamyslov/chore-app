@@ -66,10 +66,10 @@ class _Bootstrapped extends ConsumerWidget {
     // jump. An ERROR here deliberately does not reach `_ErrorScaffold`: a
     // lost remembered tab is never worth blocking startup, and the shell
     // falls back to Chores when there is no value.
-    final lastTab = ref.watch(lastTabProvider);
+    final uiState = ref.watch(uiStateProvider);
     return bootstrap.when(
       data: (_) =>
-          lastTab.isLoading ? const _LoadingScaffold() : const AppShell(),
+          uiState.isLoading ? const _LoadingScaffold() : const AppShell(),
       loading: () => const _LoadingScaffold(),
       error: (error, stackTrace) => _ErrorScaffold(
         error: error,

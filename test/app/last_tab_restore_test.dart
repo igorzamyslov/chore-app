@@ -23,7 +23,7 @@ void main() {
     // Boxed in a list: `runAsync` returns `T?`, which would otherwise be
     // indistinguishable from a stored `null`.
     final boxed = await tester.runAsync(
-      () async => [await UiStateRepository(database).readLastTab()],
+      () async => [(await UiStateRepository(database).readUiState())?.lastTab],
     );
     return boxed!.single;
   }

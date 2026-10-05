@@ -26,9 +26,12 @@ layer, and `package:clock` — nothing else (no Flutter).
 /// Returns the member after [lastAssignedMemberId] (wrapping around).
 /// If [lastAssignedMemberId] is null or no longer in the list (e.g. the
 /// chore's assignees were edited), returns the first member.
+/// If that member is [skipMemberId] and the list holds anyone else, returns
+/// the member after them instead (§2 "Covering for someone").
 String nextRotationAssignee({
   required List<String> orderedMemberIds,
   required String? lastAssignedMemberId,
+  String? skipMemberId,
 });
 ```
 Throws `ArgumentError` on an empty list.
@@ -72,11 +75,44 @@ Both "close" the pending occurrence with `closedOn = today`:
   - assignee — THE product rule: **done advances the rotation, skip
     sticks**:
     - `fixed` → the single assignee, always.
-    - `rotation` + done → `nextRotationAssignee(order, closed.assignedMemberId)`.
+    - `rotation` + done → `nextRotationAssignee(order,
+      closed.assignedMemberId, skipMemberId: completedBy)` — **whoever
+      did it is never handed the next turn** (see "Covering for someone"
+      below).
     - `rotation` + skip → `closed.assignedMemberId` (unchanged; if null or
       no longer an assignee, fall back to `nextRotationAssignee`).
     - `anyone` → null.
 - One-off chores get no next occurrence.
+
+#### Covering for someone (rotation + done by a non-assignee)
+
+Field feedback 2026-10-05: "if I do the task instead of someone, I expect
+the next instance to be rotated so that I'm not the assignee." Advancing
+purely on `assigned_member_id` broke that whenever the completer happened
+to be the next member in order — with two people, A covering B's turn
+was immediately handed A's own turn as a "reward".
+
+Rule: the next assignee is still the member after `closed.assignedMemberId`
+in rotation order (the order is never re-based on the completer), **but if
+that member is the completer, take the one after them**. Examples, order
+A → B → C:
+
+| assigned | done by | next |
+|----------|---------|------|
+| B | B | C (normal) |
+| B | A | C (A wasn't next anyway) |
+| C | A | B (A would be next → skipped) |
+| A, B rotation: B | A | B (A would be next → skipped) |
+
+- `completedBy == null` (an unattributed notification completion), or a
+  completer who isn't in the rotation: plain advance.
+- A one-member rotation can't skip (there's no one else); the guard is
+  "only skip when another member exists".
+- Skip and missed are unchanged (they stick, `completed_by` is null).
+- The same rule applies when an occurrence is REGENERATED from history
+  (`unpauseChore` / `updateChore`): if `latestClosed` is `done`, its
+  `completedBy` is passed as `skipMemberId`, so pause/unpause or a schedule
+  edit right after covering never hands the turn back to the coverer.
 
 ### catchUpOverdue(String householdId)
 Runs on app start, on app resume, and on local day change (the resume/
@@ -152,7 +188,8 @@ resurrect either, same "skip sticks" principle as `completeOccurrence`/
   `candidate = nextAfterCompletion(rule, latestClosed.closedOn)`, and due =
   `candidate` if it's after today, else `today`.
 - assignee: `fixed` → the assignee; `anyone` → null; `rotation` → continue
-  from history: `nextRotationAssignee(order, latestClosed?.assignedMemberId)`.
+  from history: `nextRotationAssignee(order, latestClosed?.assignedMemberId,
+  skipMemberId: <latestClosed.completedBy if latestClosed is done>)`.
 
 Both throw `StateError` if the chore doesn't exist or is soft-deleted;
 `pauseChore` on a paused chore (and unpause on unpaused) is a no-op.

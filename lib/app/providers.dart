@@ -218,21 +218,23 @@ final uiStateRepositoryProvider = Provider<UiStateRepository>((ref) {
   return UiStateRepository(ref.watch(appDatabaseProvider));
 });
 
-/// The last-visible shell tab's stored name, read ONCE (spec
-/// `docs/specs/last-tab-restore.md` §3).
+/// The whole `ui_state` row (last tab and Chores filters), read ONCE (spec
+/// `docs/specs/last-tab-restore.md` §3, §5.3). `null` when nothing has been
+/// written yet.
 ///
 /// A [FutureProvider] and not a stream, deliberately: `AppShell` writes this
 /// value on every tab change, and a stream would feed each write straight
 /// back into a rebuild of the very shell that produced it. The shell takes
-/// its initial tab from this in `initState` and owns the value afterwards.
+/// its initial tab from this in `initState` and owns the value afterwards;
+/// `ChoresListScreen` seeds its filters from it the same way.
 ///
 /// `autoDispose` so a data reset cannot leave a stale value behind: the reset
 /// flips the household gate to the welcome screen, which unmounts
 /// `_Bootstrapped` (the only watcher), and the next bootstrap re-reads the
 /// cleared row.
-final AutoDisposeFutureProvider<String?> lastTabProvider =
-    FutureProvider.autoDispose<String?>((ref) {
-      return ref.watch(uiStateRepositoryProvider).readLastTab();
+final AutoDisposeFutureProvider<UiStateRow?> uiStateProvider =
+    FutureProvider.autoDispose<UiStateRow?>((ref) {
+      return ref.watch(uiStateRepositoryProvider).readUiState();
     });
 
 /// The device settings singleton row, kept in sync with the database.
