@@ -10,7 +10,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(17);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000007a1', 'gina@test.local'),
@@ -60,15 +60,21 @@ select throws_ok(
   '42501', null,
   'a member cannot update households.deleted_at');
 
+-- An outsider's rename: the column grant lets the statement PLAN, RLS then
+-- matches no row. Asserted in two steps (a data-modifying WITH is not
+-- allowed inside the is() subquery): the update runs without error as Hugo,
+-- and Gina still sees her own name afterwards.
 select test_login('00000000-0000-0000-0000-0000000007b1');
+select lives_ok(
+  $$update households set name = 'Hacked'
+      where id = '10000000-0000-0000-0000-0000000007a1'$$,
+  'an outsider''s households.name update plans (grant) but is not an error');
+select test_login('00000000-0000-0000-0000-0000000007a1');
 select is(
-  (with u as (
-     update households set name = 'Hacked'
-       where id = '10000000-0000-0000-0000-0000000007a1'
-       returning 1)
-   select count(*) from u),
-  0::bigint,
-  'an outsider''s households.name update matches no row (RLS still applies)');
+  (select name from households
+    where id = '10000000-0000-0000-0000-0000000007a1'),
+  'Haus G2',
+  'an outsider''s households.name update matched no row (RLS still applies)');
 
 -- ---------------------------------------------------------------------------
 -- H4: invites.
