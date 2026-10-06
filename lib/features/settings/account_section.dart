@@ -12,6 +12,8 @@
 /// ([NoopAuthGateway]).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
@@ -21,6 +23,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
@@ -348,9 +351,10 @@ class _SignedInTile extends ConsumerWidget {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSignOut', e, s);
       if (context.mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSignOutError,
+          onRetry: () => unawaited(_signOut(context, ref)),
         );
       }
     }
@@ -506,7 +510,7 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSendMagicLink', e, s);
       if (mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSendError,
         );
@@ -732,7 +736,7 @@ class _LeaveRow extends ConsumerWidget {
       // only way to throw after it is a dead local database, which is
       // already a broken-app state rather than a failed leave.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.householdLeaveError);
+        showAppErrorSnackbar(context, message: l10n.householdLeaveError);
       }
       return;
     }
@@ -898,7 +902,7 @@ class _DeleteAccountRow extends ConsumerWidget {
       // way to throw after it is a dead local database, which is already a
       // broken-app state rather than a failed deletion.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.accountDeleteError);
+        showAppErrorSnackbar(context, message: l10n.accountDeleteError);
       }
       return;
     }
@@ -956,14 +960,11 @@ class _ReconnectRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }
@@ -1203,14 +1204,11 @@ class _JoinRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }

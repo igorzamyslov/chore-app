@@ -151,10 +151,30 @@ class FakeSyncTransport implements SyncTransport {
     _upsert('members', {'id': id, ...columns}, keyColumns: const ['id']);
   }
 
+  /// Every [updateHousehold] call, in order -- the columns the client put in
+  /// the SET list. The server grants a column-scoped UPDATE on `households`
+  /// (name only; persona review H4), so tests assert this never names
+  /// anything else.
+  final List<({String id, Map<String, Object?> columns})> householdUpdateCalls =
+      [];
+
   @override
   Future<void> updateHousehold(String id, Map<String, Object?> columns) async {
     pushedTables.add('households');
-    _upsert('households', {'id': id, ...columns}, keyColumns: const ['id']);
+    householdUpdateCalls.add((id: id, columns: Map.of(columns)));
+    // The real server only ever UPDATEs a row `create_household` already
+    // made, which is where `created_at` comes from: a first push in a test
+    // stands in for that RPC.
+    final exists = serverRows['households']!.any((row) => row['id'] == id);
+    _upsert(
+      'households',
+      {
+        'id': id,
+        if (!exists) 'created_at': now.toIso8601String(),
+        ...columns,
+      },
+      keyColumns: const ['id'],
+    );
   }
 
   /// Every [markDeleted] call, in order -- `(table, match, deletedAt)`.

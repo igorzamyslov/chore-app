@@ -201,6 +201,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('last person here'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'permanently deleted from the server after 30 days',
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.leave.confirm'),

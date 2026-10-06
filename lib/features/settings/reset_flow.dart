@@ -23,6 +23,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/data_reset.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -124,11 +125,14 @@ Future<void> confirmAndResetAppData(
     // expected failure, not a bug. `on Object catch` rather than a bare
     // `catch` also satisfies `avoid_catches_without_on_clauses`.
     if (context.mounted) {
-      showAppSnackbar(context, message: l10n.settingsResetError);
+      showAppErrorSnackbar(context, message: l10n.settingsResetError);
     }
     return;
   }
-  ref.invalidate(settingsProvider);
+  // The wipe also deleted every saved copy of an earlier household.
+  ref
+    ..invalidate(settingsProvider)
+    ..invalidate(householdArchivesProvider);
 }
 
 /// Cancels EVERY scheduled notification -- the digest horizon, every

@@ -212,11 +212,17 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get commonSave;
 
-  /// Generic 'retry' action shown under a load-error message, on both the chores and shopping list screens.
+  /// Generic 'retry' action shown under a load-error message on the chores and shopping list screens, and as the action on every error snackbar that can be retried (showAppErrorSnackbar).
   ///
   /// In en, this message translates to:
   /// **'Retry'**
   String get commonRetry;
+
+  /// Generic 'share' action that opens the OS share sheet: the snackbar action after a join that saved the old household, and the per-copy button on the saved-copies screen. Ends in an ellipsis because it opens another surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get commonShare;
 
   /// The chores bottom-navigation tab label, and the chores list screen's app bar title.
   ///
@@ -1460,6 +1466,54 @@ abstract class AppLocalizations {
   /// **'Export data'**
   String get settingsExportEntry;
 
+  /// Settings -> Data row (persona review B3), shown only when at least one copy exists: opens the list of copies saved inside the app when this device joined or reconnected to a household and its old data was replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved copies of earlier households ({count})'**
+  String settingsArchivesRow(int count);
+
+  /// App-bar title of the saved-copies screen opened from settingsArchivesRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved copies'**
+  String get settingsArchivesTitle;
+
+  /// Explanatory paragraph at the top of the saved-copies screen. States what the file is and, honestly, that the app cannot import it (same stance as settingsExportSubtitle).
+  ///
+  /// In en, this message translates to:
+  /// **'Each copy is a JSON file with everything this device held before it joined or reconnected to a household. The app can\'t open them itself — share one to keep it elsewhere, or delete the ones you no longer need.'**
+  String get settingsArchivesIntro;
+
+  /// Title of one saved copy in the saved-copies list; {when} is the locale-formatted date and time encoded in the file's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on {when}'**
+  String settingsArchivesItemTitle(String when);
+
+  /// Title of the confirmation dialog before deleting one saved copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this saved copy?'**
+  String get settingsArchivesDeleteConfirmTitle;
+
+  /// Body of the confirmation dialog before deleting one saved copy. States the irreversibility; there is no trash.
+  ///
+  /// In en, this message translates to:
+  /// **'The copy is deleted from this device and can\'t be brought back.'**
+  String get settingsArchivesDeleteConfirmBody;
+
+  /// Error snackbar when the share sheet for a saved copy fails or the file is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share that saved copy. Please try again.'**
+  String get settingsArchivesShareError;
+
+  /// Error snackbar when deleting a saved copy fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete that saved copy. Please try again.'**
+  String get settingsArchivesDeleteError;
+
   /// Sub-line of the Export row (id settings.export): the format, what is in it, and the honest limit that there is no import yet (persona review D12).
   ///
   /// In en, this message translates to:
@@ -2030,10 +2084,10 @@ abstract class AppLocalizations {
   /// **'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.'**
   String get householdLeaveConfirmBody;
 
-  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked.
+  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked. Persona review B2: the server soft-deletes the household at once (hidden from everyone) and a nightly job hard-deletes it after 30 days (supabase/migrations/20261006140000_privacy_and_grants.sql), and the copy says exactly that instead of 'removed'.
   ///
   /// In en, this message translates to:
-  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get householdLeaveConfirmBodyLastMember;
 
   /// Confirm button of the leave-household sheet.
@@ -2066,10 +2120,10 @@ abstract class AppLocalizations {
   /// **'Your account and your email address are deleted from the server. This can\'t be undone. Your profile stays with each household you\'re part of, so the others keep their history — you\'re just no longer linked to it.'**
   String get accountDeleteConfirmBody;
 
-  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving.
+  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving. Persona review B2: states the 30-day soft-delete-then-purge window, same as householdLeaveConfirmBodyLastMember.
   ///
   /// In en, this message translates to:
-  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get accountDeleteConfirmBodyLastMember;
 
   /// Confirm button of the delete-account sheet. Confirming here opens the final confirmation (D-L6); it does not start the deletion.
@@ -2186,10 +2240,10 @@ abstract class AppLocalizations {
   /// **'Reconnect to {householdName}'**
   String settingsAccountReconnectTitle(String householdName);
 
-  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same backup-file guarantee as join). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
+  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same saved-copy guarantee as join). Persona review B3: says where the copy lives and how to reach it (Settings -> Data, the saved-copies row) instead of the old 'backup file on this device', which people could not find. Still makes no promise of an in-app restore, which does not exist.
   ///
   /// In en, this message translates to:
-  /// **'Replaces your local data — it\'s saved to a backup file on this device.'**
+  /// **'Replaces your local data — it\'s kept as a saved copy inside the app (Settings → Data).'**
   String get settingsAccountReconnectIntro;
 
   /// Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked.
@@ -2300,11 +2354,11 @@ abstract class AppLocalizations {
   /// **'Use an invite code from another device — this replaces your local data.'**
   String get settingsAccountJoinIntro;
 
-  /// Snackbar shown after a successful join, naming the archive file the old household was saved to (spec §4/§7.4).
+  /// Snackbar shown after a successful join or reconnect that archived the old household (spec §4/§7.4; persona review B3). It no longer names the file -- a file name in app-private storage is useless to the person -- and instead carries a 'Share...' action (commonShare) that opens the share sheet for the saved copy; the copies are also listed under Settings -> Data (settingsArchivesRow).
   ///
   /// In en, this message translates to:
-  /// **'Your old data was saved to {fileName}.'**
-  String settingsAccountJoinSuccessSnackbar(String fileName);
+  /// **'Your previous data was saved inside the app'**
+  String get settingsAccountJoinSuccessSnackbar;
 
   /// Title of the join sheet's first step: the invite-code entry.
   ///
@@ -2402,10 +2456,10 @@ abstract class AppLocalizations {
   /// **'Bring over your open chores?'**
   String get joinHouseholdImportTitle;
 
-  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and saved to a backup file (spec §4). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
+  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and kept as a saved copy inside the app (spec §4; persona review B3: names Settings -> Data, where the copy can be shared or deleted, instead of an unfindable 'backup file'). Makes no promise of an in-app restore, which does not exist.
   ///
   /// In en, this message translates to:
-  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.'**
+  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept as a saved copy inside the app (Settings → Data).'**
   String get joinHouseholdImportBody;
 
   /// Accept button of the import-offer step.

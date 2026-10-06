@@ -356,7 +356,8 @@ From the join row: enter code (`settings.account.join.code` field) →
 Anna?") + "I'm new here" → `claimMember` or `joinAsNewMember` (new UUID,
 name prompt, auto color). Then, per §4, strictly in this order:
 1. Automatic JSON export (G8 exporter) written to the app documents dir
-   (filename `famdo-archive-<date>.json`); abort the whole join if this
+   (filename `famdo-archive-<date>.json`, amended 2026-10-06: see the B3
+   block after step 3); abort the whole join if this
    write fails.
 2. Import offer, IN-FLOW (amended 2026-08-01; a post-replace banner
    can't work — the offer's source rows are exactly what step 3
@@ -374,6 +375,17 @@ name prompt, auto color). Then, per §4, strictly in this order:
    replace is one local transaction; the post-replace UI must re-resolve
    the bootstrap household (provider invalidation), since the household
    id changes.
+
+> **Amendment 2026-10-06 (persona review B3) — saved copies are reachable.**
+> The archive filename is `famdo-archive-<yyyy-MM-dd-HHmmss>.json` (device
+> clock, via the injected `Clock`): two joins on one day no longer overwrite
+> each other's copy. The post-join snackbar no longer prints the file name;
+> it says "Your previous data was saved inside the app" with a "Share…"
+> action that opens the OS share sheet for that file. Settings → Data gains
+> "Saved copies of earlier households (N)" (hidden at 0) listing the copies
+> with Share and Delete (confirmed) each, and `resetAppData` deletes every
+> `famdo-archive-*.json` (best effort, logged on failure). The archive is
+> still not importable (backlog G-3); the copy never claims otherwise.
 
 > **Amendment 2026-10-06 (persona review D3) — name the household, confirm
 > the claim.** Once the code is accepted, the client also calls
@@ -507,6 +519,22 @@ provider `syncEngineProvider` re-evaluates on the linked state
 (watches settingsProvider's `syncHouseholdId`).
 
 ### 8.3 SupabaseSyncEngine behavior
+
+> **Amendment 2026-10-06 (persona review H4; migration
+> `20261006140000_privacy_and_grants.sql`) — column-scoped grants on
+> `households` and `household_invites`.** The table-level UPDATE on both is
+> revoked; `authenticated` keeps `UPDATE (name)` on `households` and
+> `UPDATE (revoked_at)` on `household_invites` — the only columns the client
+> ever writes. Postgres checks UPDATE privilege on the WHOLE `SET` list at
+> plan time, so the client contract is: `updateHousehold` sends ONLY
+> `{'name': …}` (`householdRow` carries nothing else; `id` is the filter and
+> `updated_at` is trigger-maintained) and `revokeActiveInvites` ONLY
+> `{'revoked_at': …}`; any other column in a payload fails the whole
+> statement with 42501. `chores`, `shopping_items`, `categories`,
+> `chore_assignees` and `chore_occurrences` stay table-level on purpose: they
+> are pushed as full-row upserts. `create_invite` now draws its 8 characters
+> from `gen_random_bytes` (pgcrypto) over the same 32-symbol alphabet instead
+> of `random()`.
 
 - **pushDirty**: per table in FK order, select rows where
   `syncDirty == true`, upsert to the server (members via

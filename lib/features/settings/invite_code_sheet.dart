@@ -196,7 +196,7 @@ class _InviteCodeSheetState extends State<_InviteCodeSheet> {
         return;
       }
       setState(() => _replacing = false);
-      showAppSnackbar(
+      showAppErrorSnackbar(
         context,
         message: AppLocalizations.of(context).settingsMembersInviteError,
       );

@@ -58,6 +58,9 @@ select throws_ok(
 select test_login('00000000-0000-0000-0000-0000000006a1');
 select set_config('test.peek_code_2',
   create_invite('10000000-0000-0000-0000-0000000006a1'::uuid), true);
+-- Backdating `expires_at` is a superuser setup step since 20261006140000:
+-- members may only UPDATE `revoked_at`.
+reset role;
 update household_invites set expires_at = now() - interval '1 hour'
   where code = current_setting('test.peek_code_2');
 

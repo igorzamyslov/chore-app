@@ -6,6 +6,8 @@
 /// than duplicating the create-invite-then-open-sheet dance.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
@@ -53,9 +55,10 @@ Future<void> runInviteFlow(
   } on Exception catch (e, s) {
     AppLog.error('ui.inviteFlow', e, s);
     if (context.mounted) {
-      showAppSnackbar(
+      showAppErrorSnackbar(
         context,
         message: AppLocalizations.of(context).settingsMembersInviteError,
+        onRetry: () => unawaited(runInviteFlow(context, ref, householdId)),
       );
     }
   }

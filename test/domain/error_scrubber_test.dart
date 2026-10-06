@@ -106,6 +106,20 @@ void main() {
       expect(scrubbed.errorType.length, lessThanOrEqualTo(200));
     });
 
+    test('a FormatException keeps only its message, never the source', () {
+      const error = FormatException(
+        'Unexpected character',
+        'Clean Anna Schmidt bathroom',
+        6,
+      );
+
+      final scrubbed = ErrorScrubber.scrub(error, null);
+
+      expect(scrubbed.errorType, 'FormatException');
+      expect(scrubbed.message, 'Unexpected character');
+      expect(scrubbed.message, isNot(contains('Anna')));
+    });
+
     test('a throwing toString does not defeat the report', () {
       final scrubbed = ErrorScrubber.scrub(_Unprintable(), null);
 
@@ -161,6 +175,29 @@ void main() {
         expect(entry.key.length, lessThanOrEqualTo(40));
         expect(entry.value.length, lessThanOrEqualTo(100));
       }
+    });
+
+    test('values run through the message rules (H8)', () {
+      const id = '3f2b8c1e-9d4a-4e7b-8a61-0c5d2e9f7a13';
+      final scrubbed = ErrorScrubber.scrub(
+        StateError('a'),
+        null,
+        context: {
+          'who': 'igor@example.com',
+          'title': 'Clean "Anna room"',
+          'phone': '49123456789',
+          'chore': id,
+          'status': 'channelError',
+        },
+      );
+
+      expect(scrubbed.context, {
+        'who': '<email>',
+        'title': 'Clean <str>',
+        'phone': '<num>',
+        'chore': id,
+        'status': 'channelError',
+      });
     });
 
     test('contextJson is null when empty and a JSON object otherwise', () {

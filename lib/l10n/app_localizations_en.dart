@@ -112,6 +112,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Retry';
 
   @override
+  String get commonShare => 'Share…';
+
+  @override
   String get choresTabLabel => 'Chores';
 
   @override
@@ -1014,6 +1017,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExportEntry => 'Export data';
 
   @override
+  String settingsArchivesRow(int count) {
+    return 'Saved copies of earlier households ($count)';
+  }
+
+  @override
+  String get settingsArchivesTitle => 'Saved copies';
+
+  @override
+  String get settingsArchivesIntro =>
+      'Each copy is a JSON file with everything this device held before it joined or reconnected to a household. The app can\'t open them itself — share one to keep it elsewhere, or delete the ones you no longer need.';
+
+  @override
+  String settingsArchivesItemTitle(String when) {
+    return 'Saved on $when';
+  }
+
+  @override
+  String get settingsArchivesDeleteConfirmTitle => 'Delete this saved copy?';
+
+  @override
+  String get settingsArchivesDeleteConfirmBody =>
+      'The copy is deleted from this device and can\'t be brought back.';
+
+  @override
+  String get settingsArchivesShareError =>
+      'Couldn\'t share that saved copy. Please try again.';
+
+  @override
+  String get settingsArchivesDeleteError =>
+      'Couldn\'t delete that saved copy. Please try again.';
+
+  @override
   String get settingsExportSubtitle =>
       'JSON file with your members, chores, history and shopping list. The app can\'t import it yet.';
 
@@ -1382,7 +1417,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get householdLeaveConfirmBodyLastMember =>
-      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get householdLeaveConfirmAction => 'Leave';
@@ -1403,7 +1438,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountDeleteConfirmBodyLastMember =>
-      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get accountDeleteConfirmAction => 'Delete account';
@@ -1484,7 +1519,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Replaces your local data — it\'s saved to a backup file on this device.';
+      'Replaces your local data — it\'s kept as a saved copy inside the app (Settings → Data).';
 
   @override
   String get settingsAccountAdoptTitle => 'Put my household online';
@@ -1570,9 +1605,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use an invite code from another device — this replaces your local data.';
 
   @override
-  String settingsAccountJoinSuccessSnackbar(String fileName) {
-    return 'Your old data was saved to $fileName.';
-  }
+  String get settingsAccountJoinSuccessSnackbar =>
+      'Your previous data was saved inside the app';
 
   @override
   String get joinHouseholdCodeTitle => 'Enter your invite code';
@@ -1636,7 +1670,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.';
+      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept as a saved copy inside the app (Settings → Data).';
 
   @override
   String get joinHouseholdImportAccept => 'Bring them over';

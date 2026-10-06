@@ -209,6 +209,30 @@ A scheduled sweep (pg_cron) is explicitly NOT specified: with the cascade
 inline in both orphaning paths, a sweep is a backstop for half-failed
 exits only. Revisit only with evidence of such failures.
 
+> **Amendment 2026-10-06 (persona review B2; migration
+> `20261006140000_privacy_and_grants.sql`) — the soft-deleted household is
+> purged after 30 days.** "Child rows are left alone" and "no sweep" are
+> superseded for the END of a household's life: hiding a household is not
+> deleting it, and PRIVACY.md could not honestly promise erasure while
+> every row of an orphaned household stayed on the server for ever. The
+> cascade above is unchanged (it still only stamps `households.deleted_at`;
+> everyone is locked out at once). A nightly pg_cron job
+> (`purge-orphaned-households`, `41 3 * * *`) now runs
+> `public.purge_orphaned_households()` — `SECURITY DEFINER`, pinned
+> `search_path`, executable by nobody but its owner — which hard-deletes,
+> for every household with `deleted_at < now() - interval '30 days'`, in FK
+> order: `chore_occurrences`, `chore_assignees`, `chores`, `shopping_items`,
+> `categories`, `household_invites`, `members`, then the `households` row.
+> The 30 days are a grace period for a half-failed or regretted exit, not a
+> restore feature: nothing in the app can undelete a household. This is the
+> one place the server hard-deletes household rows. The last-member confirm
+> copy (`householdLeaveConfirmBodyLastMember`,
+> `accountDeleteConfirmBodyLastMember`) says "hidden from everyone right
+> away and permanently deleted from the server after 30 days". pgTAP:
+> `supabase/tests/007_privacy_and_grants_test.sql` (31 days purged with its
+> children, 1 day untouched, not callable by `authenticated`, job
+> scheduled).
+
 ### 2.5 Existing RPCs need a new guard
 
 The invite-redemption family must reject a soft-deleted household —
@@ -506,7 +530,8 @@ stale assertion totals in a comment (`54/54` → `69/69`).*
 ## 6. Non-goals
 
 - No role-based enforcement. D1 stands; `members.role` stays vestigial.
-- No pg_cron sweep (§2.4).
+- No pg_cron sweep (§2.4) — superseded 2026-10-06: a nightly 30-day purge
+  of soft-deleted households exists (§2.4 amendment).
 - No change to Disconnect's user-facing behaviour or to the P2d reconnect
   flow beyond §3.1's G-A cleanup.
 - No F12 restore-from-backup.

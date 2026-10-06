@@ -942,6 +942,20 @@ void main() {
     );
 
     test(
+      'households push sends ONLY the name column: the server grants a '
+      'column-scoped UPDATE (name) and an ungranted column in the SET list '
+      'fails the whole statement with 42501 (H4)',
+      () async {
+        await engine.pushDirty();
+
+        expect(transport.householdUpdateCalls, hasLength(1));
+        final call = transport.householdUpdateCalls.single;
+        expect(call.id, household.id);
+        expect(call.columns, {'name': household.name});
+      },
+    );
+
+    test(
       "chore_assignees push denormalizes household_id off the assignee's "
       'chore',
       () async {

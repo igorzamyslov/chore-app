@@ -273,7 +273,7 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       }
     } on Exception {
       if (mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSendError,
         );

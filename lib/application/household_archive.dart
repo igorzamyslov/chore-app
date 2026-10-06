@@ -13,15 +13,50 @@ import 'package:chore_app/application/data_export.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
-/// The archive file's name: `famdo-archive-<yyyy-mm-dd>.json`, dated from
-/// [clock] (never `DateTime.now()`) so it's deterministic under a fixed
-/// test/E2E clock -- mirrors `exportFileName`'s naming (same date format,
-/// `archive` in place of `export`: this file is machine-written to the app
-/// documents directory, not shared).
+/// The archive file's name: `famdo-archive-<yyyy-MM-dd-HHmmss>.json`, stamped
+/// from [clock] (never `DateTime.now()`) so it's deterministic under a fixed
+/// test/E2E clock. The time component (persona review B3) keeps two joins on
+/// the same day from silently overwriting each other's saved copy -- the
+/// older file is the only record of that earlier household.
 String archiveFileName(Clock clock) {
-  final today = PlainDate.fromDateTime(clock.now());
-  return 'famdo-archive-${today.toIso8601()}.json';
+  final now = clock.now();
+  final date = PlainDate.fromDateTime(now).toIso8601();
+  String two(int value) => value.toString().padLeft(2, '0');
+  return 'famdo-archive-$date-${two(now.hour)}${two(now.minute)}'
+      '${two(now.second)}.json';
+}
+
+final RegExp _archiveName = RegExp(r'^famdo-archive-.+\.json$');
+final RegExp _archiveStamp = RegExp(
+  r'^famdo-archive-(\d{4})-(\d{2})-(\d{2})(?:-(\d{2})(\d{2})(\d{2}))?\.json$',
+);
+
+/// One saved copy of an earlier household, as listed under Settings -> Data
+/// (persona review B3).
+@immutable
+class HouseholdArchive {
+  /// Creates an entry for the file at [path].
+  const HouseholdArchive({required this.path, required this.fileName});
+
+  /// The file's absolute path.
+  final String path;
+
+  /// The file's name, `famdo-archive-<stamp>.json`.
+  final String fileName;
+
+  /// When the copy was made, read back from [fileName] (device-local time),
+  /// or `null` for a name that does not follow the stamp format.
+  DateTime? get savedAt {
+    final match = _archiveStamp.firstMatch(fileName);
+    if (match == null) {
+      return null;
+    }
+    int part(int group) => int.parse(match.group(group) ?? '0');
+    return DateTime(part(1), part(2), part(3), part(4), part(5), part(6));
+  }
 }
 
 /// Seam for actually writing the archive's bytes to disk -- a plain static
@@ -55,6 +90,17 @@ abstract class ArchiveFileWriter {
 
   /// Writes [contents] to [path], creating/overwriting the file.
   Future<void> write(String path, String contents);
+
+  /// The directory archives live in (the app documents directory).
+  Future<String> directoryPath();
+
+  /// The absolute paths of every archive file in [directoryPath], in no
+  /// particular order. Empty when the directory does not exist.
+  Future<List<String>> list();
+
+  /// Deletes the file at [path]; a file that is already gone is not an
+  /// error.
+  Future<void> delete(String path);
 }
 
 /// The production [ArchiveFileWriter]: a real `dart:io` file write.
@@ -66,7 +112,63 @@ class RealArchiveFileWriter extends ArchiveFileWriter {
   Future<void> write(String path, String contents) {
     return File(path).writeAsString(contents);
   }
+
+  @override
+  Future<String> directoryPath() async =>
+      (await getApplicationDocumentsDirectory()).path;
+
+  @override
+  Future<List<String>> list() async {
+    final directory = Directory(await directoryPath());
+    if (!directory.existsSync()) {
+      return const [];
+    }
+    return [
+      await for (final entity in directory.list())
+        if (entity is File && _archiveName.hasMatch(_baseName(entity.path)))
+          entity.path,
+    ];
+  }
+
+  @override
+  Future<void> delete(String path) async {
+    final file = File(path);
+    if (file.existsSync()) {
+      await file.delete();
+    }
+  }
 }
+
+String _baseName(String path) => path.substring(path.lastIndexOf('/') + 1);
+
+/// Every saved copy, newest first (names carry their timestamp, so a
+/// descending name sort is newest-first).
+Future<List<HouseholdArchive>> listHouseholdArchives() async {
+  final paths = await ArchiveFileWriter.instance.list();
+  final entries = [
+    for (final path in paths)
+      HouseholdArchive(path: path, fileName: _baseName(path)),
+  ]..sort((a, b) => b.fileName.compareTo(a.fileName));
+  return entries;
+}
+
+/// Deletes one saved copy.
+Future<void> deleteHouseholdArchive(HouseholdArchive archive) =>
+    ArchiveFileWriter.instance.delete(archive.path);
+
+/// Deletes every saved copy (`resetAppData`: a reset promises a clean
+/// device).
+Future<void> deleteAllHouseholdArchives() async {
+  final writer = ArchiveFileWriter.instance;
+  for (final path in await writer.list()) {
+    await writer.delete(path);
+  }
+}
+
+/// The absolute path of the saved copy named [fileName] -- what the
+/// post-join snackbar's "Share..." action hands to the share sheet.
+Future<String> householdArchivePath(String fileName) async =>
+    '${await ArchiveFileWriter.instance.directoryPath()}/$fileName';
 
 /// Builds the full backup document via [buildExportDocument] and writes it,
 /// UTF-8 JSON encoded, to [archiveFileName] inside [directory] -- via

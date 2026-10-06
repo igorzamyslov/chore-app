@@ -8,6 +8,7 @@ import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/account_section.dart';
 import 'package:chore_app/features/settings/appearance_section.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
 import 'package:chore_app/features/settings/evening_section.dart';
 import 'package:chore_app/features/settings/export_row.dart';
@@ -79,6 +80,10 @@ class SettingsScreen extends ConsumerWidget {
     final settingsAsync = ref.watch(settingsProvider);
     final permissionGranted = ref.watch(notificationPermissionGrantedProvider);
     final settingsRepository = ref.read(settingsRepositoryProvider);
+    // Persona review B3: the saved-copies row exists only once a join or
+    // reconnect has actually left a copy behind.
+    final archiveCount =
+        ref.watch(householdArchivesProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTabLabel)),
@@ -245,7 +250,11 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SettingsGroup(
             label: l10n.settingsDataSectionTitle,
-            children: const [ExportDataTile(), ResetDataTile()],
+            children: [
+              const ExportDataTile(),
+              if (archiveCount > 0) ArchivesTile(count: archiveCount),
+              const ResetDataTile(),
+            ],
           ),
           SettingsGroup(
             label: l10n.settingsAboutSectionTitle,
