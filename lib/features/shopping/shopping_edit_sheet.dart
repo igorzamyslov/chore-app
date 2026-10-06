@@ -91,6 +91,7 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
             'shopping.edit.name',
             child: TextField(
               controller: _nameController,
+              textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: l10n.shoppingEditNameLabel,
                 errorText: _nameError == null

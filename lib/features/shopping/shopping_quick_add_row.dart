@@ -109,6 +109,9 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
                       controller: _controller,
                       focusNode: _focusNode,
                       textInputAction: TextInputAction.done,
+                      // F12: German nouns are capitalised; without this the
+                      // list ended up half "milch", half "Milch".
+                      textCapitalization: TextCapitalization.sentences,
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
                         hintText: l10n.shoppingAddHint,
