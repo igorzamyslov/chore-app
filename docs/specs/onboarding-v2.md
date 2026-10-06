@@ -93,6 +93,18 @@ device finished applying it.
 > a "replaces your local data" warning. The join subtitle now speaks to the
 > code holder: "Got an invite code? Sign in and enter it here."
 
+> **Amendment 2026-10-06 (persona review D10) — localised defaults.** The
+> create path no longer writes English literals: the household is named
+> `householdDefaultName` ("My household" / "Mein Haushalt") and
+> `CategoryRepository.seedDefaults(householdId, locale:)` seeds German
+> category names for a `de` app locale (index for index with the English
+> seeds; every other language gets English). The bootstrap's legacy re-seed
+> passes the app locale too. The seeds are ordinary synced rows, so the
+> creating phone's language is what the household keeps. The name is now
+> also the first row of Settings → Household ("Household name",
+> `settings.household.name`, opening the existing rename sheet), not only
+> the header row inside Members.
+
 ## 2. App-spine changes
 
 - `bootstrapProvider` no longer CREATES anything. Split:

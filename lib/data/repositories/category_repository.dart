@@ -1,6 +1,8 @@
 /// Manages chore/shopping categories, including v1's seeded defaults.
 library;
 
+import 'dart:ui' show Locale;
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
@@ -66,6 +68,30 @@ class CategoryRepository {
     0xFF4C6B45, // moss
   ];
 
+  /// German names for [_choreSeeds], index for index (persona review D10:
+  /// German households saw English headers, synced to every member as-is).
+  static const List<String> _choreSeedNamesDe = [
+    'Putzen',
+    'Küche',
+    'Wäsche',
+    'Garten',
+    'Haustiere',
+    'Instandhaltung',
+    'Besorgungen',
+  ];
+
+  /// German names for [_shoppingSeeds], index for index.
+  static const List<String> _shoppingSeedNamesDe = [
+    'Obst & Gemüse',
+    'Milchprodukte',
+    'Fleisch & Fisch',
+    'Backwaren',
+    'Tiefkühl',
+    'Getränke',
+    'Haushalt',
+    'Sonstiges',
+  ];
+
   static const List<_CategorySeed> _choreSeeds = [
     (name: 'Cleaning', icon: 'cleaning_services'),
     (name: 'Kitchen', icon: 'skillet'),
@@ -102,9 +128,41 @@ class CategoryRepository {
   ///
   /// Idempotent per kind: re-running this only fills in whichever kind is
   /// still empty.
-  Future<void> seedDefaults(String householdId) async {
-    await _seedKind(householdId, CategoryKind.chore, _choreSeeds);
-    await _seedKind(householdId, CategoryKind.shopping, _shoppingSeeds);
+  ///
+  /// Names follow [locale] (persona review D10): German for `de`, English
+  /// for every other language. The seeds are ordinary synced rows written
+  /// once, so the creating phone's language is what the household keeps --
+  /// a later language switch does not rename them (users rename freely).
+  Future<void> seedDefaults(
+    String householdId, {
+    required Locale locale,
+  }) async {
+    final german = locale.languageCode == 'de';
+    await _seedKind(
+      householdId,
+      CategoryKind.chore,
+      german ? _localised(_choreSeeds, _choreSeedNamesDe) : _choreSeeds,
+    );
+    await _seedKind(
+      householdId,
+      CategoryKind.shopping,
+      german
+          ? _localised(_shoppingSeeds, _shoppingSeedNamesDe)
+          : _shoppingSeeds,
+    );
+  }
+
+  /// [seeds] with each name replaced by [names] at the same index; icons and
+  /// order unchanged.
+  static List<_CategorySeed> _localised(
+    List<_CategorySeed> seeds,
+    List<String> names,
+  ) {
+    assert(seeds.length == names.length, 'one localised name per seed');
+    return [
+      for (var i = 0; i < seeds.length; i++)
+        (name: names[i], icon: seeds[i].icon),
+    ];
   }
 
   /// Watches active categories of [kind] in [householdId], ordered by

@@ -119,6 +119,8 @@ void main() {
       final households = await database.select(database.households).get();
       expect(households, hasLength(1));
       final householdId = households.single.id;
+      // The localised default name (householdDefaultName), not a literal.
+      expect(households.single.name, 'My household');
 
       final members = await database.select(database.members).get();
       expect(members, hasLength(1));

@@ -3,6 +3,8 @@
 /// `lib/features/onboarding/welcome_screen.dart`.
 library;
 
+import 'dart:ui' show Locale;
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
@@ -53,10 +55,22 @@ class HouseholdCreateService {
   /// its default categories, marks the onboarding name-prompt flag, and
   /// clears any leftover welcome-join code prefill, all in one transaction.
   /// Resolves to the new household's id.
-  Future<String> create(String name) {
+  ///
+  /// [householdName] and [locale] localise what the household starts with
+  /// (persona review D10): the welcome flow passes `householdDefaultName`
+  /// and the app locale, so a German household is "Mein Haushalt" with
+  /// German category names rather than English literals synced to everyone.
+  Future<String> create(
+    String name, {
+    required String householdName,
+    required Locale locale,
+  }) {
     return database.transaction(() async {
-      final household = await households.createLocalHousehold(name);
-      await categories.seedDefaults(household.id);
+      final household = await households.createLocalHousehold(
+        name,
+        householdName: householdName,
+      );
+      await categories.seedDefaults(household.id, locale: locale);
       await settings.markOnboardingNamePromptShown();
       // A user who abandoned an in-progress join to start fresh instead
       // shouldn't leave that invite code sitting in `settings` (spec

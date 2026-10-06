@@ -365,6 +365,10 @@
   "@welcomeCreateError": {
     "description": "Inline error shown under the create form's name field if HouseholdCreateService.create throws (e.g. a local database error)."
   },
+  "householdDefaultName": "My household",
+  "@householdDefaultName": {
+    "description": "Name a household gets when created from the welcome screen (persona review D10: it used to be the English literal 'My household' in every language). Renamable any time under Settings → Household name."
+  },
   "welcomeJoinTitle": "Join my family's household",
   "@welcomeJoinTitle": {
     "description": "Title of the welcome screen's secondary card (id welcome.join), and the app bar title of the welcome-join subpage it opens. Hidden entirely when Supabase isn't configured (offline/F-Droid builds, tests)."
@@ -1103,6 +1107,10 @@
   "settingsHouseholdSectionTitle": "Household",
   "@settingsHouseholdSectionTitle": {
     "description": "Settings screen section header above the Members and Categories rows (spec docs/specs/theme-v2.md §4.2), the first group on the screen."
+  },
+  "settingsHouseholdNameRow": "Household name",
+  "@settingsHouseholdNameRow": {
+    "description": "First row of the Settings Household group (id settings.household.name), with the current household name as its value; tapping opens the rename sheet (persona review D10: the name was never asked for and only renamable from inside Members)."
   },
 
   "settingsMembersEntry": "Members",

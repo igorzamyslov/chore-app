@@ -295,6 +295,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong setting up your household. Please try again.';
 
   @override
+  String get householdDefaultName => 'My household';
+
+  @override
   String get welcomeJoinTitle => 'Join my family\'s household';
 
   @override
@@ -881,6 +884,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsHouseholdSectionTitle => 'Household';
+
+  @override
+  String get settingsHouseholdNameRow => 'Household name';
 
   @override
   String get settingsMembersEntry => 'Members';

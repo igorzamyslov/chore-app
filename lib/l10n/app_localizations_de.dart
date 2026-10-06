@@ -298,6 +298,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.';
 
   @override
+  String get householdDefaultName => 'Mein Haushalt';
+
+  @override
   String get welcomeJoinTitle => 'Dem Haushalt meiner Familie beitreten';
 
   @override
@@ -886,6 +889,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsHouseholdSectionTitle => 'Haushalt';
+
+  @override
+  String get settingsHouseholdNameRow => 'Name des Haushalts';
 
   @override
   String get settingsMembersEntry => 'Mitglieder';

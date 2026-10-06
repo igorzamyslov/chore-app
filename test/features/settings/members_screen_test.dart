@@ -468,6 +468,42 @@ void main() {
   );
 
   testChoreApp(
+    'Settings → Household starts with a "Household name" row showing the '
+    'name; tapping it opens the rename sheet (persona review D10)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      final row = find.bySemanticsIdentifier('settings.household.name');
+      expect(row, findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.text('Household name')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('My household')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(row).dy,
+        lessThan(
+          tester.getTopLeft(find.bySemanticsIdentifier('settings.members')).dy,
+        ),
+      );
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('members.household.rename.name'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
     'household rename (spec A2): tapping the household-name row opens a '
     'prefilled sheet; saving updates the row and the linked account '
     'subtitle',

@@ -806,7 +806,14 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
     // resolves. Nothing ever awaits this future while the gate shows.
     return Completer<String>().future;
   }
-  await ref.watch(categoryRepositoryProvider).seedDefaults(householdId);
+  // Seeds only an EMPTY kind (a legacy install with no categories); names
+  // follow the app locale (persona review D10).
+  await ref
+      .watch(categoryRepositoryProvider)
+      .seedDefaults(
+        householdId,
+        locale: resolveDigestLocale(ref.read(localeOverrideProvider)),
+      );
   // Whatever this run rolled forward has to be explainable on the very first
   // frame (backlog B-1) -- this is the run nobody can see happening, since it
   // completes before any widget builds. Safe to write another provider from

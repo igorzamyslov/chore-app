@@ -84,6 +84,7 @@
   "welcomeCreateNameLabel": "Dein Name",
   "welcomeCreateConfirm": "Los geht's",
   "welcomeCreateError": "Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.",
+  "householdDefaultName": "Mein Haushalt",
   "welcomeJoinTitle": "Dem Haushalt meiner Familie beitreten",
   "welcomeJoinSubtitle": "Hast du einen Einladungscode? Melde dich an und gib ihn hier ein.",
   "welcomeJoinReconnectSubtitle": "Dieses Gerät ist noch nicht damit verbunden.",
@@ -233,6 +234,7 @@
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
 
   "settingsHouseholdSectionTitle": "Haushalt",
+  "settingsHouseholdNameRow": "Name des Haushalts",
   "settingsMembersEntry": "Mitglieder",
 
   "settingsMembersInviteEntry": "Einladen",

@@ -346,7 +346,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       _error = null;
     });
     try {
-      await ref.read(householdCreateServiceProvider).create(name);
+      final l10n = AppLocalizations.of(context);
+      await ref
+          .read(householdCreateServiceProvider)
+          .create(
+            name,
+            householdName: l10n.householdDefaultName,
+            locale: Localizations.localeOf(context),
+          );
       // No further local state update on success: the moment the create
       // transaction commits, `householdGateProvider`'s stream flips and
       // `ChoreApp` rebuilds straight to the tab shell -- this whole screen

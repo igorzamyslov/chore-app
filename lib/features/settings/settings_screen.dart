@@ -10,6 +10,7 @@ import 'package:chore_app/features/settings/appearance_section.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
 import 'package:chore_app/features/settings/evening_section.dart';
 import 'package:chore_app/features/settings/export_row.dart';
+import 'package:chore_app/features/settings/household_rename_sheet.dart';
 import 'package:chore_app/features/settings/language_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
@@ -21,6 +22,31 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+/// The Household group's first row (persona review D10): the household's
+/// name as the row's value, tapping opens the same rename sheet the Members
+/// screen's header row uses. The name used to be the English literal
+/// "My household", never asked for and only renamable from inside Members.
+class _HouseholdNameRow extends ConsumerWidget {
+  const _HouseholdNameRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final name = ref.watch(currentHouseholdProvider).valueOrNull?.name;
+    return semantic(
+      'settings.household.name',
+      child: SettingsRow(
+        icon: Icons.home_outlined,
+        label: l10n.settingsHouseholdNameRow,
+        value: name ?? '',
+        onTap: name == null
+            ? null
+            : () => showHouseholdRenameSheet(context, currentName: name),
+      ),
+    );
+  }
+}
 
 /// The Settings tab (spec `docs/specs/theme-v2.md` §4.2: labelled groups --
 /// Household, Preferences, Data, About, in that order -- each a card of
@@ -65,6 +91,7 @@ class SettingsScreen extends ConsumerWidget {
           SettingsGroup(
             label: l10n.settingsHouseholdSectionTitle,
             children: [
+              const _HouseholdNameRow(),
               const AccountSectionBody(),
               semantic(
                 'settings.members',

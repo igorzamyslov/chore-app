@@ -518,6 +518,12 @@ abstract class AppLocalizations {
   /// **'Something went wrong setting up your household. Please try again.'**
   String get welcomeCreateError;
 
+  /// Name a household gets when created from the welcome screen (persona review D10: it used to be the English literal 'My household' in every language). Renamable any time under Settings → Household name.
+  ///
+  /// In en, this message translates to:
+  /// **'My household'**
+  String get householdDefaultName;
+
   /// Title of the welcome screen's secondary card (id welcome.join), and the app bar title of the welcome-join subpage it opens. Hidden entirely when Supabase isn't configured (offline/F-Droid builds, tests).
   ///
   /// In en, this message translates to:
@@ -1297,6 +1303,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Household'**
   String get settingsHouseholdSectionTitle;
+
+  /// First row of the Settings Household group (id settings.household.name), with the current household name as its value; tapping opens the rename sheet (persona review D10: the name was never asked for and only renamable from inside Members).
+  ///
+  /// In en, this message translates to:
+  /// **'Household name'**
+  String get settingsHouseholdNameRow;
 
   /// Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry.
   ///
