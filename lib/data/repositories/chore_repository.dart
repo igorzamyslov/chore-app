@@ -369,48 +369,55 @@ class ChoreRepository {
 
   /// Watches every active chore in [householdId], each joined with its
   /// ordered assignee ids and category.
+  ///
+  /// One joined query (chores, categories, chore_assignees) mapped in Dart
+  /// (technical review 2026-10-06 #15): no per-chore follow-up query, and
+  /// because `chore_assignees` is one of the joined tables the stream
+  /// re-emits when ONLY an assignee row changes (a pulled assignee-set
+  /// change), not just when the chore row's `updated_at` moves.
   Stream<List<ChoreWithDetails>> watchActiveChores(String householdId) {
-    final query =
-        db.select(db.chores).join([
-            leftOuterJoin(
-              db.categories,
-              db.categories.id.equalsExp(db.chores.categoryId),
-            ),
-          ])
-          ..where(
-            db.chores.householdId.equals(householdId) &
-                db.chores.deletedAt.isNull(),
-          )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
-
-    // `asyncMap` re-queries chore_assignees per emission rather than
-    // joining it directly, to avoid a row explosion from the one-to-many
-    // join. This only stays correct because `createChore`/`updateChore`
-    // always bump the chore row's `updated_at` whenever assignees change,
-    // which is what actually drives this stream's re-emission.
-    return query.watch().asyncMap(_choreDetailsFromRows);
+    return _activeChoresQuery(householdId).watch().map(_choreDetailsFromRows);
   }
 
   /// Fetches every active chore in [householdId], each joined with its
   /// ordered assignee ids and category — the one-shot `Future` equivalent
-  /// of [watchActiveChores]'s query (same `WHERE`/`ORDER BY`), with no
-  /// stream. Used by `ChoreService.catchUpOverdue`, which only ever needs a
+  /// of [watchActiveChores] (same query, same mapping), with no stream.
+  /// Used by `ChoreService.catchUpOverdue`, which only ever needs a
   /// single point-in-time read inside its transaction; reading it via
   /// `watchActiveChores(...).first` there was needlessly indirect.
   Future<List<ChoreWithDetails>> getActiveChores(String householdId) async {
-    final query =
-        db.select(db.chores).join([
-            leftOuterJoin(
-              db.categories,
-              db.categories.id.equalsExp(db.chores.categoryId),
-            ),
-          ])
-          ..where(
-            db.chores.householdId.equals(householdId) &
-                db.chores.deletedAt.isNull(),
-          )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
-    return _choreDetailsFromRows(await query.get());
+    return _choreDetailsFromRows(await _activeChoresQuery(householdId).get());
+  }
+
+  /// The query behind [watchActiveChores] and [getActiveChores]: active
+  /// chores left-joined to their category and their assignee rows. A chore
+  /// with N assignees yields N rows; [_choreDetailsFromRows] folds them
+  /// back. Ordered by title, then chore id (so equal titles never
+  /// interleave), then rotation `position`/`memberId` -- the same
+  /// deterministic assignee order [_currentAssigneeIds] uses.
+  JoinedSelectStatement<HasResultSet, dynamic> _activeChoresQuery(
+    String householdId,
+  ) {
+    return db.select(db.chores).join([
+        leftOuterJoin(
+          db.categories,
+          db.categories.id.equalsExp(db.chores.categoryId),
+        ),
+        leftOuterJoin(
+          db.choreAssignees,
+          db.choreAssignees.choreId.equalsExp(db.chores.id),
+        ),
+      ])
+      ..where(
+        db.chores.householdId.equals(householdId) &
+            db.chores.deletedAt.isNull(),
+      )
+      ..orderBy([
+        OrderingTerm(expression: db.chores.title),
+        OrderingTerm(expression: db.chores.id),
+        OrderingTerm(expression: db.choreAssignees.position),
+        OrderingTerm(expression: db.choreAssignees.memberId),
+      ]);
   }
 
   /// Fetches a single chore joined with its ordered assignee ids and
@@ -707,7 +714,7 @@ class ChoreRepository {
   /// Maps joined occurrence/chore/category/member rows to
   /// [OccurrenceWithChore].
   ///
-  /// Synchronous, unlike [_choreDetailsFromRows], because this needs no
+  /// Synchronous, like [_choreDetailsFromRows], because this needs no
   /// per-row follow-up query.
   List<OccurrenceWithChore> _occurrencesWithChoreFromRows(
     List<TypedResult> rows,
@@ -826,26 +833,42 @@ class ChoreRepository {
     });
   }
 
-  /// Maps joined chore/category rows (from [watchActiveChores] or
-  /// [getActiveChores]) to [ChoreWithDetails], resolving each chore's
-  /// ordered assignee ids along the way. Shared so the two query methods
-  /// can't drift apart on how a row becomes a [ChoreWithDetails].
-  Future<List<ChoreWithDetails>> _choreDetailsFromRows(
-    List<TypedResult> rows,
-  ) async {
+  /// Folds [_activeChoresQuery] rows (one per chore-assignee pair) into one
+  /// [ChoreWithDetails] per chore, keeping the query's order. Shared by
+  /// [watchActiveChores] and [getActiveChores] so the two can't drift apart
+  /// on how a row becomes a [ChoreWithDetails].
+  List<ChoreWithDetails> _choreDetailsFromRows(List<TypedResult> rows) {
     final result = <ChoreWithDetails>[];
+    Chore? current;
+    Category? currentCategory;
+    var assigneeIds = <String>[];
+    void flush() {
+      final chore = current;
+      if (chore != null) {
+        result.add(
+          ChoreWithDetails(
+            chore: chore,
+            assigneeMemberIds: assigneeIds,
+            category: currentCategory,
+          ),
+        );
+      }
+    }
+
     for (final row in rows) {
       final chore = row.readTable(db.chores);
-      final category = row.readTableOrNull(db.categories);
-      final assigneeIds = await _currentAssigneeIds(chore.id);
-      result.add(
-        ChoreWithDetails(
-          chore: chore,
-          assigneeMemberIds: assigneeIds,
-          category: category,
-        ),
-      );
+      if (current?.id != chore.id) {
+        flush();
+        current = chore;
+        currentCategory = row.readTableOrNull(db.categories);
+        assigneeIds = <String>[];
+      }
+      final assignee = row.readTableOrNull(db.choreAssignees);
+      if (assignee != null) {
+        assigneeIds.add(assignee.memberId);
+      }
     }
+    flush();
     return result;
   }
 
