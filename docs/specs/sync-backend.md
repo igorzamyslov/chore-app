@@ -483,6 +483,66 @@ provider `syncEngineProvider` re-evaluates on the linked state
   retry-later (log in debug); the app NEVER surfaces sync errors in P3
   (local-first: the UI is always consistent with the local db).
 
+**Amendment 2026-10-06 (persona + technical review, plan
+`docs/plans/2026-10-06-persona-review-fixes.md` W1).** The bullets above
+stand; the following refine them. Findings are numbered as in
+`docs/feedback/2026-10-06-personas/technical-review.md`.
+
+- **Paging (#2).** PostgREST silently truncates every response at
+  `max_rows` (1000). Every full-table read — `SyncTransport.pullTable` and
+  each per-table read in `HouseholdGateway.downloadHousehold` — asks for
+  `syncPageSize` (= 1000) rows at a time, ordered by `updated_at` then the
+  primary key (`id`, or `chore_id, member_id` for `chore_assignees`), and
+  keeps going until a page comes back shorter than the page size. A failure
+  on any page fails the whole pull, so the cursor never advances past rows
+  that were not fetched.
+- **Cursor overlap (#3).** Postgres' `now()` is the transaction START time,
+  so a push whose transaction began before our `server_now()` read and
+  committed after a table read is stamped below an exact cursor and would
+  never be pulled. The cursor is stored as `server_now() − syncCursorOverlap`
+  (30 s). The re-fetch this causes is idempotent: a pulled row that equals
+  the local row (data-class equality) is **not rewritten**, so a re-apply
+  fires no table update and cannot feed the write listener into a
+  push/pull loop.
+- **Per-table push with quarantine (#5).** `_pushAll` never throws. Each
+  table is pushed in its own try/catch and the sequence continues past a
+  failure. A batch the server **rejects** — a `PostgrestException` whose
+  SQLSTATE class is `22`, `23` or `42` — is retried row by row; a row still
+  rejected is *quarantined*: left dirty, skipped for this tick, and recorded
+  once per engine session as `AppLog.error('sync.rejected', …, context:
+  {table, id})` (deduplicated by `table:id`). A rejected tombstone stays in
+  the outbox the same way. Any other failure (network, server down) is
+  retry-later as before and is logged once per tick as `sync.pushDirty`.
+  `pushDirty` skips its follow-up pull only on an ordinary failure, never
+  because of a quarantined row.
+- **`refreshNow()` returns `RefreshOutcome`** (`ok` | `offline` |
+  `rejected`) instead of a bool: `rejected` if any row was quarantined this
+  run, `offline` on any other failure (including a revocation discovered by
+  the pull), else `ok`. The UI mapping is in `sync-freshness.md` §2.3.
+- **One pull in flight; own echo ignored (#17).** `pullSince()` and
+  `refreshNow()` join a running pull instead of starting a second one, so
+  two pulls can never interleave and race each other's cursor write. A
+  realtime `householdChanges` event within `realtimeEchoWindow` (1 s) of our
+  own successful push is dropped as the server echoing rows we just wrote
+  (the push's own follow-up pull already fetched them); a genuine
+  other-device change inside that window is caught by the next poll tick.
+- **A chore's assignee list is one LWW value (#8).** On pull, the
+  `chore_assignees` rows and tombstones are grouped per chore. If the local
+  chore row is dirty — or any of its local assignee rows is — nothing is
+  applied for that chore (local dirty wins for the whole list). Otherwise,
+  if any live row was pulled, the local list is replaced by the pulled list
+  (delete then insert, positions as pulled); if only tombstones were pulled
+  (a pull landing between the other device's row push and its tombstone
+  push), only those members are deleted. Rows are never merged one by one:
+  that produced a union with duplicate `position`s and a per-device
+  rotation order. `_currentAssigneeIds` tie-breaks `position` by `memberId`
+  as defence in depth.
+- **Device-clock pull stamp (#7).** After every successful pull the engine
+  reports `clock.now()` (device time) through `onPullCompleted`;
+  `syncLastPullCompletedAtProvider` holds it for the session. The cursor
+  stays server time for correctness; health and "Last synced" read the
+  device stamp (`sync-freshness.md` §2.5 amendment).
+
 ### 8.4 Testing
 
 - Unit/widget: FakeSyncEngine recording calls; engine logic tested
@@ -582,3 +642,60 @@ no `deletedAt` column, no query changes; a tombstone is an outbox entry.
    `db.yml`) proving `markDeleted` really sets `deleted_at` under RLS and
    that a second client's `pullTable` sees it.
 
+**Amendment 2026-10-06 (technical review #1, #4, #6).**
+
+- **Tombstones only kill the pending row (#1).** Every local site that
+  hard-deletes an occurrence deletes PENDING rows only, so an occurrence
+  tombstone means "the pending row is gone" — not "this id is gone". The
+  push matches `{'id': …, 'status': 'pending'}` (`markDeleted` filters on
+  every entry of the match), and `applyPulledOccurrenceDeletion` adds
+  `status = pending` to its WHERE. Hence a completion recorded and pushed
+  on device A survives a concurrent delete/edit/pause on device B: B's
+  tombstone matches nothing on the server, and B pulls the completion back.
+  Item 5 above reads with that extra condition.
+- **Convergent survivor key (#4).** Item 6's survivor is now the pending
+  occurrence with the greatest `dueDate`, tie-broken by greater `id`.
+  `updatedAt` left the key: a locally written stamp is device time and a
+  pulled one is server time, so two devices comparing the same two rows
+  could each keep a different one and tombstone the other's, leaving the
+  chore with no pending row anywhere. See §8.7.
+- **Timestamps are normalised at the boundary (#4).** Every `*FromRow`
+  mapper rewrites each `*_at` value as
+  `DateTime.parse(s).toUtc().toIso8601String()` (a `Z` suffix, like every
+  local write), so local and pulled stamps share one format wherever they
+  are compared as text (the guarded dirty-clear). A value that does not
+  parse is passed through unchanged rather than failing the pull.
+- **Repair is reachable without a pull (#6).** `repairGhostOccurrences`
+  is callable outside the pull transaction (it only touches pending rows),
+  and `ChoreService.catchUpOverdue` runs it for the household before
+  iterating chores, so an unlinked device — or a race between a local
+  insert and a pull that already repaired — is healed at the next catch-up.
+  `ChoreRepository.pendingOccurrenceOf` is tolerant meanwhile: it orders by
+  `dueDate` desc, `updatedAt` desc and takes one row instead of
+  `getSingleOrNull()`, so two pending rows can no longer throw out of
+  bootstrap.
+
+### 8.7 Invariants (added 2026-10-06)
+
+These hold across every device of a household, and every sync rule above
+must preserve them:
+
+1. **Survivor selection uses only fields both devices see identically
+   (`dueDate`, `id`).** Any rule that picks one row over another for
+   convergence — ghost repair today, anything similar tomorrow — must not
+   read `updatedAt`, `createdAt` or any other stamp that one device wrote
+   from its clock and the other received from the server.
+2. **A tombstone names the state it deletes.** An occurrence tombstone
+   deletes a *pending* row; it never deletes a row that has since become
+   `done`, `skipped` or `missed`. Local hard deletes only ever delete
+   pending occurrences, so this is the semantics the outbox already has.
+3. **The pull cursor never advances past a row that was not applied.** Every
+   page of every table is fetched before the single apply transaction, and
+   the cursor is written only after that transaction commits — with the
+   overlap, so a transaction-start-stamped row is never skipped.
+4. **Re-applying what is already local is a no-op.** A pulled row equal to
+   the local row writes nothing; a pulled assignee list equal to the local
+   list writes nothing. This is what lets the overlap re-fetch be free.
+5. **One bad row never blocks another.** Push proceeds per table and, on
+   rejection, per row; the rejected row is quarantined and reported, the
+   rest keep flowing, and the pull is never conditional on the push.
