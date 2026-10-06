@@ -33,9 +33,12 @@ import 'package:intl/intl.dart';
 /// that filtering is currently narrowing the count, so a filtered "1 of 2"
 /// is never mistaken for the household's whole day.
 ///
-/// The whole card renders as [SizedBox.shrink] when `M == 0` (nothing was
-/// ever on the plate today; an overdue-only pile is just the Overdue
-/// section) -- an empty ring is noise, not signal.
+/// The whole card renders as [SizedBox.shrink] when `M == 0` and nothing is
+/// overdue -- an empty ring is noise, not signal. **Changed 2026-10-07**
+/// (persona review E5 follow-up): with `M == 0` but an overdue pile the card
+/// stays, so a member returning to "7 to catch up" sees the line; its
+/// headline is then just [overdueCount]'s catch-up text and the ring is
+/// omitted.
 ///
 /// Semantic id `chores.progress`. The card carries a single [Semantics]
 /// label with the same sentence the visible text already shows (title +
@@ -78,15 +81,18 @@ class ChoreProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = completedToday + pendingDueToday;
-    if (total == 0) {
+    if (total == 0 && overdueCount == 0) {
       return const SizedBox.shrink();
     }
+    // Overdue pile and nothing planned for today: the catch-up line is the
+    // whole headline and there is no ring to fill.
+    final overdueOnly = total == 0;
 
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final localeName = Localizations.localeOf(context).toString();
     final remaining = total - completedToday;
-    final progress = completedToday / total;
+    final progress = overdueOnly ? 0.0 : completedToday / total;
 
     // Natural case for the accessibility label, uppercase only for display:
     // uppercase is typography, not content.
@@ -94,13 +100,19 @@ class ChoreProgressCard extends StatelessWidget {
       localeName,
     ).format(DateTime.utc(today.year, today.month, today.day));
     final dateLabel = dateNatural.toUpperCase();
-    final title = l10n.choresProgressTitle(completedToday, total);
-    final subline = remaining == 0
-        ? l10n.choresProgressAllDoneToday
-        : l10n.choresProgressRemainingToday(remaining);
-    final catchUp = overdueCount > 0
+    final catchUpText = overdueCount > 0
         ? l10n.choresProgressCatchUp(overdueCount)
         : null;
+    final title = overdueOnly
+        ? catchUpText!
+        : l10n.choresProgressTitle(completedToday, total);
+    final subline = overdueOnly
+        ? null
+        : remaining == 0
+        ? l10n.choresProgressAllDoneToday
+        : l10n.choresProgressRemainingToday(remaining);
+    // In the overdue-only case the catch-up text IS the title.
+    final catchUp = overdueOnly ? null : catchUpText;
     final sublineStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
@@ -109,7 +121,7 @@ class ChoreProgressCard extends StatelessWidget {
     return semantic(
       'chores.progress',
       child: Semantics(
-        label: [dateNatural, title, subline, ?catchUp, ?filterNote].join('. '),
+        label: [dateNatural, title, ?subline, ?catchUp, ?filterNote].join('. '),
         child: DepthCard(
           shadow: true,
           child: Padding(
@@ -130,15 +142,17 @@ class ChoreProgressCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(title, style: theme.textTheme.titleLarge),
-                        const SizedBox(height: 2),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            Text(subline, style: sublineStyle),
-                            if (catchUp != null)
-                              Text(catchUp, style: sublineStyle),
-                          ],
-                        ),
+                        if (subline != null) ...[
+                          const SizedBox(height: 2),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              Text(subline, style: sublineStyle),
+                              if (catchUp != null)
+                                Text(catchUp, style: sublineStyle),
+                            ],
+                          ),
+                        ],
                         if (filterNote != null) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -152,8 +166,10 @@ class ChoreProgressCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                ExcludeSemantics(child: _ProgressRing(progress: progress)),
+                if (!overdueOnly) ...[
+                  const SizedBox(width: 16),
+                  ExcludeSemantics(child: _ProgressRing(progress: progress)),
+                ],
               ],
             ),
           ),

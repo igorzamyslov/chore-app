@@ -237,7 +237,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           const _BannerRegion(),
           // Only once occurrences have actually loaded -- avoids a
           // zero-count flash while pendingOccurrencesProvider's stream is
-          // still resolving. ChoreProgressCard hides itself when M == 0.
+          // still resolving. ChoreProgressCard hides itself when M == 0 and
+          // nothing is overdue.
           if (occurrencesAsync.hasValue)
             ChoreProgressCard(
               completedToday: completedToday,
