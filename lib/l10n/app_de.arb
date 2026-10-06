@@ -16,6 +16,7 @@
   "notificationDigestDueOnly": "{count, plural, one{1 Aufgabe heute} other{{count} Aufgaben heute}}",
   "notificationDigestOverdueOnly": "{count, plural, one{1 überfällige Aufgabe} other{{count} überfällige Aufgaben}}",
   "notificationDigestBoth": "{dueCount, plural, one{1 Aufgabe heute} other{{dueCount} Aufgaben heute}} · {overdueCount, plural, one{1 überfällig} other{{overdueCount} überfällig}}",
+  "digestMoreCount": " und {count} weitere",
   "notificationActionDone": "Erledigt",
 
   "commonCancel": "Abbrechen",
@@ -62,6 +63,8 @@
 
   "choresFilterMemberTooltip": "Nach Mitglied filtern",
   "choresFilterMemberAll": "Alle Mitglieder",
+  "choresFilterYou": "{name} (du)",
+  "choresAssigneeAnyone": "Jemand",
   "choresFilterCategoryTooltip": "Nach Kategorie filtern",
   "choresFilterCategoryAll": "Alle Kategorien",
   "choresFilterClear": "Alles anzeigen",
@@ -72,7 +75,7 @@
   "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
-  "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
+  "choresEmptyState": "Für heute ist nichts mehr offen.",
   "choresEmptyDoneHeadline": "Für heute alles erledigt",
   "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
   "choresEmptyFreshHeadline": "Noch keine Aufgaben",
@@ -82,7 +85,8 @@
 
   "choresProgressTitle": "{n} von {m} heute erledigt",
   "choresProgressRemainingToday": "{count, plural, one{Noch 1 übrig} other{Noch {count} übrig}}",
-  "choresProgressAllDoneToday": "Alles erledigt — gut gemacht!",
+  "choresProgressAllDoneToday": "Das war alles für heute.",
+  "choresProgressCatchUp": "{count} nachzuholen",
   "choresProgressFilterActive": "Gefiltert – nicht der ganze Haushalt",
 
   "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",
@@ -105,7 +109,7 @@
   "digestPrepromptEnableAction": "Aktivieren",
   "digestPrepromptDismissAction": "Nicht jetzt",
 
-  "catchUpBannerMessage": "{count, plural, one{Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.} other{Wir haben {count} überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.}}",
+  "catchUpBannerMessage": "Deine wiederkehrenden Aufgaben sind zu ihrem neuesten Fälligkeitstermin gesprungen — du hast nichts zusätzlich verpasst.",
   "catchUpBannerDismissTooltip": "Schließen",
 
   "choresSnackbarDone": "Erledigt",
@@ -118,11 +122,18 @@
   "choresSnackbarPaused": "Pausiert",
   "choresSnackbarNoActingMember": "Dieses Gerät weiß noch nicht, wer du bist. Melde dich erneut an oder öffne die App neu.",
 
-  "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
+  "choresDoneRecently": "Kürzlich erledigt ({count})",
+  "choresDoneDayToday": "Heute",
+  "choresDoneDayYesterday": "Gestern",
   "choresDoneStatusDone": "Erledigt",
   "choresDoneStatusSkipped": "Übersprungen",
+  "choresDoneEarly": "Vorzeitig erledigt",
   "choresDoneClosedByLabel": "von {name}",
   "choresDoneReopen": "Wieder öffnen",
+  "choresReopenedSnackbar": "Wieder geöffnet",
+  "choresReopenOthersTitle": "Erledigung von {name} zurücknehmen?",
+  "choresReopenOthersBody": "Das entfernt sie aus seinem Verlauf.",
+  "choresReopenOthersConfirm": "Zurücknehmen",
 
   "choresPausedHeader": "{count, plural, one{Pausiert (1)} other{Pausiert ({count})}}",
   "choresPausedBadge": "Pausiert",
@@ -203,9 +214,9 @@
 
   "choreFormStartDateLabel": "Startdatum",
 
-  "choreFormReminderToggle": "An diese Aufgabe erinnern",
+  "choreFormReminderToggle": "Erinnere, wer dran ist",
   "choreFormReminderTime": "Erinnerungszeit",
-  "choreFormReminderHint": "Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf",
+  "choreFormReminderHint": "Klingelt um diese Zeit auf ihrem Handy. Die Tagesübersicht lässt diese Aufgabe an dem Tag aus.",
 
   "shoppingEmptyState": "Die Einkaufsliste ist leer",
   "shoppingErrorMessage": "Deine Einkaufsliste konnte nicht geladen werden.",
@@ -252,6 +263,7 @@
 
   "settingsEveningToggle": "Abends noch mal erinnern",
   "settingsEveningToggleSubtitle": "Nur wenn heute noch etwas offen ist",
+  "settingsChoreRemindersTitle": "Aufgaben-Erinnerungen",
   "settingsEveningTime": "Abends um",
   "settingsEveningInQuietHoursHint": "Liegt in deinen Ruhezeiten — wird nicht zugestellt",
   "settingsQuietHoursToggle": "Ruhezeiten",
@@ -446,6 +458,7 @@
   "statsTitle": "Aufgaben-Verlauf",
   "statsWindowLast30Days": "In den letzten 30 Tagen",
   "statsWindowSinceStart": "Seit deinem Start am {date}",
+  "statsSince": "seit {date}",
   "statsTotalDone": "{count, plural, one{1 Aufgabe erledigt} other{{count} Aufgaben erledigt}}",
   "statsShareUnknownMember": "Jemand anderes",
   "statsChoresSectionTitle": "Aufgaben",

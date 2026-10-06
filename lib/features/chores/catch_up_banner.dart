@@ -50,7 +50,7 @@ class CatchUpBanner extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                  l10n.catchUpBannerMessage(count),
+                  l10n.catchUpBannerMessage,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: onSecondaryContainer,
                   ),

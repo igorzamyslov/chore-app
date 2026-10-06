@@ -181,6 +181,64 @@ the whole bug report.
 > - **Save confirms (C1/C6).** Saving an edit shows "Saved" / "Saved —
 >   next due {date}" / "Saved — today's turn is now {name}'s" (see
 >   `occurrence-lifecycle.md` updateChore amendment).
+> **Amendment 2026-10-06 (persona review E1, E2, E5, E6, E9, E10, B9; plan
+> `docs/plans/2026-10-06-persona-review-fixes.md` W4).**
+>
+> - **Default filter (E1).** When the device is *pinned* (linked AND signed
+>   in, `memberIdentityModeProvider`) and no filter was stored, the member
+>   filter defaults to the claimed member — applied once, when the identity
+>   resolves, and written to `ui_state` so it persists
+>   (`last-tab-restore.md` §5). A stored choice, a manual pick (including
+>   "All members") or an unlinked household is never overridden. The member
+>   menu marks the acting/claimed member `choresFilterYou` ("{name} (you)" /
+>   "{name} (du)") in a household of more than one.
+> - **Unassigned under the member filter (E1).** The member filter ALSO keeps
+>   occurrences with no assignee (and paused chores with no assignees, and
+>   closed rows with no displayed member): they are anyone's, and the daily
+>   summary counts them for every member, so the list and the notification
+>   no longer disagree. An unassigned tile shows the chip
+>   `choresAssigneeAnyone` ("Anyone" / "Jemand") where the assignee's avatar
+>   would be.
+> - **Catch-up banner (E2).** `catchUpBannerMessage` states the outcome, not
+>   the mechanism, and carries no count: "Your repeating chores jumped ahead
+>   to their latest due date — you didn't miss anything extra." / "Deine
+>   wiederkehrenden Aufgaben sind zu ihrem neuesten Fälligkeitstermin
+>   gesprungen — du hast nichts zusätzlich verpasst."
+> - **Progress card (E5; amends `theme-v2.md` §4.1 item 1).** `M` = pending
+>   occurrences due **today** + occurrences completed today; the overdue pile
+>   is no longer part of it. Overdue is shown beside the sub-line as
+>   `choresProgressCatchUp` ("{count} to catch up" / "{count} nachzuholen"),
+>   never moves the ring, and does not keep the card visible on its own
+>   (`M == 0` still hides it; the Overdue section is right below). The praise
+>   copy is replaced by plain statements: `choresEmptyState` "Nothing left
+>   for today." / "Für heute ist nichts mehr offen.",
+>   `choresProgressAllDoneToday` "That's everything for today." / "Das war
+>   alles für heute."
+> - **Done recently (E9; amends `ux-round-2.md` A3).** The Done section
+>   (id `chores.done.header` unchanged) is headed `choresDoneRecently`
+>   ("Done recently ({count})" / "Kürzlich erledigt ({count})") and lists done
+>   and skipped occurrences closed in the last three days
+>   (`doneRecentlyDays`: today minus 3 through today), newest day first, then
+>   by title. Each row names its day: Today / Yesterday
+>   (`choresDoneDayToday` / `choresDoneDayYesterday`) or the locale's weekday.
+>   Reopen stays a same-day affordance: only today's rows can show it, under
+>   the unchanged LIFO rule.
+> - **Done rows (E6).** A done row closed before its due date carries the tag
+>   `choresDoneEarly` ("Done early" / "Vorzeitig erledigt"); a skipped row no
+>   longer says "by {name}" (a skip records no closer, and the assignee is
+>   not one). Reopen confirms with `choresReopenedSnackbar` ("Reopened" /
+>   "Wieder geöffnet"); reopening a row whose `completed_by` is not the
+>   acting member first asks (`chores.reopen.confirm` / `.cancel`):
+>   `choresReopenOthersTitle` "Reopen {name}'s completion?" / "Erledigung
+>   von {name} zurücknehmen?", body "This removes it from their history." /
+>   "Das entfernt sie aus seinem Verlauf.", button "Reopen" / "Zurücknehmen".
+> - **Waiting to send (E10; chores half of `ui-shopping.md`'s 2026-10-06
+>   amendment).** While the household is linked, a `sync_dirty` occurrence
+>   tile and Done row show the 14 dp `Icons.schedule` glyph with the tooltip
+>   `syncPendingItemTooltip` ("Waiting to send").
+> - **Reminder label (B9).** See `notifications-n2.md` §11's 2026-10-06
+>   amendment for `choreFormReminderToggle` / `choreFormReminderHint`.
+
 - Empty state (no pending occurrences at all): centered friendly message +
   `semantic('chores.empty')` + the add FAB remains.
 - FAB `chores.add` → form screen.

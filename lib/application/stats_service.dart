@@ -21,7 +21,11 @@ const int statsWindowDays = 30;
 /// and how many chores they completed in the window.
 class MemberShare {
   /// Creates a share entry.
-  const MemberShare({required this.member, required this.doneCount});
+  const MemberShare({
+    required this.member,
+    required this.doneCount,
+    this.since,
+  });
 
   /// The member, or `null` for the unattributed "Someone else" bucket.
   final Member? member;
@@ -29,6 +33,13 @@ class MemberShare {
   /// Completions credited to [member] in the window. May be 0 for a current
   /// roster member -- hiding a zero would make the card dishonest.
   final int doneCount;
+
+  /// The day [member]'s own window starts, when that is later than the
+  /// overview's [StatsOverview.windowStart] because they joined partway
+  /// through it (persona review 2026-10-06 E7); `null` otherwise. The UI
+  /// says "since {date}", so a recent joiner's low count reads as "just
+  /// arrived", not as "does nothing".
+  final PlainDate? since;
 }
 
 /// Everything the chore-history overview screen renders.
@@ -123,6 +134,7 @@ class StatsService {
     final countById = <String?, int>{
       for (final count in counts) count.memberId: count.doneCount,
     };
+    var totalDone = counts.fold(0, (sum, count) => sum + count.doneCount);
 
     // Roster order = member creation order, and deliberately unfiltered on
     // `deleted_at`: a member who has since left still shows the work they
@@ -139,11 +151,38 @@ class StatsService {
               ..orderBy([(tbl) => OrderingTerm(expression: tbl.createdAt)]))
             .get();
 
-    final shares = <MemberShare>[
-      for (final member in roster)
-        if (member.deletedAt == null || (countById[member.id] ?? 0) > 0)
-          MemberShare(member: member, doneCount: countById[member.id] ?? 0),
-    ];
+    // Persona review 2026-10-06 E7: each member's window starts no earlier
+    // than the day they joined, so someone who arrived last week is not
+    // measured against a month they were not here for. Floored at today for
+    // the same reason the household start is (a `created_at` ahead of the
+    // clock must not invert the window).
+    final shares = <MemberShare>[];
+    for (final member in roster) {
+      final fullCount = countById[member.id] ?? 0;
+      if (member.deletedAt != null && fullCount == 0) {
+        continue;
+      }
+      final joined = PlainDate.fromDateTime(
+        DateTime.parse(member.createdAt).toLocal(),
+      );
+      final memberStart = joined.isAfter(today) ? today : joined;
+      if (!memberStart.isAfter(windowStart)) {
+        shares.add(MemberShare(member: member, doneCount: fullCount));
+        continue;
+      }
+      final own = await stats.doneCountsByMember(
+        householdId,
+        windowStart: memberStart,
+        windowEnd: today,
+      );
+      final ownCount = own
+          .where((count) => count.memberId == member.id)
+          .fold(0, (sum, count) => sum + count.doneCount);
+      totalDone -= fullCount - ownCount;
+      shares.add(
+        MemberShare(member: member, doneCount: ownCount, since: memberStart),
+      );
+    }
     final unattributed = countById[null] ?? 0;
     if (unattributed > 0) {
       shares.add(MemberShare(member: null, doneCount: unattributed));
@@ -156,7 +195,7 @@ class StatsService {
       windowEnd: today,
       windowClampedToHouseholdStart: clamped,
       shares: shares,
-      totalDone: counts.fold(0, (sum, count) => sum + count.doneCount),
+      totalDone: totalDone,
       activeChores: [
         for (final rollup in rollups)
           if (rollup.chore.deletedAt == null) rollup,

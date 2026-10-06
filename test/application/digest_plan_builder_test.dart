@@ -106,10 +106,12 @@ void main() {
   DeviceSettings withSettings({
     bool quietHoursEnabled = false,
     bool eveningReminderEnabled = false,
+    bool choreRemindersEnabled = true,
     int? digestMinutes,
   }) => settings.copyWith(
     quietHoursEnabled: quietHoursEnabled,
     eveningReminderEnabled: eveningReminderEnabled,
+    choreRemindersEnabled: choreRemindersEnabled,
     digestMinutes: digestMinutes ?? settings.digestMinutes,
   );
 
@@ -140,6 +142,35 @@ void main() {
     );
     expect(plans, everyElement(isNull));
   });
+
+  test(
+    'each slot carries the titles of the chores it counted (persona review '
+    'E8)',
+    () async {
+      await service.createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await service.createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+      );
+
+      final plans = buildDigestPlans(
+        now: DateTime(2026, 1, 5, 7),
+        settings: settings,
+        pending: await pending(),
+        recipientMemberId: null,
+      );
+
+      expect(plans.first!.titles.toSet(), {'Dishes', 'Bins'});
+      expect(plans.first!.titles, hasLength(2));
+    },
+  );
 
   test('a daily chore fills the whole horizon with "1 due"', () async {
     await service.createChore(
@@ -348,6 +379,41 @@ void main() {
           );
           expect(plans.reminders.first!.occurrenceId, 'o1');
           expect(plans.reminders.skip(1), everyElement(isNull));
+        },
+      );
+
+      test(
+        'the chore-reminders master switch OFF (persona review 2026-10-06 '
+        'E3) arms nothing, and Rule D lets go: the chore the reminder would '
+        "have announced is back in that day's digest count",
+        () {
+          final pendingRows = [
+            row(
+              id: 'o1',
+              dueDate: PlainDate(2026, 8, 30),
+              reminderMinutes: 1080,
+            ),
+          ];
+          final on = buildNotificationPlans(
+            now: DateTime(2026, 8, 30, 6),
+            settings: withSettings(),
+            pending: pendingRows,
+            recipientMemberId: null,
+          );
+          expect(on.reminders.first, isNotNull);
+          // Rule D: the armed reminder takes the chore out of today's digest.
+          expect(on.digest.first?.dueTodayCount ?? 0, 0);
+
+          final off = buildNotificationPlans(
+            now: DateTime(2026, 8, 30, 6),
+            settings: withSettings(choreRemindersEnabled: false),
+            pending: pendingRows,
+            recipientMemberId: null,
+          );
+          expect(off.reminders, everyElement(isNull));
+          expect(off.reminderOverflowCount, 0);
+          expect(off.digest.first, isNotNull);
+          expect(off.digest.first!.dueTodayCount, 1);
         },
       );
 

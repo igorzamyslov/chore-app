@@ -13,14 +13,19 @@ import 'package:intl/intl.dart';
 
 /// A raised card summarizing today's chore-completion progress: an
 /// uppercase locale-formatted date, 'N of M done today', a sub-line ('K
-/// still to go', or a done-for-the-day line when K is 0), an optional
+/// still to go', or a done-for-the-day line when K is 0, plus 'N to catch
+/// up' when overdue occurrences exist), an optional
 /// filter-active line, and a decorative 58dp progress ring.
 ///
-/// **Counting rule (exact)**: [pendingDueOrOverdue] is the count of
-/// still-pending occurrences due today or overdue; [completedToday] is the
-/// count of occurrences with status `done` (never `skipped` -- a skip isn't
-/// "done") closed today. `M` = `pendingDueOrOverdue + completedToday`; `N` =
-/// `completedToday`. **Changed 2026-08-07** (triage T1.1/D3): both figures
+/// **Counting rule (exact)**: [pendingDueToday] is the count of
+/// still-pending occurrences due TODAY; [completedToday] is the count of
+/// occurrences with status `done` (never `skipped` -- a skip isn't "done")
+/// closed today. `M` = `pendingDueToday + completedToday`; `N` =
+/// `completedToday`. **Changed 2026-10-06** (persona review E5): overdue
+/// occurrences are no longer part of `M` -- a returning member would read
+/// "0 of 7 done today" with a 0% ring for work that was never today's.
+/// They are reported separately as [overdueCount] ("N to catch up") on the
+/// sub-line, and never drag the ring. **Changed 2026-08-07** (triage T1.1/D3): both figures
 /// are computed by the caller from the SAME member/category-filtered
 /// collections the chores list screen renders its sections from -- never
 /// the whole household when a filter is active -- so this card and the list
@@ -29,7 +34,8 @@ import 'package:intl/intl.dart';
 /// is never mistaken for the household's whole day.
 ///
 /// The whole card renders as [SizedBox.shrink] when `M == 0` (nothing was
-/// ever on the plate today) -- an empty ring is noise, not signal.
+/// ever on the plate today; an overdue-only pile is just the Overdue
+/// section) -- an empty ring is noise, not signal.
 ///
 /// Semantic id `chores.progress`. The card carries a single [Semantics]
 /// label with the same sentence the visible text already shows (title +
@@ -38,12 +44,13 @@ import 'package:intl/intl.dart';
 /// accessibility tree, so a screen reader announces the sentence exactly
 /// once.
 class ChoreProgressCard extends StatelessWidget {
-  /// Creates the progress card for [completedToday]/[pendingDueOrOverdue]
+  /// Creates the progress card for [completedToday]/[pendingDueToday]
   /// (see the counting rule above), on [today], noting via [filterActive]
   /// whether a member/category filter is currently narrowing those counts.
   const ChoreProgressCard({
     required this.completedToday,
-    required this.pendingDueOrOverdue,
+    required this.pendingDueToday,
+    required this.overdueCount,
     required this.today,
     required this.filterActive,
     super.key,
@@ -53,20 +60,24 @@ class ChoreProgressCard extends StatelessWidget {
   /// both `N` and the "completed today" term added into `M`.
   final int completedToday;
 
-  /// Still-pending occurrences due today or overdue.
-  final int pendingDueOrOverdue;
+  /// Still-pending occurrences due today.
+  final int pendingDueToday;
+
+  /// Still-pending occurrences overdue (due before [today]) -- shown as "N
+  /// to catch up", never counted into the N-of-M figure.
+  final int overdueCount;
 
   /// The current local calendar day, per the app's injected clock.
   final PlainDate today;
 
   /// Whether a member/category filter is active on the chores list right
-  /// now -- when `true`, [completedToday]/[pendingDueOrOverdue] are the
+  /// now -- when `true`, [completedToday]/[pendingDueToday] are the
   /// FILTERED subset, not the whole household's day, and the card says so.
   final bool filterActive;
 
   @override
   Widget build(BuildContext context) {
-    final total = completedToday + pendingDueOrOverdue;
+    final total = completedToday + pendingDueToday;
     if (total == 0) {
       return const SizedBox.shrink();
     }
@@ -87,12 +98,18 @@ class ChoreProgressCard extends StatelessWidget {
     final subline = remaining == 0
         ? l10n.choresProgressAllDoneToday
         : l10n.choresProgressRemainingToday(remaining);
+    final catchUp = overdueCount > 0
+        ? l10n.choresProgressCatchUp(overdueCount)
+        : null;
+    final sublineStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     final filterNote = filterActive ? l10n.choresProgressFilterActive : null;
 
     return semantic(
       'chores.progress',
       child: Semantics(
-        label: [dateNatural, title, subline, ?filterNote].join('. '),
+        label: [dateNatural, title, subline, ?catchUp, ?filterNote].join('. '),
         child: DepthCard(
           shadow: true,
           child: Padding(
@@ -114,11 +131,13 @@ class ChoreProgressCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(title, style: theme.textTheme.titleLarge),
                         const SizedBox(height: 2),
-                        Text(
-                          subline,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            Text(subline, style: sublineStyle),
+                            if (catchUp != null)
+                              Text(catchUp, style: sublineStyle),
+                          ],
                         ),
                         if (filterNote != null) ...[
                           const SizedBox(height: 2),

@@ -227,6 +227,104 @@ void main() {
     },
   );
 
+  group('per-member window clamp (persona review 2026-10-06 E7)', () {
+    test(
+      'a member who joined mid-window starts counting at THEIR join date, '
+      'and says so; an established member does not',
+      () async {
+        await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+        await _member(db, 'anna', 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+        await _member(
+          db,
+          'newbie',
+          'hh',
+          createdAt: '2026-08-05T10:00:00.000Z',
+        );
+        await _chore(db, 'c1', 'hh', title: 'Bathroom');
+        await _done(
+          db,
+          'a1',
+          'c1',
+          closedOn: '2026-07-20',
+          completedBy: 'anna',
+        );
+        // Credited to newbie before the day they joined (an import, or a
+        // device clock that was wrong): outside THEIR window.
+        await _done(
+          db,
+          'n0',
+          'c1',
+          closedOn: '2026-08-01',
+          completedBy: 'newbie',
+        );
+        await _done(
+          db,
+          'n1',
+          'c1',
+          closedOn: '2026-08-06',
+          completedBy: 'newbie',
+        );
+
+        final overview = await serviceAt(
+          DateTime(2026, 8, 11, 9),
+        ).overview('hh');
+
+        final anna = overview.shares.firstWhere((s) => s.member?.id == 'anna');
+        final newbie = overview.shares.firstWhere(
+          (s) => s.member?.id == 'newbie',
+        );
+        expect(anna.since, isNull);
+        expect(anna.doneCount, 1);
+        expect(newbie.since, PlainDate(2026, 8, 5));
+        expect(newbie.doneCount, 1);
+        // The total agrees with the rows it is the sum of.
+        expect(overview.totalDone, 2);
+        // The window itself is unchanged: it is the household's.
+        expect(overview.windowStart, PlainDate(2026, 7, 13));
+      },
+    );
+
+    test(
+      'a member created on a young household\u2019s own first day is not '
+      'marked "since" anything',
+      () async {
+        await _household(db, 'hh', createdAt: '2026-08-09T10:00:00.000Z');
+        await _member(db, 'anna', 'hh', createdAt: '2026-08-09T10:00:00.000Z');
+
+        final overview = await serviceAt(
+          DateTime(2026, 8, 11, 9),
+        ).overview('hh');
+
+        expect(overview.windowClampedToHouseholdStart, isTrue);
+        expect(overview.shares.single.since, isNull);
+      },
+    );
+
+    test(
+      'a member whose created_at is in the future never inverts their window',
+      () async {
+        await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
+        await _member(db, 'ahead', 'hh', createdAt: '2026-09-20T10:00:00.000Z');
+        await _chore(db, 'c1', 'hh', title: 'Bathroom');
+        await _done(
+          db,
+          'o1',
+          'c1',
+          closedOn: '2026-08-11',
+          completedBy: 'ahead',
+        );
+
+        final overview = await serviceAt(
+          DateTime(2026, 8, 11, 9),
+        ).overview('hh');
+
+        final share = overview.shares.single;
+        expect(share.since, PlainDate(2026, 8, 11));
+        expect(share.doneCount, 1);
+      },
+    );
+  });
+
   test('chores split into active and deleted, each alphabetical', () async {
     await _household(db, 'hh', createdAt: '2026-01-01T10:00:00.000Z');
     await _chore(db, 'a', 'hh', title: 'Bathroom');

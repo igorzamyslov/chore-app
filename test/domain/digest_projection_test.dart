@@ -78,6 +78,68 @@ void main() {
   });
 
   group('projectDigestCounts', () {
+    test(
+      'carries the counted chore titles, due-on-the-day first and then '
+      'overdue, each group in input order (persona review E8)',
+      () {
+        final counts = projectDigestCounts(
+          occurrences: [
+            _occurrence(
+              id: 'o1',
+              choreTitle: 'Old bins',
+              dueDate: PlainDate(2026, 1, 2),
+            ),
+            _occurrence(
+              id: 'o2',
+              choreTitle: 'Dishes',
+              dueDate: PlainDate(2026, 1, 6),
+            ),
+            _occurrence(
+              id: 'o3',
+              choreTitle: 'Laundry',
+              dueDate: PlainDate(2026, 1, 6),
+            ),
+            _occurrence(
+              id: 'o4',
+              choreTitle: 'Later',
+              dueDate: PlainDate(2026, 1, 20),
+            ),
+          ],
+          date: PlainDate(2026, 1, 6),
+          recipientMemberId: null,
+        );
+        expect(counts.titles, ['Dishes', 'Laundry', 'Old bins']);
+      },
+    );
+
+    test('titles follow the same scoping and Rule D as the counts', () {
+      final counts = projectDigestCounts(
+        occurrences: [
+          _occurrence(
+            id: 'mine',
+            choreTitle: 'Mine',
+            dueDate: PlainDate(2026, 1, 6),
+            assignedMemberId: 'me',
+          ),
+          _occurrence(
+            id: 'theirs',
+            choreTitle: 'Theirs',
+            dueDate: PlainDate(2026, 1, 6),
+            assignedMemberId: 'partner',
+          ),
+          _occurrence(
+            id: 'rung',
+            choreTitle: 'Rung',
+            dueDate: PlainDate(2026, 1, 6),
+          ),
+        ],
+        date: PlainDate(2026, 1, 6),
+        recipientMemberId: 'me',
+        armedReminderDates: {'rung': PlainDate(2026, 1, 6)},
+      );
+      expect(counts.titles, ['Mine']);
+    });
+
     test('splits due-on-the-day from overdue-before-it', () {
       final counts = projectDigestCounts(
         occurrences: [

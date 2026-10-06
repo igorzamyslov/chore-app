@@ -65,6 +65,20 @@ class StatsShareCard extends StatelessWidget {
     String nameOf(MemberShare share) =>
         share.member?.name ?? l10n.statsShareUnknownMember;
 
+    // E7 (persona review 2026-10-06): "since {date}" for a member whose own
+    // window starts later than the card's, else null.
+    String? sinceOf(MemberShare share) {
+      final since = share.since;
+      if (since == null) {
+        return null;
+      }
+      return l10n.statsSince(
+        DateFormat.MMMMd(
+          localeName,
+        ).format(DateTime(since.year, since.month, since.day)),
+      );
+    }
+
     // Extracted rather than inlined into the row below: at four levels of
     // widget nesting the interpolation runs past the 80-column limit, and
     // `dart format` cannot break a string literal to fix it.
@@ -79,7 +93,11 @@ class StatsShareCard extends StatelessWidget {
         label: [
           windowLabel,
           totalLabel,
-          for (final share in shares) '${nameOf(share)}: ${share.doneCount}',
+          for (final share in shares)
+            [
+              '${nameOf(share)}: ${share.doneCount}',
+              ?sinceOf(share),
+            ].join(', '),
         ].join('. '),
         child: ExcludeSemantics(
           child: DepthCard(
@@ -137,9 +155,21 @@ class StatsShareCard extends StatelessWidget {
                             ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              nameOf(share),
-                              style: theme.textTheme.bodyLarge,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  nameOf(share),
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                if (sinceOf(share) case final since?)
+                                  Text(
+                                    since,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           Text(

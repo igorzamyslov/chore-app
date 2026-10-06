@@ -64,7 +64,7 @@ tags:
 # Settle proof (README convention 6) BEFORE tapping the header: the
 # Done-today section animates in after a complete, and its final header
 # text doubles as the "exactly one closed" assertion.
-- assertVisible: "Done today (1)"
+- assertVisible: "Done recently (1)"
 - tapOn:
     id: "chores.done.header"
 # Exactly one still-pending tile (the untouched sibling) AND the Done-today

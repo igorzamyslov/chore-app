@@ -156,7 +156,7 @@ class TodayNotifier extends Notifier<PlainDate> {
   /// A no-op when the calendar day hasn't actually changed: this is called
   /// on every app resume, and an unguarded write would re-subscribe every
   /// drift stream watching [todayProvider] (notably
-  /// [closedTodayOccurrencesProvider]) each time the user so much as
+  /// [closedRecentlyOccurrencesProvider]) each time the user so much as
   /// glances at another app.
   void refresh() {
     final today = PlainDate.fromDateTime(ref.read(clockProvider).now());
@@ -916,15 +916,22 @@ final pendingOccurrencesProvider = StreamProvider<List<OccurrenceWithChore>>((
       );
 });
 
-/// Occurrences of the bootstrap household closed (done or skipped) today,
+/// How many days back the chores list's "Done recently" section reaches:
+/// rows closed on `today - doneRecentlyDays` or later (persona review
+/// 2026-10-06 E9 — "the last 3 days").
+const doneRecentlyDays = 3;
+
+/// Occurrences of the bootstrap household closed (done or skipped) in the
+/// last [doneRecentlyDays] days up to and including today, newest day first,
 /// each joined with its chore, category, assigned member, and completer.
 ///
-/// Backs the chores list's collapsed 'Done today' section (spec
-/// `docs/specs/ux-round-2.md` A3).
+/// Backs the chores list's collapsed "Done recently" section (spec
+/// `docs/specs/ux-round-2.md` A3, widened from today-only by persona review
+/// 2026-10-06 E9 so a mis-tap from last night is still visible).
 ///
 /// Rebuilds at local midnight: the date comes from [todayProvider], not
 /// from a one-shot [clockProvider] read (backlog A-2 / audit P1).
-final closedTodayOccurrencesProvider =
+final closedRecentlyOccurrencesProvider =
     StreamProvider<List<ClosedOccurrenceWithChore>>((ref) async* {
       // Watched BEFORE the await, deliberately: a `ref.watch` placed after
       // an await registers its dependency late, and on the welcome gate
@@ -935,7 +942,7 @@ final closedTodayOccurrencesProvider =
       final householdId = await ref.watch(bootstrapProvider.future);
       yield* ref
           .watch(choreRepositoryProvider)
-          .watchClosedOnDate(householdId, today);
+          .watchClosedSince(householdId, today.addDays(-doneRecentlyDays));
     });
 
 /// Paused chores of the bootstrap household, each joined with its ordered
@@ -1726,7 +1733,7 @@ class NotificationActionSignalController {
     // pre-completion rows to whatever screen is open.
     _ref
       ..invalidate(pendingOccurrencesProvider)
-      ..invalidate(closedTodayOccurrencesProvider);
+      ..invalidate(closedRecentlyOccurrencesProvider);
     // `invalidate` does not synchronously deliver a fresh value, so THIS
     // recompute may well read pre-invalidation data. That is fine and is not a
     // race worth fixing: `DigestRescheduleController` already

@@ -295,6 +295,10 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   }
 }
 
+/// How long the Settings tab's attention dot lives after the digest
+/// pre-prompt was shown (persona review 2026-10-06 E3).
+const _attentionBadgeLifetime = Duration(days: 7);
+
 class _BottomTabBar extends ConsumerWidget {
   const _BottomTabBar({required this.selected, required this.onSelected});
 
@@ -328,11 +332,22 @@ class _BottomTabBar extends ConsumerWidget {
     // it for the sake of a dot.
     final settings = ref.watch(settingsProvider).valueOrNull;
     final permissionGranted = ref.watch(notificationPermissionGrantedProvider);
+    //
+    // Persona review 2026-10-06 E3: it also expires. A week after the
+    // pre-prompt the dot has had its chance; a reluctant user reads a
+    // permanent dot as nagging. The Settings sub-line keeps stating the
+    // fact for anyone who goes looking.
+    final shownAt = DateTime.tryParse(settings?.digestPrepromptShownAt ?? '');
+    final badgeExpired =
+        shownAt != null &&
+        ref.watch(clockProvider).now().difference(shownAt) >
+            _attentionBadgeLifetime;
     final showAttentionBadge =
         settings != null &&
         settings.digestEnabled &&
         !permissionGranted &&
-        settings.digestPrepromptShownAt != null;
+        settings.digestPrepromptShownAt != null &&
+        !badgeExpired;
 
     return Container(
       // A 1px top hairline (spec docs/specs/theme-v2.md §4.5) sits on this

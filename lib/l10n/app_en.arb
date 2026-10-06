@@ -95,6 +95,16 @@
       }
     }
   },
+  "digestMoreCount": " and {count} more",
+  "@digestMoreCount": {
+    "description": "Suffix appended to the daily-summary notification body after the first three chore titles when more chores than that are waiting (persona review 2026-10-06 E8): 'Dishes, Bins, Laundry and 2 more'. The leading space is part of the string: it is concatenated directly after the last title.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "notificationActionDone": "Done",
   "@notificationActionDone": {
     "description": "Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows."
@@ -273,6 +283,20 @@
   "@choresFilterMemberAll": {
     "description": "Member-filter menu entry that resets the filter to show every member's chores."
   },
+  "choresFilterYou": "{name} (you)",
+  "@choresFilterYou": {
+    "description": "Member-filter menu entry for the member this device acts as (the claimed member when signed in, else the app-bar member), shown only in a household of more than one so the person holding the phone can find their own name. Persona review 2026-10-06 E1.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Leon"
+      }
+    }
+  },
+  "choresAssigneeAnyone": "Anyone",
+  "@choresAssigneeAnyone": {
+    "description": "Chip on a chore tile with no assignee, in the place where the assignee's avatar and name would be. The member filter keeps these tiles (anyone may do them, and the daily summary counts them for every member). Persona review 2026-10-06 E1."
+  },
   "choresFilterCategoryTooltip": "Filter by category",
   "@choresFilterCategoryTooltip": {
     "description": "Tooltip for the chores list's category-filter button."
@@ -310,9 +334,9 @@
     "description": "Final row of the acting-member switcher sheet (spec docs/feedback/2026-08-01-ux-audit.md B2), pushing the Members management screen."
   },
 
-  "choresEmptyState": "No chores pending — nice work!",
+  "choresEmptyState": "Nothing left for today.",
   "@choresEmptyState": {
-    "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done')."
+    "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done'). Plain statement, no praise: a teenager read the old 'nice work' as patronising (persona review 2026-10-06 E5)."
   },
   "choresEmptyDoneHeadline": "All done for today",
   "@choresEmptyDoneHeadline": {
@@ -363,9 +387,19 @@
       }
     }
   },
-  "choresProgressAllDoneToday": "That's everything — nice work",
+  "choresProgressAllDoneToday": "That's everything for today.",
   "@choresProgressAllDoneToday": {
-    "description": "Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed."
+    "description": "Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5)."
+  },
+  "choresProgressCatchUp": "{count} to catch up",
+  "@choresProgressCatchUp": {
+    "description": "Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
   },
   "choresProgressFilterActive": "Filtered — not the whole household",
   "@choresProgressFilterActive": {
@@ -443,15 +477,9 @@
     "description": "Digest pre-prompt banner's dismiss action: marks it shown without requesting the OS permission (the digest stays enabled but silent until permission arrives via Settings)."
   },
 
-  "catchUpBannerMessage": "{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}",
+  "catchUpBannerMessage": "Your repeating chores jumped ahead to their latest due date — you didn't miss anything extra.",
   "@catchUpBannerMessage": {
-    "description": "Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "example": "3"
-      }
-    }
+    "description": "Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Reworded 2026-10-06 (persona review E2) from the mechanism ('moved forward' reads as earlier OR later) to the outcome the reader cares about: the repeating chores now sit on their latest due date and nothing extra counts against them. Still avoids 'missed' as an accusation and any claim the user was away, since catch-up also runs on a local day change with the app open. No count: the sentence reads the same for one chore or many, and the banner covers fewer chores than a count would imply."
   },
   "catchUpBannerDismissTooltip": "Dismiss",
   "@catchUpBannerDismissTooltip": {
@@ -514,15 +542,23 @@
     "description": "Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either."
   },
 
-  "choresDoneHeader": "{count, plural, one{Done today (1)} other{Done today ({count})}}",
-  "@choresDoneHeader": {
-    "description": "Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.",
+  "choresDoneRecently": "Done recently ({count})",
+  "@choresDoneRecently": {
+    "description": "Header of the chores list's collapsed Done section (replaces 'Done today ({count})', persona review 2026-10-06 E9): occurrences closed (done or skipped) in the last three days, so a mis-tap from last night can still be found. {count} is how many rows it holds.",
     "placeholders": {
       "count": {
         "type": "int",
-        "example": "2"
+        "example": "3"
       }
     }
+  },
+  "choresDoneDayToday": "Today",
+  "@choresDoneDayToday": {
+    "description": "Day label on a Done-section row closed today. The section spans several days, so each row names its own (persona review 2026-10-06 E9)."
+  },
+  "choresDoneDayYesterday": "Yesterday",
+  "@choresDoneDayYesterday": {
+    "description": "Day label on a Done-section row closed yesterday. Older rows show the weekday name, formatted by the locale."
   },
   "choresDoneStatusDone": "Done",
   "@choresDoneStatusDone": {
@@ -531,6 +567,10 @@
   "choresDoneStatusSkipped": "Skipped",
   "@choresDoneStatusSkipped": {
     "description": "Done-today section row marker for an occurrence that was skipped, as opposed to completed."
+  },
+  "choresDoneEarly": "Done early",
+  "@choresDoneEarly": {
+    "description": "Small tag on a done row in the chores list's Done section when the occurrence was completed before its due date (closed on a day earlier than the due date). Neutral wording, no judgement: completing early is allowed and credited, the tag only keeps an early tick distinguishable from an on-time one (persona review 2026-10-06 E6)."
   },
   "choresDoneClosedByLabel": "by {name}",
   "@choresDoneClosedByLabel": {
@@ -545,6 +585,28 @@
   "choresDoneReopen": "Reopen",
   "@choresDoneReopen": {
     "description": "Done-today section row action: undoes the close and restores the occurrence to pending, via ChoreService.reopenOccurrence."
+  },
+  "choresReopenedSnackbar": "Reopened",
+  "@choresReopenedSnackbar": {
+    "description": "Snackbar confirming that Reopen on a row of the Done section put the occurrence back on the list. Reopen used to be silent (persona review 2026-10-06 E6)."
+  },
+  "choresReopenOthersTitle": "Reopen {name}'s completion?",
+  "@choresReopenOthersTitle": {
+    "description": "Title of the confirmation shown when Reopen is tapped on a done row whose completion is credited to a member other than the one using this device. {name} is the member who completed it.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "choresReopenOthersBody": "This removes it from their history.",
+  "@choresReopenOthersBody": {
+    "description": "Body of the reopen-someone-else's-completion confirmation: says what is lost (the credit in that member's chore history), so the person does not wipe somebody's credit by accident."
+  },
+  "choresReopenOthersConfirm": "Reopen",
+  "@choresReopenOthersConfirm": {
+    "description": "Confirm button of the reopen-someone-else's-completion dialog."
   },
 
   "choresPausedHeader": "{count, plural, one{Paused (1)} other{Paused ({count})}}",
@@ -1017,17 +1079,17 @@
     "description": "Label of the chore form's start-date field."
   },
 
-  "choreFormReminderToggle": "Remind me about this chore",
+  "choreFormReminderToggle": "Remind whoever it's assigned to",
   "@choreFormReminderToggle": {
-    "description": "Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver."
+    "description": "Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Reworded 2026-10-06 (persona review B9) from 'Remind me about this chore': the reminder is a property of the shared chore and rings on the phone of whoever it is assigned to (or of everyone, when unassigned), so it must not read as a personal setting of the person editing the form. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver."
   },
   "choreFormReminderTime": "Reminder time",
   "@choreFormReminderTime": {
     "description": "Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over."
   },
-  "choreFormReminderHint": "This chore won't be counted in the daily summary",
+  "choreFormReminderHint": "Rings on their phone at this time. That day's daily summary leaves this chore out.",
   "@choreFormReminderHint": {
-    "description": "Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding."
+    "description": "Sub-line under the chore form's reminder time card. Says whose phone rings ('their': whoever the chore is assigned to) and explains Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Reworded 2026-10-06 (persona review B9); the copy is quoted verbatim in the spec's §11 amendment and is binding."
   },
 
   "shoppingEmptyState": "Shopping list is empty",
@@ -1243,6 +1305,10 @@
   "settingsEveningToggleSubtitle": "Only if something is still open today",
   "@settingsEveningToggleSubtitle": {
     "description": "BINDING COPY -- spec docs/specs/notifications-n2.md §5.1 and §11 fix this string verbatim. Permanent sub-line under settingsEveningToggle, shown whether the switch is on or off, stating the condition in the same register as the label: the evening notification only fires when at least one chore is due TODAY and still open (overdue ones never count, decision D6, which is what makes it impossible to receive two evenings running about the same chore)."
+  },
+  "settingsChoreRemindersTitle": "Chore reminders",
+  "@settingsChoreRemindersTitle": {
+    "description": "Label of the device-level master switch for per-chore reminders, in Settings' notifications group (persona review 2026-10-06 E3). Off means no chore reminder rings on THIS phone, whatever the chores say; the daily summary and the evening reminder have their own switches. Ships on, since reminders are opt-in per chore already."
   },
   "settingsEveningTime": "Evening time",
   "@settingsEveningTime": {
@@ -2167,6 +2233,16 @@
       "date": {
         "type": "String",
         "example": "9 August"
+      }
+    }
+  },
+  "statsSince": "since {date}",
+  "@statsSince": {
+    "description": "Small line under a member's name on the chore-history share card when that member joined partway through the 30-day window (persona review 2026-10-06 E7): their own window starts at the day they joined, so a low count reads as 'just arrived', not 'does nothing'. {date} is a locale-formatted month and day.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "August 6"
       }
     }
   },

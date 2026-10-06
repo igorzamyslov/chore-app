@@ -241,8 +241,9 @@ class ReminderPlan {
 class ReminderPlanResult {
   /// Creates a result.
   ///
-  /// Built at exactly one place -- see [planReminders] -- so [armed] and
-  /// [overflowCount] cannot disagree.
+  /// Built only by [planReminders] -- its ceiling truncation, or its
+  /// master-switch-off early return, which is empty on both counts -- so
+  /// [armed] and [overflowCount] cannot disagree.
   const ReminderPlanResult({required this.armed, required this.overflowCount});
 
   /// The reminders to arm, in fire-moment order, at most [reminderCeiling]
@@ -291,7 +292,15 @@ class ReminderPlanResult {
 /// [snoozedUntilByOccurrenceId] holds UTC instants (as stored by
 /// `ReminderSnoozeRepository`); they are converted to local before any
 /// comparison, because every other moment here is device-local.
+///
+/// [enabled] is the device's "Chore reminders" master switch
+/// (`Settings.choreRemindersEnabled`, persona review 2026-10-06 E3): when
+/// `false` NOTHING is armed and nothing overflows, so Rule D (§2.4) has an
+/// empty armed set to read and the digest reports every chore again -- a
+/// device that muted reminders must not also lose those chores from its
+/// summary.
 ReminderPlanResult planReminders({
+  required bool enabled,
   required DateTime now,
   required Iterable<ProjectedOccurrence> occurrences,
   required String? recipientMemberId,
@@ -300,6 +309,9 @@ ReminderPlanResult planReminders({
   required int quietStartMinutes,
   required int quietEndMinutes,
 }) {
+  if (!enabled) {
+    return const ReminderPlanResult(armed: [], overflowCount: 0);
+  }
   final today = PlainDate.fromDateTime(now);
   final windowEnd = today.addDays(reminderArmWindowDays);
   final eligible = <ReminderPlan>[];

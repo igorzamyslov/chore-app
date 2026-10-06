@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
   String notificationDigestBoth(int dueCount, int overdueCount);
 
+  /// Suffix appended to the daily-summary notification body after the first three chore titles when more chores than that are waiting (persona review 2026-10-06 E8): 'Dishes, Bins, Laundry and 2 more'. The leading space is part of the string: it is concatenated directly after the last title.
+  ///
+  /// In en, this message translates to:
+  /// **' and {count} more'**
+  String digestMoreCount(int count);
+
   /// Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows.
   ///
   /// In en, this message translates to:
@@ -410,6 +416,18 @@ abstract class AppLocalizations {
   /// **'All members'**
   String get choresFilterMemberAll;
 
+  /// Member-filter menu entry for the member this device acts as (the claimed member when signed in, else the app-bar member), shown only in a household of more than one so the person holding the phone can find their own name. Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (you)'**
+  String choresFilterYou(String name);
+
+  /// Chip on a chore tile with no assignee, in the place where the assignee's avatar and name would be. The member filter keeps these tiles (anyone may do them, and the daily summary counts them for every member). Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone'**
+  String get choresAssigneeAnyone;
+
   /// Tooltip for the chores list's category-filter button.
   ///
   /// In en, this message translates to:
@@ -458,10 +476,10 @@ abstract class AppLocalizations {
   /// **'Manage members'**
   String get actingManageMembers;
 
-  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done').
+  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done'). Plain statement, no praise: a teenager read the old 'nice work' as patronising (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'No chores pending — nice work!'**
+  /// **'Nothing left for today.'**
   String get choresEmptyState;
 
   /// Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyState when the household has chores but none are currently pending.
@@ -512,11 +530,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
   String choresProgressRemainingToday(int count);
 
-  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed.
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'That\'s everything — nice work'**
+  /// **'That\'s everything for today.'**
   String get choresProgressAllDoneToday;
+
+  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} to catch up'**
+  String choresProgressCatchUp(int count);
 
   /// Day-progress card's extra bodySmall line (spec docs/specs/theme-v2.md §4.1 item 1, changed 2026-08-07 per triage T1.1/D3), shown only while a member/category filter is active on the chores list: makes explicit that the card's N-of-M counts are the filtered subset, not the whole household's day, so a narrowed '1 of 2' is never mistaken for everyone's progress.
   ///
@@ -626,11 +650,11 @@ abstract class AppLocalizations {
   /// **'Not now'**
   String get digestPrepromptDismissAction;
 
-  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.
+  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Reworded 2026-10-06 (persona review E2) from the mechanism ('moved forward' reads as earlier OR later) to the outcome the reader cares about: the repeating chores now sit on their latest due date and nothing extra counts against them. Still avoids 'missed' as an accusation and any claim the user was away, since catch-up also runs on a local day change with the app open. No count: the sentence reads the same for one chore or many, and the banner covers fewer chores than a count would imply.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}'**
-  String catchUpBannerMessage(int count);
+  /// **'Your repeating chores jumped ahead to their latest due date — you didn\'t miss anything extra.'**
+  String get catchUpBannerMessage;
 
   /// Tooltip for the catch-up banner's X dismiss button, which resets the count so the banner hides until a genuinely new catch-up run reports one.
   ///
@@ -692,11 +716,23 @@ abstract class AppLocalizations {
   /// **'This device doesn\'t know who you are yet. Sign in again or reopen the app.'**
   String get choresSnackbarNoActingMember;
 
-  /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
+  /// Header of the chores list's collapsed Done section (replaces 'Done today ({count})', persona review 2026-10-06 E9): occurrences closed (done or skipped) in the last three days, so a mis-tap from last night can still be found. {count} is how many rows it holds.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{Done today (1)} other{Done today ({count})}}'**
-  String choresDoneHeader(int count);
+  /// **'Done recently ({count})'**
+  String choresDoneRecently(int count);
+
+  /// Day label on a Done-section row closed today. The section spans several days, so each row names its own (persona review 2026-10-06 E9).
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get choresDoneDayToday;
+
+  /// Day label on a Done-section row closed yesterday. Older rows show the weekday name, formatted by the locale.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get choresDoneDayYesterday;
 
   /// Done-today section row marker for an occurrence that was completed, as opposed to skipped.
   ///
@@ -710,6 +746,12 @@ abstract class AppLocalizations {
   /// **'Skipped'**
   String get choresDoneStatusSkipped;
 
+  /// Small tag on a done row in the chores list's Done section when the occurrence was completed before its due date (closed on a day earlier than the due date). Neutral wording, no judgement: completing early is allowed and credited, the tag only keeps an early tick distinguishable from an on-time one (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Done early'**
+  String get choresDoneEarly;
+
   /// Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).
   ///
   /// In en, this message translates to:
@@ -721,6 +763,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reopen'**
   String get choresDoneReopen;
+
+  /// Snackbar confirming that Reopen on a row of the Done section put the occurrence back on the list. Reopen used to be silent (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Reopened'**
+  String get choresReopenedSnackbar;
+
+  /// Title of the confirmation shown when Reopen is tapped on a done row whose completion is credited to a member other than the one using this device. {name} is the member who completed it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen {name}\'s completion?'**
+  String choresReopenOthersTitle(String name);
+
+  /// Body of the reopen-someone-else's-completion confirmation: says what is lost (the credit in that member's chore history), so the person does not wipe somebody's credit by accident.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes it from their history.'**
+  String get choresReopenOthersBody;
+
+  /// Confirm button of the reopen-someone-else's-completion dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get choresReopenOthersConfirm;
 
   /// Header of the collapsed-by-default 'Paused' section, showing how many chores are paused.
   ///
@@ -1184,10 +1250,10 @@ abstract class AppLocalizations {
   /// **'Start date'**
   String get choreFormStartDateLabel;
 
-  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
+  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Reworded 2026-10-06 (persona review B9) from 'Remind me about this chore': the reminder is a property of the shared chore and rings on the phone of whoever it is assigned to (or of everyone, when unassigned), so it must not read as a personal setting of the person editing the form. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
   ///
   /// In en, this message translates to:
-  /// **'Remind me about this chore'**
+  /// **'Remind whoever it\'s assigned to'**
   String get choreFormReminderToggle;
 
   /// Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over.
@@ -1196,10 +1262,10 @@ abstract class AppLocalizations {
   /// **'Reminder time'**
   String get choreFormReminderTime;
 
-  /// Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding.
+  /// Sub-line under the chore form's reminder time card. Says whose phone rings ('their': whoever the chore is assigned to) and explains Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Reworded 2026-10-06 (persona review B9); the copy is quoted verbatim in the spec's §11 amendment and is binding.
   ///
   /// In en, this message translates to:
-  /// **'This chore won\'t be counted in the daily summary'**
+  /// **'Rings on their phone at this time. That day\'s daily summary leaves this chore out.'**
   String get choreFormReminderHint;
 
   /// Shopping list empty-state message, shown when there are no items at all.
@@ -1423,6 +1489,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only if something is still open today'**
   String get settingsEveningToggleSubtitle;
+
+  /// Label of the device-level master switch for per-chore reminders, in Settings' notifications group (persona review 2026-10-06 E3). Off means no chore reminder rings on THIS phone, whatever the chores say; the daily summary and the evening reminder have their own switches. Ships on, since reminders are opt-in per chore already.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore reminders'**
+  String get settingsChoreRemindersTitle;
 
   /// Title of the settings row holding the evening re-reminder's fire time, revealed under settingsEveningToggle. Shows the chosen time as trailing text via TimeOfDay.format and opens a time picker on tap. Default 20:00, which sits an hour clear of the 22:00 quiet-hours default so the shipped combination does not collide.
   ///
@@ -2509,6 +2581,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Since you started, {date}'**
   String statsWindowSinceStart(String date);
+
+  /// Small line under a member's name on the chore-history share card when that member joined partway through the 30-day window (persona review 2026-10-06 E7): their own window starts at the day they joined, so a low count reads as 'just arrived', not 'does nothing'. {date} is a locale-formatted month and day.
+  ///
+  /// In en, this message translates to:
+  /// **'since {date}'**
+  String statsSince(String date);
 
   /// Total completions in the share window; also the single-member household's replacement for the whole share card.
   ///

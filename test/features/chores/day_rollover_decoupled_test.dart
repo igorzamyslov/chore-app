@@ -1,10 +1,10 @@
 /// A regression test that decouples `ChoresListScreen`'s direct
 /// `ref.watch(todayProvider)` (backlog A-2 / audit P1) from
-/// `closedTodayOccurrencesProvider`'s OWN dependency on [todayProvider].
+/// `closedRecentlyOccurrencesProvider`'s OWN dependency on [todayProvider].
 ///
 /// Both providers watch `todayProvider`, so
 /// `test/features/chores/day_rollover_widget_test.dart` -- which leaves
-/// `closedTodayOccurrencesProvider` live -- cannot tell "the list re-buckets
+/// `closedRecentlyOccurrencesProvider` live -- cannot tell "the list re-buckets
 /// because it reads today itself"
 /// apart from "the list rebuilds only because its sibling stream provider
 /// happened to rebuild for its own, unrelated reason". A reviewer confirmed
@@ -12,11 +12,12 @@
 /// `todayProvider` watch to a one-shot `clockProvider.now()` read leaves the
 /// full suite green -- proof the existing coverage was masking exactly this.
 ///
-/// This test overrides `closedTodayOccurrencesProvider` with a FIXED, one-shot
-/// empty stream that never depends on [todayProvider] at all, so it can never
-/// rebuild `ChoresListScreen` on its own. With no chore ever completed today,
-/// there is nothing for that section to show either way, so the override
-/// changes nothing observable except removing the masking dependency.
+/// This test overrides `closedRecentlyOccurrencesProvider` with a FIXED,
+/// one-shot empty stream that never depends on [todayProvider] at all, so it
+/// can never rebuild `ChoresListScreen` on its own. With no chore ever
+/// completed today, there is nothing for that section to show either way, so
+/// the override changes nothing observable except removing the masking
+/// dependency.
 library;
 
 import 'package:chore_app/app/app.dart';
@@ -37,7 +38,7 @@ void main() {
   var currentTime = DateTime(2026, 1, 5, 9);
 
   testChoreApp(
-    'with closedTodayOccurrencesProvider held fixed (so it cannot mask the '
+    'with closedRecentlyOccurrencesProvider held fixed (so it cannot mask the '
     'effect), crossing local midnight still re-buckets Tomorrow into Today',
     today: DateTime(2026, 1, 5, 9),
     clock: Clock(() => currentTime),
@@ -46,7 +47,7 @@ void main() {
       // depends on -- and never rebuilds in response to -- todayProvider.
       // Any re-bucketing observed below can therefore only come from
       // ChoresListScreen's own direct todayProvider watch.
-      closedTodayOccurrencesProvider.overrideWith(
+      closedRecentlyOccurrencesProvider.overrideWith(
         (ref) => Stream.value(const []),
       ),
     ],

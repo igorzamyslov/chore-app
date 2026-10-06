@@ -4,7 +4,7 @@
 /// changed something.
 ///
 /// Also covers what the same two triggers do for the UI's notion of the
-/// date — [todayProvider] and the [closedTodayOccurrencesProvider] rebuild
+/// date — [todayProvider] and the [closedRecentlyOccurrencesProvider] rebuild
 /// that hangs off it (backlog A-2 / audit P1).
 ///
 /// Same approach as `test/app/digest_reschedule_test.dart`: the real
@@ -481,10 +481,10 @@ void main() {
     );
   });
 
-  group('closedTodayOccurrencesProvider', () {
+  group('closedRecentlyOccurrencesProvider', () {
     testWidgets(
-      'empties when the calendar day rolls over: a completion made '
-      'yesterday is no longer "closed today"',
+      'keeps a completion for three days after the calendar day rolls over, '
+      'then lets it go (E9: "Done recently" reaches back three days)',
       (tester) async {
         var currentTime = DateTime(2026, 1, 5, 9);
         final database = AppDatabase(NativeDatabase.memory());
@@ -512,24 +512,39 @@ void main() {
         await service.completeOccurrence(pending!.id, completedBy: me.id);
 
         // A StreamProvider only runs while something listens to it.
-        container.listen(closedTodayOccurrencesProvider, (_, _) {});
+        container.listen(closedRecentlyOccurrencesProvider, (_, _) {});
         await _pumpUntil(
           tester,
           () async =>
-              container.read(closedTodayOccurrencesProvider).value?.length == 1,
+              container.read(closedRecentlyOccurrencesProvider).value?.length ==
+              1,
         );
 
         // Midnight passes. Nothing else changes in the database at all.
+        // Yesterday's completion is still inside the three-day window.
         currentTime = DateTime(2026, 1, 6, 0, 0, 1);
         container.read(todayProvider.notifier).refresh();
+        for (var i = 0; i < 20; i++) {
+          await tester.pump(const Duration(milliseconds: 5));
+        }
+        expect(
+          container.read(closedRecentlyOccurrencesProvider).value,
+          hasLength(1),
+        );
 
-        // The provider re-subscribes against the new date; until its new
-        // stream emits, Riverpod keeps serving the previous value, which is
-        // exactly what _pumpUntil is for.
+        // Four days on, the close (Jan 5) falls before the window start
+        // (Jan 6). The provider re-subscribes against the new date; until
+        // its new stream emits, Riverpod keeps serving the previous value,
+        // which is exactly what _pumpUntil is for.
+        currentTime = DateTime(2026, 1, 9, 0, 0, 1);
+        container.read(todayProvider.notifier).refresh();
         await _pumpUntil(
           tester,
           () async =>
-              container.read(closedTodayOccurrencesProvider).value?.isEmpty ??
+              container
+                  .read(closedRecentlyOccurrencesProvider)
+                  .value
+                  ?.isEmpty ??
               false,
         );
 

@@ -88,6 +88,25 @@ attributed to `completed_by`.
   lexicographically and the window is a plain string range — no date parsing in
   SQL.
 
+> **Amendment 2026-10-06 (persona review E7, Leon A10; plan
+> `docs/plans/2026-10-06-persona-review-fixes.md` W4) — per-member clamp.**
+> The household clamp above is not enough on its own: someone who joined last
+> week is still measured against a month they were not here for and reads as
+> "0%" beside the person who has been here all along. `StatsService.overview`
+> therefore ALSO clamps each roster member's own window start to
+> `max(windowStart, member.created_at)` (their creation instant converted to a
+> local calendar date, floored at today like the household start, so it can
+> never invert). A member whose clamped start is later than the overview's
+> `windowStart` is counted over `[their start, today]` — the service re-reads
+> `doneCountsByMember` for that range and takes their row — and the card says so
+> with `MemberShare.since` and the line `statsSince` ("since {date}" / "seit
+> {date}") under their name. The overview's `windowStart`, the window label and
+> `totalDone` stay consistent: `totalDone` is the sum of what the rows show
+> (every clamp reduction is subtracted from it). Departed members and the
+> "Someone else" bucket keep the full window. Still no sorting, no ranking and
+> no per-member drill-down (§0 rules 2 and 5): the clamp changes whose zero is
+> read as "just arrived", nothing else.
+
 ### 2.3 Query shape and scale
 
 Occurrence history grows unbounded by design (`lib/data/db/tables.dart`:

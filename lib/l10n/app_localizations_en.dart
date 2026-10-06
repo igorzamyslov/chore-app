@@ -97,6 +97,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String digestMoreCount(int count) {
+    return ' and $count more';
+  }
+
+  @override
   String get notificationActionDone => 'Done';
 
   @override
@@ -229,6 +234,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresFilterMemberAll => 'All members';
 
   @override
+  String choresFilterYou(String name) {
+    return '$name (you)';
+  }
+
+  @override
+  String get choresAssigneeAnyone => 'Anyone';
+
+  @override
   String get choresFilterCategoryTooltip => 'Filter by category';
 
   @override
@@ -256,7 +269,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actingManageMembers => 'Manage members';
 
   @override
-  String get choresEmptyState => 'No chores pending — nice work!';
+  String get choresEmptyState => 'Nothing left for today.';
 
   @override
   String get choresEmptyDoneHeadline => 'All done for today';
@@ -293,7 +306,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get choresProgressAllDoneToday => 'That\'s everything — nice work';
+  String get choresProgressAllDoneToday => 'That\'s everything for today.';
+
+  @override
+  String choresProgressCatchUp(int count) {
+    return '$count to catch up';
+  }
 
   @override
   String get choresProgressFilterActive => 'Filtered — not the whole household';
@@ -356,17 +374,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get digestPrepromptDismissAction => 'Not now';
 
   @override
-  String catchUpBannerMessage(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          'We moved $count overdue chores forward to their most recent due dates, so nothing piled up.',
-      one:
-          'We moved 1 overdue chore forward to its most recent due date, so nothing piled up.',
-    );
-    return '$_temp0';
-  }
+  String get catchUpBannerMessage =>
+      'Your repeating chores jumped ahead to their latest due date — you didn\'t miss anything extra.';
 
   @override
   String get catchUpBannerDismissTooltip => 'Dismiss';
@@ -408,15 +417,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device doesn\'t know who you are yet. Sign in again or reopen the app.';
 
   @override
-  String choresDoneHeader(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Done today ($count)',
-      one: 'Done today (1)',
-    );
-    return '$_temp0';
+  String choresDoneRecently(int count) {
+    return 'Done recently ($count)';
   }
+
+  @override
+  String get choresDoneDayToday => 'Today';
+
+  @override
+  String get choresDoneDayYesterday => 'Yesterday';
 
   @override
   String get choresDoneStatusDone => 'Done';
@@ -425,12 +434,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresDoneStatusSkipped => 'Skipped';
 
   @override
+  String get choresDoneEarly => 'Done early';
+
+  @override
   String choresDoneClosedByLabel(String name) {
     return 'by $name';
   }
 
   @override
   String get choresDoneReopen => 'Reopen';
+
+  @override
+  String get choresReopenedSnackbar => 'Reopened';
+
+  @override
+  String choresReopenOthersTitle(String name) {
+    return 'Reopen $name\'s completion?';
+  }
+
+  @override
+  String get choresReopenOthersBody => 'This removes it from their history.';
+
+  @override
+  String get choresReopenOthersConfirm => 'Reopen';
 
   @override
   String choresPausedHeader(int count) {
@@ -806,14 +832,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormStartDateLabel => 'Start date';
 
   @override
-  String get choreFormReminderToggle => 'Remind me about this chore';
+  String get choreFormReminderToggle => 'Remind whoever it\'s assigned to';
 
   @override
   String get choreFormReminderTime => 'Reminder time';
 
   @override
   String get choreFormReminderHint =>
-      'This chore won\'t be counted in the daily summary';
+      'Rings on their phone at this time. That day\'s daily summary leaves this chore out.';
 
   @override
   String get shoppingEmptyState => 'Shopping list is empty';
@@ -992,6 +1018,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsEveningToggleSubtitle =>
       'Only if something is still open today';
+
+  @override
+  String get settingsChoreRemindersTitle => 'Chore reminders';
 
   @override
   String get settingsEveningTime => 'Evening time';
@@ -1698,6 +1727,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String statsWindowSinceStart(String date) {
     return 'Since you started, $date';
+  }
+
+  @override
+  String statsSince(String date) {
+    return 'since $date';
   }
 
   @override

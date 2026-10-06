@@ -361,6 +361,76 @@ void main() {
       expect(plugin.pending[1001]!.title, 'Famdo');
     });
 
+    group('digest body lists chore titles (persona review E8)', () {
+      Future<void> applyTitles(List<String> titles, {int overdue = 0}) {
+        return scheduler.applyDigestPlans(
+          plansOf({
+            0: DigestPlan(
+              fireAt: DateTime(2026, 7, 24, 8),
+              dueTodayCount: titles.length - overdue,
+              overdueCount: overdue,
+              titles: titles,
+            ),
+          }),
+        );
+      }
+
+      test('up to three titles are listed, and the count line becomes the '
+          'title', () async {
+        await applyTitles(['Dishes', 'Bins']);
+        expect(plugin.pending[1001]!.title, '2 chores today');
+        expect(plugin.pending[1001]!.body, 'Dishes, Bins');
+
+        await applyTitles(['Dishes', 'Bins', 'Laundry']);
+        expect(plugin.pending[1001]!.body, 'Dishes, Bins, Laundry');
+      });
+
+      test('more than three adds "and N more"', () async {
+        await applyTitles(['A', 'B', 'C', 'D', 'E'], overdue: 1);
+        expect(plugin.pending[1001]!.title, '4 chores today · 1 overdue');
+        expect(plugin.pending[1001]!.body, 'A, B, C and 2 more');
+      });
+
+      test('a single title is the whole body', () async {
+        await applyTitles(['Dishes']);
+        expect(plugin.pending[1001]!.title, '1 chore today');
+        expect(plugin.pending[1001]!.body, 'Dishes');
+      });
+
+      test('German copy joins and counts in German', () async {
+        final germanScheduler = NotificationScheduler(
+          plugin: plugin,
+          localeResolver: () => const Locale('de'),
+        );
+        await germanScheduler.applyDigestPlans(
+          plansOf({
+            0: DigestPlan(
+              fireAt: DateTime(2026, 7, 24, 8),
+              dueTodayCount: 5,
+              overdueCount: 0,
+              titles: const ['A', 'B', 'C', 'D', 'E'],
+            ),
+          }),
+        );
+        expect(plugin.pending[1001]!.body, 'A, B, C und 2 weitere');
+      });
+
+      test('a plan without titles keeps the old shape: app title, count '
+          'line as the body', () async {
+        await scheduler.applyDigestPlans(
+          plansOf({
+            0: DigestPlan(
+              fireAt: DateTime(2026, 7, 24, 8),
+              dueTodayCount: 2,
+              overdueCount: 0,
+            ),
+          }),
+        );
+        expect(plugin.pending[1001]!.title, 'Famdo');
+        expect(plugin.pending[1001]!.body, '2 chores today');
+      });
+    });
+
     test('German locale produces German copy', () async {
       final germanScheduler = NotificationScheduler(
         plugin: plugin,

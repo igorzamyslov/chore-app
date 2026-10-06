@@ -171,7 +171,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();
@@ -233,7 +233,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();

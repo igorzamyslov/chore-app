@@ -55,6 +55,12 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   String? _memberFilter;
   String? _categoryFilter;
 
+  // E1 (persona review 2026-10-06): whether the "default to my chores"
+  // decision has been made. True from the start when a filter was stored,
+  // and from the first manual filter change; otherwise settled by [build]
+  // once the device's identity resolves.
+  bool _defaultSettled = false;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +70,38 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final stored = ref.read(uiStateProvider).valueOrNull;
     _memberFilter = stored?.choresMemberFilter;
     _categoryFilter = stored?.choresCategoryFilter;
+    _defaultSettled = _memberFilter != null || _categoryFilter != null;
+  }
+
+  /// E1: a signed-in member's list opens on THEIR chores (plus unassigned
+  /// ones) when nothing was stored. Settles the first time identity is
+  /// known: pinned with a resolved claim applies and stores the default;
+  /// an unlinked household has nobody to default to. A still-resolving
+  /// identity waits, so a late claim cannot override a manual pick (which
+  /// settles it too).
+  void _settleDefaultFilter() {
+    if (_defaultSettled) {
+      return;
+    }
+    switch (ref.watch(memberIdentityModeProvider)) {
+      case MemberIdentityMode.unknown:
+        return;
+      case MemberIdentityMode.switching:
+        _defaultSettled = true;
+      case MemberIdentityMode.pinned:
+        final claimed = ref.watch(claimedMemberProvider);
+        if (claimed == null) {
+          return;
+        }
+        _defaultSettled = true;
+        _memberFilter = claimed.id;
+        // Not inside build: a blind write, after this frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _persistFilters();
+          }
+        });
+    }
   }
 
   /// Writes the current filters to `ui_state`, blind and fire-and-forget.
@@ -83,6 +121,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _settleDefaultFilter();
     // Stale stored ids degrade to "All" at read time; nothing is written
     // back. While members/categories have no value yet the stored id is kept,
     // so there is no unfiltered flash before they load.
@@ -97,7 +136,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         ? null
         : _categoryFilter;
     final occurrencesAsync = ref.watch(pendingOccurrencesProvider);
-    final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
+    final closedRecently = ref.watch(closedRecentlyOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     // todayProvider, not a one-shot clock read: this is what re-buckets the
@@ -121,7 +160,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // today" while a member filter showed a list of 2 underneath, which is
     // exactly the "a number disagrees with the list beneath it" failure
     // mode this app exists to avoid. `_filterOccurrences`/
-    // `_filterClosedToday` below are the SAME functions `_Body` uses to
+    // `_filterClosed` below are the SAME functions `_Body` uses to
     // build the sections themselves, so the card's numbers and the list can
     // never disagree -- and when a filter is active, the card says so (see
     // ChoreProgressCard.filterActive).
@@ -131,18 +170,27 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final filteredClosedTodayForCount = _filterClosedToday(
-      closedToday ?? const [],
+    final filteredClosedForCount = _filterClosed(
+      closedRecently ?? const [],
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final completedToday = filteredClosedTodayForCount
+    // The recent window reaches back three days (E9); the card counts only
+    // what was completed TODAY.
+    final completedToday = filteredClosedForCount
         .where(
-          (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
+          (occurrence) =>
+              occurrence.occurrence.status == OccurrenceStatus.done &&
+              occurrence.occurrence.closedOn == today,
         )
         .length;
-    final pendingDueOrOverdue = filteredOccurrencesForCount
-        .where((occurrence) => !occurrence.occurrence.dueDate.isAfter(today))
+    // E5 (persona review 2026-10-06): the overdue pile is not part of
+    // "today" -- it is reported beside it as "N to catch up".
+    final pendingDueToday = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate == today)
+        .length;
+    final overdueCount = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate.isBefore(today))
         .length;
 
     return Scaffold(
@@ -153,14 +201,20 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           MemberFilterButton(
             selected: memberFilter,
             onChanged: (value) {
-              setState(() => _memberFilter = value);
+              setState(() {
+                _memberFilter = value;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
           CategoryFilterButton(
             selected: categoryFilter,
             onChanged: (value) {
-              setState(() => _categoryFilter = value);
+              setState(() {
+                _categoryFilter = value;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
@@ -175,7 +229,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           if (occurrencesAsync.hasValue)
             ChoreProgressCard(
               completedToday: completedToday,
-              pendingDueOrOverdue: pendingDueOrOverdue,
+              pendingDueToday: pendingDueToday,
+              overdueCount: overdueCount,
               today: today,
               filterActive: filterActive,
             ),
@@ -184,9 +239,10 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
               data: (occurrences) {
                 final body = _Body(
                   occurrences: occurrences,
-                  closedToday: closedToday ?? const [],
+                  closedRecently: closedRecently ?? const [],
                   paused: paused ?? const [],
                   hasActiveChores: hasActiveChores,
+                  syncLinked: syncLinked,
                   today: today,
                   memberFilter: memberFilter,
                   categoryFilter: categoryFilter,
@@ -600,10 +656,32 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     );
   }
 
-  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) {
-    return ref
+  /// Reopens a done/skipped row (persona review 2026-10-06 E6): asks first
+  /// when the completion is credited to somebody other than the person
+  /// holding this device -- it removes the credit from THEIR history --
+  /// and confirms in words afterwards (Reopen used to be silent).
+  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) async {
+    final completer = occurrence.completedByMember;
+    final actingId = ref.read(actingMemberProvider)?.id;
+    if (completer != null && completer.id != actingId) {
+      final confirmed = await showReopenOthersDialog(
+        context,
+        completerName: completer.name,
+      );
+      if (!mounted || !confirmed) {
+        return;
+      }
+    }
+    await ref
         .read(choreServiceProvider)
         .reopenOccurrence(occurrence.occurrence.id);
+    if (!mounted) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: AppLocalizations.of(context).choresReopenedSnackbar,
+    );
   }
 
   Future<void> _resume(ChoreWithDetails details) {
@@ -616,6 +694,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     setState(() {
       _memberFilter = null;
       _categoryFilter = null;
+      _defaultSettled = true;
     });
     _persistFilters();
   }
@@ -686,7 +765,12 @@ List<OccurrenceWithChore> _filterOccurrences(
   required String? categoryFilter,
 }) {
   return occurrences.where((occurrence) {
-    if (memberFilter != null && occurrence.assignedMember?.id != memberFilter) {
+    // E1: an unassigned occurrence is anyone's, so it passes every member
+    // filter -- the daily summary counts it for each member too.
+    final assignee = occurrence.assignedMember;
+    if (memberFilter != null &&
+        assignee != null &&
+        assignee.id != memberFilter) {
       return false;
     }
     if (categoryFilter != null && occurrence.category?.id != categoryFilter) {
@@ -696,22 +780,24 @@ List<OccurrenceWithChore> _filterOccurrences(
   }).toList();
 }
 
-/// Filters [closedToday] the same way (see [_filterOccurrences]), matching
-/// each row's DISPLAYED member -- the completer for a done row, the
-/// assignee for a skipped one (skipping doesn't record a dedicated closer).
-List<ClosedOccurrenceWithChore> _filterClosedToday(
-  List<ClosedOccurrenceWithChore> closedToday, {
+/// Filters [closedRecently] (done/skipped in the last few days) the same way
+/// (see [_filterOccurrences]), matching each row's DISPLAYED member -- the
+/// completer for a done row, the assignee for a skipped one (skipping
+/// doesn't record a dedicated closer).
+List<ClosedOccurrenceWithChore> _filterClosed(
+  List<ClosedOccurrenceWithChore> closedRecently, {
   required String? memberFilter,
   required String? categoryFilter,
 }) {
-  return closedToday.where((row) {
+  return closedRecently.where((row) {
     if (categoryFilter != null && row.category?.id != categoryFilter) {
       return false;
     }
     if (memberFilter != null) {
       final displayedMemberId =
           row.occurrence.completedBy ?? row.assignedMember?.id;
-      if (displayedMemberId != memberFilter) {
+      // E1: no displayed member means unassigned: kept, like pending rows.
+      if (displayedMemberId != null && displayedMemberId != memberFilter) {
         return false;
       }
     }
@@ -722,9 +808,10 @@ List<ClosedOccurrenceWithChore> _filterClosedToday(
 class _Body extends StatelessWidget {
   const _Body({
     required this.occurrences,
-    required this.closedToday,
+    required this.closedRecently,
     required this.paused,
     required this.hasActiveChores,
+    required this.syncLinked,
     required this.today,
     required this.memberFilter,
     required this.categoryFilter,
@@ -737,14 +824,18 @@ class _Body extends StatelessWidget {
   });
 
   final List<OccurrenceWithChore> occurrences;
-  final List<ClosedOccurrenceWithChore> closedToday;
+  final List<ClosedOccurrenceWithChore> closedRecently;
   final List<ChoreWithDetails> paused;
 
   /// Whether the household has any active (non-deleted) chore at all —
-  /// unfiltered, unlike [occurrences]/[closedToday]/[paused] above — the
+  /// unfiltered, unlike [occurrences]/[closedRecently]/[paused] above — the
   /// signal that distinguishes the "fresh install" empty state from "all
   /// done" (spec `docs/specs/polish-round-1.md` A1).
   final bool hasActiveChores;
+
+  /// Whether the household is linked: a still-`syncDirty` row then shows
+  /// the "waiting to send" clock (persona review 2026-10-06 E10).
+  final bool syncLinked;
   final PlainDate today;
   final String? memberFilter;
   final String? categoryFilter;
@@ -774,8 +865,8 @@ class _Body extends StatelessWidget {
     // contradict each other. Member semantics per section: done rows match
     // the person they display (completer for done, assignee for skipped);
     // paused chores match "member is among the assignees".
-    final filteredClosedToday = _filterClosedToday(
-      closedToday,
+    final filteredClosed = _filterClosed(
+      closedRecently,
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
@@ -783,7 +874,9 @@ class _Body extends StatelessWidget {
       if (categoryFilter != null && details.category?.id != categoryFilter) {
         return false;
       }
+      // E1: a chore nobody is assigned to is anyone's, so it stays.
       if (memberFilter != null &&
+          details.assigneeMemberIds.isNotEmpty &&
           !details.assigneeMemberIds.contains(memberFilter)) {
         return false;
       }
@@ -791,19 +884,21 @@ class _Body extends StatelessWidget {
     }).toList();
 
     final hasCollapsedSections =
-        filteredPaused.isNotEmpty || filteredClosedToday.isNotEmpty;
+        filteredPaused.isNotEmpty || filteredClosed.isNotEmpty;
 
     if (filtered.isEmpty && !hasCollapsedSections) {
       // B1 (spec docs/feedback/2026-08-01-ux-audit.md): a filter hiding
       // EVERYTHING is not the same as genuinely nothing pending -- the
-      // unfiltered lists above (occurrences/closedToday/paused) are the
+      // unfiltered lists above (occurrences/closedRecently/paused) are the
       // "would something show without the filter" signal; only when a
       // filter is active AND clearing it would actually reveal something
       // does the honest "nothing here for this filter" state replace the
       // fresh/done praise copy.
       final filterActive = memberFilter != null || categoryFilter != null;
       final hasUnfilteredContent =
-          occurrences.isNotEmpty || closedToday.isNotEmpty || paused.isNotEmpty;
+          occurrences.isNotEmpty ||
+          closedRecently.isNotEmpty ||
+          paused.isNotEmpty;
       final empty = filterActive && hasUnfilteredContent
           ? _ChoresEmptyFilteredState(onClear: onClearFilters)
           : _ChoresEmptyState(fresh: !hasActiveChores);
@@ -853,6 +948,7 @@ class _Body extends StatelessWidget {
                   occurrence: occurrence,
                   today: today,
                   section: section,
+                  waitingToSend: syncLinked && occurrence.occurrence.syncDirty,
                   onComplete: () => onComplete(occurrence),
                   onOpenMenu: () => onOpenMenu(occurrence),
                 ),
@@ -863,13 +959,16 @@ class _Body extends StatelessWidget {
             onResume: onResume,
             onOpenMenu: onOpenPausedMenu,
           ),
-        if (filteredClosedToday.isNotEmpty)
+        if (filteredClosed.isNotEmpty)
           ChoreDoneSection(
-            occurrences: filteredClosedToday,
-            // Computed from the UNFILTERED closedToday (see that
+            occurrences: filteredClosed,
+            today: today,
+            syncLinked: syncLinked,
+            // Computed from the UNFILTERED closedRecently (see that
             // function's doc comment on why filters mustn't affect it).
             reopenableOccurrenceIds: latestClosedTodayOccurrenceIds(
-              closedToday,
+              closedRecently,
+              today: today,
             ),
             onReopen: onReopen,
           ),

@@ -34,7 +34,9 @@ ReminderPlanResult _plan(
   String? recipientMemberId,
   Map<String, DateTime> snoozes = const {},
   bool quietHoursEnabled = false,
+  bool enabled = true,
 }) => planReminders(
+  enabled: enabled,
   now: now ?? DateTime(2026, 8, 30, 9),
   occurrences: occurrences,
   recipientMemberId: recipientMemberId,
@@ -212,6 +214,26 @@ void main() {
   });
 
   group('planReminders (spec docs/specs/notifications-n2.md §2.3)', () {
+    test(
+      'the master switch OFF (persona review 2026-10-06 E3) plans nothing: '
+      'no armed reminder and no ceiling overflow, however many chores '
+      'carry one',
+      () {
+        final occurrences = [
+          for (var i = 0; i < reminderCeiling + 5; i++)
+            _occ(id: 'o$i', dueDate: PlainDate(2026, 8, 30)),
+        ];
+        // Guard: the same input arms (and overflows) with the switch on.
+        final on = _plan(occurrences);
+        expect(on.armed, hasLength(reminderCeiling));
+        expect(on.overflowCount, 5);
+
+        final off = _plan(occurrences, enabled: false);
+        expect(off.armed, isEmpty);
+        expect(off.overflowCount, 0);
+      },
+    );
+
     test('a chore with NO reminder_minutes is not eligible at all', () {
       final result = _plan([
         _occ(dueDate: PlainDate(2026, 8, 30), reminderMinutes: null),

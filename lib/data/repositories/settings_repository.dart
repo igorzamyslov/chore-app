@@ -101,6 +101,21 @@ class SettingsRepository {
     );
   }
 
+  /// Turns this device's per-chore reminders on or off (persona review
+  /// 2026-10-06 E3). Off arms none of them -- see `planReminders` -- while
+  /// the digest and the evening re-reminder keep their own switches.
+  Future<void> setChoreRemindersEnabled({required bool enabled}) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        choreRemindersEnabled: Value(enabled),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
   /// Sets the digest's fire time, as minutes since local midnight.
   ///
   /// Throws [ArgumentError] if [minutesSinceMidnight] is outside `0..1439`.

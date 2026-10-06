@@ -76,6 +76,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
     required this.section,
     required this.onComplete,
     required this.onOpenMenu,
+    this.waitingToSend = false,
     super.key,
   });
 
@@ -98,6 +99,13 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// Called when the tile body or the trailing menu button is tapped, or
   /// the tile is long-pressed.
   final VoidCallback onOpenMenu;
+
+  /// Whether to show the small "waiting to send" clock before the menu
+  /// button (persona review 2026-10-06 E10): the caller passes `true` only
+  /// while the household is linked AND this occurrence is `syncDirty`, so
+  /// a change made on a weak connection does not look identical to one the
+  /// rest of the household already has.
+  final bool waitingToSend;
 
   @override
   Widget build(BuildContext context) {
@@ -168,6 +176,15 @@ class ChoreOccurrenceTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (waitingToSend)
+                Tooltip(
+                  message: l10n.syncPendingItemTooltip,
+                  child: Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               semantic(
                 'chores.occurrence.${chore.id}.menu',
                 child: IconButton(
@@ -268,7 +285,10 @@ class _MetadataRow extends StatelessWidget {
         children: [
           // Assignee first: "whose is this" is what a scan of the list
           // looks for, so it sits at a fixed left position on every tile.
-          if (assignee != null) _MemberAvatarName(member: assignee),
+          if (assignee != null)
+            _MemberAvatarName(member: assignee)
+          else
+            const _AnyoneChip(),
           if (category != null) _CategoryDotName(category: category),
           if (_showsDueText)
             _DueChip(
@@ -341,6 +361,29 @@ class _DueChip extends StatelessWidget {
         text,
         style: theme.textTheme.labelMedium?.copyWith(color: ink),
       ),
+    );
+  }
+}
+
+/// The chip standing in for the assignee on an unassigned tile (persona
+/// review 2026-10-06 E1): anyone may do it, and the member filter keeps it.
+class _AnyoneChip extends StatelessWidget {
+  const _AnyoneChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.group_outlined,
+          size: 16,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 4),
+        Text(AppLocalizations.of(context).choresAssigneeAnyone),
+      ],
     );
   }
 }

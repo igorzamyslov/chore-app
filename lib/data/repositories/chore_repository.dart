@@ -738,6 +738,47 @@ class ChoreRepository {
     String householdId,
     PlainDate date,
   ) {
+    return _watchClosed(
+      householdId,
+      where: db.choreOccurrences.closedOn.equalsValue(date),
+      orderBy: [OrderingTerm(expression: db.chores.title)],
+    );
+  }
+
+  /// Watches occurrences of active chores in [householdId] closed (done or
+  /// skipped — never missed) on or after [since], newest close day first,
+  /// then by chore title. The same display join as [watchClosedOnDate].
+  ///
+  /// Backs the chores list's "Done recently" section (persona review
+  /// 2026-10-06 E9): the caller passes today minus the look-back window, so
+  /// a mis-tap from yesterday is still on the screen the person looks at.
+  Stream<List<ClosedOccurrenceWithChore>> watchClosedSince(
+    String householdId,
+    PlainDate since,
+  ) {
+    return _watchClosed(
+      householdId,
+      where: db.choreOccurrences.closedOn.isBiggerOrEqualValue(
+        since.toIso8601(),
+      ),
+      orderBy: [
+        OrderingTerm(
+          expression: db.choreOccurrences.closedOn,
+          mode: OrderingMode.desc,
+        ),
+        OrderingTerm(expression: db.chores.title),
+      ],
+    );
+  }
+
+  /// The shared query behind [watchClosedOnDate] and [watchClosedSince]:
+  /// done/skipped occurrences of [householdId]'s active chores matching
+  /// [where] (a condition on `closedOn`), in [orderBy] order.
+  Stream<List<ClosedOccurrenceWithChore>> _watchClosed(
+    String householdId, {
+    required Expression<bool> where,
+    required List<OrderingTerm> orderBy,
+  }) {
     final completedByMember = db.members.createAlias('completed_by_member');
     final query =
         db.select(db.choreOccurrences).join([
@@ -761,7 +802,7 @@ class ChoreRepository {
           ..where(
             db.chores.householdId.equals(householdId) &
                 db.chores.deletedAt.isNull() &
-                db.choreOccurrences.closedOn.equalsValue(date) &
+                where &
                 (db.choreOccurrences.status.equalsValue(
                       OccurrenceStatus.done,
                     ) |
@@ -769,7 +810,7 @@ class ChoreRepository {
                       OccurrenceStatus.skipped,
                     )),
           )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
+          ..orderBy(orderBy);
 
     return query.watch().map((rows) {
       return [
