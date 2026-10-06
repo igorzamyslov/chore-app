@@ -316,6 +316,31 @@ void main() {
       expect(normalizeShoppingItemName('MILK'), 'milk');
       expect(normalizeShoppingItemName('   '), '');
     });
+
+    test('folds diacritics so Müsli matches Musli (F7)', () {
+      expect(normalizeShoppingItemName('Müsli'), 'musli');
+      expect(normalizeShoppingItemName('MUSLI'), 'musli');
+      expect(normalizeShoppingItemName('Äpfel'), 'apfel');
+      expect(normalizeShoppingItemName('Öl'), 'ol');
+      expect(normalizeShoppingItemName('Soße'), 'sosse');
+      expect(normalizeShoppingItemName('Straße'), 'strasse');
+      expect(normalizeShoppingItemName('Café  Crème'), 'cafe creme');
+      expect(normalizeShoppingItemName('Jalapeño'), 'jalapeno');
+      expect(normalizeShoppingItemName('Crêpe à la Façon'), 'crepe a la facon');
+    });
+  });
+
+  group('duplicate lookup folds diacritics (F7)', () {
+    test('findActiveByNormalizedName finds Müsli for musli', () async {
+      await repo.addItem(householdId, name: 'Müsli');
+
+      final hit = await repo.findActiveByNormalizedName(
+        householdId,
+        normalizeShoppingItemName('Musli'),
+      );
+
+      expect(hit?.item.name, 'Müsli');
+    });
   });
 
   group('suggestions', () {

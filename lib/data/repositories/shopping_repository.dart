@@ -52,16 +52,71 @@ class ShoppingSuggestion {
 /// filter in Dart.
 typedef _HistoryRow = ({ShoppingItem item, Category? category});
 
+/// Lowercase letters that [normalizeShoppingItemName] folds to plain ASCII
+/// (persona finding F7: "Müsli" and "Musli" are the same staple). A small
+/// explicit map rather than a Unicode-decomposition dependency: German
+/// plus the Latin accents that show up on a European shopping list.
+const _diacriticFolds = <String, String>{
+  'ä': 'a',
+  'ö': 'o',
+  'ü': 'u',
+  'ß': 'ss',
+  'à': 'a',
+  'á': 'a',
+  'â': 'a',
+  'ã': 'a',
+  'å': 'a',
+  'æ': 'ae',
+  'ç': 'c',
+  'è': 'e',
+  'é': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'ì': 'i',
+  'í': 'i',
+  'î': 'i',
+  'ï': 'i',
+  'ñ': 'n',
+  'ò': 'o',
+  'ó': 'o',
+  'ô': 'o',
+  'õ': 'o',
+  'ø': 'o',
+  'œ': 'oe',
+  'ù': 'u',
+  'ú': 'u',
+  'û': 'u',
+  'ý': 'y',
+  'ÿ': 'y',
+  'š': 's',
+  'ž': 'z',
+  'č': 'c',
+  'ł': 'l',
+};
+
+final _diacriticPattern = RegExp('[${_diacriticFolds.keys.join()}]');
+
 /// Normalizes a shopping item name for matching and deduplication: trims
-/// leading/trailing whitespace, lowercases, and collapses runs of inner
-/// whitespace to a single space.
+/// leading/trailing whitespace, lowercases, folds diacritics to ASCII
+/// (ä→a, ö→o, ü→u, ß→ss, é→e …), and collapses runs of inner whitespace to
+/// a single space.
+///
+/// The folded form is for COMPARISON only: items keep the casing and
+/// accents the person typed.
 ///
 /// Shared by [ShoppingRepository.suggestions] (prefix matching),
 /// [ShoppingRepository.findActiveByNormalizedName] (B3 duplicate
 /// detection), and the quick-add row (to normalize its own input before
 /// calling either). See `docs/specs/ux-round-2.md` B2/B3.
 String normalizeShoppingItemName(String name) {
-  return name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  return name
+      .trim()
+      .toLowerCase()
+      .replaceAllMapped(
+        _diacriticPattern,
+        (match) => _diacriticFolds[match.group(0)]!,
+      )
+      .replaceAll(RegExp(r'\s+'), ' ');
 }
 
 /// Repository for the household's shared shopping list.
