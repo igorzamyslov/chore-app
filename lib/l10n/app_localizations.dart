@@ -1700,6 +1700,30 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get categoryEditColorLabel;
 
+  /// Subtitle of a chore category's row on the Categories screen (persona review 2026-10-06 C10, Maria: 'I want to merge Kitchen into Cleaning'): how many active chores use it, so a merge or delete can be judged before opening it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 chore} other{Used by {count} chores}}'**
+  String categoryUsageCount(int count);
+
+  /// Subtitle of a shopping category's row on the Categories screen (persona review C10): how many shopping items (checked or not) use it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 item} other{Used by {count} items}}'**
+  String categoryUsageCountShopping(int count);
+
+  /// Label of the dropdown in the category delete dialog, shown when chores or items use the category (persona review C10): where those chores/items go. Defaults to 'Uncategorized'; lists the other categories of the same kind, so deleting can merge one category into another.
+  ///
+  /// In en, this message translates to:
+  /// **'Move them to'**
+  String get categoryDeleteMoveTo;
+
+  /// The default entry of the category delete dialog's 'Move them to' dropdown: the chores/items keep no category.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get categoryDeleteMoveToNone;
+
   /// Title of the category delete-confirmation dialog.
   ///
   /// In en, this message translates to:
@@ -1712,10 +1736,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
   String categoryDeleteDialogBodyChoresZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10; it used to say they would all lose their category).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it.} other{This deletes \'{categoryName}\'. {count} chores use it.}}'**
   String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
 
   /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
@@ -1724,10 +1748,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
   String categoryDeleteDialogBodyShoppingZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it.} other{This deletes \'{categoryName}\'. {count} shopping items use it.}}'**
   String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).

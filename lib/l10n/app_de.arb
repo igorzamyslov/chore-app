@@ -307,11 +307,15 @@
   "categoryEditIconLabel": "Symbol",
   "categoryEditColorLabel": "Farbe",
 
+  "categoryUsageCount": "{count, plural, =0{Noch nicht verwendet} one{Von 1 Aufgabe verwendet} other{Von {count} Aufgaben verwendet}}",
+  "categoryUsageCountShopping": "{count, plural, =0{Noch nicht verwendet} one{Von 1 Artikel verwendet} other{Von {count} Artikeln verwendet}}",
+  "categoryDeleteMoveTo": "Verschieben nach",
+  "categoryDeleteMoveToNone": "Ohne Kategorie",
   "categoryDeleteDialogTitle": "Kategorie löschen?",
   "categoryDeleteDialogBodyChoresZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keiner Aufgabe verwendet.",
-  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und sind danach ohne Kategorie.}}",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie.}}",
   "categoryDeleteDialogBodyShoppingZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keinem Artikel verwendet.",
-  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und sind danach ohne Kategorie.}}",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie.}}",
 
   "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",

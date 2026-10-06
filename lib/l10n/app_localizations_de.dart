@@ -1128,6 +1128,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryEditColorLabel => 'Farbe';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Aufgaben verwendet',
+      one: 'Von 1 Aufgabe verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Artikeln verwendet',
+      one: 'Von 1 Artikel verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Verschieben nach';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Ohne Kategorie';
+
+  @override
   String get categoryDeleteDialogTitle => 'Kategorie löschen?';
 
   @override
@@ -1141,9 +1171,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie.',
     );
     return '$_temp0';
   }
@@ -1159,9 +1188,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie.',
     );
     return '$_temp0';
   }

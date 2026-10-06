@@ -254,10 +254,14 @@ class CategoryRepository {
     );
   }
 
-  /// Soft-deletes a category and, in the same transaction, clears
-  /// `categoryId` on every active chore and shopping item that referenced
-  /// it.
-  Future<void> softDeleteCategory(String id) async {
+  /// Soft-deletes a category and, in the same transaction, moves every
+  /// active chore and shopping item that referenced it to
+  /// [moveToCategoryId] — `null` (the default) clears their `categoryId`,
+  /// i.e. they become uncategorized. Passing another category of the same
+  /// kind merges this one into it (persona review 2026-10-06 C10, "Move
+  /// them to"). The plan calls this `deleteCategory(id, {moveToCategoryId})`;
+  /// the existing name is kept so the sync callers stay untouched.
+  Future<void> softDeleteCategory(String id, {String? moveToCategoryId}) async {
     final now = _isoNow();
     await db.transaction(() async {
       await (db.update(
@@ -274,7 +278,7 @@ class CategoryRepository {
           ))
           .write(
             ChoresCompanion(
-              categoryId: const Value(null),
+              categoryId: Value(moveToCategoryId),
               updatedAt: Value(now),
               syncDirty: syncDirtyOnWrite,
             ),
@@ -284,7 +288,7 @@ class CategoryRepository {
           ))
           .write(
             ShoppingItemsCompanion(
-              categoryId: const Value(null),
+              categoryId: Value(moveToCategoryId),
               updatedAt: Value(now),
               syncDirty: syncDirtyOnWrite,
             ),
@@ -315,6 +319,46 @@ class CategoryRepository {
                 ))
                 .get();
         return rows.length;
+    }
+  }
+
+  /// Watches how many active chores or shopping items — whichever [kind]
+  /// matches — reference each category of [householdId], keyed by category
+  /// id (a category nothing uses is simply absent). Same `WHERE` as
+  /// [countActiveReferences], so a row's count on the Categories screen
+  /// always equals what its delete dialog then states (persona review
+  /// 2026-10-06 C10).
+  Stream<Map<String, int>> watchActiveReferenceCounts(
+    String householdId,
+    CategoryKind kind,
+  ) {
+    Map<String, int> tally(Iterable<String?> categoryIds) {
+      final counts = <String, int>{};
+      for (final categoryId in categoryIds.nonNulls) {
+        counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+      }
+      return counts;
+    }
+
+    switch (kind) {
+      case CategoryKind.chore:
+        return (db.select(db.chores)..where(
+              (tbl) =>
+                  tbl.householdId.equals(householdId) &
+                  tbl.deletedAt.isNull() &
+                  tbl.categoryId.isNotNull(),
+            ))
+            .watch()
+            .map((rows) => tally(rows.map((row) => row.categoryId)));
+      case CategoryKind.shopping:
+        return (db.select(db.shoppingItems)..where(
+              (tbl) =>
+                  tbl.householdId.equals(householdId) &
+                  tbl.deletedAt.isNull() &
+                  tbl.categoryId.isNotNull(),
+            ))
+            .watch()
+            .map((rows) => tally(rows.map((row) => row.categoryId)));
     }
   }
 

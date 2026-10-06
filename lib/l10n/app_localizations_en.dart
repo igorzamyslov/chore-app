@@ -1121,6 +1121,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryEditColorLabel => 'Color';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count chores',
+      one: 'Used by 1 chore',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count items',
+      one: 'Used by 1 item',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Move them to';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Uncategorized';
+
+  @override
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
@@ -1133,10 +1163,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count chores use it.',
+      one: 'This deletes \'$categoryName\'. 1 chore uses it.',
     );
     return '$_temp0';
   }
@@ -1151,10 +1179,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count shopping items use it.',
+      one: 'This deletes \'$categoryName\'. 1 shopping item uses it.',
     );
     return '$_temp0';
   }

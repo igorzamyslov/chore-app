@@ -1438,6 +1438,28 @@
     "description": "Section label above the category edit sheet's color swatch picker."
   },
 
+  "categoryUsageCount": "{count, plural, =0{Not used yet} one{Used by 1 chore} other{Used by {count} chores}}",
+  "@categoryUsageCount": {
+    "description": "Subtitle of a chore category's row on the Categories screen (persona review 2026-10-06 C10, Maria: 'I want to merge Kitchen into Cleaning'): how many active chores use it, so a merge or delete can be judged before opening it.",
+    "placeholders": {
+      "count": { "type": "int", "example": "3" }
+    }
+  },
+  "categoryUsageCountShopping": "{count, plural, =0{Not used yet} one{Used by 1 item} other{Used by {count} items}}",
+  "@categoryUsageCountShopping": {
+    "description": "Subtitle of a shopping category's row on the Categories screen (persona review C10): how many shopping items (checked or not) use it.",
+    "placeholders": {
+      "count": { "type": "int", "example": "3" }
+    }
+  },
+  "categoryDeleteMoveTo": "Move them to",
+  "@categoryDeleteMoveTo": {
+    "description": "Label of the dropdown in the category delete dialog, shown when chores or items use the category (persona review C10): where those chores/items go. Defaults to 'Uncategorized'; lists the other categories of the same kind, so deleting can merge one category into another."
+  },
+  "categoryDeleteMoveToNone": "Uncategorized",
+  "@categoryDeleteMoveToNone": {
+    "description": "The default entry of the category delete dialog's 'Move them to' dropdown: the chores/items keep no category."
+  },
   "categoryDeleteDialogTitle": "Delete category?",
   "@categoryDeleteDialogTitle": {
     "description": "Title of the category delete-confirmation dialog."
@@ -1452,9 +1474,9 @@
       }
     }
   },
-  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{This deletes '{categoryName}'. 1 chore uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} chores use it and will become uncategorized.}}",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{This deletes '{categoryName}'. 1 chore uses it.} other{This deletes '{categoryName}'. {count} chores use it.}}",
   "@categoryDeleteDialogBodyChoresCount": {
-    "description": "Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.",
+    "description": "Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10; it used to say they would all lose their category).",
     "placeholders": {
       "categoryName": {
         "type": "String",
@@ -1476,9 +1498,9 @@
       }
     }
   },
-  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{This deletes '{categoryName}'. 1 shopping item uses it and will become uncategorized.} other{This deletes '{categoryName}'. {count} shopping items use it and will become uncategorized.}}",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{This deletes '{categoryName}'. 1 shopping item uses it.} other{This deletes '{categoryName}'. {count} shopping items use it.}}",
   "@categoryDeleteDialogBodyShoppingCount": {
-    "description": "Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.",
+    "description": "Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10).",
     "placeholders": {
       "categoryName": {
         "type": "String",
