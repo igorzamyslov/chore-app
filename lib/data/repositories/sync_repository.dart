@@ -362,12 +362,24 @@ class SyncRepository {
           ))
           .go();
 
-  /// Ghost repair (spec §8.6.6): for every chore of [householdId] with MORE
-  /// THAN ONE pending occurrence, keeps the one with the greatest
-  /// `updatedAt` (tie: greater `dueDate`, then greater `id`) and hard-deletes
-  /// the rest through [deleteOccurrencesRecordingTombstones]. The product
-  /// invariant is "at most one pending occurrence per chore", so any extra
-  /// one is a ghost an older client failed to delete on the server.
+  /// Ghost repair (spec §8.6.6, survivor key amended 2026-10-06 -- §8.7):
+  /// for every chore of [householdId] with MORE THAN ONE pending
+  /// occurrence, keeps the one with the greatest `dueDate` (tie: greater
+  /// `id`) and hard-deletes the rest through
+  /// [deleteOccurrencesRecordingTombstones]. The product invariant is "at
+  /// most one pending occurrence per chore", so any extra one is a ghost an
+  /// older client failed to delete on the server, or the other device's
+  /// copy of a catch-up both devices ran the same morning.
+  ///
+  /// `updatedAt` is deliberately NOT part of the key (technical review
+  /// 2026-10-06 #4): a locally written stamp comes from this device's
+  /// clock, a pulled one from the server's, so two devices comparing the
+  /// same two rows could each pick a different survivor and tombstone the
+  /// other's -- leaving the chore with no pending row anywhere. `dueDate`
+  /// and `id` are the only fields both devices see identically, so both
+  /// converge on the same survivor. Callable from anywhere, not only the
+  /// pull transaction: it touches pending rows only and opens its own
+  /// transaction for each deletion (`ChoreService.catchUpOverdue` runs it).
   Future<void> repairGhostOccurrences(
     String householdId,
     String deletedAt,
@@ -395,10 +407,6 @@ class SyncRepository {
         continue;
       }
       group.sort((a, b) {
-        final byUpdated = b.updatedAt.compareTo(a.updatedAt);
-        if (byUpdated != 0) {
-          return byUpdated;
-        }
         final byDue = b.dueDate.toIso8601().compareTo(a.dueDate.toIso8601());
         return byDue != 0 ? byDue : b.id.compareTo(a.id);
       });

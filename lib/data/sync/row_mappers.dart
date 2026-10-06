@@ -81,9 +81,9 @@ Member memberFromRow(Map<String, Object?> row) => Member(
   color: (row['color']! as num).toInt(),
   role: MemberRole.values.byName(row['role']! as String),
   userId: row['user_id'] as String?,
-  createdAt: row['created_at']! as String,
-  updatedAt: row['updated_at']! as String,
-  deletedAt: row['deleted_at'] as String?,
+  createdAt: utcIso(row['created_at']! as String),
+  updatedAt: utcIso(row['updated_at']! as String),
+  deletedAt: utcIsoOrNull(row['deleted_at'] as String?),
   syncDirty: false,
 );
 
@@ -111,9 +111,9 @@ Category categoryFromRow(Map<String, Object?> row) => Category(
   icon: row['icon']! as String,
   color: (row['color']! as num).toInt(),
   sortOrder: (row['sort_order']! as num).toInt(),
-  createdAt: row['created_at']! as String,
-  updatedAt: row['updated_at']! as String,
-  deletedAt: row['deleted_at'] as String?,
+  createdAt: utcIso(row['created_at']! as String),
+  updatedAt: utcIso(row['updated_at']! as String),
+  deletedAt: utcIsoOrNull(row['deleted_at'] as String?),
   syncDirty: false,
 );
 
@@ -152,7 +152,7 @@ Chore choreFromRow(Map<String, Object?> row) => Chore(
   assignmentMode: AssignmentMode.values.byName(
     row['assignment_mode']! as String,
   ),
-  pausedAt: row['paused_at'] as String?,
+  pausedAt: utcIsoOrNull(row['paused_at'] as String?),
   // `as num?` rather than `as int?`, matching how `color`/`sort_order`
   // already tolerate PostgREST's JSON numbers. A MISSING key yields `null`
   // here too, which is the mixed-version tolerance spec
@@ -160,9 +160,9 @@ Chore choreFromRow(Map<String, Object?> row) => Chore(
   // server simply does not send the column.
   reminderMinutes: (row['reminder_minutes'] as num?)?.toInt(),
   createdBy: row['created_by'] as String?,
-  createdAt: row['created_at']! as String,
-  updatedAt: row['updated_at']! as String,
-  deletedAt: row['deleted_at'] as String?,
+  createdAt: utcIso(row['created_at']! as String),
+  updatedAt: utcIso(row['updated_at']! as String),
+  deletedAt: utcIsoOrNull(row['deleted_at'] as String?),
   syncDirty: false,
 );
 
@@ -226,8 +226,8 @@ ChoreOccurrence choreOccurrenceFromRow(Map<String, Object?> row) =>
       closedOn: row['closed_on'] == null
           ? null
           : const PlainDateConverter().fromSql(row['closed_on']! as String),
-      createdAt: row['created_at']! as String,
-      updatedAt: row['updated_at']! as String,
+      createdAt: utcIso(row['created_at']! as String),
+      updatedAt: utcIso(row['updated_at']! as String),
       syncDirty: false,
     );
 
@@ -255,10 +255,10 @@ ShoppingItem shoppingItemFromRow(Map<String, Object?> row) => ShoppingItem(
   quantityNote: row['quantity_note'] as String?,
   categoryId: row['category_id'] as String?,
   addedBy: row['added_by'] as String?,
-  checkedAt: row['checked_at'] as String?,
-  createdAt: row['created_at']! as String,
-  updatedAt: row['updated_at']! as String,
-  deletedAt: row['deleted_at'] as String?,
+  checkedAt: utcIsoOrNull(row['checked_at'] as String?),
+  createdAt: utcIso(row['created_at']! as String),
+  updatedAt: utcIso(row['updated_at']! as String),
+  deletedAt: utcIsoOrNull(row['deleted_at'] as String?),
   syncDirty: false,
 );
 
@@ -282,7 +282,35 @@ Map<String, Object?> householdRow(Household household) => {
 Household householdFromRow(Map<String, Object?> row) => Household(
   id: row['id']! as String,
   name: row['name']! as String,
-  createdAt: row['created_at']! as String,
-  updatedAt: row['updated_at']! as String,
+  createdAt: utcIso(row['created_at']! as String),
+  updatedAt: utcIso(row['updated_at']! as String),
   syncDirty: false,
 );
+
+/// Normalises a server timestamp string to the format every LOCAL write
+/// uses (`DateTime.now().toUtc().toIso8601String()`, i.e. a `Z` suffix),
+/// keeping the instant unchanged.
+///
+/// Postgres hands out `…+00:00` with a variable number of fraction digits;
+/// local writes produce `…Z`. Several things compare these strings
+/// LEXICALLY -- the guarded dirty-clear (`updated_at == <the value read>`)
+/// and, until the 2026-10-06 amendment, ghost repair's survivor key -- and
+/// `'…00.123Z' > '…00.123456+00:00'` is true as text while false as time.
+/// Normalising at the boundary (technical review 2026-10-06 #4) makes every
+/// `*_at` column in the local database one format, whichever device wrote
+/// it. Applied by every `*FromRow` function above, so both the sync
+/// engine's pull and `HouseholdGateway.downloadHousehold` get it for free.
+///
+/// A string `DateTime` cannot parse is passed through unchanged: the server
+/// column is `timestamptz`, so this never happens for a real row, and a
+/// throw here would turn one odd value into a whole-pull failure (every
+/// table is applied in one transaction) -- the exact silent-blackout class
+/// the rest of the engine is careful to avoid.
+String utcIso(String serverTimestamp) =>
+    DateTime.tryParse(serverTimestamp)?.toUtc().toIso8601String() ??
+    serverTimestamp;
+
+/// [utcIso] for a nullable column (`deleted_at`, `paused_at`,
+/// `checked_at`).
+String? utcIsoOrNull(String? serverTimestamp) =>
+    serverTimestamp == null ? null : utcIso(serverTimestamp);

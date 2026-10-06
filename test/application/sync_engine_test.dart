@@ -156,6 +156,36 @@ void main() {
     });
 
     test(
+      'pulled timestamps are normalised to the local format: a Postgres '
+      '"+00:00" stamp is stored as the same instant with a "Z" suffix '
+      '(technical review 2026-10-06 #4, so local and pulled stamps compare '
+      'lexically)',
+      () async {
+        transport.serverRows['categories']!.add({
+          'id': 'server-category',
+          'household_id': household.id,
+          'kind': 'chore',
+          'name': 'From server',
+          'icon': 'b',
+          'color': 2,
+          'sort_order': 0,
+          'created_at': '2026-05-01T10:00:00.123456+00:00',
+          'updated_at': '2026-06-01T10:00:00.5+00:00',
+          'deleted_at': '2026-06-02T10:00:00+02:00',
+        });
+
+        await engine.pullSince();
+
+        final row = await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals('server-category'))).getSingle();
+        expect(row.createdAt, '2026-05-01T10:00:00.123456Z');
+        expect(row.updatedAt, '2026-06-01T10:00:00.500Z');
+        expect(row.deletedAt, '2026-06-02T08:00:00.000Z');
+      },
+    );
+
+    test(
       'pulled vs local-dirty: pull keeps the local row untouched',
       () async {
         final category = await categories.createCategory(
@@ -1266,58 +1296,61 @@ void main() {
       expect(left.map((row) => row.memberId), [owner]);
     });
 
-    test('ghost repair keeps the latest-updated pending occurrence and '
-        'tombstones the rest', () async {
-      final chore = await fixedChore();
-      final ghost = await chores.insertOccurrence(
-        choreId: chore.id,
-        dueDate: PlainDate(2026, 3, 1),
-      );
-      final survivor = await chores.insertOccurrence(
-        choreId: chore.id,
-        dueDate: PlainDate(2026, 1, 1),
-      );
-      Future<void> stamp(String id, String updatedAt) =>
-          (db.update(db.choreOccurrences)..where((tbl) => tbl.id.equals(id)))
-              .write(ChoreOccurrencesCompanion(updatedAt: Value(updatedAt)));
-      await stamp(ghost.id, '2026-01-01T00:00:00.000Z');
-      await stamp(survivor.id, '2026-01-02T00:00:00.000Z');
-
-      await engine.pullSince();
-
-      final pending = await chores.pendingOccurrenceOf(chore.id);
-      expect(pending!.id, survivor.id);
-      final rows = await outbox();
-      expect(rows, hasLength(1));
-      expect(rows.single.entity, 'chore_occurrences');
-      expect(rows.single.rowId, ghost.id);
-    });
-
     test(
-      'ghost repair breaks an updatedAt tie by the later due date',
+      'ghost repair keeps the latest-DUE pending occurrence regardless of '
+      'updatedAt (technical review 2026-10-06 #4: the survivor key uses '
+      'only fields both devices see identically, spec §8.7)',
       () async {
         final chore = await fixedChore();
-        final early = await chores.insertOccurrence(
-          choreId: chore.id,
-          dueDate: PlainDate(2026, 1, 1),
-        );
-        final later = await chores.insertOccurrence(
+        final survivor = await chores.insertOccurrence(
           choreId: chore.id,
           dueDate: PlainDate(2026, 3, 1),
         );
-        await db
-            .update(db.choreOccurrences)
-            .write(
-              const ChoreOccurrencesCompanion(
-                updatedAt: Value('2026-01-01T00:00:00.000Z'),
-              ),
-            );
+        final ghost = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 1),
+        );
+        Future<void> stamp(String id, String updatedAt) =>
+            (db.update(db.choreOccurrences)..where((tbl) => tbl.id.equals(id)))
+                .write(ChoreOccurrencesCompanion(updatedAt: Value(updatedAt)));
+        // The earlier-due row was written LATER: under the old
+        // updatedAt-first key it would have won, and a second device whose
+        // clock disagrees would have picked the other one -- two devices
+        // tombstoning each other's survivor until no pending row is left.
+        await stamp(survivor.id, '2026-01-01T00:00:00.000Z');
+        await stamp(ghost.id, '2026-01-02T00:00:00.000Z');
 
         await engine.pullSince();
 
-        expect((await chores.pendingOccurrenceOf(chore.id))!.id, later.id);
-        expect((await outbox()).single.rowId, early.id);
+        final pending = await chores.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, survivor.id);
+        final rows = await outbox();
+        expect(rows, hasLength(1));
+        expect(rows.single.entity, 'chore_occurrences');
+        expect(rows.single.rowId, ghost.id);
       },
     );
+
+    test('ghost repair breaks a dueDate tie by the greater id', () async {
+      final chore = await fixedChore();
+      final a = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 1),
+      );
+      final b = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 1),
+      );
+      final expectedSurvivor = a.id.compareTo(b.id) > 0 ? a : b;
+      final expectedGhost = identical(expectedSurvivor, a) ? b : a;
+
+      await engine.pullSince();
+
+      expect(
+        (await chores.pendingOccurrenceOf(chore.id))!.id,
+        expectedSurvivor.id,
+      );
+      expect((await outbox()).single.rowId, expectedGhost.id);
+    });
   });
 }
