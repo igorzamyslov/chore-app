@@ -153,6 +153,8 @@ Family-scale data (hundreds of rows) permits a simple, robust engine:
   devices editing the same row: last push wins — acceptable for chores
   at family scale; occurrences are mostly-append which limits real
   conflicts. Tombstones (`deleted_at`) replicate exactly like updates.
+  **Exception (amendment 2026-10-06, §8.8):** a newer pulled `shopping_items`
+  row still lends its `checked_at`/`deleted_at` to a dirty local row.
 - **Realtime**: `postgres_changes` subscription per household (filter on
   the denormalized `household_id`), feeding the same apply path as pull.
   REQUIRES the synced tables be in the `supabase_realtime` publication
