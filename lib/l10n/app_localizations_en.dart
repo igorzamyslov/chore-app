@@ -223,6 +223,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
 
   @override
+  String get choresActingMemberHint =>
+      'Credit and your daily summary follow this person.';
+
+  @override
   String actingMemberSignedInAs(String name) {
     return 'You\'re signed in as $name';
   }
@@ -355,8 +359,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String choresSnackbarDoneBy(String name) {
+  String choresDoneCredited(String name) {
     return 'Done — credited to $name';
+  }
+
+  @override
+  String choresDoneCreditedNextDue(String name, String date) {
+    return 'Done — credited to $name, next due $date';
   }
 
   @override

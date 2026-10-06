@@ -62,6 +62,7 @@
 
   "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
   "actingMemberSheetTitle": "Wer ist gerade dran?",
+  "choresActingMemberHint": "Gutschrift und deine Tagesübersicht richten sich nach dieser Person.",
   "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
@@ -103,7 +104,8 @@
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
-  "choresSnackbarDoneBy": "Erledigt — {name} gutgeschrieben",
+  "choresDoneCredited": "Erledigt — gutgeschrieben für {name}",
+  "choresDoneCreditedNextDue": "Erledigt — gutgeschrieben für {name}, als Nächstes fällig {date}",
   "choresSnackbarSkipped": "Übersprungen",
   "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
   "choresSnackbarUndo": "Rückgängig",

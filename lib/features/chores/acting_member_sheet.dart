@@ -98,9 +98,27 @@ class _ActingMemberSheet extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(
-                l10n.actingMemberSheetTitle,
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.actingMemberSheetTitle,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  // C5 (persona review 2026-10-06, Maria P2-F): switching
+                  // here also moves this device's daily summary and
+                  // reminders to that person -- say so before the tap.
+                  semantic(
+                    'actingMember.sheet.hint',
+                    child: Text(
+                      l10n.choresActingMemberHint,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             for (final member in members)

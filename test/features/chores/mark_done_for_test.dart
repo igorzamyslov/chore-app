@@ -15,9 +15,10 @@ import '../settings/fake_auth_gateway.dart';
 
 /// A-5 "Mark done for…" (spec `docs/feedback/2026-08-07-field-feedback.md`
 /// B1): the rare "I finished something for someone else" case, as ONE row
-/// in the chore action sheet — offered only where the switcher was taken
-/// away (linked AND signed in), never on the tile, and never on the
-/// one-tap complete path.
+/// in the chore action sheet — offered whenever the household has more
+/// than one member (persona review 2026-10-06 C5 dropped the linked-and-
+/// signed-in gate), never on the tile, and never on the one-tap complete
+/// path.
 const _user = AuthUser(id: 'u-1', email: 'me@example.com');
 
 /// Links the household and mirrors [_user]'s claim onto [memberId], exactly
@@ -64,15 +65,61 @@ void main() {
     );
   }
 
+  // Persona review 2026-10-06 C5 (Maria P2-F): the row used to be gated on
+  // linked-and-signed-in, so a local household could only credit someone
+  // else by switching the app-bar avatar -- which also re-scopes the digest.
   testChoreApp(
-    'a local-only household never sees the Mark done for… row',
+    'a local household with someone else in it offers Mark done for… too, '
+    'and it credits the picked member without switching who I am',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
-      await HouseholdRepository(
+      final me = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();
+      final anna = await HouseholdRepository(
         database,
       ).addMember(householdId, name: 'Anna', color: 0xFF112233);
+      final chore = await seedChore(database, householdId);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('chores.menu.markDoneFor'));
+      await tester.pumpAndSettle();
+      // The person holding the phone (the acting member) is not offered.
+      expect(
+        find.bySemanticsIdentifier('chores.markDoneFor.row.${me.id}'),
+        findsNothing,
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.markDoneFor.row.${anna.id}'),
+      );
+      await tester.pumpAndSettle();
+
+      final closed =
+          await (database.select(
+                database.choreOccurrences,
+              )..where((tbl) => tbl.status.equalsValue(OccurrenceStatus.done)))
+              .getSingle();
+      expect(closed.completedBy, anna.id);
+      expect(find.text('Done — credited to Anna'), findsOneWidget);
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.actingMemberId, isNot(anna.id));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a local household of one has nobody to credit, so no row',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
       final chore = await seedChore(database, householdId);
       await tester.pumpAndSettle();
 

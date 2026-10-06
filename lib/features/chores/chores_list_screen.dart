@@ -287,7 +287,19 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     if (!mounted) {
       return;
     }
-    await _showCloseSnackbar(occurrence: occurrence, skipped: false);
+    // C5 (persona review 2026-10-06): in a household of more than one the
+    // Done snackbar names who got the credit -- the acting member can be
+    // switched from the app bar, so a bare "Done" hid whose name it went
+    // under. A household of one has nobody else it could have gone to.
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final credited = members.length > 1
+        ? members.where((m) => m.id == completedBy).firstOrNull
+        : null;
+    await _showCloseSnackbar(
+      occurrence: occurrence,
+      skipped: false,
+      creditedTo: credited,
+    );
   }
 
   /// The rare "I finished something for someone else" path (A-5, spec
@@ -301,10 +313,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// `settings.actingMemberId` — crediting somebody is not becoming them.
   Future<void> _markDoneFor(OccurrenceWithChore occurrence) async {
     final members = ref.read(membersProvider).value ?? const <Member>[];
+    // The person holding the phone: the claimed member when signed in to
+    // a linked household, else the local acting member (C5 offers this row
+    // in local households too).
     final picked = await showMarkDoneForSheet(
       context,
       members: members,
-      excludeMemberId: ref.read(claimedMemberProvider)?.id,
+      excludeMemberId:
+          ref.read(claimedMemberProvider)?.id ??
+          ref.read(actingMemberProvider)?.id,
     );
     if (!mounted || picked == null) {
       return;
@@ -324,16 +341,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
-    // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
-    // "Mark done for…" replaces the app-bar switcher, so it is offered in
-    // exactly the state where that switcher is gone -- and only when there
-    // is somebody else to credit.
-    final pinned =
-        ref.read(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+    // A-5 (spec docs/feedback/2026-08-07-field-feedback.md B1), widened by
+    // persona review 2026-10-06 C5: "Mark done for…" is offered whenever
+    // there is somebody else to credit, linked or not. In a local household
+    // it is the way to credit someone WITHOUT switching the app-bar avatar,
+    // which also re-scopes this device's daily summary and reminders.
     final memberCount = ref.read(membersProvider).value?.length ?? 0;
     final action = await showChoreActionSheet(
       context,
-      showMarkDoneFor: pinned && memberCount > 1,
+      showMarkDoneFor: memberCount > 1,
     );
     if (!mounted || action == null) {
       return;
@@ -467,29 +483,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
 
     final l10n = AppLocalizations.of(context);
-    // A-5: on the "Mark done for…" path the credited member is NOT the
-    // person holding the phone, so the confirmation says whose credit it
-    // was. The next-due variants are skipped here deliberately — WHO got
-    // the credit is the fact worth confirming on this path, and the chore's
-    // next occurrence is visible in the list behind the bar anyway.
-    if (creditedTo != null) {
-      showAppSnackbar(
-        context,
-        message: l10n.choresSnackbarDoneBy(creditedTo.name),
-        action: SnackBarAction(
-          label: l10n.choresSnackbarUndo,
-          onPressed: () {
-            unawaited(
-              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
-            );
-          },
-        ),
-      );
-      return;
-    }
+    // [creditedTo] is set on the "Mark done for…" path (A-5) and, since
+    // persona review 2026-10-06 C5, on every completion in a household of
+    // more than one: the confirmation says whose credit it was, then (for a
+    // recurring chore) when it is next due. Every variant keeps the leading
+    // "Done" that E2E substring checks rely on.
     final String message;
     if (nextPending == null) {
-      message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
+      message = skipped
+          ? l10n.choresSnackbarSkipped
+          : creditedTo != null
+          ? l10n.choresDoneCredited(creditedTo.name)
+          : l10n.choresSnackbarDone;
     } else {
       final localeName = Localizations.localeOf(context).toString();
       // The same "today" the list itself is bucketing on, so the snackbar's
@@ -504,6 +509,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       );
       message = skipped
           ? l10n.choresSnackbarSkippedNextDue(dueText)
+          : creditedTo != null
+          ? l10n.choresDoneCreditedNextDue(creditedTo.name, dueText)
           : l10n.choresSnackbarDoneNextDue(dueText);
     }
 

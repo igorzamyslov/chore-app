@@ -404,6 +404,12 @@ abstract class AppLocalizations {
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
 
+  /// Second line under the acting-member switcher's title (persona review 2026-10-06 C5, Maria P2-F): switching the avatar also changes whose chores the daily summary and reminders cover on this device, which the title alone never said.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit and your daily summary follow this person.'**
+  String get choresActingMemberHint;
+
   /// Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.
   ///
   /// In en, this message translates to:
@@ -608,11 +614,17 @@ abstract class AppLocalizations {
   /// **'Done — next due {dueText}'**
   String choresSnackbarDoneNextDue(String dueText);
 
-  /// Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.
+  /// Undo snackbar after completing a one-off occurrence in a household of more than one member, or via 'Mark done for…' (persona review 2026-10-06 C5, replacing choresSnackbarDoneBy): names who got the credit, because the app-bar avatar can be switched and a bare 'Done' hid whose name it went under. The UNDO action reopens the occurrence.
   ///
   /// In en, this message translates to:
   /// **'Done — credited to {name}'**
-  String choresSnackbarDoneBy(String name);
+  String choresDoneCredited(String name);
+
+  /// Undo snackbar after completing a RECURRING occurrence in a household of more than one member, or via 'Mark done for…' (persona review C5): who got the credit, then when the chore is next due. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31'). Keeps the leading 'Done' so 'Done'-substring checks still match.
+  ///
+  /// In en, this message translates to:
+  /// **'Done — credited to {name}, next due {date}'**
+  String choresDoneCreditedNextDue(String name, String date);
 
   /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
   ///
