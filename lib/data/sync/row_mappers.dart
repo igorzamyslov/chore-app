@@ -130,6 +130,7 @@ Map<String, Object?> choreRow(Chore chore) => {
   'start_date': chore.startDate.toIso8601(),
   'assignment_mode': chore.assignmentMode.name,
   'paused_at': chore.pausedAt,
+  'paused_until': chore.pausedUntil?.toIso8601(),
   'reminder_minutes': chore.reminderMinutes,
   'created_by': chore.createdBy,
   'created_at': chore.createdAt,
@@ -153,6 +154,12 @@ Chore choreFromRow(Map<String, Object?> row) => Chore(
     row['assignment_mode']! as String,
   ),
   pausedAt: utcIsoOrNull(row['paused_at'] as String?),
+  // A MISSING key (a server without migration 20261006130000) reads as
+  // null, "until I resume it" -- the same mixed-version tolerance as
+  // `reminder_minutes` below.
+  pausedUntil: row['paused_until'] == null
+      ? null
+      : const PlainDateConverter().fromSql(row['paused_until']! as String),
   // `as num?` rather than `as int?`, matching how `color`/`sort_order`
   // already tolerate PostgREST's JSON numbers. A MISSING key yields `null`
   // here too, which is the mixed-version tolerance spec

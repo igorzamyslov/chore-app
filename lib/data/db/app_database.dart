@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -289,6 +289,15 @@ class AppDatabase extends _$AppDatabase {
         // would throw a duplicate-column error.
         await migrator.addColumn(uiState, uiState.choresMemberFilter);
         await migrator.addColumn(uiState, uiState.choresCategoryFilter);
+      }
+      if (from < 19) {
+        // v18 -> v19 (plan `docs/plans/2026-10-06-persona-review-fixes.md`
+        // §1, W3): the nullable `chores.pausedUntil` plain date ("pause
+        // until"), defaulting to `NULL` ("until I resume it") -- no data
+        // rewrite. Flat and UNCONDITIONAL: `chores` has existed since
+        // schemaVersion 1, so `createTable` never covers this column on any
+        // path. Same shape as the `chores.reminderMinutes` (v13) backfill.
+        await migrator.addColumn(chores, chores.pausedUntil);
       }
     },
     beforeOpen: (details) async {
