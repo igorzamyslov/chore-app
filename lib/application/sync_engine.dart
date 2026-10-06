@@ -303,6 +303,7 @@ class SupabaseSyncEngine implements SyncEngine {
     this.pollInterval = const Duration(seconds: 60),
     this.realtimeEchoWindow = const Duration(seconds: 1),
     this.clock = const Clock(),
+    this.onPullCompleted,
   }) : _sync = SyncRepository(db);
 
   /// The local database this engine reads from and writes to.
@@ -343,10 +344,21 @@ class SupabaseSyncEngine implements SyncEngine {
   /// pass a shorter value.
   final Duration realtimeEchoWindow;
 
-  /// The DEVICE clock, used for the echo window and for tombstone stamps
-  /// -- never for the pull cursor, which is server time (spec §8.3).
-  /// Injected so tests can pin it.
+  /// The DEVICE clock, used for the echo window, for tombstone stamps and
+  /// for [onPullCompleted]'s timestamp -- never for the pull cursor, which
+  /// is server time (spec §8.3). Injected so tests can pin it.
   final Clock clock;
+
+  /// Called with `clock.now()` -- DEVICE time -- after every successful
+  /// pull, once the cursor is stored (spec `docs/specs/sync-freshness.md`
+  /// §2.5 amendment 2026-10-06, technical review #7). `syncEngineProvider`
+  /// feeds it into `syncLastPullCompletedAtProvider`, which the health
+  /// indicator and the "Last synced" line read instead of the persisted
+  /// cursor: the cursor is SERVER time, and comparing it with the device
+  /// clock made a phone whose clock was five minutes ahead show the
+  /// can't-reach-the-household banner forever while sync worked perfectly.
+  /// `null` (tests, or any caller that does not care) means never called.
+  final void Function(DateTime completedAt)? onPullCompleted;
 
   final SyncRepository _sync;
 
@@ -794,6 +806,7 @@ class SupabaseSyncEngine implements SyncEngine {
     // comment for why `now()` being transaction-start time makes an exact
     // cursor leak rows.
     await settings.setSyncLastPulledAt(serverNow.subtract(syncCursorOverlap));
+    onPullCompleted?.call(clock.now());
     return false;
   }
 

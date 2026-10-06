@@ -533,15 +533,50 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   if (transport == null || linkedHouseholdId == null || !signedIn) {
     return const NoopSyncEngine();
   }
+  // The engine outlives nothing: a pull that was in flight when this
+  // provider is disposed (a sign-out, an unlink) may still complete, and
+  // must not then touch a disposed `ref`.
+  var disposed = false;
+  ref.onDispose(() => disposed = true);
   final engine = SupabaseSyncEngine(
     db: ref.watch(appDatabaseProvider),
     transport: transport,
     settings: ref.watch(settingsRepositoryProvider),
     householdId: linkedHouseholdId,
+    clock: ref.watch(clockProvider),
+    onPullCompleted: (completedAt) {
+      if (!disposed) {
+        ref.read(syncLastPullCompletedAtProvider.notifier).state = completedAt;
+      }
+    },
   )..start();
   ref.onDispose(engine.stop);
   return engine;
 });
+
+/// The DEVICE-clock moment this session's engine most recently completed a
+/// pull (spec `docs/specs/sync-freshness.md` §2.5 amendment 2026-10-06;
+/// plan §2), `null` until the first pull of this app session lands. Set by
+/// the engine through `SupabaseSyncEngine.onPullCompleted`.
+///
+/// Exists because the persisted cursor (`settings.syncLastPulledAt`) is
+/// SERVER time by design (spec `sync-backend.md` §8.3), and
+/// [syncHealthStatusProvider] / the "Last synced" line compare their input
+/// against [clockProvider] -- the device. A phone five minutes ahead of the
+/// server showed the can't-reach-the-household banner permanently while
+/// sync worked (technical review 2026-10-06 #7). Both now prefer this
+/// value and fall back to the cursor only before the first pull of the
+/// session, where a stale answer is bounded by the observing-since floor
+/// anyway.
+///
+/// In-memory on purpose and never reset on unlink or sign-out: a leftover
+/// value from an earlier engine session is older than the new session's
+/// `syncObservingSinceProvider` stamp, and [computeSyncHealth] measures
+/// from the LATER of the two, so a stale value can only ever be ignored,
+/// never make a device look healthier than it is.
+final syncLastPullCompletedAtProvider = StateProvider<DateTime?>(
+  (ref) => null,
+);
 
 /// The moment this device most recently had a genuine chance to reach its
 /// household at all -- `null` while not linked+signed in (spec
@@ -659,12 +694,16 @@ final syncHealthStatusProvider = Provider<SyncHealthStatus>((ref) {
   final timer = Timer(syncHealthRecheckInterval, ref.invalidateSelf);
   ref.onDispose(timer.cancel);
 
+  // Device-clock stamp of this session's last pull first; the SERVER-time
+  // cursor only before this session has pulled at all (spec §2.5
+  // amendment 2026-10-06 -- see syncLastPullCompletedAtProvider).
   final lastPulledAtRaw = settings?.syncLastPulledAt;
+  final lastPulledAt =
+      ref.watch(syncLastPullCompletedAtProvider) ??
+      (lastPulledAtRaw == null ? null : DateTime.parse(lastPulledAtRaw));
   return computeSyncHealth(
     now: ref.watch(clockProvider).now(),
-    lastPulledAt: lastPulledAtRaw == null
-        ? null
-        : DateTime.parse(lastPulledAtRaw),
+    lastPulledAt: lastPulledAt,
     linkedAt: DateTime.parse(linkedAtRaw),
     observingSince: observingSince,
     dirtySince: ref.watch(dirtySinceProvider).valueOrNull,

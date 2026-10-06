@@ -84,23 +84,32 @@ class _LastSyncedLineState extends ConsumerState<LastSyncedLine> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // The DEVICE-clock stamp of this session's last pull when there is one
+    // (spec §2.5 amendment 2026-10-06, `syncLastPullCompletedAtProvider`):
+    // the persisted cursor is server time, and "10 minutes ago" computed
+    // from the device clock against a server stamp was off by the clock
+    // skew. The cursor remains the fallback before the first pull of the
+    // session, when it is the only record there is.
+    final completedAt = ref.watch(syncLastPullCompletedAtProvider);
     final lastPulledAtRaw = ref
         .watch(settingsProvider)
         .valueOrNull
         ?.syncLastPulledAt;
+    final lastPulledAt =
+        completedAt ??
+        (lastPulledAtRaw == null ? null : DateTime.parse(lastPulledAtRaw));
     // Spec §2.4 amendment 2026-10-06: how many changes are still waiting
     // to be sent. `0` while unlinked or still loading, so the line is
     // simply absent then.
     final pending = ref.watch(syncPendingCountProvider).valueOrNull ?? 0;
 
     final lines = <Widget>[];
-    if (lastPulledAtRaw == null) {
+    if (lastPulledAt == null) {
       _stopTicking();
       // Deliberately semantics-free: while there is no cursor there must be
       // no `settings.account.lastSynced` node for E2E or widget tests to
       // find, exactly as the omitted widget it replaced had none.
     } else {
-      final lastPulledAt = DateTime.parse(lastPulledAtRaw);
       final now = ref.watch(clockProvider).now();
       _tickAt(
         _nextChange(now: now, lastPulledAt: lastPulledAt),

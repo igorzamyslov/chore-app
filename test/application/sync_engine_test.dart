@@ -17,6 +17,7 @@ import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/error_scrubber.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -458,6 +459,46 @@ void main() {
         expect((await settings.ensureSettings()).syncLastPulledAt, isNull);
         final local = await db.select(db.categories).get();
         expect(local.where((row) => row.id.startsWith('cat-')), isEmpty);
+      },
+    );
+
+    test(
+      'onPullCompleted receives the DEVICE clock after a successful pull, '
+      'and nothing after a failed one (technical review 2026-10-06 #7)',
+      () async {
+        final deviceNow = DateTime.utc(2026, 7, 1, 12);
+        final completions = <DateTime>[];
+        final stampedEngine = SupabaseSyncEngine(
+          db: db,
+          transport: transport,
+          settings: settings,
+          householdId: household.id,
+          clock: Clock.fixed(deviceNow),
+          onPullCompleted: completions.add,
+        );
+        addTearDown(stampedEngine.stop);
+        // The server clock disagrees with the device by ten minutes; the
+        // cursor records the server, the callback the device.
+        transport.now = deviceNow.subtract(const Duration(minutes: 10));
+
+        await stampedEngine.pullSince();
+        expect(completions, [deviceNow]);
+        expect(
+          (await settings.ensureSettings()).syncLastPulledAt,
+          transport.now.subtract(syncCursorOverlap).toIso8601String(),
+        );
+
+        final failingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _ThrowingPullTransport('chores'),
+          settings: settings,
+          householdId: household.id,
+          clock: Clock.fixed(deviceNow),
+          onPullCompleted: completions.add,
+        );
+        addTearDown(failingEngine.stop);
+        await failingEngine.pullSince();
+        expect(completions, hasLength(1));
       },
     );
 

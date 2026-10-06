@@ -352,4 +352,71 @@ void main() {
       await _shutDown(tester, container, database);
     },
   );
+
+  testWidgets(
+    'a device clock ten minutes AHEAD of the server does not flag a device '
+    'whose pulls keep succeeding: health is measured on the device-clock '
+    'pull stamp, not the server-time cursor (technical review 2026-10-06 '
+    '#7, spec §2.5 amendment)',
+    (tester) async {
+      final database = AppDatabase(NativeDatabase.memory());
+      // Device: 08:10. Server: 08:00.
+      var currentTime = DateTime.utc(2026, 8, 11, 8, 10);
+      final transport = FakeSyncTransport()..now = DateTime.utc(2026, 8, 11, 8);
+      final container = ProviderContainer(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(database),
+          clockProvider.overrideWithValue(Clock(() => currentTime)),
+          syncTransportProvider.overrideWithValue(transport),
+          authGatewayProvider.overrideWithValue(
+            FakeAuthGateway(
+              currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(householdRepositoryProvider)
+          .createLocalHousehold('Me');
+      container.read(syncEngineControllerProvider);
+      final householdId = await _awaitBootstrap(tester, container);
+      await container
+          .read(settingsRepositoryProvider)
+          .setSyncLinked(householdId: householdId, linkedAt: currentTime);
+      await _awaitLinkedEngine(tester, container);
+      await tester.pump(const Duration(seconds: 1));
+
+      // Six minutes into the session -- past the observing-since floor's
+      // grace -- with both clocks advanced and a pull that succeeds.
+      currentTime = currentTime.add(const Duration(minutes: 6));
+      transport.now = transport.now.add(const Duration(minutes: 6));
+      await container.read(syncEngineProvider).pullSince();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+        container.read(syncLastPullCompletedAtProvider),
+        currentTime,
+        reason: 'the engine stamps the DEVICE clock on each completed pull',
+      );
+      // The persisted cursor is server time minus the overlap: against the
+      // device clock it reads as 10.5 minutes stale, and against the
+      // session floor as 6 -- both past the 5-minute threshold. Without the
+      // device stamp this device would be flagged while syncing perfectly.
+      expect(
+        (await container.read(settingsRepositoryProvider).ensureSettings())
+            .syncLastPulledAt,
+        transport.now.subtract(syncCursorOverlap).toIso8601String(),
+      );
+
+      container.invalidate(syncHealthStatusProvider);
+      expect(
+        container.read(syncHealthStatusProvider),
+        SyncHealthStatus.healthy,
+      );
+
+      await _shutDown(tester, container, database);
+    },
+  );
 }
