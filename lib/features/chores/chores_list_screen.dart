@@ -136,7 +136,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         ? null
         : _categoryFilter;
     final occurrencesAsync = ref.watch(pendingOccurrencesProvider);
-    final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
+    final closedRecently = ref.watch(closedRecentlyOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     // todayProvider, not a one-shot clock read: this is what re-buckets the
@@ -160,7 +160,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // today" while a member filter showed a list of 2 underneath, which is
     // exactly the "a number disagrees with the list beneath it" failure
     // mode this app exists to avoid. `_filterOccurrences`/
-    // `_filterClosedToday` below are the SAME functions `_Body` uses to
+    // `_filterClosed` below are the SAME functions `_Body` uses to
     // build the sections themselves, so the card's numbers and the list can
     // never disagree -- and when a filter is active, the card says so (see
     // ChoreProgressCard.filterActive).
@@ -170,14 +170,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final filteredClosedTodayForCount = _filterClosedToday(
-      closedToday ?? const [],
+    final filteredClosedForCount = _filterClosed(
+      closedRecently ?? const [],
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final completedToday = filteredClosedTodayForCount
+    // The recent window reaches back three days (E9); the card counts only
+    // what was completed TODAY.
+    final completedToday = filteredClosedForCount
         .where(
-          (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
+          (occurrence) =>
+              occurrence.occurrence.status == OccurrenceStatus.done &&
+              occurrence.occurrence.closedOn == today,
         )
         .length;
     // E5 (persona review 2026-10-06): the overdue pile is not part of
@@ -235,7 +239,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
               data: (occurrences) {
                 final body = _Body(
                   occurrences: occurrences,
-                  closedToday: closedToday ?? const [],
+                  closedRecently: closedRecently ?? const [],
                   paused: paused ?? const [],
                   hasActiveChores: hasActiveChores,
                   today: today,
@@ -775,15 +779,16 @@ List<OccurrenceWithChore> _filterOccurrences(
   }).toList();
 }
 
-/// Filters [closedToday] the same way (see [_filterOccurrences]), matching
-/// each row's DISPLAYED member -- the completer for a done row, the
-/// assignee for a skipped one (skipping doesn't record a dedicated closer).
-List<ClosedOccurrenceWithChore> _filterClosedToday(
-  List<ClosedOccurrenceWithChore> closedToday, {
+/// Filters [closedRecently] (done/skipped in the last few days) the same way
+/// (see [_filterOccurrences]), matching each row's DISPLAYED member -- the
+/// completer for a done row, the assignee for a skipped one (skipping
+/// doesn't record a dedicated closer).
+List<ClosedOccurrenceWithChore> _filterClosed(
+  List<ClosedOccurrenceWithChore> closedRecently, {
   required String? memberFilter,
   required String? categoryFilter,
 }) {
-  return closedToday.where((row) {
+  return closedRecently.where((row) {
     if (categoryFilter != null && row.category?.id != categoryFilter) {
       return false;
     }
@@ -802,7 +807,7 @@ List<ClosedOccurrenceWithChore> _filterClosedToday(
 class _Body extends StatelessWidget {
   const _Body({
     required this.occurrences,
-    required this.closedToday,
+    required this.closedRecently,
     required this.paused,
     required this.hasActiveChores,
     required this.today,
@@ -817,11 +822,11 @@ class _Body extends StatelessWidget {
   });
 
   final List<OccurrenceWithChore> occurrences;
-  final List<ClosedOccurrenceWithChore> closedToday;
+  final List<ClosedOccurrenceWithChore> closedRecently;
   final List<ChoreWithDetails> paused;
 
   /// Whether the household has any active (non-deleted) chore at all —
-  /// unfiltered, unlike [occurrences]/[closedToday]/[paused] above — the
+  /// unfiltered, unlike [occurrences]/[closedRecently]/[paused] above — the
   /// signal that distinguishes the "fresh install" empty state from "all
   /// done" (spec `docs/specs/polish-round-1.md` A1).
   final bool hasActiveChores;
@@ -854,8 +859,8 @@ class _Body extends StatelessWidget {
     // contradict each other. Member semantics per section: done rows match
     // the person they display (completer for done, assignee for skipped);
     // paused chores match "member is among the assignees".
-    final filteredClosedToday = _filterClosedToday(
-      closedToday,
+    final filteredClosed = _filterClosed(
+      closedRecently,
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
@@ -873,19 +878,21 @@ class _Body extends StatelessWidget {
     }).toList();
 
     final hasCollapsedSections =
-        filteredPaused.isNotEmpty || filteredClosedToday.isNotEmpty;
+        filteredPaused.isNotEmpty || filteredClosed.isNotEmpty;
 
     if (filtered.isEmpty && !hasCollapsedSections) {
       // B1 (spec docs/feedback/2026-08-01-ux-audit.md): a filter hiding
       // EVERYTHING is not the same as genuinely nothing pending -- the
-      // unfiltered lists above (occurrences/closedToday/paused) are the
+      // unfiltered lists above (occurrences/closedRecently/paused) are the
       // "would something show without the filter" signal; only when a
       // filter is active AND clearing it would actually reveal something
       // does the honest "nothing here for this filter" state replace the
       // fresh/done praise copy.
       final filterActive = memberFilter != null || categoryFilter != null;
       final hasUnfilteredContent =
-          occurrences.isNotEmpty || closedToday.isNotEmpty || paused.isNotEmpty;
+          occurrences.isNotEmpty ||
+          closedRecently.isNotEmpty ||
+          paused.isNotEmpty;
       final empty = filterActive && hasUnfilteredContent
           ? _ChoresEmptyFilteredState(onClear: onClearFilters)
           : _ChoresEmptyState(fresh: !hasActiveChores);
@@ -945,13 +952,15 @@ class _Body extends StatelessWidget {
             onResume: onResume,
             onOpenMenu: onOpenPausedMenu,
           ),
-        if (filteredClosedToday.isNotEmpty)
+        if (filteredClosed.isNotEmpty)
           ChoreDoneSection(
-            occurrences: filteredClosedToday,
-            // Computed from the UNFILTERED closedToday (see that
+            occurrences: filteredClosed,
+            today: today,
+            // Computed from the UNFILTERED closedRecently (see that
             // function's doc comment on why filters mustn't affect it).
             reopenableOccurrenceIds: latestClosedTodayOccurrenceIds(
-              closedToday,
+              closedRecently,
+              today: today,
             ),
             onReopen: onReopen,
           ),

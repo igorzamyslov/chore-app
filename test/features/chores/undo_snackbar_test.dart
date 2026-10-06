@@ -45,7 +45,7 @@ void main() {
       // Weekly, due exactly 7 days out from today: "In 7 days".
       expect(find.text('Done — next due In 7 days'), findsOneWidget);
       expect(find.text('Undo'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       // showAppSnackbar's presentation: 4s floating (see
       // lib/app/snackbars.dart), not the 5s fixed bar this used to be.

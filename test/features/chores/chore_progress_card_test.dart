@@ -299,7 +299,7 @@ void main() {
 
       expect(find.text('Me pending'), findsOneWidget);
       expect(find.text('Anna pending'), findsNothing);
-      expect(find.textContaining('Done today'), findsNothing);
+      expect(find.textContaining('Done recently'), findsNothing);
 
       expect(find.text('0 of 1 done today'), findsOneWidget);
       expect(find.text('1 still to go'), findsOneWidget);

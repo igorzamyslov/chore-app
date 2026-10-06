@@ -1,6 +1,7 @@
 /// The UI half of backlog A-2 / audit P1: with NOTHING overdue and no other
-/// trigger, crossing local midnight must re-bucket the list and empty the
-/// 'Done today' section.
+/// trigger, crossing local midnight must re-bucket the list and age the
+/// 'Done recently' section's rows (today's completion becomes yesterday's,
+/// and loses its Reopen).
 ///
 /// The controller half (what actually calls [TodayNotifier.refresh] at
 /// midnight and on resume) is covered in `test/app/day_change_catchup_test.dart`;
@@ -28,11 +29,12 @@ void main() {
   var currentTime = DateTime(2026, 1, 5, 9);
 
   testChoreApp(
-    'at local midnight the list re-buckets and "Done today" empties, with '
-    'nothing overdue',
+    'at local midnight the list re-buckets and a completion made today ages '
+    'into "Yesterday" without Reopen, with nothing overdue',
     today: DateTime(2026, 1, 5, 9),
     clock: Clock(() => currentTime),
     (tester, database) async {
+      final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
       final me = await database.select(database.members).getSingle();
       final service = ChoreService(
@@ -50,7 +52,8 @@ void main() {
         startDate: PlainDate(2026, 1, 6),
         assignmentMode: AssignmentMode.anyone,
       );
-      // Completed today: sits under 'Done today (1)' until midnight.
+      // Completed today: listed under 'Done recently (1)' as "Today", with
+      // Reopen, until midnight.
       final dishes = await service.createChore(
         householdId: householdId,
         title: 'Dishes',
@@ -66,7 +69,7 @@ void main() {
       // Section headers render uppercase (theme-v2.md §2/§4.1 item 2) via
       // the widget's own .toUpperCase(); chore titles are untouched. Same
       // idiom as list_grouping_test.dart.
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       expect(find.text('TOMORROW'), findsOneWidget);
       expect(find.text('TODAY'), findsNothing);
 
@@ -78,7 +81,17 @@ void main() {
       ).read(todayProvider.notifier).refresh();
       await tester.pumpAndSettle();
 
-      expect(find.text('Done today (1)'), findsNothing);
+      // Still listed (the section reaches back three days), but it is
+      // yesterday's now: relabelled, and no longer reopenable.
+      expect(find.text('Done recently (1)'), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yesterday'), findsOneWidget);
+      expect(find.text('Today'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('chores.done.${pending.id}.reopen'),
+        findsNothing,
+      );
       expect(find.text('TOMORROW'), findsNothing);
       expect(find.text('TODAY'), findsOneWidget);
 
@@ -94,6 +107,8 @@ void main() {
           .where(expectedOrder.contains)
           .toList();
       expect(renderedTexts, expectedOrder);
+
+      handle.dispose();
     },
   );
 

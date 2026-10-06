@@ -409,15 +409,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device doesn\'t know who you are yet. Sign in again or reopen the app.';
 
   @override
-  String choresDoneHeader(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Done today ($count)',
-      one: 'Done today (1)',
-    );
-    return '$_temp0';
+  String choresDoneRecently(int count) {
+    return 'Done recently ($count)';
   }
+
+  @override
+  String get choresDoneDayToday => 'Today';
+
+  @override
+  String get choresDoneDayYesterday => 'Yesterday';
 
   @override
   String get choresDoneStatusDone => 'Done';

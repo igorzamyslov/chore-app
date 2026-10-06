@@ -856,6 +856,63 @@ void main() {
     });
   });
 
+  group('watchClosedSince', () {
+    test(
+      'returns done/skipped rows closed on or after the cutoff, newest day '
+      'first, then by title; excludes older closes and pending rows',
+      () async {
+        final cutoff = PlainDate(2026, 1, 7);
+
+        Future<void> closed(
+          String title,
+          PlainDate closedOn, {
+          OccurrenceStatus status = OccurrenceStatus.done,
+        }) async {
+          final chore = await repo.createChore(
+            householdId: householdId,
+            title: title,
+            startDate: PlainDate(2026, 1, 1),
+            assignmentMode: AssignmentMode.anyone,
+          );
+          final occurrence = await repo.insertOccurrence(
+            choreId: chore.id,
+            dueDate: closedOn,
+          );
+          await repo.closeOccurrence(
+            occurrence.id,
+            status: status,
+            closedOn: closedOn,
+          );
+        }
+
+        await closed('Today B', PlainDate(2026, 1, 10));
+        await closed('Today A', PlainDate(2026, 1, 10));
+        await closed('Yesterday', PlainDate(2026, 1, 9));
+        await closed('On the cutoff', cutoff, status: OccurrenceStatus.skipped);
+        await closed('Too old', PlainDate(2026, 1, 6));
+        final pendingChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Still pending',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: pendingChore.id,
+          dueDate: PlainDate(2026, 1, 10),
+        );
+
+        final rows = await repo.watchClosedSince(householdId, cutoff).first;
+
+        expect(rows.map((r) => r.chore.title), [
+          'Today A',
+          'Today B',
+          'Yesterday',
+          'On the cutoff',
+        ]);
+      },
+    );
+  });
+
   group('hard-delete tombstones (spec sync-backend.md §8.6.2)', () {
     Future<List<SyncTombstone>> tombstones() => (db.select(
       db.syncTombstones,

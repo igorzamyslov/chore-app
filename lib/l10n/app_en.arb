@@ -528,15 +528,23 @@
     "description": "Shown instead of silently doing nothing when ChoresListScreen._complete finds no completedBy: actingMemberProvider is null (pinned mode, claim not yet resolved, e.g. right after HouseholdLinkService.adopt before the first pull -- see spec docs/specs/members-management.md §4.2) and the occurrence has no assignee to fall back on either."
   },
 
-  "choresDoneHeader": "{count, plural, one{Done today (1)} other{Done today ({count})}}",
-  "@choresDoneHeader": {
-    "description": "Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.",
+  "choresDoneRecently": "Done recently ({count})",
+  "@choresDoneRecently": {
+    "description": "Header of the chores list's collapsed Done section (replaces 'Done today ({count})', persona review 2026-10-06 E9): occurrences closed (done or skipped) in the last three days, so a mis-tap from last night can still be found. {count} is how many rows it holds.",
     "placeholders": {
       "count": {
         "type": "int",
-        "example": "2"
+        "example": "3"
       }
     }
+  },
+  "choresDoneDayToday": "Today",
+  "@choresDoneDayToday": {
+    "description": "Day label on a Done-section row closed today. The section spans several days, so each row names its own (persona review 2026-10-06 E9)."
+  },
+  "choresDoneDayYesterday": "Yesterday",
+  "@choresDoneDayYesterday": {
+    "description": "Day label on a Done-section row closed yesterday. Older rows show the weekday name, formatted by the locale."
   },
   "choresDoneStatusDone": "Done",
   "@choresDoneStatusDone": {

@@ -182,7 +182,7 @@ void main() {
       // No filter: no badge; both aux sections visible.
       expect(find.byType(Badge), findsNothing);
       expect(find.textContaining('Paused'), findsOneWidget);
-      expect(find.textContaining('Done today'), findsOneWidget);
+      expect(find.textContaining('Done recently'), findsOneWidget);
 
       // Filter to Anna: badge appears; Done-today (completed by me)
       // disappears, Paused (assigned to Anna) stays.
@@ -191,7 +191,7 @@ void main() {
       await tapMenuEntry(tester, 'Anna');
       expect(find.byType(Badge), findsOneWidget);
       expect(find.textContaining('Paused'), findsOneWidget);
-      expect(find.textContaining('Done today'), findsNothing);
+      expect(find.textContaining('Done recently'), findsNothing);
 
       // Reset: badge gone, both sections back.
       await tester.tap(find.byIcon(Icons.person_outline));
@@ -199,7 +199,7 @@ void main() {
       await tapMenuEntry(tester, 'All members');
       expect(find.byType(Badge), findsNothing);
       expect(find.textContaining('Paused'), findsOneWidget);
-      expect(find.textContaining('Done today'), findsOneWidget);
+      expect(find.textContaining('Done recently'), findsOneWidget);
     },
   );
 }

@@ -120,7 +120,9 @@
   "choresSnackbarPaused": "Pausiert",
   "choresSnackbarNoActingMember": "Dieses Gerät weiß noch nicht, wer du bist. Melde dich erneut an oder öffne die App neu.",
 
-  "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
+  "choresDoneRecently": "Kürzlich erledigt ({count})",
+  "choresDoneDayToday": "Heute",
+  "choresDoneDayYesterday": "Gestern",
   "choresDoneStatusDone": "Erledigt",
   "choresDoneStatusSkipped": "Übersprungen",
   "choresDoneEarly": "Vorzeitig erledigt",

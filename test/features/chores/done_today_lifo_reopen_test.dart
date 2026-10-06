@@ -55,7 +55,7 @@ void main() {
       await service.completeOccurrence(b.id, completedBy: meMember.id);
       await tester.pumpAndSettle();
 
-      expect(find.text('Done today (2)'), findsOneWidget);
+      expect(find.text('Done recently (2)'), findsOneWidget);
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();
 
@@ -76,7 +76,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       expect(
         find.bySemanticsIdentifier('chores.done.${a.id}.reopen'),
         findsOneWidget,

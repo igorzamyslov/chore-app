@@ -1,4 +1,4 @@
-# Complete → appears under 'Done today' → Reopen restores it (ux-round-2 A3).
+# Complete → appears under 'Done recently' → Reopen restores it (ux-round-2 A3).
 appId: ${APP_ID}
 tags:
   - happy
@@ -27,7 +27,7 @@ tags:
     id: "chores.add"
 - tapOn:
     id: 'chores\.occurrence\..*\.complete'
-# One-off chore completed: list empty, but it lives in Done today.
+# One-off chore completed: list empty, but it lives in Done recently.
 - tapOn:
     id: "chores.done.header"
 - assertVisible: "(?s).*Dust shelves.*"

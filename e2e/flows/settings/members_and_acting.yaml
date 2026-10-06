@@ -80,7 +80,7 @@ tags:
 # id regex needs no `index:` disambiguation.
 - tapOn:
     id: 'chores\.occurrence\..*\.complete'
-- assertVisible: "Done today (1)"
+- assertVisible: "Done recently (1)"
 - tapOn:
     id: "chores.done.header"
 # choresDoneClosedByLabel = "by {name}" (lib/l10n/app_en.arb): asserts the

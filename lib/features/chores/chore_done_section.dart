@@ -1,37 +1,51 @@
-/// The collapsed-by-default 'Done today (N)' section: occurrences closed
-/// (done or skipped) today, each with a Reopen action.
+/// The collapsed-by-default 'Done recently (N)' section: occurrences closed
+/// (done or skipped) in the last few days, each row naming its day, with a
+/// Reopen action on today's.
 library;
 
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-/// The 'Done today' section: a collapsed-by-default [ExpansionTile] headed
-/// 'Done today (N)', holding one row per closed-today [occurrences] entry.
+/// The 'Done recently' section: a collapsed-by-default [ExpansionTile]
+/// headed 'Done recently (N)', holding one row per [occurrences] entry
+/// (closed in the last few days, newest first), each labelled with the day
+/// it was closed (Today / Yesterday / weekday).
 ///
-/// See `docs/specs/ux-round-2.md` A3. The caller only mounts this widget
-/// while there's at least one closed-today occurrence.
+/// See `docs/specs/ux-round-2.md` A3; widened from today-only by persona
+/// review 2026-10-06 E9 (a mis-tap from last night used to be permanent
+/// through the UI). The caller only mounts this widget while there's at
+/// least one such occurrence.
 ///
 /// **LIFO amendment (2026-08-01, field feedback B2 —
 /// `docs/feedback/2026-08-01-field-feedback.md`):** a row only gets a
 /// Reopen action if its occurrence id is in [reopenableOccurrenceIds] —
-/// each chore's LATEST closed-today row, per
+/// each chore's LATEST closed-today row (older days never: the service only
+/// reopens same-day closes), per
 /// `ChoreService.reopenOccurrence`'s LIFO contract. The affordance
 /// reappears on the next-latest row once the chain unwinds.
 class ChoreDoneSection extends StatelessWidget {
-  /// Creates the section for [occurrences], closed today.
+  /// Creates the section for [occurrences], closed within the recent window
+  /// ending [today].
   const ChoreDoneSection({
     required this.occurrences,
+    required this.today,
     required this.reopenableOccurrenceIds,
     required this.onReopen,
     super.key,
   });
 
-  /// The occurrences closed (done or skipped) today, to list.
+  /// The occurrences closed (done or skipped) recently, to list.
   final List<ClosedOccurrenceWithChore> occurrences;
+
+  /// The current local calendar day, for each row's Today / Yesterday /
+  /// weekday label.
+  final PlainDate today;
 
   /// The ids of the rows that may show the Reopen action — see
   /// [latestClosedTodayOccurrenceIds].
@@ -60,13 +74,14 @@ class ChoreDoneSection extends StatelessWidget {
         ),
         title: semantic(
           'chores.done.header',
-          child: Text(l10n.choresDoneHeader(occurrences.length)),
+          child: Text(l10n.choresDoneRecently(occurrences.length)),
         ),
         children: [
           for (var i = 0; i < occurrences.length; i++) ...[
             if (i > 0) const Divider(height: 1, thickness: 1),
             _DoneRow(
               occurrence: occurrences[i],
+              today: today,
               showReopen: reopenableOccurrenceIds.contains(
                 occurrences[i].occurrence.id,
               ),
@@ -80,9 +95,10 @@ class ChoreDoneSection extends StatelessWidget {
 }
 
 /// The ids of each chore's LATEST closed-today occurrence in [occurrences]
-/// — ordered by due date, then `updatedAt` as tiebreak, matching the LIFO
-/// rule `ChoreService.reopenOccurrence` enforces (see its doc comment and
-/// `docs/specs/occurrence-lifecycle.md` §reopenOccurrence).
+/// (rows closed on other days are ignored: reopening is a same-day
+/// affordance) — ordered by due date, then `updatedAt` as tiebreak, matching
+/// the LIFO rule `ChoreService.reopenOccurrence` enforces (see its doc
+/// comment and `docs/specs/occurrence-lifecycle.md` §reopenOccurrence).
 ///
 /// Deliberately computed over the FULL closed-today list, not whatever
 /// member/category-filtered subset the caller displays: an active filter
@@ -91,10 +107,14 @@ class ChoreDoneSection extends StatelessWidget {
 /// will actually accept — computing from the filtered list could offer
 /// Reopen on a row that then throws `StateError` when tapped.
 Set<String> latestClosedTodayOccurrenceIds(
-  List<ClosedOccurrenceWithChore> occurrences,
-) {
+  List<ClosedOccurrenceWithChore> occurrences, {
+  required PlainDate today,
+}) {
   final latestByChore = <String, ClosedOccurrenceWithChore>{};
   for (final row in occurrences) {
+    if (row.occurrence.closedOn != today) {
+      continue;
+    }
     final current = latestByChore[row.chore.id];
     if (current == null || _isLaterClosedToday(row, current)) {
       latestByChore[row.chore.id] = row;
@@ -120,11 +140,13 @@ bool _isLaterClosedToday(
 class _DoneRow extends StatelessWidget {
   const _DoneRow({
     required this.occurrence,
+    required this.today,
     required this.showReopen,
     required this.onReopen,
   });
 
   final ClosedOccurrenceWithChore occurrence;
+  final PlainDate today;
 
   /// Whether this row is its chore's latest closed-today occurrence — see
   /// [ChoreDoneSection]'s LIFO doc comment.
@@ -166,6 +188,7 @@ class _DoneRow extends StatelessWidget {
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            if (closedOn != null) Text(_dayLabel(context, closedOn, today)),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -253,4 +276,21 @@ Future<bool> showReopenOthersDialog(
     },
   );
   return confirmed ?? false;
+}
+
+/// The day a row was closed, as people say it: Today / Yesterday, else the
+/// weekday name (rows reach back only a few days, so a weekday is
+/// unambiguous).
+String _dayLabel(BuildContext context, PlainDate closedOn, PlainDate today) {
+  final l10n = AppLocalizations.of(context);
+  final daysAgo = closedOn.daysUntil(today);
+  if (daysAgo <= 0) {
+    return l10n.choresDoneDayToday;
+  }
+  if (daysAgo == 1) {
+    return l10n.choresDoneDayYesterday;
+  }
+  return DateFormat.EEEE(
+    Localizations.localeOf(context).toString(),
+  ).format(DateTime.utc(closedOn.year, closedOn.month, closedOn.day));
 }

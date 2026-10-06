@@ -704,11 +704,23 @@ abstract class AppLocalizations {
   /// **'This device doesn\'t know who you are yet. Sign in again or reopen the app.'**
   String get choresSnackbarNoActingMember;
 
-  /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
+  /// Header of the chores list's collapsed Done section (replaces 'Done today ({count})', persona review 2026-10-06 E9): occurrences closed (done or skipped) in the last three days, so a mis-tap from last night can still be found. {count} is how many rows it holds.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{Done today (1)} other{Done today ({count})}}'**
-  String choresDoneHeader(int count);
+  /// **'Done recently ({count})'**
+  String choresDoneRecently(int count);
+
+  /// Day label on a Done-section row closed today. The section spans several days, so each row names its own (persona review 2026-10-06 E9).
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get choresDoneDayToday;
+
+  /// Day label on a Done-section row closed yesterday. Older rows show the weekday name, formatted by the locale.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get choresDoneDayYesterday;
 
   /// Done-today section row marker for an occurrence that was completed, as opposed to skipped.
   ///
