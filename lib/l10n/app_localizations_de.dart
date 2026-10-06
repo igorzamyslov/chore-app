@@ -881,6 +881,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get syncPendingItemTooltip => 'Wartet aufs Senden';
 
   @override
+  String get shoppingSuggestionForget => 'Vorschlag vergessen';
+
+  @override
   String shoppingAddedCount(int count) {
     return '$count Artikel hinzugefügt';
   }

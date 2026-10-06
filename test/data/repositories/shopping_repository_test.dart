@@ -309,6 +309,85 @@ void main() {
     });
   });
 
+  group('grouped history query (H6-query)', () {
+    test(
+      'spellings that normalize alike (case, diacritics, spacing) count as '
+      'one name and the newest spelling wins',
+      () async {
+        await repo.addItem(householdId, name: 'Müsli');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'MÜSLI');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'musli ');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'Muesli');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'Mulch');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'mulch');
+
+        final names = [
+          for (final s in await repo.suggestions(householdId, 'mu')) s.name,
+        ];
+
+        // musli x3 beats mulch x2 beats muesli x1: frequency first, and the
+        // three spellings of musli are ONE entry showing the newest one.
+        expect(names, ['musli ', 'mulch', 'Muesli']);
+      },
+    );
+
+    test(
+      'the most recent non-null category survives a newer uncategorized row '
+      'and spellings in different SQL groups',
+      () async {
+        final produce = await createCategory(
+          id: 'cat-produce',
+          name: 'Produce',
+          sortOrder: 0,
+        );
+        final dairy = await createCategory(
+          id: 'cat-dairy',
+          name: 'Dairy',
+          sortOrder: 1,
+        );
+        await repo.addItem(householdId, name: 'Käse', categoryId: produce.id);
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'KÄSE', categoryId: dairy.id);
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'kase');
+
+        expect(
+          await repo.mostRecentCategoryIdForNormalizedName(householdId, 'kase'),
+          dairy.id,
+        );
+        final suggestion = (await repo.suggestions(householdId, 'ka')).single;
+        expect(suggestion.name, 'kase');
+        expect(suggestion.categoryId, dairy.id);
+        expect(suggestion.category?.name, 'Dairy');
+        expect(
+          await repo.mostRecentCategoryIdForNormalizedName(householdId, 'nope'),
+          isNull,
+        );
+      },
+    );
+
+    test("another household's history never leaks in", () async {
+      await db
+          .into(db.households)
+          .insert(
+            HouseholdsCompanion.insert(
+              id: 'h2',
+              name: 'Other',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await repo.addItem('h2', name: 'Secret');
+
+      expect(await repo.suggestions(householdId, 'se'), isEmpty);
+    });
+  });
+
   group('device UI memory in ui_state (F9, F11)', () {
     test(
       'collapsed categories round-trip and are wiped with ui_state',

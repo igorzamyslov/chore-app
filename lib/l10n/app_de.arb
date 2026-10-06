@@ -220,6 +220,7 @@
   "relativeTimeHoursAgo": "{count, plural, one{vor 1 Stunde} other{vor {count} Stunden}}",
   "relativeTimeOn": "am {date}",
   "syncPendingItemTooltip": "Wartet aufs Senden",
+  "shoppingSuggestionForget": "Vorschlag vergessen",
   "shoppingAddedCount": "{count} Artikel hinzugefügt",
   "shoppingAddMovedBack":"Zurück auf die Liste verschoben",
 

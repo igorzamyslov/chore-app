@@ -1,9 +1,12 @@
 /// Type-ahead suggestions shown under the shopping list's quick-add field.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Renders [suggestions] (already ranked and limited by
@@ -20,11 +23,16 @@ import 'package:flutter/material.dart';
 /// Tapping a chip calls [onTap] with that suggestion; the caller (the
 /// quick-add row) adds it immediately, subject to the same duplicate
 /// prevention as a typed submit. See `docs/specs/ux-round-2.md` B2/B3.
+///
+/// **Long-pressing a chip opens a one-entry menu, "Forget this
+/// suggestion"** (persona finding F11), which calls [onForget]: a typo added
+/// once used to stay proposed forever.
 class ShoppingSuggestionsList extends StatelessWidget {
   /// Creates the suggestions list for [suggestions].
   const ShoppingSuggestionsList({
     required this.suggestions,
     required this.onTap,
+    required this.onForget,
     super.key,
   });
 
@@ -33,6 +41,9 @@ class ShoppingSuggestionsList extends StatelessWidget {
 
   /// Called with the tapped suggestion.
   final ValueChanged<ShoppingSuggestion> onTap;
+
+  /// Called with the suggestion the user chose to forget.
+  final ValueChanged<ShoppingSuggestion> onForget;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +67,7 @@ class ShoppingSuggestionsList extends StatelessWidget {
               index: i,
               suggestion: suggestions[i],
               onTap: () => onTap(suggestions[i]),
+              onForget: () => onForget(suggestions[i]),
             ),
         ],
       ),
@@ -68,49 +80,86 @@ class _SuggestionChip extends StatelessWidget {
     required this.index,
     required this.suggestion,
     required this.onTap,
+    required this.onForget,
     super.key,
   });
 
   final int index;
   final ShoppingSuggestion suggestion;
   final VoidCallback onTap;
+  final VoidCallback onForget;
+
+  /// Opens the one-entry "Forget this suggestion" menu at the chip.
+  Future<void> _showForgetMenu(BuildContext context) async {
+    final box = context.findRenderObject()! as RenderBox;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final position = RelativeRect.fromLTRB(
+      topLeft.dx,
+      topLeft.dy + box.size.height,
+      overlay.size.width - topLeft.dx - box.size.width,
+      0,
+    );
+    final forget = await showMenu<bool>(
+      context: context,
+      position: position,
+      items: [
+        PopupMenuItem<bool>(
+          value: true,
+          child: semantic(
+            'shopping.suggestion.$index.forget',
+            child: Text(AppLocalizations.of(context).shoppingSuggestionForget),
+          ),
+        ),
+      ],
+    );
+    if (forget ?? false) {
+      onForget();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final category = suggestion.category;
     return semantic(
       'shopping.suggestion.$index',
-      child: ActionChip(
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (category != null) ...[
-              // Icon only, and LEADING. Deliberately not `CategoryBadge`
-              // (which is icon + name): a category name is regularly longer
-              // than the item it describes -- "Haushaltswaren" against
-              // "Milch" -- so on a chip it doubled the width and pushed the
-              // useful half, the item name, out of a glanceable position.
-              // Leading keeps the names left-aligned down the wrap, which is
-              // what the eye scans.
-              //
-              // `semanticLabel` carries the category name that is no longer
-              // drawn: an `Icon` without one is invisible to a screen
-              // reader, so dropping the text would otherwise have removed
-              // the category from the accessible tree entirely rather than
-              // just from the pixels. The chip still reads
-              // "<category>, <item>".
-              Icon(
-                categoryIcon(category.icon),
-                color: categoryTone(context, category.color),
-                size: 16,
-                semanticLabel: category.name,
-              ),
-              const SizedBox(width: 6),
+      // A long-press-only detector: it claims no tap and no drag, so the
+      // chip's own tap (add) and the list's vertical scroll are untouched.
+      child: GestureDetector(
+        onLongPress: () => unawaited(_showForgetMenu(context)),
+        child: ActionChip(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (category != null) ...[
+                // Icon only, and LEADING. Deliberately not `CategoryBadge`
+                // (which is icon + name): a category name is regularly longer
+                // than the item it describes -- "Haushaltswaren" against
+                // "Milch" -- so on a chip it doubled the width and pushed the
+                // useful half, the item name, out of a glanceable position.
+                // Leading keeps the names left-aligned down the wrap, which is
+                // what the eye scans.
+                //
+                // `semanticLabel` carries the category name that is no longer
+                // drawn: an `Icon` without one is invisible to a screen
+                // reader, so dropping the text would otherwise have removed
+                // the category from the accessible tree entirely rather than
+                // just from the pixels. The chip still reads
+                // "<category>, <item>".
+                Icon(
+                  categoryIcon(category.icon),
+                  color: categoryTone(context, category.color),
+                  size: 16,
+                  semanticLabel: category.name,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(suggestion.name),
             ],
-            Text(suggestion.name),
-          ],
+          ),
+          onPressed: onTap,
         ),
-        onPressed: onTap,
       ),
     );
   }

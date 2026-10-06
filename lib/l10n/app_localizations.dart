@@ -1244,6 +1244,12 @@ abstract class AppLocalizations {
   /// **'Waiting to send'**
   String get syncPendingItemTooltip;
 
+  /// The only entry of the menu that opens when a suggestion chip under the shopping quick-add field is long-pressed (persona finding F11, tom-shopping MF3: a typo added once stayed proposed forever). Choosing it hides that name from the chips and type-ahead on this device; items already on the list are unaffected.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget this suggestion'**
+  String get shoppingSuggestionForget;
+
   /// Snackbar shown after the quick-add field is submitted with a comma- or newline-separated list that added more than one NEW item (persona finding F7: a pasted "oat milk, sourdough" used to become one item). Only used for two or more; a single add stays silent. Duplicates in the list are skipped and not counted.
   ///
   /// In en, this message translates to:

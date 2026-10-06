@@ -194,6 +194,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
           ShoppingSuggestionsList(
             suggestions: _suggestions,
             onTap: _selectSuggestion,
+            onForget: _forgetSuggestion,
           ),
       ],
     );
@@ -287,6 +288,18 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     }
     _announce(outcome, AppLocalizations.of(context));
     _afterAdd();
+  }
+
+  /// F11: hides [suggestion] from the chips and type-ahead from now on,
+  /// then re-queries so it drops out of the list immediately.
+  Future<void> _forgetSuggestion(ShoppingSuggestion suggestion) async {
+    await ref
+        .read(shoppingRepositoryProvider)
+        .forgetSuggestion(suggestion.name);
+    if (!mounted) {
+      return;
+    }
+    await _updateSuggestions();
   }
 
   void _announce(_AddOutcome outcome, AppLocalizations l10n) {

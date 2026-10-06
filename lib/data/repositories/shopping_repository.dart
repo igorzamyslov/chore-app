@@ -47,12 +47,65 @@ class ShoppingSuggestion {
   final Category? category;
 }
 
-/// One shopping item row paired with its resolved category, as read
-/// directly off a join — the shared shape [ShoppingRepository.suggestions],
-/// [ShoppingRepository.findActiveByNormalizedName], and
-/// [ShoppingRepository.mostRecentCategoryIdForNormalizedName] all group and
-/// filter in Dart.
-typedef _HistoryRow = ({ShoppingItem item, Category? category});
+/// One distinct normalized item name's add history, aggregated by
+/// [ShoppingRepository._historyGroups]: the shared shape
+/// [ShoppingRepository.suggestions] and
+/// [ShoppingRepository.mostRecentCategoryIdForNormalizedName] work from.
+class _HistoryGroup {
+  _HistoryGroup({
+    required this.key,
+    required this.count,
+    required this.activeCount,
+    required this.latestCreatedAt,
+    required this.latestName,
+    required this.latestDeletedAt,
+    required this.latestCheckedAt,
+    required this.latestCategoryId,
+  });
+
+  /// The [normalizeShoppingItemName] form shared by every row in the group.
+  final String key;
+
+  /// How many rows (active or soft-deleted) were ever added under [key].
+  int count;
+
+  /// How many of those are still active (not soft-deleted).
+  int activeCount;
+
+  /// `created_at` of the newest row.
+  DateTime latestCreatedAt;
+
+  /// The casing/spelling of the newest row.
+  String latestName;
+
+  /// `deleted_at` / `checked_at` of the newest row (decide the
+  /// deleted-while-unchecked exclusion).
+  String? latestDeletedAt;
+  String? latestCheckedAt;
+
+  /// The newest row's category, which may be `null` even when an older row
+  /// had one -- see [mostRecentCategoryId].
+  String? latestCategoryId;
+
+  /// The most recent NON-null category ever used for [key], or `null`.
+  String? mostRecentCategoryId;
+  DateTime? mostRecentCategoryAt;
+
+  /// Folds another SQL-level group that normalizes to the same [key] into
+  /// this one (SQL's `lower()` is ASCII-only and its `trim()` only strips
+  /// spaces, so "Müsli"/"MÜSLI" arrive as separate SQL groups).
+  void absorb(_HistoryGroup other) {
+    count += other.count;
+    activeCount += other.activeCount;
+    if (other.latestCreatedAt.isAfter(latestCreatedAt)) {
+      latestCreatedAt = other.latestCreatedAt;
+      latestName = other.latestName;
+      latestDeletedAt = other.latestDeletedAt;
+      latestCheckedAt = other.latestCheckedAt;
+      latestCategoryId = other.latestCategoryId;
+    }
+  }
+}
 
 /// Lowercase letters that [normalizeShoppingItemName] folds to plain ASCII
 /// (persona finding F7: "Müsli" and "Musli" are the same staple). A small
@@ -238,94 +291,48 @@ class ShoppingRepository {
       return const [];
     }
 
-    final rows = await _historyRows(householdId);
+    final groups = await _historyGroups(householdId);
     final forgotten = await forgottenSuggestionNames();
-    final excludedNormalizedNames = {
-      ...forgotten,
-      if (prefix.isEmpty) ..._namesToExcludeFromFocusSuggestions(rows),
-    };
 
-    final groups = <String, List<_HistoryRow>>{};
-    for (final row in rows) {
-      final normalized = normalizeShoppingItemName(row.item.name);
-      if (!normalized.startsWith(normalizedPrefix) ||
-          excludedNormalizedNames.contains(normalized)) {
-        continue;
-      }
-      groups.putIfAbsent(normalized, () => []).add(row);
-    }
+    // The focus-suggestions (empty-prefix) path hides a name for the two
+    // independent reasons spelled out above: ANY row of it is still active
+    // (on the list right now), or its MOST RECENT row was deleted while
+    // unchecked (explicitly removed without being bought -- field feedback
+    // round 2, bug 1). A name whose newest row was checked-then-deleted
+    // (cleared after shopping) stays eligible. Forgotten names (F11) are
+    // hidden on both paths.
+    final candidates =
+        [
+          for (final group in groups)
+            if (group.key.startsWith(normalizedPrefix) &&
+                !forgotten.contains(group.key) &&
+                !(prefix.isEmpty &&
+                    (group.activeCount > 0 ||
+                        (group.latestDeletedAt != null &&
+                            group.latestCheckedAt == null))))
+              group,
+        ]..sort((a, b) {
+          final byFrequency = b.count.compareTo(a.count);
+          return byFrequency != 0
+              ? byFrequency
+              : b.latestCreatedAt.compareTo(a.latestCreatedAt);
+        });
 
-    final ranked =
-        <({ShoppingSuggestion suggestion, int frequency, DateTime recency})>[];
-    for (final group in groups.values) {
-      group.sort(
-        (a, b) => DateTime.parse(
-          b.item.createdAt,
-        ).compareTo(DateTime.parse(a.item.createdAt)),
-      );
-      final mostRecent = group.first;
-      final mostRecentWithCategory = group.firstWhere(
-        (row) => row.item.categoryId != null,
-        orElse: () => mostRecent,
-      );
-      ranked.add((
-        suggestion: ShoppingSuggestion(
-          name: mostRecent.item.name,
-          categoryId: mostRecentWithCategory.item.categoryId,
-          category: mostRecentWithCategory.category,
+    final top = candidates.take(limit).toList();
+    final categories = await _categoriesById([
+      for (final group in top)
+        if ((group.mostRecentCategoryId ?? group.latestCategoryId) != null)
+          group.mostRecentCategoryId ?? group.latestCategoryId!,
+    ]);
+    return [
+      for (final group in top)
+        ShoppingSuggestion(
+          name: group.latestName,
+          categoryId: group.mostRecentCategoryId ?? group.latestCategoryId,
+          category:
+              categories[group.mostRecentCategoryId ?? group.latestCategoryId],
         ),
-        frequency: group.length,
-        recency: DateTime.parse(mostRecent.item.createdAt),
-      ));
-    }
-
-    ranked.sort((a, b) {
-      final byFrequency = b.frequency.compareTo(a.frequency);
-      return byFrequency != 0 ? byFrequency : b.recency.compareTo(a.recency);
-    });
-
-    return [for (final entry in ranked.take(limit)) entry.suggestion];
-  }
-
-  /// Computes the set of normalized names to exclude from the
-  /// focus-suggestions (empty-prefix) path of [suggestions], for the two
-  /// independent reasons spelled out in [suggestions]' doc comment: ANY
-  /// row of the name is still active (on the list right now), or the
-  /// name's MOST RECENT row (by `created_at`) was deleted while unchecked
-  /// (explicitly removed without being bought — field feedback round 2,
-  /// bug 1). A name whose most recent row was checked-then-deleted
-  /// (cleared after shopping) is left eligible.
-  Set<String> _namesToExcludeFromFocusSuggestions(List<_HistoryRow> rows) {
-    final excluded = <String>{};
-    final mostRecentByName = <String, _HistoryRow>{};
-    for (final row in rows) {
-      final normalized = normalizeShoppingItemName(row.item.name);
-      // Reason 1 — still on the list. Tested against EVERY row, not just
-      // the name's most recent one: B3 duplicate prevention normally keeps
-      // at most one active row per name (and it is the newest), but "never
-      // propose something the user can already see on this screen" must
-      // not silently depend on an invariant enforced in another feature.
-      if (row.item.deletedAt == null) {
-        excluded.add(normalized);
-      }
-      final current = mostRecentByName[normalized];
-      if (current == null ||
-          DateTime.parse(
-            row.item.createdAt,
-          ).isAfter(DateTime.parse(current.item.createdAt))) {
-        mostRecentByName[normalized] = row;
-      }
-    }
-    // Reason 2 — explicitly removed without ever being bought. Only the
-    // most recent row decides this, so adding the name again later (a
-    // newer row) makes it eligible again.
-    for (final entry in mostRecentByName.entries) {
-      final item = entry.value.item;
-      if (item.deletedAt != null && item.checkedAt == null) {
-        excluded.add(entry.key);
-      }
-    }
-    return excluded;
+    ];
   }
 
   /// Finds the ACTIVE (non-deleted) item in [householdId] whose normalized
@@ -338,11 +345,25 @@ class ShoppingRepository {
     String householdId,
     String normalizedName,
   ) async {
-    final rows = await _historyRows(householdId);
-    for (final row in rows) {
-      if (row.item.deletedAt == null &&
-          normalizeShoppingItemName(row.item.name) == normalizedName) {
-        return ShoppingItemWithCategory(item: row.item, category: row.category);
+    // Only ACTIVE rows can be a duplicate, so the (potentially years-long)
+    // history never needs reading for this.
+    final query =
+        db.select(db.shoppingItems).join([
+          leftOuterJoin(
+            db.categories,
+            db.categories.id.equalsExp(db.shoppingItems.categoryId),
+          ),
+        ])..where(
+          db.shoppingItems.householdId.equals(householdId) &
+              db.shoppingItems.deletedAt.isNull(),
+        );
+    for (final row in await query.get()) {
+      final item = row.readTable(db.shoppingItems);
+      if (normalizeShoppingItemName(item.name) == normalizedName) {
+        return ShoppingItemWithCategory(
+          item: item,
+          category: row.readTableOrNull(db.categories),
+        );
       }
     }
     return null;
@@ -360,45 +381,116 @@ class ShoppingRepository {
     String householdId,
     String normalizedName,
   ) async {
-    final rows = await _historyRows(householdId);
-    final matches =
-        [
-          for (final row in rows)
-            if (normalizeShoppingItemName(row.item.name) == normalizedName) row,
-        ]..sort(
-          (a, b) => DateTime.parse(
-            b.item.createdAt,
-          ).compareTo(DateTime.parse(a.item.createdAt)),
-        );
-    for (final row in matches) {
-      final categoryId = row.item.categoryId;
-      if (categoryId != null) {
-        return categoryId;
+    for (final group in await _historyGroups(householdId)) {
+      if (group.key == normalizedName) {
+        return group.mostRecentCategoryId;
       }
     }
     return null;
   }
 
-  /// Every item ever added to [householdId] (active or soft-deleted),
-  /// joined with its resolved category — the shared raw fetch behind
-  /// [suggestions], [findActiveByNormalizedName], and
-  /// [mostRecentCategoryIdForNormalizedName].
-  Future<List<_HistoryRow>> _historyRows(String householdId) async {
-    final query = db.select(db.shoppingItems).join([
-      leftOuterJoin(
-        db.categories,
-        db.categories.id.equalsExp(db.shoppingItems.categoryId),
-      ),
-    ])..where(db.shoppingItems.householdId.equals(householdId));
+  /// The household's whole add history (active and soft-deleted rows),
+  /// aggregated per distinct normalized name -- the shared fetch behind
+  /// [suggestions] and [mostRecentCategoryIdForNormalizedName] (persona
+  /// finding H6-query).
+  ///
+  /// This used to load EVERY row ever added, for every keystroke and for
+  /// each of the three queries per add. It is now two `GROUP BY` queries
+  /// that return one row per distinct name: count, newest `created_at`, and
+  /// -- through SQLite's documented bare-column rule, which takes the
+  /// non-aggregate columns of a query with exactly one `max()` from the
+  /// row holding that maximum -- the newest row's name, state and
+  /// category; plus the newest NON-null category per name. SQL's `lower()`
+  /// and `trim()` are only an approximation of [normalizeShoppingItemName]
+  /// (ASCII-only, spaces-only, no diacritic folding), so the SQL groups are
+  /// merged by the real normalized key here; every aggregate is
+  /// merge-safe.
+  Future<List<_HistoryGroup>> _historyGroups(String householdId) async {
+    final variables = [Variable<String>(householdId)];
+    final latest = await db
+        .customSelect(
+          '''
+SELECT lower(trim(name)) AS k,
+       COUNT(*) AS cnt,
+       SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) AS active_cnt,
+       MAX(created_at) AS latest_created_at,
+       name AS latest_name,
+       deleted_at AS latest_deleted_at,
+       checked_at AS latest_checked_at,
+       category_id AS latest_category_id
+FROM shopping_items
+WHERE household_id = ?1
+GROUP BY k
+''',
+          variables: variables,
+          readsFrom: {db.shoppingItems},
+        )
+        .get();
+    final categorised = await db
+        .customSelect(
+          '''
+SELECT lower(trim(name)) AS k,
+       MAX(created_at) AS category_created_at,
+       name AS category_row_name,
+       category_id AS category_id
+FROM shopping_items
+WHERE household_id = ?1 AND category_id IS NOT NULL
+GROUP BY k
+''',
+          variables: variables,
+          readsFrom: {db.shoppingItems},
+        )
+        .get();
 
-    final rows = await query.get();
-    return [
-      for (final row in rows)
-        (
-          item: row.readTable(db.shoppingItems),
-          category: row.readTableOrNull(db.categories),
-        ),
-    ];
+    final byKey = <String, _HistoryGroup>{};
+    for (final row in latest) {
+      final name = row.read<String>('latest_name');
+      final group = _HistoryGroup(
+        key: normalizeShoppingItemName(name),
+        count: row.read<int>('cnt'),
+        activeCount: row.read<int>('active_cnt'),
+        latestCreatedAt: DateTime.parse(row.read<String>('latest_created_at')),
+        latestName: name,
+        latestDeletedAt: row.readNullable<String>('latest_deleted_at'),
+        latestCheckedAt: row.readNullable<String>('latest_checked_at'),
+        latestCategoryId: row.readNullable<String>('latest_category_id'),
+      );
+      final existing = byKey[group.key];
+      if (existing == null) {
+        byKey[group.key] = group;
+      } else {
+        existing.absorb(group);
+      }
+    }
+    for (final row in categorised) {
+      // Every categorised row also appears in the first query, so its group
+      // exists; the row's own name normalizes to the group's key.
+      final group =
+          byKey[normalizeShoppingItemName(
+            row.read<String>('category_row_name'),
+          )];
+      if (group == null) {
+        continue;
+      }
+      final at = DateTime.parse(row.read<String>('category_created_at'));
+      final newest = group.mostRecentCategoryAt;
+      if (newest == null || at.isAfter(newest)) {
+        group
+          ..mostRecentCategoryAt = at
+          ..mostRecentCategoryId = row.read<String>('category_id');
+      }
+    }
+    return byKey.values.toList();
+  }
+
+  Future<Map<String, Category>> _categoriesById(List<String> ids) async {
+    if (ids.isEmpty) {
+      return const {};
+    }
+    final rows = await (db.select(
+      db.categories,
+    )..where((tbl) => tbl.id.isIn(ids))).get();
+    return {for (final category in rows) category.id: category};
   }
 
   /// Adds a new item to [householdId]'s shopping list.
