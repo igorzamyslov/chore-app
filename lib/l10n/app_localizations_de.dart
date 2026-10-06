@@ -789,7 +789,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get shoppingClearButton => 'Erledigte leeren';
+  String get shoppingClearButton => 'Einkaufswagen leeren';
 
   @override
   String get shoppingUncheckAll => 'Alles zurücklegen';
@@ -1385,7 +1385,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncHealthBannerMessage =>
-      'Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.';
+      'Gerade keine Verbindung zum Haushalt. Deine Änderungen sind gespeichert — zieh die Liste nach unten, um es erneut zu versuchen.';
 
   @override
   String get settingsAccountSignOutError =>

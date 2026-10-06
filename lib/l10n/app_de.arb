@@ -202,7 +202,7 @@
   "shoppingUncategorized": "Ohne Kategorie",
 
   "shoppingCartHeader": "{count, plural, one{Im Einkaufswagen (1)} other{Im Einkaufswagen ({count})}}",
-  "shoppingClearButton": "Erledigte leeren",
+  "shoppingClearButton": "Einkaufswagen leeren",
   "shoppingUncheckAll": "Alles zurücklegen",
 
   "shoppingClearedSnackbar": "{count, plural, one{1 Artikel entfernt} other{{count} Artikel entfernt}}",
@@ -366,7 +366,7 @@
   "syncRefreshErrorRevoked": "Dieses Handy wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Haushalt neu.",
   "syncRefreshErrorRejected": "Der Haushalts-Server hat eine Änderung von diesem Handy abgelehnt, sie ist also nicht angekommen. Prüfe, ob es ein App-Update gibt; deine anderen Änderungen werden weiter synchronisiert.",
   "syncPendingChanges": "{count, plural, one{1 Änderung wartet aufs Senden} other{{count} Änderungen warten aufs Senden}}",
-  "syncHealthBannerMessage": "Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.",
+  "syncHealthBannerMessage": "Gerade keine Verbindung zum Haushalt. Deine Änderungen sind gespeichert — zieh die Liste nach unten, um es erneut zu versuchen.",
   "settingsAccountSignOutError": "Abmelden hat nicht geklappt. Versuch es noch mal.",
   "settingsAccountComingSoonTitle": "Synchronisierung — bald verfügbar",
   "settingsAccountReconnectTitle": "Mit {householdName} neu verbinden",
