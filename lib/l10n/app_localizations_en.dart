@@ -764,6 +764,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAssignmentAnyone => 'Anyone';
 
   @override
+  String get choreFormAssignmentHelpFixed => 'Always the same person.';
+
+  @override
+  String get choreFormAssignmentHelpRotation =>
+      'Takes turns in this order, starting at 1.';
+
+  @override
+  String get choreFormAssignmentHelpAnyone => 'Whoever gets to it.';
+
+  @override
   String choreFormAssigneeOrderLabel(int order, String name) {
     return '$order. $name';
   }

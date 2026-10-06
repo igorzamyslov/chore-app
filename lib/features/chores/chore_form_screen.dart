@@ -73,6 +73,12 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   late PlainDate _startDate;
   AssignmentMode _assignmentMode = AssignmentMode.anyone;
   List<String> _selectedMemberIds = [];
+  // C7 (persona review 2026-10-06): each mode's own selection, so switching
+  // Rotation -> Fixed -> Rotation gives back the ordered list just built
+  // instead of wiping it. `_selectedMemberIds` stays the live selection of
+  // the CURRENT mode; these hold the other modes' picks while away.
+  String? _fixedMemberId;
+  List<String> _rotationMemberIds = [];
 
   TitleError? _titleError;
   IntervalError? _intervalError;
@@ -566,10 +572,25 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     });
   }
 
+  /// Switches the assignment mode, parking the outgoing mode's selection
+  /// and restoring the incoming one's (C7, persona review 2026-10-06).
   void _onAssignmentModeChanged(AssignmentMode mode) {
     setState(() {
+      switch (_assignmentMode) {
+        case AssignmentMode.fixed:
+          _fixedMemberId = _selectedMemberIds.firstOrNull;
+        case AssignmentMode.rotation:
+          _rotationMemberIds = List.of(_selectedMemberIds);
+        case AssignmentMode.anyone:
+          break;
+      }
       _assignmentMode = mode;
-      _selectedMemberIds = [];
+      final fixed = _fixedMemberId;
+      _selectedMemberIds = switch (mode) {
+        AssignmentMode.fixed => [?fixed],
+        AssignmentMode.rotation => List.of(_rotationMemberIds),
+        AssignmentMode.anyone => [],
+      };
       _assignmentError = null;
     });
   }

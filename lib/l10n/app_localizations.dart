@@ -1112,6 +1112,24 @@ abstract class AppLocalizations {
   /// **'Anyone'**
   String get choreFormAssignmentAnyone;
 
+  /// Helper line under the chore form's assignment-mode control while 'Fixed' is selected (persona review 2026-10-06 C7: the three modes were unexplained).
+  ///
+  /// In en, this message translates to:
+  /// **'Always the same person.'**
+  String get choreFormAssignmentHelpFixed;
+
+  /// Helper line under the assignment-mode control while 'Rotation' is selected (persona review C7): the numbered list below IS the turn order, and the member numbered 1 gets the first turn.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes turns in this order, starting at 1.'**
+  String get choreFormAssignmentHelpRotation;
+
+  /// Helper line under the assignment-mode control while 'Anyone' is selected (persona review C7): nobody is assigned; whoever does it gets the credit.
+  ///
+  /// In en, this message translates to:
+  /// **'Whoever gets to it.'**
+  String get choreFormAssignmentHelpAnyone;
+
   /// Rotation-mode assignee chip label showing the member's tap order before their name, e.g. '1. Alex'.
   ///
   /// In en, this message translates to:
