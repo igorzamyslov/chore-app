@@ -982,7 +982,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberEditDeleteBlockedSelf =>
-      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.';
+      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Household.';
 
   @override
   String get memberEditDeleteBlockedOffline =>
@@ -1124,7 +1124,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.';
+      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device. Technical error reports are sent too — you can switch them off under About.';
+
+  @override
+  String get settingsAccountHowItWorks => 'How accounts work';
+
+  @override
+  String get settingsAccountHowItWorksAccountTitle => 'Account';
+
+  @override
+  String get settingsAccountHowItWorksAccountBody =>
+      'Your email login on the sync server. You only need one to share a household or keep several phones in step.';
+
+  @override
+  String get settingsAccountHowItWorksMemberTitle => 'Member';
+
+  @override
+  String get settingsAccountHowItWorksMemberBody =>
+      'A person in the household. A member may have their own account and phone, or not — anyone can mark their chores.';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdTitle => 'Household';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdBody =>
+      'The shared chores and shopping list. It lives on your phone, and on the sync server too once you put it online.';
 
   @override
   String get settingsAccountEmailLabel => 'Email address';
@@ -1147,12 +1171,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsAccountPausedNotice(String householdName) {
-    return 'This device is still connected to $householdName, but syncing is paused. Changes you make now will be sent once you sign in again.';
+    return 'This phone is still connected to $householdName, but syncing is paused. Changes you make now will be sent once you sign in again. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.';
   }
 
   @override
   String get settingsAccountDisconnect =>
       'Disconnect from the online household';
+
+  @override
+  String get settingsAccountDisconnectSubtitle =>
+      'Stops syncing on this phone only — the household stays online for everyone else.';
 
   @override
   String get settingsAccountDisconnectConfirmTitle =>
@@ -1167,6 +1195,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountLeave => 'Leave the household';
+
+  @override
+  String get settingsAccountLeaveSubtitle =>
+      'Removes you from the household. Your chores and history stay with them.';
 
   @override
   String householdLeaveConfirmTitle(String householdName) {
@@ -1235,7 +1267,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.';
+      'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Sign out';
@@ -1246,7 +1278,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncRefreshErrorRevoked =>
-      'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.';
+      'This phone was removed from the household, so nothing will sync. Nothing is lost — see Settings → Household to reconnect.';
 
   @override
   String get syncHealthBannerMessage =>
@@ -1555,11 +1587,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
+      'Export your data first if you want a copy. This permanently deletes your household, members, chores, and shopping list. There is no cloud backup — this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>
-      'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.';
+      'Export your data first if you want a copy. Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list. Your account and email stay on the server — Delete my account removes them.';
 
   @override
   String get settingsResetConfirm1Action => 'Continue';

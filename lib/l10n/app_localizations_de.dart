@@ -988,7 +988,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get memberEditDeleteBlockedSelf =>
-      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.';
+      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Haushalt.';
 
   @override
   String get memberEditDeleteBlockedOffline =>
@@ -1131,7 +1131,31 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.';
+      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät. Technische Fehlerberichte werden ebenfalls gesendet — unter Über die App kannst du sie abschalten.';
+
+  @override
+  String get settingsAccountHowItWorks => 'So funktionieren Konten';
+
+  @override
+  String get settingsAccountHowItWorksAccountTitle => 'Konto';
+
+  @override
+  String get settingsAccountHowItWorksAccountBody =>
+      'Deine E-Mail-Anmeldung beim Sync-Server. Du brauchst es nur, um einen Haushalt zu teilen oder mehrere Handys auf dem gleichen Stand zu halten.';
+
+  @override
+  String get settingsAccountHowItWorksMemberTitle => 'Mitglied';
+
+  @override
+  String get settingsAccountHowItWorksMemberBody =>
+      'Eine Person im Haushalt. Ein Mitglied kann ein eigenes Konto und Handy haben oder auch nicht — jeder kann seine Aufgaben abhaken.';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdTitle => 'Haushalt';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdBody =>
+      'Die gemeinsamen Aufgaben und die Einkaufsliste. Er liegt auf deinem Handy und, sobald du ihn online stellst, auch auf dem Sync-Server.';
 
   @override
   String get settingsAccountEmailLabel => 'E-Mail-Adresse';
@@ -1154,12 +1178,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String settingsAccountPausedNotice(String householdName) {
-    return 'Dieses Gerät ist weiterhin mit $householdName verbunden, aber die Synchronisierung ist pausiert. Änderungen, die du jetzt vornimmst, werden gesendet, sobald du dich wieder anmeldest.';
+    return 'Dieses Handy ist weiterhin mit $householdName verbunden, aber die Synchronisierung ist pausiert. Änderungen, die du jetzt vornimmst, werden gesendet, sobald du dich wieder anmeldest. Ändert jemand anderes inzwischen dasselbe, ersetzt deine Version seine, sobald du dich wieder anmeldest.';
   }
 
   @override
   String get settingsAccountDisconnect =>
       'Verbindung zum Online-Haushalt trennen';
+
+  @override
+  String get settingsAccountDisconnectSubtitle =>
+      'Stoppt die Synchronisierung nur auf diesem Handy — für alle anderen bleibt der Haushalt online.';
 
   @override
   String get settingsAccountDisconnectConfirmTitle =>
@@ -1174,6 +1202,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountLeave => 'Haushalt verlassen';
+
+  @override
+  String get settingsAccountLeaveSubtitle =>
+      'Entfernt dich aus dem Haushalt. Deine Aufgaben und dein Verlauf bleiben dort.';
 
   @override
   String householdLeaveConfirmTitle(String householdName) {
@@ -1242,7 +1274,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet.';
+      'Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet. Ändert jemand anderes inzwischen dasselbe, ersetzt deine Version seine, sobald du dich wieder anmeldest.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Abmelden';
@@ -1253,7 +1285,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncRefreshErrorRevoked =>
-      'Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.';
+      'Dieses Handy wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Haushalt neu.';
 
   @override
   String get syncHealthBannerMessage =>
@@ -1564,11 +1596,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
+      'Exportiere vorher deine Daten, wenn du eine Kopie behalten willst. Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung — das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>
-      'Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät.';
+      'Exportiere vorher deine Daten, wenn du eine Kopie behalten willst. Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät. Dein Konto und deine E-Mail bleiben auf dem Server — Konto löschen entfernt sie.';
 
   @override
   String get settingsResetConfirm1Action => 'Weiter';

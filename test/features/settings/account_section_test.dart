@@ -116,9 +116,38 @@ void main() {
         find.text(
           "Signing in stores your email and your household's data — chores, "
           'shopping list, members — on the sync server, so your devices stay '
-          'in step. Without an account, everything stays on this device.',
+          'in step. Without an account, everything stays on this device. '
+          'Technical error reports are sent too — you can switch them off '
+          'under About.',
         ),
         findsOneWidget,
+      );
+
+      // Persona review D9: a "How accounts work" link under the intro
+      // defines the three terms the exit rows rely on.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.howItWorks'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+        findsOneWidget,
+      );
+      for (final heading in ['Account', 'Member', 'Household']) {
+        expect(
+          find.descendant(
+            of: find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+            matching: find.text(heading),
+          ),
+          findsOneWidget,
+          reason: heading,
+        );
+      }
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+        findsNothing,
       );
 
       FilledButton sendButtonWidget() => tester.widget<FilledButton>(
@@ -330,9 +359,10 @@ void main() {
       );
       expect(
         find.text(
-          'This device is still connected to My household, but syncing is '
+          'This phone is still connected to My household, but syncing is '
           'paused. Changes you make now will be sent once you sign in '
-          'again.',
+          'again. If someone else edits the same item meanwhile, your '
+          'version replaces theirs when you sign back in.',
         ),
         findsOneWidget,
       );

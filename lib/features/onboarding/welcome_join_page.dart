@@ -26,6 +26,8 @@ import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
+import 'package:chore_app/features/settings/account_section.dart'
+    show HowAccountsWorkLink;
 import 'package:chore_app/features/settings/account_validation.dart';
 import 'package:chore_app/features/settings/join_flow_steps.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -223,7 +225,8 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(l10n.settingsAccountIntro),
-        const SizedBox(height: 12),
+        const HowAccountsWorkLink(semanticId: 'welcome.join.howItWorks'),
+        const SizedBox(height: 4),
         semantic(
           'welcome.join.email',
           child: TextField(

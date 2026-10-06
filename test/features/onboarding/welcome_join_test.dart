@@ -478,7 +478,9 @@ void main() {
         find.text(
           "Signing in stores your email and your household's data — chores, "
           'shopping list, members — on the sync server, so your devices stay '
-          'in step. Without an account, everything stays on this device.',
+          'in step. Without an account, everything stays on this device. '
+          'Technical error reports are sent too — you can switch them off '
+          'under About.',
         ),
         findsOneWidget,
       );

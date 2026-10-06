@@ -1469,7 +1469,7 @@ abstract class AppLocalizations {
   /// Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10.
   ///
   /// In en, this message translates to:
-  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.'**
+  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Household.'**
   String get memberEditDeleteBlockedSelf;
 
   /// Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2).
@@ -1685,8 +1685,50 @@ abstract class AppLocalizations {
   /// Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that).
   ///
   /// In en, this message translates to:
-  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.'**
+  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device. Technical error reports are sent too — you can switch them off under About.'**
   String get settingsAccountIntro;
+
+  /// Text link under the sign-in intro (ids settings.account.howItWorks / welcome.join.howItWorks) and the title of the sheet it opens, which defines account, member and household (persona review D9: the three terms were never explained).
+  ///
+  /// In en, this message translates to:
+  /// **'How accounts work'**
+  String get settingsAccountHowItWorks;
+
+  /// First heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsAccountHowItWorksAccountTitle;
+
+  /// Paragraph under 'Account' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your email login on the sync server. You only need one to share a household or keep several phones in step.'**
+  String get settingsAccountHowItWorksAccountBody;
+
+  /// Second heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get settingsAccountHowItWorksMemberTitle;
+
+  /// Paragraph under 'Member' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'A person in the household. A member may have their own account and phone, or not — anyone can mark their chores.'**
+  String get settingsAccountHowItWorksMemberBody;
+
+  /// Third heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Household'**
+  String get settingsAccountHowItWorksHouseholdTitle;
+
+  /// Paragraph under 'Household' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'The shared chores and shopping list. It lives on your phone, and on the sync server too once you put it online.'**
+  String get settingsAccountHowItWorksHouseholdBody;
 
   /// Label of the Account section's signed-out email TextField.
   ///
@@ -1721,7 +1763,7 @@ abstract class AppLocalizations {
   /// Notice shown ABOVE the reused sign-in form in the Account section's honest signed-out-but-linked state (spec docs/feedback/2026-08-07-field-feedback.md A1.1) -- names the still-connected household and states plainly that syncing is paused, replacing what used to render as a bare, indistinguishable-from-never-linked sign-in form.
   ///
   /// In en, this message translates to:
-  /// **'This device is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again.'**
+  /// **'This phone is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.'**
   String settingsAccountPausedNotice(String householdName);
 
   /// Label of the Account section's A1.2 disconnect row -- a secondary, clearly non-primary action shown below the reused sign-in form in the signed-out-but-linked state, and below the Invite row in the normal signed-in linked state.
@@ -1729,6 +1771,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disconnect from the online household'**
   String get settingsAccountDisconnect;
+
+  /// Subtitle of the Account section's Disconnect row (id settings.account.disconnect): the purely local exit, worded against Leave (persona review D9).
+  ///
+  /// In en, this message translates to:
+  /// **'Stops syncing on this phone only — the household stays online for everyone else.'**
+  String get settingsAccountDisconnectSubtitle;
 
   /// Title of the A1.2 disconnect confirmation dialog.
   ///
@@ -1753,6 +1801,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leave the household'**
   String get settingsAccountLeave;
+
+  /// Subtitle of the Account section's Leave row (id settings.account.leave): what leaving does, in one line, so it reads differently from Disconnect and Delete my account (persona review D9: four exit rows with no subtitles).
+  ///
+  /// In en, this message translates to:
+  /// **'Removes you from the household. Your chores and history stay with them.'**
+  String get settingsAccountLeaveSubtitle;
 
   /// Title of the leave-household confirm sheet.
   ///
@@ -1865,7 +1919,7 @@ abstract class AppLocalizations {
   /// Body of the sign-out confirmation dialog (spec docs/feedback/2026-08-07-field-feedback.md A1.3): states plainly what signing out actually does -- syncing pauses, the household stays on this device, and changes made while signed out are kept and sent on the next sign-in -- replacing the old, less complete 'sign in again anytime' copy.
   ///
   /// In en, this message translates to:
-  /// **'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.'**
+  /// **'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.'**
   String get settingsAccountSignOutConfirmBody;
 
   /// Confirm button of the sign-out confirmation dialog.
@@ -1883,7 +1937,7 @@ abstract class AppLocalizations {
   /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED pull-to-refresh is what discovered that this device's membership was revoked (spec docs/specs/household-lifecycle.md 3.5). SupabaseSyncEngine.refreshNow() has already cleared the sync link by the time it returns false for this case, so syncRefreshError's 'will sync later' would be a promise the app cannot keep.
   ///
   /// In en, this message translates to:
-  /// **'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.'**
+  /// **'This phone was removed from the household, so nothing will sync. Nothing is lost — see Settings → Household to reconnect.'**
   String get syncRefreshErrorRevoked;
 
   /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
@@ -2327,13 +2381,13 @@ abstract class AppLocalizations {
   /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
+  /// **'Export your data first if you want a copy. This permanently deletes your household, members, chores, and shopping list. There is no cloud backup — this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
   String get settingsResetConfirm1Body;
 
   /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.
   ///
   /// In en, this message translates to:
-  /// **'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.'**
+  /// **'Export your data first if you want a copy. Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list. Your account and email stay on the server — Delete my account removes them.'**
   String get settingsResetConfirm1BodyLinked;
 
   /// Confirm button of the first reset dialog; advances to the second, final confirmation rather than deleting anything yet.

@@ -350,6 +350,25 @@ Disconnect is unchanged and stays distinct: it is purely local, keeps
 (`lib/application/household_link_service.dart`). The copy must keep the
 two clearly apart.
 
+> **Amendment 2026-10-06 (persona review D9, B4, B5, B8, D13) — terms and
+> consequences.** The Leave row carries the subtitle "Removes you from the
+> household. Your chores and history stay with them." and Disconnect "Stops
+> syncing on this phone only — the household stays online for everyone
+> else." A "How accounts work" link under the sign-in intro
+> (`settings.account.howItWorks`; `welcome.join.howItWorks` on the welcome
+> join subpage) opens a sheet defining Account (your email login on the
+> sync server), Member (a person in the household, with or without an
+> account) and Household (the shared chores and list, on your phone and, once
+> online, on the server). Copy pointing at "Settings → Account" now says
+> "Settings → Household"; the paused notice and the revoked-refresh error
+> say "this phone". The sign-out confirm and the paused notice add that a
+> concurrent edit by someone else is replaced by your version when you sign
+> back in (last write wins, `sync-backend.md` §8). The reset confirm points
+> at Export first, uses an em dash, and its linked variant adds that the
+> account and email stay on the server until Delete my account. The sign-in
+> intro discloses that technical error reports are sent too and can be
+> switched off under About.
+
 ### 3.4 Last-member warning (D-L5)
 
 The Leave confirm needs the count of CLAIMED members to decide whether to

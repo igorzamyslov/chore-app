@@ -99,6 +99,21 @@ void main() {
         findsOneWidget,
         reason: 'Disconnect is a different, purely local action and stays',
       );
+      // Persona review D9: each exit row says what it does in one line.
+      expect(
+        find.text(
+          'Removes you from the household. Your chores and history stay '
+          'with them.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Stops syncing on this phone only — the household stays online '
+          'for everyone else.',
+        ),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },

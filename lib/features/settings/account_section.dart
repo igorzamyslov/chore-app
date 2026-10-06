@@ -144,6 +144,89 @@ class _LeftNotice extends StatelessWidget {
   }
 }
 
+/// The "How accounts work" text link under the sign-in intro (persona
+/// review D9): account, member and household were never defined anywhere,
+/// so the four exit rows read as synonyms. Opens [showHowAccountsWorkSheet].
+/// Shared with the welcome join subpage, which passes its own [semanticId].
+class HowAccountsWorkLink extends StatelessWidget {
+  /// Creates the link.
+  const HowAccountsWorkLink({required this.semanticId, super.key});
+
+  /// The link's semantic id (`settings.account.howItWorks` here,
+  /// `welcome.join.howItWorks` on the welcome join subpage).
+  final String semanticId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: semantic(
+        semanticId,
+        child: TextButton(
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          onPressed: () => showHowAccountsWorkSheet(context),
+          child: Text(AppLocalizations.of(context).settingsAccountHowItWorks),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the "How accounts work" sheet: three short definitions -- account,
+/// member, household -- in that order (persona review D9).
+Future<void> showHowAccountsWorkSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      final l10n = AppLocalizations.of(sheetContext);
+      final theme = Theme.of(sheetContext);
+      Widget paragraph(String title, String body) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(body, style: theme.textTheme.bodyMedium),
+          ],
+        ),
+      );
+      return semantic(
+        'settings.account.howItWorks.sheet',
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsAccountHowItWorks,
+                  style: theme.textTheme.titleLarge,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksAccountTitle,
+                  l10n.settingsAccountHowItWorksAccountBody,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksMemberTitle,
+                  l10n.settingsAccountHowItWorksMemberBody,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksHouseholdTitle,
+                  l10n.settingsAccountHowItWorksHouseholdBody,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// The disabled placeholder row shown when Supabase isn't configured.
 class _ComingSoonTile extends StatelessWidget {
   const _ComingSoonTile();
@@ -349,7 +432,8 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l10n.settingsAccountIntro),
-          const SizedBox(height: 12),
+          const HowAccountsWorkLink(semanticId: 'settings.account.howItWorks'),
+          const SizedBox(height: 4),
           semantic(
             'settings.account.email',
             child: TextField(
@@ -493,6 +577,7 @@ class _DisconnectRow extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.link_off),
         title: Text(l10n.settingsAccountDisconnect),
+        subtitle: Text(l10n.settingsAccountDisconnectSubtitle),
         onTap: () => _confirmAndDisconnect(context, ref),
       ),
     );
@@ -578,6 +663,7 @@ class _LeaveRow extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.logout),
         title: Text(l10n.settingsAccountLeave),
+        subtitle: Text(l10n.settingsAccountLeaveSubtitle),
         onTap: () => _leave(context, ref),
       ),
     );

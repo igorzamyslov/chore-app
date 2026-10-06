@@ -182,10 +182,11 @@ void main() {
 
       expect(
         find.text(
-          'Your household stays online — this phone just disconnects '
-          'from it. You can reconnect by signing in again. This still '
-          "permanently deletes this phone's local members, chores, and "
-          'shopping list.',
+          'Export your data first if you want a copy. Your household stays '
+          'online — this phone just disconnects from it. You can reconnect '
+          "by signing in again. This still permanently deletes this phone's "
+          'local members, chores, and shopping list. Your account and email '
+          'stay on the server — Delete my account removes them.',
         ),
         findsOneWidget,
       );
