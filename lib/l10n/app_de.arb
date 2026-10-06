@@ -106,7 +106,7 @@
   "digestPrepromptEnableAction": "Aktivieren",
   "digestPrepromptDismissAction": "Nicht jetzt",
 
-  "catchUpBannerMessage": "{count, plural, one{Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.} other{Wir haben {count} überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.}}",
+  "catchUpBannerMessage": "Deine wiederkehrenden Aufgaben sind zu ihrem neuesten Fälligkeitstermin gesprungen — du hast nichts zusätzlich verpasst.",
   "catchUpBannerDismissTooltip": "Schließen",
 
   "choresSnackbarDone": "Erledigt",

@@ -632,11 +632,11 @@ abstract class AppLocalizations {
   /// **'Not now'**
   String get digestPrepromptDismissAction;
 
-  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.
+  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Reworded 2026-10-06 (persona review E2) from the mechanism ('moved forward' reads as earlier OR later) to the outcome the reader cares about: the repeating chores now sit on their latest due date and nothing extra counts against them. Still avoids 'missed' as an accusation and any claim the user was away, since catch-up also runs on a local day change with the app open. No count: the sentence reads the same for one chore or many, and the banner covers fewer chores than a count would imply.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}'**
-  String catchUpBannerMessage(int count);
+  /// **'Your repeating chores jumped ahead to their latest due date — you didn\'t miss anything extra.'**
+  String get catchUpBannerMessage;
 
   /// Tooltip for the catch-up banner's X dismiss button, which resets the count so the banner hides until a genuinely new catch-up run reports one.
   ///
