@@ -1238,10 +1238,10 @@ abstract class AppLocalizations {
   /// **'Start date'**
   String get choreFormStartDateLabel;
 
-  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
+  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Reworded 2026-10-06 (persona review B9) from 'Remind me about this chore': the reminder is a property of the shared chore and rings on the phone of whoever it is assigned to (or of everyone, when unassigned), so it must not read as a personal setting of the person editing the form. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
   ///
   /// In en, this message translates to:
-  /// **'Remind me about this chore'**
+  /// **'Remind whoever it\'s assigned to'**
   String get choreFormReminderToggle;
 
   /// Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over.
@@ -1250,10 +1250,10 @@ abstract class AppLocalizations {
   /// **'Reminder time'**
   String get choreFormReminderTime;
 
-  /// Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding.
+  /// Sub-line under the chore form's reminder time card. Says whose phone rings ('their': whoever the chore is assigned to) and explains Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Reworded 2026-10-06 (persona review B9); the copy is quoted verbatim in the spec's §11 amendment and is binding.
   ///
   /// In en, this message translates to:
-  /// **'This chore won\'t be counted in the daily summary'**
+  /// **'Rings on their phone at this time. That day\'s daily summary leaves this chore out.'**
   String get choreFormReminderHint;
 
   /// Shopping list empty-state message, shown when there are no items at all.

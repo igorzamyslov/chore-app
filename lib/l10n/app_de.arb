@@ -212,9 +212,9 @@
 
   "choreFormStartDateLabel": "Startdatum",
 
-  "choreFormReminderToggle": "An diese Aufgabe erinnern",
+  "choreFormReminderToggle": "Erinnere, wer dran ist",
   "choreFormReminderTime": "Erinnerungszeit",
-  "choreFormReminderHint": "Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf",
+  "choreFormReminderHint": "Klingelt um diese Zeit auf ihrem Handy. Die Tagesübersicht lässt diese Aufgabe an dem Tag aus.",
 
   "shoppingEmptyState": "Die Einkaufsliste ist leer",
   "shoppingErrorMessage": "Deine Einkaufsliste konnte nicht geladen werden.",

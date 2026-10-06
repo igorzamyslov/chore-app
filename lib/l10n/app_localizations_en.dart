@@ -824,14 +824,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormStartDateLabel => 'Start date';
 
   @override
-  String get choreFormReminderToggle => 'Remind me about this chore';
+  String get choreFormReminderToggle => 'Remind whoever it\'s assigned to';
 
   @override
   String get choreFormReminderTime => 'Reminder time';
 
   @override
   String get choreFormReminderHint =>
-      'This chore won\'t be counted in the daily summary';
+      'Rings on their phone at this time. That day\'s daily summary leaves this chore out.';
 
   @override
   String get shoppingEmptyState => 'Shopping list is empty';
