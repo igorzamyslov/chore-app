@@ -94,9 +94,13 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 labelText: l10n.shoppingEditNameLabel,
-                errorText: _nameError == null
-                    ? null
-                    : l10n.shoppingEditNameRequiredError,
+                errorText: switch (_nameError) {
+                  null => null,
+                  ItemNameError.required => l10n.shoppingEditNameRequiredError,
+                  // Same copy and meaning as the quick-add's duplicate
+                  // snackbar, so the existing key is reused.
+                  ItemNameError.duplicate => l10n.shoppingAddAlreadyOnList,
+                },
               ),
             ),
           ),
@@ -156,15 +160,32 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
       setState(() => _nameError = nameError);
       return;
     }
+    final repository = ref.read(shoppingRepositoryProvider);
+    // F7: a rename runs the same duplicate check as quick-add, folding case
+    // and diacritics. Only when the normalized name actually changed, so
+    // editing just the quantity (or the casing) of an item that already
+    // shares a name with another is never blocked.
+    final normalized = normalizeShoppingItemName(name);
+    if (normalized != normalizeShoppingItemName(widget.item.item.name)) {
+      final existing = await repository.findActiveByNormalizedName(
+        widget.item.item.householdId,
+        normalized,
+      );
+      if (!mounted) {
+        return;
+      }
+      if (existing != null && existing.item.id != widget.item.item.id) {
+        setState(() => _nameError = ItemNameError.duplicate);
+        return;
+      }
+    }
     final quantityNote = _quantityController.text.trim();
-    await ref
-        .read(shoppingRepositoryProvider)
-        .updateItem(
-          widget.item.item.id,
-          name: name,
-          quantityNote: Value(quantityNote.isEmpty ? null : quantityNote),
-          categoryId: Value(_categoryId),
-        );
+    await repository.updateItem(
+      widget.item.item.id,
+      name: name,
+      quantityNote: Value(quantityNote.isEmpty ? null : quantityNote),
+      categoryId: Value(_categoryId),
+    );
     if (!mounted) {
       return;
     }
