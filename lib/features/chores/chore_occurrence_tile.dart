@@ -147,10 +147,23 @@ class ChoreOccurrenceTile extends StatelessWidget {
                 ),
               semantic(
                 'chores.occurrence.${chore.id}.complete',
-                child: IconButton(
-                  icon: const _CompleteRing(),
-                  tooltip: l10n.choresOccurrenceCompleteTooltip,
-                  onPressed: onComplete,
+                // G1 (persona review 2026-10-06): a screen reader walking a
+                // list of identical "Complete" buttons cannot tell which
+                // chore each one belongs to, so the label names it. The
+                // inner IconButton's own tooltip semantics are excluded to
+                // avoid announcing "Complete" twice.
+                child: Semantics(
+                  label:
+                      '${l10n.choresOccurrenceCompleteTooltip}: '
+                      '${chore.title}',
+                  button: true,
+                  excludeSemantics: true,
+                  onTap: onComplete,
+                  child: IconButton(
+                    icon: const _CompleteRing(),
+                    tooltip: l10n.choresOccurrenceCompleteTooltip,
+                    onPressed: onComplete,
+                  ),
                 ),
               ),
               Expanded(
@@ -187,10 +200,18 @@ class ChoreOccurrenceTile extends StatelessWidget {
                 ),
               semantic(
                 'chores.occurrence.${chore.id}.menu',
-                child: IconButton(
-                  icon: const Icon(Icons.more_vert),
-                  tooltip: l10n.choresOccurrenceMoreActionsTooltip,
-                  onPressed: onOpenMenu,
+                child: Semantics(
+                  label:
+                      '${l10n.choresOccurrenceMoreActionsTooltip}: '
+                      '${chore.title}',
+                  button: true,
+                  excludeSemantics: true,
+                  onTap: onOpenMenu,
+                  child: IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: l10n.choresOccurrenceMoreActionsTooltip,
+                    onPressed: onOpenMenu,
+                  ),
                 ),
               ),
             ],

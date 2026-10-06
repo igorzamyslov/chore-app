@@ -106,6 +106,7 @@ class ShoppingItemTile extends StatelessWidget {
               children: [
                 _CheckRing(
                   identifier: 'shopping.item.${shoppingItem.id}.check',
+                  label: shoppingItem.name,
                   checked: checked,
                   onChanged: onCheckedChanged,
                 ),
@@ -185,11 +186,16 @@ class ShoppingItemTile extends StatelessWidget {
 class _CheckRing extends StatelessWidget {
   const _CheckRing({
     required this.identifier,
+    required this.label,
     required this.checked,
     required this.onChanged,
   });
 
   final String identifier;
+
+  /// The item's name: without it the ring is an unnamed checkbox to a
+  /// screen reader (G1, persona review 2026-10-06).
+  final String label;
   final bool checked;
   final ValueChanged<bool> onChanged;
 
@@ -199,6 +205,7 @@ class _CheckRing extends StatelessWidget {
     return Semantics(
       identifier: identifier,
       container: true,
+      label: label,
       button: true,
       checked: checked,
       onTap: () => onChanged(!checked),

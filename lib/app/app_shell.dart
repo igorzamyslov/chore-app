@@ -376,6 +376,13 @@ class _BottomTabBar extends ConsumerWidget {
                       child: Semantics(
                         button: true,
                         selected: tab == selected,
+                        // G1: "Tab 1 of 3" (the platform's own phrase, from
+                        // MaterialLocalizations) joins the tab's text, as
+                        // NavigationBar would announce it.
+                        label: MaterialLocalizations.of(context).tabLabel(
+                          tabIndex: tab.index + 1,
+                          tabCount: _AppTab.values.length,
+                        ),
                         // Field feedback 2026-08-07 C2: a bare InkWell
                         // rippled a grey RECTANGLE across the whole tab
                         // column while the active state is a rounded pill --
