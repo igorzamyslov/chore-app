@@ -65,6 +65,117 @@
 > was a deliberate workaround for the `Dismissible`, and that workaround is
 > why this cost was never observed in CI.
 
+## Amendment 2026-10-06 — persona review: Tom, the one who shops
+
+Source: `docs/feedback/2026-10-06-personas/tom-shopping.md`; plan
+`docs/plans/2026-10-06-persona-review-fixes.md` §W2. **Where this block and
+the text below disagree, this block wins.** Finding ids are the persona
+document's (PP = pain point, MF = missing feature, Q = quality of life).
+
+**App bar (F1, F10).** The title gains a one-line status subtitle,
+`ShoppingStatusLine` (`shopping.status`): `shoppingRemainingCount` — "7 left"
+(DE "Noch 7"), "Nothing left" at zero — and, **only while the household is
+linked and signed in**, ` · ` plus either `syncPendingChanges` when
+`syncPendingCountProvider` > 0 (pending beats synced: "synced 2 min ago" would
+be a half-truth about the very thing Tom is worried about) or
+`shoppingSyncedAgo` — "synced {relative}" — from
+`syncLastPullCompletedAtProvider`, falling back to the persisted cursor before
+the first pull of the session (the same source as Settings → Account's "Last
+synced"). The relative phrase and its self-refreshing timer are shared with
+that line (`lib/features/settings/relative_time.dart`). An unlinked household
+sees only the remaining count.
+
+**Who added it (F1).** A row added by a member other than the acting/claimed
+member shows that member's `MemberAvatar` (16 dp) after the name, tooltip = the
+member's name. Own rows, rows with no `addedBy`, and rows whose adder is no
+longer a member show nothing.
+
+**Waiting to send (E10).** While linked, a row whose `syncDirty` is true shows
+a 14 dp `Icons.schedule` at its trailing edge, tooltip `syncPendingItemTooltip`
+("Waiting to send"). The wording is deliberately not "failed": the glyph is
+there for a moment after every edit.
+
+**Ticking (F3).** Ticking an item (not unticking) shows the snackbar
+`shoppingCheckedSnackbar` — "In the cart" (DE "Im Einkaufswagen") — with Undo,
+which unchecks it. Latest wins.
+
+**Bulk actions (F4).** `showAppSnackbar` takes `duration` (default 4 s). Clear
+checked and Put all back use 8 s. Put all back now also shows
+`shoppingPutBackSnackbar` ("Put 3 items back") whose Undo re-checks exactly the
+captured ids (`ShoppingRepository.checkItems`).
+
+**Quick-add input (F6, F7, F12).**
+- The input is split on commas and newlines into one item per entry (each
+  trimmed, empty dropped); each entry goes through the B3 duplicate flow in
+  turn. More than one NEW item added → snackbar `shoppingAddedCount` ("3 items
+  added"). A single entry behaves exactly as before. The field is a text-type,
+  up-to-3-line field so a pasted multi-line list keeps its newlines (a
+  `maxLines: 1` field strips them and fuses the lines into one name).
+- `parseQuantity` (`quick_add_parsing.dart`) recognises `^(\d+)\s*[x×]?\s+(.+)$`
+  and `^(.+?)\s+[x×]\s*(\d+)$` and stores the number as `quantityNote` and the
+  rest as the name: "2x Milch" → "Milch", note "2". Quick-add only; duplicates
+  are judged on the name alone.
+- Both name fields (quick-add, edit sheet) use
+  `TextCapitalization.sentences`.
+
+**Duplicates (F7).** `normalizeShoppingItemName` additionally folds diacritics
+(ä→a, ö→o, ü→u, ß→ss, é→e …) for comparison only; items keep what was typed.
+Renaming in the edit sheet runs the same check against the other active items
+(only when the normalized name changed) and shows the inline error
+"Already on the list" (the existing `shoppingAddAlreadyOnList` copy and key —
+there is no separate `shoppingEditDuplicateError`).
+
+**Row text (F8).** Item name `titleMedium`, quantity `bodyMedium`.
+
+**Collapsible aisles (F9).** Tapping a category header (including the
+Uncategorized one) collapses or expands that aisle's card; the header shows a
+chevron (`expand_more` / `chevron_right`) and, while collapsed, the number of
+hidden items in parentheses. Semantic id `shopping.category.<id>.toggle`
+(`shopping.category.uncategorized.toggle` for the uncategorized run). Persisted
+per device in `ui_state` under `shopping.collapsed.<categoryId>`.
+*Storage note:* `ui_state` is a fixed-column single-row table, not a key/value
+store, so these entries are extra rows whose `id` is the key and whose value
+sits in the nullable text column `last_tab`; the shell only ever reads the
+`'device'` row, and a data reset clears the table. A schema change was
+deliberately avoided (plan §1); a future migration can give the value its own
+column without touching callers (`ShoppingRepository` owns all access).
+
+**Forgetting suggestions (F11, H6-query).** Long-pressing a suggestion chip
+opens a one-entry menu, `shoppingSuggestionForget` ("Forget this suggestion",
+DE "Vorschlag vergessen"); choosing it stores the normalized name in the JSON
+list `shopping.forgottenSuggestions` (same table) and the name no longer
+appears in the chips or the type-ahead. Items already on the list are
+untouched. The add history behind suggestions, duplicate lookup and category
+inheritance is no longer loaded in full: suggestions and category inheritance
+read two `GROUP BY` queries (one row per distinct name: count, newest
+`created_at`, newest row's state, newest non-null category), merged by the
+real normalized key; the duplicate check reads active rows only.
+
+**Edit sheet (F14).** Leaving the sheet any way but Save or Delete (drag down,
+tap outside, system back) saves a changed, valid, non-duplicate edit through
+the same path as Save; an untouched sheet writes nothing, an emptied or
+duplicate name is dropped silently, and Delete discards pending edits. This
+**supersedes** widget-test item 10's "dismissing without a choice leaves the
+item untouched" for the case where something was changed.
+
+**German copy (F13).** DE `shoppingClearButton` is now "Einkaufswagen leeren"
+(matching the cart header); the DE sync banner reads "Gerade keine Verbindung
+zum Haushalt. Deine Änderungen sind gespeichert — zieh die Liste nach unten, um
+es erneut zu versuchen."; sync strings use em dashes throughout.
+
+**Sync (A9).** Pulled shopping rows now merge field-level into a dirty local
+row — see `docs/specs/sync-backend.md` §8.8.
+
+Tests added (`test/features/shopping/` unless noted): `check_snackbar_test`,
+`bulk_snackbar_test`, `snackbar_duration_test`, `capitalization_test`,
+`edit_rename_duplicate_test`, `quick_add_test` (split, count, quantity),
+`quick_add_parsing_test`, `item_text_size_test`, `sync_status_test`,
+`pending_glyph_test`, `category_collapse_test`, `suggestion_forget_test`,
+`edit_dismiss_saves_test`, `german_copy_test`;
+`test/data/repositories/shopping_repository_test.dart` (folding, `checkItems`,
+ui_state memory, grouped history); `test/application/sync_engine_test.dart`
+(A9).
+
 ## Placement
 
 | What | Where |
