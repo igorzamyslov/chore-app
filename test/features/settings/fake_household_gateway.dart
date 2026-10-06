@@ -172,6 +172,17 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// failed action must be shown inline, so tests need to force it.
   Exception? removeMemberError;
 
+  /// Every [renameMember] call, in call order.
+  final List<({String memberId, String name})> renameMemberCalls = [];
+
+  /// Set to make the next [renameMember] call throw this instead of
+  /// succeeding.
+  Exception? renameMemberError;
+
+  /// Every exit-related call ('rename', 'leave', 'deleteAccount') in call
+  /// order -- lets a test assert rename-on-exit runs BEFORE the exit RPC.
+  final List<String> exitCallOrder = [];
+
   /// Every [leaveHousehold] call's household id, in call order.
   final List<String> leaveHouseholdCalls = [];
 
@@ -310,8 +321,19 @@ class FakeHouseholdGateway implements HouseholdGateway {
   }
 
   @override
+  Future<void> renameMember(String memberId, String name) async {
+    renameMemberCalls.add((memberId: memberId, name: name));
+    exitCallOrder.add('rename');
+    final error = renameMemberError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
   Future<void> leaveHousehold(String householdId) async {
     leaveHouseholdCalls.add(householdId);
+    exitCallOrder.add('leave');
     final error = leaveHouseholdError;
     if (error != null) {
       throw error;
@@ -321,6 +343,7 @@ class FakeHouseholdGateway implements HouseholdGateway {
   @override
   Future<void> deleteAccount() async {
     deleteAccountCallCount++;
+    exitCallOrder.add('deleteAccount');
     final error = deleteAccountError;
     if (error != null) {
       throw error;

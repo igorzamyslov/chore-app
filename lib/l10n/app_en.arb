@@ -1653,6 +1653,10 @@
   "@settingsAccountAdoptConfirmAction": {
     "description": "Confirm button of the adopt confirm sheet (id settings.account.adopt.confirm); Cancel is commonCancel (id settings.account.adopt.cancel)."
   },
+  "settingsAccountLeftNotice": "You left this household's online copy. What's on this phone stays yours; to share it again, start a new household from it later.",
+  "@settingsAccountLeftNotice": {
+    "description": "Plain notice shown in the Account section INSTEAD of the 'Put my household online' row after this phone left the household (settings.syncLeftAt, id settings.account.leftNotice). Adopting again would collide with the copy still online for the others, so the row was a dead end (persona review D8)."
+  },
   "settingsAccountAdoptRetry": "Try again",
   "@settingsAccountAdoptRetry": {
     "description": "Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe."
@@ -2052,6 +2056,10 @@
   "exitConfirmCancel": "Cancel",
   "@exitConfirmCancel": {
     "description": "Cancel button of the shared exit-confirmation sheet."
+  },
+  "householdExitNameLabel": "Your name in the household's history",
+  "@householdExitNameLabel": {
+    "description": "Label of the optional rename field in the Leave and Delete-account confirm sheets (ids settings.account.leave.name / settings.account.deleteAccount.name), prefilled with the current profile name. Your profile and its history stay with the household after you go, so this is the place to change what they keep calling you (persona review D8)."
   },
 
   "membershipRevokedTitle": "You're no longer part of this household",

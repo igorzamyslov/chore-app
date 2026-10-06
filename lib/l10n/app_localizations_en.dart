@@ -1288,6 +1288,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountAdoptConfirmAction => 'Put online';
 
   @override
+  String get settingsAccountLeftNotice =>
+      'You left this household\'s online copy. What\'s on this phone stays yours; to share it again, start a new household from it later.';
+
+  @override
   String get settingsAccountAdoptRetry => 'Try again';
 
   @override
@@ -1583,6 +1587,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitConfirmCancel => 'Cancel';
+
+  @override
+  String get householdExitNameLabel => 'Your name in the household\'s history';
 
   @override
   String get membershipRevokedTitle =>

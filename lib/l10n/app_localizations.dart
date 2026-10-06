@@ -1946,6 +1946,12 @@ abstract class AppLocalizations {
   /// **'Put online'**
   String get settingsAccountAdoptConfirmAction;
 
+  /// Plain notice shown in the Account section INSTEAD of the 'Put my household online' row after this phone left the household (settings.syncLeftAt, id settings.account.leftNotice). Adopting again would collide with the copy still online for the others, so the row was a dead end (persona review D8).
+  ///
+  /// In en, this message translates to:
+  /// **'You left this household\'s online copy. What\'s on this phone stays yours; to share it again, start a new household from it later.'**
+  String get settingsAccountLeftNotice;
+
   /// Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe.
   ///
   /// In en, this message translates to:
@@ -2377,6 +2383,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get exitConfirmCancel;
+
+  /// Label of the optional rename field in the Leave and Delete-account confirm sheets (ids settings.account.leave.name / settings.account.deleteAccount.name), prefilled with the current profile name. Your profile and its history stay with the household after you go, so this is the place to change what they keep calling you (persona review D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Your name in the household\'s history'**
+  String get householdExitNameLabel;
 
   /// Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5).
   ///

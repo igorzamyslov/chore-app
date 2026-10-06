@@ -323,6 +323,9 @@ class SettingsRepository {
         syncHouseholdId: Value(householdId),
         syncLinkedAt: Value(linkedAt.toUtc().toIso8601String()),
         membershipRevoked: const Value(false),
+        // Linking again (adopt, join, reconnect) ends the "you left" state
+        // (spec household-lifecycle.md §2.2, amendment 2026-10-06).
+        syncLeftAt: const Value(null),
         updatedAt: Value(_isoNow()),
       ),
     );

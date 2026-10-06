@@ -95,7 +95,8 @@ class MemberService {
   /// Everything from here on runs in ONE transaction:
   ///
   /// 1. Both guards again (each throws [StateError], changing nothing).
-  /// 2. Referential cleanup, over every active (non-soft-deleted) chore of
+  /// 2. Referential cleanup ([ChoreRepository.detachMemberFromChores]),
+  ///    over every active (non-soft-deleted) chore of
   ///    the member's household:
   ///    - rotation chores containing [memberId] in their assignee order:
   ///      remove them from that order; if 2 or more assignees remain, stay
@@ -134,49 +135,9 @@ class MemberService {
     await database.transaction(() async {
       final member = await _requireRemovable(memberId);
 
-      final activeChores = await chores.getActiveChores(member.householdId);
-      for (final details in activeChores) {
-        final assignees = details.assigneeMemberIds;
-        if (!assignees.contains(memberId)) {
-          continue;
-        }
-        switch (details.chore.assignmentMode) {
-          case AssignmentMode.rotation:
-            final remaining = [
-              for (final id in assignees)
-                if (id != memberId) id,
-            ];
-            if (remaining.length >= 2) {
-              await chores.updateChore(
-                details.chore.id,
-                assigneeMemberIds: remaining,
-              );
-            } else if (remaining.length == 1) {
-              await chores.updateChore(
-                details.chore.id,
-                assignmentMode: AssignmentMode.fixed,
-                assigneeMemberIds: remaining,
-              );
-            } else {
-              await chores.updateChore(
-                details.chore.id,
-                assignmentMode: AssignmentMode.anyone,
-                assigneeMemberIds: const [],
-              );
-            }
-          case AssignmentMode.fixed:
-            await chores.updateChore(
-              details.chore.id,
-              assignmentMode: AssignmentMode.anyone,
-              assigneeMemberIds: const [],
-            );
-          case AssignmentMode.anyone:
-          // Unreachable: `anyone` chores have no assignees, so `assignees
-          // .contains(memberId)` above is always false for this branch.
-        }
-      }
-
-      await chores.unassignPendingOccurrencesForMember(memberId);
+      // Steps 2 and 3: the shared assignment rewrite, also run when a pull
+      // soft-deletes a member (`SyncRepository.applyPulledMember`).
+      await chores.detachMemberFromChores(member.id);
 
       final now = clock.now().toUtc().toIso8601String();
       await (database.update(

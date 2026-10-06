@@ -88,12 +88,17 @@ class AccountSectionBody extends ConsumerWidget {
       // the signed-in account already has a membership elsewhere, the
       // reconnect row goes FIRST, above both.
       final membership = ref.watch(myMembershipProvider).valueOrNull;
+      // Persona review D8: after leaving, this phone's copy is the leaver's
+      // own. Putting it online again would collide with the household that
+      // is still online for everyone else, so the Adopt row gives way to a
+      // plain notice until something links this phone again (or Reset).
+      final leftAt = ref.watch(settingsProvider).valueOrNull?.syncLeftAt;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SignedInTile(user: user),
           if (membership != null) _ReconnectRow(membership: membership),
-          const _AdoptRow(),
+          if (leftAt == null) const _AdoptRow() else const _LeftNotice(),
           const _JoinRow(),
           // Last in the section, below everything else: the most
           // destructive row here. Present in this UNLINKED branch too --
@@ -114,6 +119,27 @@ class AccountSectionBody extends ConsumerWidget {
         const _DisconnectRow(),
         const _DeleteAccountRow(),
       ],
+    );
+  }
+}
+
+/// Shown instead of [_AdoptRow] once this phone has left the household's
+/// online copy (`settings.syncLeftAt`, persona review D8): plain text, no
+/// action -- the old "Put my household online" row was a dead end here.
+class _LeftNotice extends StatelessWidget {
+  const _LeftNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: semantic(
+        'settings.account.leftNotice',
+        child: Text(
+          AppLocalizations.of(context).settingsAccountLeftNotice,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ),
     );
   }
 }
@@ -565,6 +591,8 @@ class _LeaveRow extends ConsumerWidget {
     // not arrived yet), where over-warning about a cascade is much cheaper
     // than silently taking a household down.
     final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    // Rename-on-exit (persona review D8): the leaver's own profile, prefilled.
+    final me = ref.read(claimedMemberProvider);
     final result = await showExitConfirmSheet(
       context,
       title: l10n.householdLeaveConfirmTitle(householdName ?? ''),
@@ -573,16 +601,22 @@ class _LeaveRow extends ConsumerWidget {
           : l10n.householdLeaveConfirmBody,
       actionLabel: l10n.householdLeaveConfirmAction,
       semanticPrefix: 'settings.account.leave',
+      initialName: me?.name,
     );
     if (!result.confirmed) {
       return;
     }
+    final newName = result.newName;
     try {
       await ref
           .read(householdExitServiceProvider)
           .leaveHousehold(
             householdId: householdId,
             alsoDeleteLocalData: result.alsoDeleteLocalData,
+            rename: me == null || newName == null
+                ? null
+                : (memberId: me.id, name: newName),
+            lastClaimedMember: lastClaimed,
           );
     } on Object catch (e, s) {
       AppLog.error('ui.accountLeaveHousehold', e, s);
@@ -690,6 +724,10 @@ class _DeleteAccountRow extends ConsumerWidget {
     // loaded, where over-warning is much cheaper than silently taking a
     // household down.
     final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    // Rename-on-exit (persona review D8): delete_account keeps the profile and
+    // its name, so this is the one chance to change it. Only while linked --
+    // unlinked, this phone knows no profile of this account to rename.
+    final me = ref.read(claimedMemberProvider);
     final result = await showExitConfirmSheet(
       context,
       title: l10n.accountDeleteConfirmTitle,
@@ -698,6 +736,7 @@ class _DeleteAccountRow extends ConsumerWidget {
           : l10n.accountDeleteConfirmBody,
       actionLabel: l10n.accountDeleteConfirmAction,
       semanticPrefix: 'settings.account.deleteAccount',
+      initialName: me?.name,
     );
     if (!result.confirmed || !context.mounted) {
       return;
@@ -734,10 +773,16 @@ class _DeleteAccountRow extends ConsumerWidget {
     if (!confirmed || !context.mounted) {
       return;
     }
+    final newName = result.newName;
     try {
       await ref
           .read(householdExitServiceProvider)
-          .deleteAccount(alsoDeleteLocalData: result.alsoDeleteLocalData);
+          .deleteAccount(
+            alsoDeleteLocalData: result.alsoDeleteLocalData,
+            rename: me == null || newName == null
+                ? null
+                : (memberId: me.id, name: newName),
+          );
     } on Object catch (e, s) {
       AppLog.error('ui.accountDeleteAccount', e, s);
       // `on Object`, not `on Exception`. Same reasoning as [_LeaveRow] and

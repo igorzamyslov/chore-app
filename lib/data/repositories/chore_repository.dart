@@ -257,6 +257,80 @@ class ChoreRepository {
     });
   }
 
+  /// Removes [memberId] from every assignment in its household, in one
+  /// transaction (extracted from `MemberService.deleteMember`, plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` §2 / W5.6 -- the rules
+  /// moved here unchanged):
+  ///
+  /// - rotation chores containing [memberId] in their assignee order: it is
+  ///   removed from that order; 2 or more remaining stay rotation, exactly
+  ///   1 remaining converts to `fixed`, 0 remaining converts to `anyone`;
+  /// - fixed chores whose single assignee is [memberId] convert to `anyone`;
+  /// - every PENDING occurrence assigned to [memberId] (any chore, any
+  ///   mode) has its `assignedMemberId` cleared -- the step that actually
+  ///   frees the member's current turn, since the list rewrite above only
+  ///   changes future assignment.
+  ///
+  /// History is untouched: closed occurrences keep pointing at the member.
+  /// Does NOT touch the member row itself. A no-op for an unknown id.
+  ///
+  /// Callers: `MemberService.deleteMember` (local removal) and
+  /// `SyncRepository.applyPulledMember` (a pull that soft-deletes a member
+  /// someone else removed, or who left -- `leave_household` soft-deletes
+  /// the leaver since migration `20261006120000_join_funnel.sql`).
+  Future<void> detachMemberFromChores(String memberId) async {
+    await db.transaction(() async {
+      final member = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(memberId))).getSingleOrNull();
+      if (member == null) {
+        return;
+      }
+      final activeChores = await getActiveChores(member.householdId);
+      for (final details in activeChores) {
+        final assignees = details.assigneeMemberIds;
+        if (!assignees.contains(memberId)) {
+          continue;
+        }
+        switch (details.chore.assignmentMode) {
+          case AssignmentMode.rotation:
+            final remaining = [
+              for (final id in assignees)
+                if (id != memberId) id,
+            ];
+            if (remaining.length >= 2) {
+              await updateChore(
+                details.chore.id,
+                assigneeMemberIds: remaining,
+              );
+            } else if (remaining.length == 1) {
+              await updateChore(
+                details.chore.id,
+                assignmentMode: AssignmentMode.fixed,
+                assigneeMemberIds: remaining,
+              );
+            } else {
+              await updateChore(
+                details.chore.id,
+                assignmentMode: AssignmentMode.anyone,
+                assigneeMemberIds: const [],
+              );
+            }
+          case AssignmentMode.fixed:
+            await updateChore(
+              details.chore.id,
+              assignmentMode: AssignmentMode.anyone,
+              assigneeMemberIds: const [],
+            );
+          case AssignmentMode.anyone:
+          // Unreachable: `anyone` chores have no assignees, so `assignees
+          // .contains(memberId)` above is always false for this branch.
+        }
+      }
+      await unassignPendingOccurrencesForMember(memberId);
+    });
+  }
+
   /// Soft-deletes a chore and hard-deletes its pending occurrence, if any.
   ///
   /// History occurrences (done/skipped/missed) are kept.

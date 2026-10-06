@@ -149,6 +149,43 @@ authorization matrix.
   is UNIQUE per household, so an account may legitimately be in several),
   runs the §2.4 cascade for each, then deletes the `auth.users` row (D-L4).
 
+> **Amendment 2026-10-06 (persona review D8; migration
+> `20261006120000_join_funnel.sql`) — leaving really leaves.** The first
+> bullet above is superseded: `leave_household()` now unclaims AND
+> soft-deletes the caller's own member row (`deleted_at = now()`, stamped
+> before the orphan cascade, which is kept unchanged — the last claimed
+> member leaving still cascades the household, D-L5). A member who left
+> used to stay in every rotation with nobody told; now the family's devices
+> drop them from rotations at the next pull, while their history keeps the
+> name (soft-deleted members are still rendered in Chore history). **The
+> reclaim-via-invite path is gone**: joining again means "I'm new here" or
+> an unclaimed profile, like anyone else.
+>
+> Client side:
+> - `SyncRepository.applyPulledMember` detaches a member whose pulled row
+>   newly carries `deletedAt` (local row active and clean) via
+>   `ChoreRepository.detachMemberFromChores` — the assignment rewrite
+>   extracted unchanged from `MemberService.deleteMember` (rotation lists
+>   shrink, 1 left → fixed, 0 left → anyone; fixed → anyone; pending
+>   occurrences of that member unassigned; history untouched).
+> - **Rename-on-exit.** The Leave and Delete-account confirm sheets carry an
+>   optional field "Your name in the household's history"
+>   (`settings.account.leave.name` / `settings.account.deleteAccount.name`),
+>   prefilled with the caller's current profile name (only while linked). A
+>   changed, non-empty name is written BEFORE the exit RPC — on the server
+>   through `HouseholdGateway.renameMember` (a direct `members.name`
+>   update, since the exit unlinks this device before the engine could push
+>   a dirty row), then locally through `HouseholdRepository.renameMember`.
+>   `delete_account()` itself is unchanged: it keeps the profile and its
+>   name, which is exactly why the rename is offered there.
+> - **`settings.syncLeftAt`** (client schema v18) is stamped on a successful
+>   leave that was not the cascade case and did not wipe this phone. While
+>   set, the Account section hides "Put my household online" (re-adopting
+>   would collide with the copy still online for everyone else) and shows
+>   `settingsAccountLeftNotice` (`settings.account.leftNotice`) instead.
+>   Cleared by any later link (`SettingsRepository.setSyncLinked`) and by
+>   Reset app data.
+
 ### 2.3 remove_member can never orphan a household
 
 The caller is always a claimed member who stays behind, and self-removal

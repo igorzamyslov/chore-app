@@ -1296,6 +1296,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountAdoptConfirmAction => 'Online stellen';
 
   @override
+  String get settingsAccountLeftNotice =>
+      'Du hast die Online-Kopie dieses Haushalts verlassen. Was auf diesem Handy ist, bleibt deins; um es wieder zu teilen, kannst du später einen neuen Haushalt daraus machen.';
+
+  @override
   String get settingsAccountAdoptRetry => 'Erneut versuchen';
 
   @override
@@ -1593,6 +1597,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exitConfirmCancel => 'Abbrechen';
+
+  @override
+  String get householdExitNameLabel => 'Dein Name im Verlauf des Haushalts';
 
   @override
   String get membershipRevokedTitle =>

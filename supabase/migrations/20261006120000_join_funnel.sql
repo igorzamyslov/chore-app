@@ -6,6 +6,8 @@
 --    to, and claimed on one tap. The client now asks for the household's
 --    display name first and shows it in the chooser and the confirm line
 --    ("Join {household} as {name}?").
+-- 2. leave_household soft-deletes the caller's own member row (W5.6,
+--    finding D8) -- see the second half of this file.
 
 -- peek_invite: the household name an active invite code would join.
 --
@@ -46,3 +48,50 @@ $$;
 
 revoke execute on function public.peek_invite(text) from public, anon;
 grant execute on function public.peek_invite(text) to authenticated;
+
+-- 2. leave_household soft-deletes the leaver's own profile (W5.6, finding
+--    D8). Before this, leaving only unclaimed the row: the person stayed in
+--    every rotation and every assignee list, and nobody was told. Now the
+--    family stops seeing them in rotations at the next pull (the client's
+--    pulled-member hook detaches a newly soft-deleted member from its
+--    chores, ChoreRepository.detachMemberFromChores); their history stays,
+--    because soft-deleted members are still rendered in Chore history.
+--
+--    The reclaim-via-invite path this used to preserve is gone on purpose
+--    (spec docs/specs/household-lifecycle.md §2.2, amendment 2026-10-06):
+--    rejoining means "I'm new here" or an unclaimed profile.
+--
+--    Order matters: the soft delete is stamped BEFORE _exit_membership and
+--    the orphan cascade, all in this one transaction. _cascade_if_orphaned
+--    counts claimed live rows, which the unclaim alone already removes, so
+--    the cascade decision is unchanged -- the last claimed member leaving
+--    still cascades the household (D-L5).
+--
+--    coalesce(): idempotent on a row someone already soft-deleted through
+--    the members UPDATE grant (the state membership_exit.sql documents) --
+--    keep the original stamp.
+create or replace function public.leave_household(p_household_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_member_id uuid;
+begin
+  if not is_household_member(p_household_id) then
+    raise exception 'not a member of this household';
+  end if;
+  select id into v_member_id from members
+    where household_id = p_household_id
+      and user_id = auth.uid()
+      and deleted_at is null;
+  update members
+    set deleted_at = coalesce(deleted_at, now())
+    where id = v_member_id;
+  perform _cascade_if_orphaned(_exit_membership(v_member_id));
+end;
+$$;
+
+revoke execute on function public.leave_household(uuid) from public, anon;
+grant execute on function public.leave_household(uuid) to authenticated;

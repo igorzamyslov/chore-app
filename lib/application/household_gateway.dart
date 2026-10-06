@@ -251,10 +251,20 @@ abstract class HouseholdGateway {
   /// partial failure is safe.
   Future<void> removeMember(String memberId);
 
+  /// PostgREST update of `members.name` (UPDATE is granted on `name`) for
+  /// the caller's own [memberId]: the rename-on-exit step (persona review
+  /// D8) that runs BEFORE [leaveHousehold] / [deleteAccount], while the
+  /// caller is still a member and RLS still lets the write through. Direct
+  /// rather than through the sync engine because the exit unlinks this
+  /// device right afterwards, so a dirty row would never be pushed.
+  Future<void> renameMember(String memberId, String name);
+
   /// RPC `leave_household` (spec `docs/specs/household-lifecycle.md` §2.2,
-  /// F9): unclaims the caller's own member row in [householdId] and NOTHING
-  /// else -- the profile stays active, so the family keeps seeing the person
-  /// and their history, and they can claim it again later through an invite.
+  /// F9): unclaims AND soft-deletes the caller's own member row in
+  /// [householdId] (amendment 2026-10-06, migration
+  /// `20261006120000_join_funnel.sql`) -- the family stops seeing the person
+  /// in rotations, their history keeps the name. Rejoining means "I'm new
+  /// here" or an unclaimed profile; there is no reclaim path any more.
   ///
   /// If that leaves the household with no claimed members at all, the server
   /// cascades it (§2.4, D-L5): the online household and its shared history
@@ -364,6 +374,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
 
   @override
   Future<void> removeMember(String memberId) => _unreachable();
+
+  @override
+  Future<void> renameMember(String memberId, String name) => _unreachable();
 
   @override
   Future<void> leaveHousehold(String householdId) => _unreachable();
@@ -590,6 +603,11 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       'remove_member',
       params: {'p_member_id': memberId},
     );
+  }
+
+  @override
+  Future<void> renameMember(String memberId, String name) async {
+    await _client.from('members').update({'name': name}).eq('id', memberId);
   }
 
   @override

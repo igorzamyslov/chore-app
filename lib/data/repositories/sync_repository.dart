@@ -12,6 +12,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:drift/drift.dart';
 
 /// Data access backing `SupabaseSyncEngine`'s push (dirty-select,
@@ -219,13 +220,29 @@ class SyncRepository {
   );
 
   /// Applies a pulled `members` row, unless the local row is dirty.
-  Future<void> applyPulledMember(Member pulled) => _applyPulled(
-    existing: (db.select(
+  ///
+  /// Post-hook (plan `docs/plans/2026-10-06-persona-review-fixes.md` W5.6):
+  /// when the pull is what soft-deletes a member this device still had
+  /// active -- someone removed them, or they left (`leave_household`
+  /// soft-deletes the leaver since migration
+  /// `20261006120000_join_funnel.sql`) -- the member is detached from every
+  /// rotation, fixed assignment and pending occurrence right after the
+  /// write ([ChoreRepository.detachMemberFromChores]), exactly as a local
+  /// removal would. Without it a departed member kept their turns forever.
+  Future<void> applyPulledMember(Member pulled) async {
+    final existing = await (db.select(
       db.members,
-    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.members).insertOnConflictUpdate(pulled),
-  );
+    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull();
+    if (existing != null && existing.syncDirty) {
+      return;
+    }
+    await db.into(db.members).insertOnConflictUpdate(pulled);
+    if (pulled.deletedAt != null &&
+        existing != null &&
+        existing.deletedAt == null) {
+      await ChoreRepository(db).detachMemberFromChores(pulled.id);
+    }
+  }
 
   /// Applies a pulled `categories` row, unless the local row is dirty.
   Future<void> applyPulledCategory(Category pulled) => _applyPulled(

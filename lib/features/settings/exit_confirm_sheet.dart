@@ -14,6 +14,7 @@ class ExitConfirmResult {
   const ExitConfirmResult({
     required this.confirmed,
     required this.alsoDeleteLocalData,
+    this.newName,
   });
 
   /// Whether the user confirmed the exit at all.
@@ -22,18 +23,31 @@ class ExitConfirmResult {
   /// Whether the user additionally opted into wiping this device's data.
   /// Always `false` when [confirmed] is `false`.
   final bool alsoDeleteLocalData;
+
+  /// The rename-on-exit choice (persona review D8): the trimmed new name
+  /// when the sheet showed the name field and the user changed it to
+  /// something non-empty, else `null` (keep the current name). Always
+  /// `null` when [confirmed] is `false`.
+  final String? newName;
 }
 
 /// Shows the exit confirmation and resolves to the user's choice.
 ///
 /// Dismissing resolves to a declined, non-deleting result -- never null,
 /// so callers need no null handling.
+///
+/// [initialName] non-null adds the optional rename-on-exit field
+/// (`<semanticPrefix>.name`, persona review D8), prefilled with it: "Your
+/// name in the household's history". Leave and Delete account pass the
+/// caller's current profile name; the revocation notice passes nothing (the
+/// profile is no longer the caller's to rename).
 Future<ExitConfirmResult> showExitConfirmSheet(
   BuildContext context, {
   required String title,
   required String body,
   required String actionLabel,
   required String semanticPrefix,
+  String? initialName,
 }) async {
   final result = await showModalBottomSheet<ExitConfirmResult>(
     context: context,
@@ -43,6 +57,7 @@ Future<ExitConfirmResult> showExitConfirmSheet(
       body: body,
       actionLabel: actionLabel,
       semanticPrefix: semanticPrefix,
+      initialName: initialName,
     ),
   );
   return result ??
@@ -55,12 +70,14 @@ class _ExitConfirmSheet extends StatefulWidget {
     required this.body,
     required this.actionLabel,
     required this.semanticPrefix,
+    required this.initialName,
   });
 
   final String title;
   final String body;
   final String actionLabel;
   final String semanticPrefix;
+  final String? initialName;
 
   @override
   State<_ExitConfirmSheet> createState() => _ExitConfirmSheetState();
@@ -70,6 +87,27 @@ class _ExitConfirmSheetState extends State<_ExitConfirmSheet> {
   /// Unchecked in every exit (D-L3): the safe default is the same one
   /// everywhere, including delete-account.
   bool _alsoDeleteLocalData = false;
+
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.initialName ?? '',
+  );
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  /// The rename to report: only a non-empty name that differs from the one
+  /// the field was prefilled with.
+  String? get _newName {
+    final initial = widget.initialName;
+    if (initial == null) {
+      return null;
+    }
+    final name = _nameController.text.trim();
+    return name.isEmpty || name == initial.trim() ? null : name;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +138,20 @@ class _ExitConfirmSheetState extends State<_ExitConfirmSheet> {
             const SizedBox(height: 12),
             Text(widget.body, style: theme.textTheme.bodyMedium),
             const SizedBox(height: 16),
+            if (widget.initialName != null) ...[
+              semantic(
+                '${widget.semanticPrefix}.name',
+                child: TextField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: l10n.householdExitNameLabel,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             semantic(
               '${widget.semanticPrefix}.deleteLocal',
               child: CheckboxListTile(
@@ -145,6 +197,7 @@ class _ExitConfirmSheetState extends State<_ExitConfirmSheet> {
                       ExitConfirmResult(
                         confirmed: true,
                         alsoDeleteLocalData: _alsoDeleteLocalData,
+                        newName: _newName,
                       ),
                     ),
                     child: Text(widget.actionLabel),

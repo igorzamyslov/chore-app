@@ -45,6 +45,7 @@ void main() {
   final failingDeleteGateway = FakeHouseholdGateway()
     ..deleteAccountError = Exception('offline');
   final failingDeleteAuth = FakeAuthGateway(currentUser: me);
+  final renameLeaveGateway = FakeHouseholdGateway();
 
   /// Links the seeded household and marks the bootstrap member claimed by
   /// [me], i.e. the ordinary signed-in-and-linked state that
@@ -97,6 +98,71 @@ void main() {
         find.bySemanticsIdentifier('settings.account.disconnect'),
         findsOneWidget,
         reason: 'Disconnect is a different, purely local action and stays',
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'leaving (not the last member) with a new name: the sheet prefills the '
+    'current name, the rename reaches the server before leave_household, '
+    'and afterwards the Adopt row gives way to the "you left" notice '
+    '(persona review D8)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(FakeAuthGateway(currentUser: me)),
+      householdGatewayProvider.overrideWithValue(renameLeaveGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await linkAndClaim(database);
+      final myId = (await (database.select(
+        database.members,
+      )..where((tbl) => tbl.userId.equals('me'))).getSingle()).id;
+      // A second claimed member, so this is NOT the cascade case.
+      final other = await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Other', color: 0xFF8C7BC9);
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(other.id)))
+          .write(const MembersCompanion(userId: Value('other')));
+
+      await openSettingsTab(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.account.leave'));
+      await tester.pumpAndSettle();
+
+      final nameField = find.descendant(
+        of: find.bySemanticsIdentifier('settings.account.leave.name'),
+        matching: find.byType(TextField),
+      );
+      expect(tester.widget<TextField>(nameField).controller!.text, 'Me');
+      expect(find.text("Your name in the household's history"), findsOneWidget);
+      await tester.enterText(nameField, 'P.');
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.leave.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(renameLeaveGateway.exitCallOrder, ['rename', 'leave']);
+      expect(renameLeaveGateway.renameMemberCalls, [
+        (memberId: myId, name: 'P.'),
+      ]);
+      final settings = await SettingsRepository(database).ensureSettings();
+      expect(settings.syncHouseholdId, isNull);
+      expect(settings.syncLeftAt, isNotNull);
+
+      expect(
+        find.bySemanticsIdentifier('settings.account.adopt'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.leftNotice'),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.account.join'),
+        findsOneWidget,
       );
 
       handle.dispose();
