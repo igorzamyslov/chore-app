@@ -227,4 +227,40 @@ void main() {
       handle.dispose();
     },
   );
+
+  // Persona review 2026-10-06 C3: tapping a chore used to do nothing; the
+  // sheet lived behind the kebab and a long-press only.
+  testChoreApp(
+    'tapping the tile body opens the action sheet; long-press still does',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      ).createChore(
+        householdId: householdId,
+        title: 'Take out bins',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Take out bins'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsOneWidget);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsNothing);
+
+      await tester.longPress(find.text('Take out bins'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
 }
