@@ -108,9 +108,12 @@ captured ids (`ShoppingRepository.checkItems`).
 - The input is split on commas and newlines into one item per entry (each
   trimmed, empty dropped); each entry goes through the B3 duplicate flow in
   turn. More than one NEW item added → snackbar `shoppingAddedCount` ("3 items
-  added"). A single entry behaves exactly as before. The field is a text-type,
-  up-to-3-line field so a pasted multi-line list keeps its newlines (a
-  `maxLines: 1` field strips them and fuses the lines into one name).
+  added"). A single entry behaves exactly as before. The field stays
+  SINGLE-line: a multi-line field would keep pasted newlines, but a hardware
+  Enter then inserts a newline instead of submitting (`tab_swipe.yaml` adds
+  sixteen items with `pressKey: Enter`). So in practice the split is on
+  commas; the parser's newline handling serves the future share-to-app path
+  (backlog F-2), where text does not pass through this field.
 - `parseQuantity` (`quick_add_parsing.dart`) recognises `^(\d+)\s*[x×]?\s+(.+)$`
   and `^(.+?)\s+[x×]\s*(\d+)$` and stores the number as `quantityNote` and the
   rest as the name: "2x Milch" → "Milch", note "2". Quick-add only; duplicates

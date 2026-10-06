@@ -116,16 +116,16 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
                       // F12: German nouns are capitalised; without this the
                       // list ended up half "milch", half "Milch".
                       textCapitalization: TextCapitalization.sentences,
-                      // A pasted multi-line list ("oat milk\nsourdough") must
-                      // keep its newlines for `splitQuickAddInput`: Flutter
-                      // strips them from a `maxLines: 1` field, fusing the
-                      // lines into one name. So the field is allowed to
-                      // wrap to three lines, while the explicit text
-                      // keyboard type keeps the keyboard's action key
-                      // "Done" (submit) instead of a newline key.
+                      // Deliberately single-line. A multi-line field would
+                      // keep pasted newlines for `splitQuickAddInput`, but
+                      // a hardware Enter then INSERTS a newline instead of
+                      // submitting -- `e2e/flows/shell/tab_swipe.yaml` adds
+                      // sixteen items with `pressKey: Enter`, and so does
+                      // anyone with a keyboard. Comma-separated input still
+                      // splits; newline splitting in the parser is kept for
+                      // the future share-to-app path (backlog F-2), where
+                      // the text does not pass through this field.
                       keyboardType: TextInputType.text,
-                      minLines: 1,
-                      maxLines: 3,
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
                         hintText: l10n.shoppingAddHint,

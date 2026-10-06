@@ -36,7 +36,7 @@ void main() {
   );
 
   testChoreApp(
-    'quick add: a comma / newline list becomes one item per entry, with an '
+    'quick add: a comma-separated list becomes one item per entry, with an '
     '"N items added" snackbar (F7)',
     today: today,
     (tester, database) async {
@@ -48,8 +48,10 @@ void main() {
         matching: find.byType(TextField),
       );
 
-      // A pasted newline must not be swallowed by the single-line field.
-      await tester.enterText(inputField, 'Oat milk, Sourdough\nEggs,, milk ');
+      // The field is single-line on purpose (a hardware Enter must submit,
+      // not insert a newline -- see shopping_quick_add_row.dart), so the
+      // split users actually reach is the comma one.
+      await tester.enterText(inputField, 'Oat milk, Sourdough, Eggs,, milk ');
       await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
       await tester.pumpAndSettle();
 
