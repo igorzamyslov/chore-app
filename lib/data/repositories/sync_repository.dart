@@ -251,6 +251,7 @@ class SyncRepository {
 
   /// Applies a pulled `households` row, unless the local row is dirty.
   Future<void> applyPulledHousehold(Household pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.households,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -260,6 +261,7 @@ class SyncRepository {
 
   /// Applies a pulled `members` row, unless the local row is dirty.
   Future<void> applyPulledMember(Member pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.members,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -269,6 +271,7 @@ class SyncRepository {
 
   /// Applies a pulled `categories` row, unless the local row is dirty.
   Future<void> applyPulledCategory(Category pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.categories,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -278,6 +281,7 @@ class SyncRepository {
 
   /// Applies a pulled `chores` row, unless the local row is dirty.
   Future<void> applyPulledChore(Chore pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.chores,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -320,6 +324,12 @@ class SyncRepository {
       return;
     }
     if (live.isNotEmpty) {
+      // Same no-op rule as [_applyPulled]: an unchanged list (a re-fetch
+      // inside the cursor overlap) must not be rewritten, or the write
+      // listener would turn every pull into another push/pull.
+      if (_sameAssigneeSet(current, live)) {
+        return;
+      }
       await (db.delete(
         db.choreAssignees,
       )..where((tbl) => tbl.choreId.equals(choreId))).go();
@@ -342,6 +352,7 @@ class SyncRepository {
   /// dirty.
   Future<void> applyPulledChoreOccurrence(ChoreOccurrence pulled) =>
       _applyPulled(
+        pulled: pulled,
         existing: (db.select(
           db.choreOccurrences,
         )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -352,6 +363,7 @@ class SyncRepository {
 
   /// Applies a pulled `shopping_items` row, unless the local row is dirty.
   Future<void> applyPulledShoppingItem(ShoppingItem pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.shoppingItems,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -481,18 +493,44 @@ class SyncRepository {
     }
   }
 
+  /// Whether [current] and [pulled] describe the same assignee list
+  /// (same members at the same positions, every row clean), in any order.
+  static bool _sameAssigneeSet(
+    List<ChoreAssignee> current,
+    List<ChoreAssignee> pulled,
+  ) {
+    if (current.length != pulled.length) {
+      return false;
+    }
+    String key(ChoreAssignee row) =>
+        '${row.memberId}:${row.position}:${row.syncDirty}';
+    final currentKeys = current.map(key).toSet();
+    return pulled.every((row) => currentKeys.contains(key(row)));
+  }
+
   /// Shared "replace unless locally dirty" shape for every `applyPulled*`
   /// method above: reads the current local row (if any) via [existing];
   /// if it exists and [isDirty] says it's dirty, does nothing (local dirty
-  /// wins); otherwise runs [write] (an insert-or-replace keyed on the
-  /// table's primary key).
+  /// wins); if it exists and already EQUALS [pulled] (drift data classes
+  /// compare by value, `syncDirty` included), also does nothing; otherwise
+  /// runs [write] (an insert-or-replace keyed on the table's primary key).
+  ///
+  /// The equality short-circuit is load-bearing since the cursor overlap
+  /// (`syncCursorOverlap`, spec §8.3 amendment 2026-10-06): every pull
+  /// re-fetches the rows stamped in the last 30 s of server time, and
+  /// rewriting an unchanged row would fire drift's table-update stream,
+  /// which the engine's write listener turns into a debounced push, whose
+  /// follow-up pull re-fetches the same rows again -- a push/pull loop for
+  /// as long as the rows stay inside the window. A no-op write is not a
+  /// write, so the listener never hears about a re-apply.
   Future<void> _applyPulled<D>({
+    required D pulled,
     required Future<D?> existing,
     required bool Function(D) isDirty,
     required Future<void> Function() write,
   }) async {
     final row = await existing;
-    if (row != null && isDirty(row)) {
+    if (row != null && (isDirty(row) || row == pulled)) {
       return;
     }
     await write();

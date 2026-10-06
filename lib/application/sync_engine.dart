@@ -55,6 +55,19 @@ const List<String> syncedTablesInFkOrder = [
 /// and the short-page stop condition would then never fire.
 const int syncPageSize = 1000;
 
+/// How far BEHIND the fetched server `now()` the pull cursor is stored
+/// (spec §8.3 amendment 2026-10-06, technical review #3). Postgres' `now()`
+/// -- what `set_updated_at()` stamps -- is the TRANSACTION START time, not
+/// the commit time: a push whose transaction began before our
+/// `server_now()` read and committed after our table read gets an
+/// `updated_at` below a cursor equal to that `now()`, and no later
+/// incremental pull would ever see it. Storing the cursor this much earlier
+/// re-fetches everything stamped in the window on the next pull; the apply
+/// is idempotent (LWW + dirty check, every row arrives in its current server
+/// state), so a re-apply costs a few rows of bandwidth and loses nothing.
+/// 30 s is far longer than any PostgREST transaction this app issues.
+const Duration syncCursorOverlap = Duration(seconds: 30);
+
 /// The columns that, after `updated_at`, make a page order total for
 /// [table] -- its primary key. `chore_assignees` is keyed by
 /// `(chore_id, member_id)` and has no `id`.
@@ -704,8 +717,10 @@ class SupabaseSyncEngine implements SyncEngine {
         : DateTime.parse(current.syncLastPulledAt!);
     // Server now() FIRST (spec §8.3): a row touched between this call and
     // the per-table reads below ends up with `updated_at` AFTER this
-    // value, so the NEXT pull (cursor == this value) finds it again --
-    // a possible harmless re-apply, never a missed row.
+    // value, so the NEXT pull finds it again -- a possible harmless
+    // re-apply, never a missed row. (A row whose TRANSACTION began before
+    // this call but committed after a table read is stamped BEFORE this
+    // value; the cursor overlap below covers that case.)
     final serverNow = await transport.serverNow();
 
     final householdRows = await _pullAllPages('households', since);
@@ -774,8 +789,11 @@ class SupabaseSyncEngine implements SyncEngine {
       );
     });
 
-    // Cursor stored only after the transaction above commits (spec §8.3).
-    await settings.setSyncLastPulledAt(serverNow);
+    // Cursor stored only after the transaction above commits (spec §8.3),
+    // and BEHIND the server now() by [syncCursorOverlap] -- see its doc
+    // comment for why `now()` being transaction-start time makes an exact
+    // cursor leak rows.
+    await settings.setSyncLastPulledAt(serverNow.subtract(syncCursorOverlap));
     return false;
   }
 

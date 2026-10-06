@@ -476,7 +476,8 @@ void main() {
     );
 
     test(
-      'cursor advances to the fetched server now() after a successful pull',
+      'cursor advances to the fetched server now() MINUS the overlap after '
+      'a successful pull (spec §8.3 amendment 2026-10-06)',
       () async {
         transport.now = DateTime.utc(2026, 5, 1, 12);
 
@@ -485,8 +486,49 @@ void main() {
         final settingsRow = await SettingsRepository(db).ensureSettings();
         expect(
           settingsRow.syncLastPulledAt,
-          DateTime.utc(2026, 5, 1, 12).toIso8601String(),
+          DateTime.utc(
+            2026,
+            5,
+            1,
+            12,
+          ).subtract(syncCursorOverlap).toIso8601String(),
         );
+      },
+    );
+
+    test(
+      'a row committed with an updated_at just BEFORE the server now() a '
+      'pull read (a transaction that started before it and committed after '
+      'the table read) is still fetched by the next pull (technical review '
+      '2026-10-06 #3)',
+      () async {
+        transport.now = DateTime.utc(2026, 5, 1, 12);
+        await engine.pullSince();
+
+        // Postgres' now() is the TRANSACTION START time: a push whose
+        // transaction began 10 s before our server_now() read but committed
+        // after our categories read carries this stamp.
+        final stamp = transport.now.subtract(const Duration(seconds: 10));
+        transport.serverRows['categories']!.add({
+          'id': 'late-commit',
+          'household_id': household.id,
+          'kind': 'chore',
+          'name': 'Committed late',
+          'icon': 'a',
+          'color': 1,
+          'sort_order': 0,
+          'created_at': stamp.toIso8601String(),
+          'updated_at': stamp.toIso8601String(),
+          'deleted_at': null,
+        });
+        transport.now = transport.now.add(const Duration(minutes: 1));
+
+        await engine.pullSince();
+
+        final row = await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals('late-commit'))).getSingleOrNull();
+        expect(row, isNotNull);
       },
     );
 
@@ -1008,6 +1050,36 @@ void main() {
           db.categories,
         )..where((tbl) => tbl.id.equals('server-category'))).getSingleOrNull();
         expect(row, isNotNull);
+      },
+    );
+
+    test(
+      'a pull that re-fetches UNCHANGED rows (inside the cursor overlap) is '
+      'a no-op locally: it fires no table update, so the write listener '
+      'does not turn it into another push and pull',
+      () async {
+        engine.start();
+        // start()'s push + pull, then the debounced push the pulled rows
+        // used to trigger; wait all of that out.
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        final pushesBefore = transport.pushedTables.length;
+        final pullsBefore = transport.serverNowCalls;
+
+        // The fake server's clock has not moved, so every row it holds is
+        // inside the overlap window and comes back again, unchanged.
+        await engine.pullSince();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+
+        expect(transport.serverNowCalls, pullsBefore + 1);
+        expect(
+          transport.pushedTables.length,
+          pushesBefore,
+          reason:
+              "rewriting identical rows would fire drift's table-update "
+              'stream and schedule a debounced push, whose own pull would '
+              're-fetch the same rows -- a loop for as long as they stay '
+              'inside the window',
+        );
       },
     );
 
