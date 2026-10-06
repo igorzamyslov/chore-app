@@ -98,6 +98,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String digestMoreCount(int count) {
+    return ' und $count weitere';
+  }
+
+  @override
   String get notificationActionDone => 'Erledigt';
 
   @override

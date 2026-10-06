@@ -427,7 +427,10 @@ void main() {
       );
 
       expect(plugin.lastDoneActionTitle, 'Erledigt');
-      expect(plugin.pending[digestNotificationIdBase]!.body, '1 Aufgabe heute');
+      expect(
+        plugin.pending[digestNotificationIdBase]!.title,
+        '1 Aufgabe heute',
+      );
     });
   });
 

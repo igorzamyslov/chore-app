@@ -15,6 +15,10 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+/// How many chore titles the daily digest's body names before it falls back
+/// to "and N more" (persona review 2026-10-06 E8).
+const int _digestTitlesShown = 3;
+
 /// The lowest notification id the daily digest owns; horizon slot `k`
 /// (0 = the next slot) uses `digestNotificationIdBase + k` (spec
 /// `docs/specs/notifications.md` architecture #2).
@@ -670,8 +674,15 @@ class NotificationScheduler {
         final soleOccurrenceId = plan.soleOccurrenceId;
         await plugin.zonedSchedule(
           id: id,
-          title: l10n.appTitle,
-          body: _digestBody(l10n, plan),
+          // E8 (persona review 2026-10-06): with titles to show, the count
+          // line moves up into the title and the body names the chores;
+          // without them the notification keeps its count-only shape.
+          title: plan.titles.isEmpty
+              ? l10n.appTitle
+              : _digestCountLine(l10n, plan),
+          body: plan.titles.isEmpty
+              ? _digestCountLine(l10n, plan)
+              : _digestTitlesLine(l10n, plan.titles),
           fireAt: plan.fireAt,
           channelId: digestChannelId,
           channelName: l10n.notificationChannelDigestName,
@@ -825,7 +836,15 @@ class NotificationScheduler {
     }
   }
 
-  String _digestBody(AppLocalizations l10n, DigestPlan plan) {
+  /// Up to [_digestTitlesShown] chore titles, comma-separated, then "and N
+  /// more" for the rest (persona review 2026-10-06 E8).
+  String _digestTitlesLine(AppLocalizations l10n, List<String> titles) {
+    final shown = titles.take(_digestTitlesShown).join(', ');
+    final rest = titles.length - _digestTitlesShown;
+    return rest > 0 ? '$shown${l10n.digestMoreCount(rest)}' : shown;
+  }
+
+  String _digestCountLine(AppLocalizations l10n, DigestPlan plan) {
     if (plan.dueTodayCount > 0 && plan.overdueCount > 0) {
       return l10n.notificationDigestBoth(
         plan.dueTodayCount,

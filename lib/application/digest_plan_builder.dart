@@ -244,6 +244,7 @@ List<DigestPlan?> _digestPlans({
         // own actionability (spec `docs/specs/notifications.md` N2). Slot 3
         // can carry a Done button while slot 4 does not.
         soleOccurrenceId: counts.soleOccurrenceId,
+        titles: counts.titles,
       ),
     );
   }

@@ -95,6 +95,16 @@
       }
     }
   },
+  "digestMoreCount": " and {count} more",
+  "@digestMoreCount": {
+    "description": "Suffix appended to the daily-summary notification body after the first three chore titles when more chores than that are waiting (persona review 2026-10-06 E8): 'Dishes, Bins, Laundry and 2 more'. The leading space is part of the string: it is concatenated directly after the last title.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
   "notificationActionDone": "Done",
   "@notificationActionDone": {
     "description": "Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows."

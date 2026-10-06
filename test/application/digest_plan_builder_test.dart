@@ -143,6 +143,35 @@ void main() {
     expect(plans, everyElement(isNull));
   });
 
+  test(
+    'each slot carries the titles of the chores it counted (persona review '
+    'E8)',
+    () async {
+      await service.createChore(
+        householdId: householdId,
+        title: 'Dishes',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await service.createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: PlainDate(2026, 1, 5),
+        assignmentMode: AssignmentMode.anyone,
+      );
+
+      final plans = buildDigestPlans(
+        now: DateTime(2026, 1, 5, 7),
+        settings: settings,
+        pending: await pending(),
+        recipientMemberId: null,
+      );
+
+      expect(plans.first!.titles.toSet(), {'Dishes', 'Bins'});
+      expect(plans.first!.titles, hasLength(2));
+    },
+  );
+
   test('a daily chore fills the whole horizon with "1 due"', () async {
     await service.createChore(
       householdId: householdId,

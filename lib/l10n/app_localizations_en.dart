@@ -97,6 +97,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String digestMoreCount(int count) {
+    return ' and $count more';
+  }
+
+  @override
   String get notificationActionDone => 'Done';
 
   @override

@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
   String notificationDigestBoth(int dueCount, int overdueCount);
 
+  /// Suffix appended to the daily-summary notification body after the first three chore titles when more chores than that are waiting (persona review 2026-10-06 E8): 'Dishes, Bins, Laundry and 2 more'. The leading space is part of the string: it is concatenated directly after the last title.
+  ///
+  /// In en, this message translates to:
+  /// **' and {count} more'**
+  String digestMoreCount(int count);
+
   /// Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows.
   ///
   /// In en, this message translates to:
