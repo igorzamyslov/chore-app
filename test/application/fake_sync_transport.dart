@@ -138,6 +138,10 @@ class FakeSyncTransport implements SyncTransport {
     markDeletedCalls.add((table: table, match: match, deletedAt: deletedAt));
     // An UPDATE: matches zero rows harmlessly, and (like the real
     // `set_updated_at()` trigger) bumps `updated_at` on the rows it hits.
+    // EVERY entry of [match] filters, exactly like PostgREST's `.match()`:
+    // an occurrence tombstone's `status: 'pending'` therefore skips a
+    // server row that has since been completed (spec §8.6 amendment
+    // 2026-10-06), which is what the completion-race test relies on.
     final list = serverRows[table]!;
     for (var i = 0; i < list.length; i++) {
       final row = list[i];

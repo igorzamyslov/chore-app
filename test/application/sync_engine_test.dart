@@ -1003,7 +1003,10 @@ void main() {
       expect(transport.markDeletedCalls, hasLength(1));
       final call = transport.markDeletedCalls.single;
       expect(call.table, 'chore_occurrences');
-      expect(call.match, {'id': occurrence.id});
+      // The status match is load-bearing (technical review 2026-10-06 #1):
+      // an occurrence tombstone means "the PENDING row is gone", so it
+      // must never land on a row another device has since completed.
+      expect(call.match, {'id': occurrence.id, 'status': 'pending'});
       final serverRow = transport.serverRows['chore_occurrences']!.single;
       expect(serverRow['deleted_at'], call.deletedAt);
       expect(serverRow['updated_at'], DateTime.utc(2026, 3).toIso8601String());
@@ -1135,6 +1138,108 @@ void main() {
 
       expect(await chores.getOccurrence(occurrence.id), isNotNull);
     });
+
+    test(
+      'pull of a tombstone for a locally DONE occurrence leaves it alone '
+      '(technical review 2026-10-06 #1: a tombstone only kills the pending '
+      'row)',
+      () async {
+        final chore = await fixedChore();
+        final occurrence = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await engine.pushDirty();
+        await chores.closeOccurrence(
+          occurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: PlainDate(2026, 1, 5),
+          completedBy: owner,
+        );
+        await engine.pushDirty();
+        // The row is clean (just pushed) AND done; a tombstone now arrives
+        // for its id from a device that deleted it while it was pending.
+        serverTouched(
+          transport.serverRows['chore_occurrences']!.single,
+          deletedAt: '2026-02-01T00:00:00.000Z',
+        );
+
+        await engine.pullSince();
+
+        final kept = await chores.getOccurrence(occurrence.id);
+        expect(kept, isNotNull);
+        expect(kept!.status, OccurrenceStatus.done);
+      },
+    );
+
+    test(
+      'the completion race from the 2026-10-06 review (#1): A completes O '
+      'and pushes, B tombstones O and pushes, A pulls -- A keeps O as done '
+      'and B gets the completion back',
+      () async {
+        // Device A is the group's fixture; device B is a second database
+        // sharing the same fake server.
+        final dbB = AppDatabase(NativeDatabase.memory());
+        addTearDown(dbB.close);
+        final choresB = ChoreRepository(dbB);
+        final engineB = SupabaseSyncEngine(
+          db: dbB,
+          transport: transport,
+          settings: SettingsRepository(dbB),
+          householdId: household.id,
+        );
+        addTearDown(engineB.stop);
+
+        final chore = await fixedChore();
+        final occurrence = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await engine.pushDirty();
+        await engineB.pullSince();
+        expect(await choresB.getOccurrence(occurrence.id), isNotNull);
+
+        // A completes O (and gets the next occurrence), pushes first.
+        transport.now = DateTime.utc(2026, 1, 6);
+        await chores.closeOccurrence(
+          occurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: PlainDate(2026, 1, 5),
+          completedBy: owner,
+        );
+        await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 12),
+        );
+        await engine.pushDirty();
+
+        // B, not having pulled yet, deletes the chore: a local hard delete
+        // of its (still pending, on B) occurrence O plus a tombstone.
+        transport.now = DateTime.utc(2026, 1, 7);
+        await choresB.softDeleteChore(chore.id);
+        await engineB.pushDirty();
+
+        final serverO = transport.serverRows['chore_occurrences']!.singleWhere(
+          (row) => row['id'] == occurrence.id,
+        );
+        expect(
+          serverO['deleted_at'],
+          isNull,
+          reason: 'the tombstone matched on status = pending; O is done',
+        );
+
+        transport.now = DateTime.utc(2026, 1, 8);
+        await engine.pullSince();
+        final onA = await chores.getOccurrence(occurrence.id);
+        expect(onA, isNotNull);
+        expect(onA!.status, OccurrenceStatus.done);
+
+        await engineB.pullSince();
+        final onB = await choresB.getOccurrence(occurrence.id);
+        expect(onB, isNotNull, reason: 'B pulls the completion back');
+        expect(onB!.status, OccurrenceStatus.done);
+      },
+    );
 
     test('pull of a tombstoned assignee deletes it locally', () async {
       final b = await households.addMember(household.id, name: 'B', color: 1);

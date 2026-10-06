@@ -186,9 +186,12 @@ abstract class SyncTransport {
   Future<void> updateHousehold(String id, Map<String, Object?> columns);
 
   /// Sets `deleted_at` to [deletedAt] on the [table] row(s) matching
-  /// [match] (column to value: `{'id': ...}` for an occurrence,
-  /// `{'chore_id': ..., 'member_id': ...}` for an assignee) -- the push half
-  /// of a local HARD delete (spec `docs/specs/sync-backend.md` §8.6.3).
+  /// [match] (column to value: `{'id': ..., 'status': 'pending'}` for an
+  /// occurrence, `{'chore_id': ..., 'member_id': ...}` for an assignee) --
+  /// the push half of a local HARD delete (spec `docs/specs/sync-backend.md`
+  /// §8.6.3). Every entry of [match] is a filter: a tombstone whose row no
+  /// longer matches (an occurrence completed elsewhere since) must match
+  /// nothing.
   ///
   /// An UPDATE, never an upsert: a tombstone carries no full row. Matching
   /// zero rows (the row was never pushed) is success, not an error.
@@ -713,6 +716,13 @@ class SupabaseSyncEngine implements SyncEngine {
   /// (the re-added row's own push already sends `deleted_at: null`).
   /// Otherwise [SyncTransport.markDeleted], then delete exactly that
   /// tombstone. Throws like every other push step.
+  ///
+  /// An occurrence tombstone matches on `status = 'pending'` as well as
+  /// `id` (spec §8.6 amendment 2026-10-06, technical review #1): every
+  /// local site that hard-deletes an occurrence only ever deletes PENDING
+  /// rows, so the tombstone's meaning is "the pending row is gone" -- and
+  /// it must not land on a row another device has since completed, which
+  /// would erase that completion from the server and from every device.
   Future<void> _pushTombstones() async {
     for (final tombstone in await _sync.pendingTombstones()) {
       final memberId = tombstone.memberId;
@@ -725,7 +735,7 @@ class SupabaseSyncEngine implements SyncEngine {
           tombstone.entity,
           isAssignee
               ? {'chore_id': tombstone.rowId, 'member_id': memberId}
-              : {'id': tombstone.rowId},
+              : {'id': tombstone.rowId, 'status': 'pending'},
           tombstone.deletedAt,
         );
       }

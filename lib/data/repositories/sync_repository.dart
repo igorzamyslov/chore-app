@@ -336,11 +336,19 @@ class SyncRepository {
 
   /// Applies a pulled tombstone for the `chore_occurrences` row [id]: a
   /// local hard delete, unless the local row is `syncDirty` (local dirty
-  /// wins, §8.3; its push sends `deleted_at: null`). No tombstone is
+  /// wins, §8.3; its push sends `deleted_at: null`) OR is no longer
+  /// pending (spec §8.6 amendment 2026-10-06, technical review #1: a
+  /// tombstone means "the pending row is gone", and must never erase a
+  /// completion this device recorded and already pushed). No tombstone is
   /// recorded -- the server already knows.
-  Future<void> applyPulledOccurrenceDeletion(String id) => (db.delete(
-    db.choreOccurrences,
-  )..where((tbl) => tbl.id.equals(id) & tbl.syncDirty.equals(false))).go();
+  Future<void> applyPulledOccurrenceDeletion(String id) =>
+      (db.delete(db.choreOccurrences)..where(
+            (tbl) =>
+                tbl.id.equals(id) &
+                tbl.syncDirty.equals(false) &
+                tbl.status.equalsValue(OccurrenceStatus.pending),
+          ))
+          .go();
 
   /// Applies a pulled tombstone for the `chore_assignees` row keyed
   /// [choreId] + [memberId]; same dirty rule as
