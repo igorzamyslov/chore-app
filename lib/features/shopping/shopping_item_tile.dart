@@ -99,7 +99,7 @@ class ShoppingItemTile extends StatelessWidget {
                       children: [
                         Text(
                           shoppingItem.name,
-                          style: theme.textTheme.titleSmall?.copyWith(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             decoration: checked
                                 ? TextDecoration.lineThrough
                                 : null,
@@ -109,7 +109,7 @@ class ShoppingItemTile extends StatelessWidget {
                         if (quantityNote != null && quantityNote.isNotEmpty)
                           Text(
                             quantityNote,
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: mutedColor,
                               decoration: checked
                                   ? TextDecoration.lineThrough
