@@ -104,6 +104,17 @@ Chores list's member and category filter buttons
   already waits for.
 - No user-visible strings, no setting.
 
+> **Amendment 2026-10-06 (persona review E1; see `ui-foundation-chores.md`).**
+> "Nothing stored" now has one active reading: when the device is pinned
+> (linked AND signed in) and BOTH stored filters are `NULL`, the member
+> filter defaults to the claimed member. `ChoresListScreen` settles that
+> decision once — as soon as `memberIdentityModeProvider` is known and, when
+> pinned, the claim resolves — and records it like any other change, so it
+> persists. Any manual pick or "Show everything" settles it too (nothing
+> applied afterwards can override a choice made earlier). Consequence, by
+> design: an explicit "All members" is stored as `NULL` and therefore opens as
+> "mine" again on the next cold start, which is the point of the default.
+
 ### 5.2 Storage
 
 Two nullable text columns on `ui_state`: `chores_member_filter`,
