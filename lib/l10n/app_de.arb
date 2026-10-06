@@ -31,6 +31,9 @@
   "categoryPickerManageTooltip": "Kategorien bearbeiten",
 
   "choresMenuMarkDoneFor": "Für jemand anderen erledigen …",
+  "choresMenuReassign": "Diese Runde übergeben …",
+  "choresReassignTitle": "Wer übernimmt diese Runde?",
+  "choresReassignedSnackbar": "An {name} übergeben",
   "choresMarkDoneForTitle": "Wer hat das gemacht?",
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",

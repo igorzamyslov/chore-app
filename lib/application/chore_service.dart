@@ -480,6 +480,28 @@ class ChoreService {
     return member?.name;
   }
 
+  /// Hands the open turn [occurrenceId] to [memberId] (`null` = nobody,
+  /// which is only ever the Undo of reassigning an unassigned `anyone`
+  /// turn) — persona review 2026-10-06 C2 ("Anna's ill, Ben takes her turn
+  /// this week"). Writes `assigned_member_id` on that one pending row and
+  /// marks it dirty; the chore's own assignment is untouched.
+  ///
+  /// Rotation afterwards needs no special case: [_closeAndAdvance] advances
+  /// from the closed occurrence's `assigned_member_id`, so the next turn is
+  /// the member after the REASSIGNED holder in order, and the cover rule
+  /// (whoever completes it is skipped for the next turn) applies as usual.
+  ///
+  /// Throws [StateError] if [occurrenceId] doesn't exist or isn't pending.
+  Future<void> reassignOccurrence(String occurrenceId, String? memberId) {
+    return database.transaction(() async {
+      final occurrence = await _findOccurrence(occurrenceId);
+      if (occurrence == null || occurrence.status != OccurrenceStatus.pending) {
+        throw StateError('Occurrence $occurrenceId is not pending');
+      }
+      await chores.setOccurrenceAssignee(occurrenceId, memberId);
+    });
+  }
+
   /// Reopens a closed-today occurrence: in one transaction, deletes the
   /// chore's current pending occurrence (if any) and resets [occurrenceId]
   /// back to pending, clearing `closedOn`/`completedBy` while keeping its

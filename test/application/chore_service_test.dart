@@ -1412,4 +1412,146 @@ void main() {
       },
     );
   });
+
+  // Persona review 2026-10-06 C2 (Maria P2-I): "Anna's ill. I just want Ben
+  // to take her turn this week."
+  group('reassignOccurrence', () {
+    test(
+      'moves the open turn to the picked member and marks it dirty',
+      () async {
+        final anna = await _insertMember(db, 'anna', householdId);
+        final ben = await _insertMember(db, 'ben', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bins',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.fixed,
+          recurrence: Recurrence.everyNDays(7),
+          assigneeMemberIds: [anna],
+        );
+        final before = await repo.pendingOccurrenceOf(chore.id);
+        await (db.update(db.choreOccurrences)
+              ..where((tbl) => tbl.id.equals(before!.id)))
+            .write(const ChoreOccurrencesCompanion(syncDirty: Value(false)));
+
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).reassignOccurrence(before!.id, ben);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, before.id);
+        expect(pending.dueDate, before.dueDate);
+        expect(pending.assignedMemberId, ben);
+        expect(pending.syncDirty, isTrue);
+        // The chore's own assignment is untouched: this is one turn.
+        final details = await repo.getChore(chore.id);
+        expect(details!.assigneeMemberIds, [anna]);
+      },
+    );
+
+    test(
+      'in a rotation the next turn goes to the member after the REASSIGNED '
+      'holder',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        final aTurn = await repo.pendingOccurrenceOf(chore.id);
+        expect(aTurn!.assignedMemberId, a);
+
+        // A is away: hand A's turn to B. B completes it.
+        await service.reassignOccurrence(aTurn.id, b);
+        await service.completeOccurrence(aTurn.id, completedBy: b);
+
+        // After B (the reassigned holder) comes C.
+        final next = await repo.pendingOccurrenceOf(chore.id);
+        expect(next!.assignedMemberId, c);
+      },
+    );
+
+    test(
+      'the cover rule still applies: completed by someone other than the '
+      'reassigned holder, that person is not handed the next turn',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        final aTurn = await repo.pendingOccurrenceOf(chore.id);
+
+        // Reassigned to B, but C does it: after B would be C, who covered,
+        // so the turn passes to A.
+        await service.reassignOccurrence(aTurn!.id, b);
+        await service.completeOccurrence(aTurn.id, completedBy: c);
+
+        final next = await repo.pendingOccurrenceOf(chore.id);
+        expect(next!.assignedMemberId, a);
+      },
+    );
+
+    test(
+      'reassigning back to null (undo of an anyone turn) is allowed',
+      () async {
+        final ben = await _insertMember(db, 'ben', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Hoover',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+
+        await service.reassignOccurrence(pending!.id, ben);
+        expect(
+          (await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId,
+          ben,
+        );
+        await service.reassignOccurrence(pending.id, null);
+        expect(
+          (await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId,
+          isNull,
+        );
+      },
+    );
+
+    test('throws for an occurrence that is not pending', () async {
+      final ben = await _insertMember(db, 'ben', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      final service = serviceOn(PlainDate(2026, 1, 1));
+      await service.completeOccurrence(pending!.id, completedBy: ben);
+
+      await expectLater(
+        service.reassignOccurrence(pending.id, ben),
+        throwsStateError,
+      );
+      await expectLater(
+        service.reassignOccurrence('missing', ben),
+        throwsStateError,
+      );
+    });
+  });
 }

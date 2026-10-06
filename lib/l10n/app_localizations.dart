@@ -254,6 +254,24 @@ abstract class AppLocalizations {
   /// **'Mark done for…'**
   String get choresMenuMarkDoneFor;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C2, Maria: 'Anna's ill, I just want Ben to take her turn'): hand just this open turn to another member without completing, skipping or editing the chore. Shown when the household has more than one member. 'Turn' because only the current one moves; the chore's assignment stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassign this turn…'**
+  String get choresMenuReassign;
+
+  /// Title of the member picker opened by 'Reassign this turn…' (persona review C2). The member the turn is with now is not listed.
+  ///
+  /// In en, this message translates to:
+  /// **'Who takes this turn?'**
+  String get choresReassignTitle;
+
+  /// Snackbar after handing an open turn to another member (persona review C2); its Undo hands the turn back to whoever had it before.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassigned to {name}'**
+  String choresReassignedSnackbar(String name);
+
   /// Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is.
   ///
   /// In en, this message translates to:

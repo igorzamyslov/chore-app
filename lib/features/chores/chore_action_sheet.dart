@@ -14,6 +14,10 @@ enum ChoreMenuAction {
   /// `showMarkDoneFor` is true.
   markDoneFor,
 
+  /// Hand the open turn to another member (persona review 2026-10-06 C2).
+  /// Offered only when `showReassign` is true.
+  reassign,
+
   /// Skip the pending occurrence.
   skip,
 
@@ -36,8 +40,8 @@ enum ChoreMenuAction {
 ///
 /// Two variants:
 ///
-/// - a pending occurrence (the default): optionally mark-done-for, then
-///   skip/edit/pause/delete;
+/// - a pending occurrence (the default): optionally mark-done-for and
+///   reassign, then skip/edit/pause/delete;
 /// - [paused] (persona review 2026-10-06 C4): resume/edit/delete only — a
 ///   paused chore has no open turn to skip, mark done or pause again, but
 ///   it can still be changed or removed without resuming it first.
@@ -53,10 +57,13 @@ enum ChoreMenuAction {
 /// rare — no tile placement, no prompt on the common path, no banner, and
 /// completing a chore as yourself stays exactly one tap. The caller
 /// computes the gate so this sheet stays Riverpod-free. Ignored when
-/// [paused].
+/// [paused]. [showReassign] adds "Reassign this turn…" right below it, on
+/// the same terms (persona review 2026-10-06 C2: somebody else to hand the
+/// turn to).
 Future<ChoreMenuAction?> showChoreActionSheet(
   BuildContext context, {
   required bool showMarkDoneFor,
+  bool showReassign = false,
   bool paused = false,
 }) {
   return showModalBottomSheet<ChoreMenuAction>(
@@ -97,6 +104,13 @@ Future<ChoreMenuAction?> showChoreActionSheet(
                 id: 'chores.menu.markDoneFor',
                 icon: Icons.how_to_reg_outlined,
                 label: l10n.choresMenuMarkDoneFor,
+              ),
+            if (!paused && showReassign)
+              row(
+                ChoreMenuAction.reassign,
+                id: 'chores.menu.reassign',
+                icon: Icons.swap_horiz,
+                label: l10n.choresMenuReassign,
               ),
             if (!paused)
               row(

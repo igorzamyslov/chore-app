@@ -130,6 +130,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Mark done for…';
 
   @override
+  String get choresMenuReassign => 'Reassign this turn…';
+
+  @override
+  String get choresReassignTitle => 'Who takes this turn?';
+
+  @override
+  String choresReassignedSnackbar(String name) {
+    return 'Reassigned to $name';
+  }
+
+  @override
   String get choresMarkDoneForTitle => 'Who did this one?';
 
   @override

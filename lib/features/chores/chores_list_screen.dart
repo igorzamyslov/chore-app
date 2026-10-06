@@ -350,6 +350,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final action = await showChoreActionSheet(
       context,
       showMarkDoneFor: memberCount > 1,
+      // C2 (persona review 2026-10-06): same gate -- somebody else to hand
+      // the turn to.
+      showReassign: memberCount > 1,
     );
     if (!mounted || action == null) {
       return;
@@ -357,6 +360,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     switch (action) {
       case ChoreMenuAction.markDoneFor:
         await _markDoneFor(occurrence);
+      case ChoreMenuAction.reassign:
+        await _reassign(occurrence);
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)
@@ -396,11 +401,46 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       case ChoreMenuAction.delete:
         await _delete(details.chore);
       case ChoreMenuAction.markDoneFor:
+      case ChoreMenuAction.reassign:
       case ChoreMenuAction.skip:
       case ChoreMenuAction.pause:
         // Not offered on the paused sheet: there is no open turn.
         break;
     }
+  }
+
+  /// "Reassign this turn…" (persona review 2026-10-06 C2): pick a member,
+  /// hand them this one open turn, confirm with an Undo that hands it back.
+  /// The chore's own assignment is untouched; rotation continues from the
+  /// new holder (spec `docs/specs/occurrence-lifecycle.md`,
+  /// reassignOccurrence).
+  Future<void> _reassign(OccurrenceWithChore occurrence) async {
+    final previous = occurrence.occurrence.assignedMemberId;
+    final picked = await showReassignTurnSheet(
+      context,
+      members: ref.read(membersProvider).value ?? const <Member>[],
+      currentHolderId: previous,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    final occurrenceId = occurrence.occurrence.id;
+    final service = ref.read(choreServiceProvider);
+    await service.reassignOccurrence(occurrenceId, picked.id);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.choresReassignedSnackbar(picked.name),
+      action: SnackBarAction(
+        label: l10n.choresSnackbarUndo,
+        onPressed: () {
+          unawaited(service.reassignOccurrence(occurrenceId, previous));
+        },
+      ),
+    );
   }
 
   /// Opens [choreId] in the edit form and, if it was saved, confirms the

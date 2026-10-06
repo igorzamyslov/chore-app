@@ -143,6 +143,21 @@
   "@choresMenuMarkDoneFor": {
     "description": "Chore occurrence action-sheet entry (A-5, docs/feedback/2026-08-07-field-feedback.md B1): complete this occurrence crediting ANOTHER member, without changing who you are. Shown only on a linked, signed-in household with at least two members — the rare 'I finished something for someone else' case."
   },
+  "choresMenuReassign": "Reassign this turn…",
+  "@choresMenuReassign": {
+    "description": "Chore occurrence action-sheet entry (persona review 2026-10-06 C2, Maria: 'Anna's ill, I just want Ben to take her turn'): hand just this open turn to another member without completing, skipping or editing the chore. Shown when the household has more than one member. 'Turn' because only the current one moves; the chore's assignment stays as it is."
+  },
+  "choresReassignTitle": "Who takes this turn?",
+  "@choresReassignTitle": {
+    "description": "Title of the member picker opened by 'Reassign this turn…' (persona review C2). The member the turn is with now is not listed."
+  },
+  "choresReassignedSnackbar": "Reassigned to {name}",
+  "@choresReassignedSnackbar": {
+    "description": "Snackbar after handing an open turn to another member (persona review C2); its Undo hands the turn back to whoever had it before.",
+    "placeholders": {
+      "name": { "type": "String", "example": "Ben" }
+    }
+  },
   "choresMarkDoneForTitle": "Who did this one?",
   "@choresMarkDoneForTitle": {
     "description": "Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is."
