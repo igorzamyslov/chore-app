@@ -273,15 +273,18 @@ ShoppingItem shoppingItemFromRow(Map<String, Object?> row) => ShoppingItem(
 /// `HouseholdGateway.uploadHouseholdData` never uploads the household row
 /// itself (it's created by the `create_household` RPC instead), but the
 /// engine's `pushDirty` treats `households` like any other synced table.
-/// Deliberately carries no `deleted_at` (the local `Households` table has no
-/// such column -- households are never locally soft-deleted in this slice)
-/// so a push never clobbers the server's value for a column local data
-/// can't represent.
+///
+/// **Carries ONLY `name`** (persona review H4). The server grants
+/// `UPDATE (name)` on `households` and nothing else
+/// (`supabase/migrations/20261006140000_privacy_and_grants.sql`), and
+/// Postgres checks UPDATE privilege against the WHOLE `SET` list at plan
+/// time: one ungranted column in the payload (`created_at`, `updated_at`, ...)
+/// fails the entire statement with 42501 even when its value is unchanged --
+/// the same lesson as the members push. `id` travels as the row filter (the
+/// first argument of `SyncTransport.updateHousehold`), `updated_at` is
+/// server-maintained by trigger, and there is no local `deleted_at` to send.
 Map<String, Object?> householdRow(Household household) => {
-  'id': household.id,
   'name': household.name,
-  'created_at': household.createdAt,
-  'updated_at': household.updatedAt,
 };
 
 /// Maps a server `households` row to a local [Household] (pull), always
