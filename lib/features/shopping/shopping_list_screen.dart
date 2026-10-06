@@ -223,6 +223,7 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   final body = _Body(
                     items: items,
                     membersById: membersById,
+                    syncLinked: syncLinked,
                     actingMemberId: actingMemberId,
                     heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
@@ -388,6 +389,7 @@ class _Body extends StatelessWidget {
   const _Body({
     required this.items,
     required this.membersById,
+    required this.syncLinked,
     required this.actingMemberId,
     required this.heldBuckets,
     required this.cartExpanded,
@@ -402,6 +404,10 @@ class _Body extends StatelessWidget {
 
   /// Every household member by id, to resolve a row's `addedBy`.
   final Map<String, Member> membersById;
+
+  /// Whether the household is linked and signed in (E10: only then can a
+  /// dirty row be "waiting to send").
+  final bool syncLinked;
 
   /// The acting (or claimed) member's id; their own additions get no avatar.
   final String? actingMemberId;
@@ -528,6 +534,7 @@ class _Body extends StatelessWidget {
       key: ValueKey(item.item.id),
       item: item,
       addedBy: _addedByOther(item),
+      waitingToSend: syncLinked && item.item.syncDirty,
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onLongPress: () => onLongPressItem(item),

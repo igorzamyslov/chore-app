@@ -5,6 +5,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// A row for one active [ShoppingItemWithCategory].
@@ -45,6 +46,7 @@ class ShoppingItemTile extends StatelessWidget {
     required this.onCheckedChanged,
     required this.onLongPress,
     this.addedBy,
+    this.waitingToSend = false,
     super.key,
   });
 
@@ -71,6 +73,13 @@ class ShoppingItemTile extends StatelessWidget {
   /// adder, and for an adder who is no longer a member: the list stays quiet
   /// unless there is someone else to attribute.
   final Member? addedBy;
+
+  /// Whether to show the small "waiting to send" clock at the row's trailing
+  /// edge (persona finding E10): the caller passes `true` only while the
+  /// household is linked AND this row is `syncDirty`. Without it a change
+  /// made on a weak connection looked identical to one the partner already
+  /// has.
+  final bool waitingToSend;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +157,16 @@ class ShoppingItemTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (waitingToSend)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, right: 12),
+                    child: Tooltip(
+                      message: AppLocalizations.of(
+                        context,
+                      ).syncPendingItemTooltip,
+                      child: Icon(Icons.schedule, size: 14, color: mutedColor),
+                    ),
+                  ),
               ],
             ),
           ),
