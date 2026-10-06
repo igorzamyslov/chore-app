@@ -9,7 +9,7 @@ void main() {
   final today = DateTime(2026, 7, 24, 9);
 
   testChoreApp(
-    'row text is sized for arm\'s length: name titleMedium, quantity '
+    "row text is sized for arm's length: name titleMedium, quantity "
     'bodyMedium (F8)',
     today: today,
     (tester, database) async {

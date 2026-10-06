@@ -213,6 +213,13 @@
   "shoppingAddHint": "Artikel hinzufügen…",
   "shoppingAddTooltip": "Artikel hinzufügen",
   "shoppingAddAlreadyOnList": "Schon auf der Liste",
+  "shoppingRemainingCount": "{count, plural, =0{Nichts mehr offen} other{Noch {count}}}",
+  "shoppingSyncedAgo": "synchronisiert {relative}",
+  "relativeTimeJustNow": "gerade eben",
+  "relativeTimeMinutesAgo": "{count, plural, one{vor 1 Min.} other{vor {count} Min.}}",
+  "relativeTimeHoursAgo": "{count, plural, one{vor 1 Stunde} other{vor {count} Stunden}}",
+  "relativeTimeOn": "am {date}",
+  "syncPendingItemTooltip": "Wartet aufs Senden",
   "shoppingAddedCount": "{count} Artikel hinzugefügt",
   "shoppingAddMovedBack":"Zurück auf die Liste verschoben",
 

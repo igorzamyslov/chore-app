@@ -1202,6 +1202,48 @@ abstract class AppLocalizations {
   /// **'Already on the list'**
   String get shoppingAddAlreadyOnList;
 
+  /// First half of the Shopping tab's app-bar status line (persona findings F1/MF2): how many items are still unchecked on the list, so Tom can see 'how much is left' at a glance without the cart count. Deliberately terse — it sits under the screen title. Zero reads 'Nothing left' rather than '0 left'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nothing left} other{{count} left}}'**
+  String shoppingRemainingCount(int count);
+
+  /// Second half of the Shopping tab's status line, shown only while the household is linked and nothing is waiting to send (persona findings F1/F10, PP2: 'did her butter ever reach my phone?'). {relative} is a relative-time phrase such as 'just now', '5 min ago' or 'on Fri, Jul 31' (relativeTimeJustNow and friends). Lowercase because it follows ' · ' on the same line as the remaining count.
+  ///
+  /// In en, this message translates to:
+  /// **'synced {relative}'**
+  String shoppingSyncedAgo(String relative);
+
+  /// A relative-time phrase for something under a minute old, embedded in a larger sentence (the Shopping status line's 'synced just now'). Lowercase, no trailing period.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get relativeTimeJustNow;
+
+  /// A relative-time phrase for something one minute to under an hour old, embedded in a larger sentence. {count} is whole minutes elapsed. Abbreviated because it shares a line with other text.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 min ago} other{{count} min ago}}'**
+  String relativeTimeMinutesAgo(int count);
+
+  /// A relative-time phrase for something one hour to under a day old, embedded in a larger sentence. {count} is whole hours elapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 hour ago} other{{count} hours ago}}'**
+  String relativeTimeHoursAgo(int count);
+
+  /// A relative-time phrase for something a day or more old, embedded in a larger sentence. {date} is a locale-formatted weekday+month+day string (package:intl DateFormat.MMMEd), e.g. 'Fri, Jul 31'.
+  ///
+  /// In en, this message translates to:
+  /// **'on {date}'**
+  String relativeTimeOn(String date);
+
+  /// Tooltip (and accessibility label) of the small clock glyph at the trailing edge of a list row (shopping items; chore occurrences too) that has a local change the server has not received yet (persona finding E10). 'Waiting to send' rather than 'failed' or 'offline': in the normal case the glyph is there for a second or two after every edit, so the wording must not alarm — same stance as syncPendingChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to send'**
+  String get syncPendingItemTooltip;
+
   /// Snackbar shown after the quick-add field is submitted with a comma- or newline-separated list that added more than one NEW item (persona finding F7: a pasted "oat milk, sourdough" used to become one item). Only used for two or more; a single add stays silent. Duplicates in the list are skipped and not counted.
   ///
   /// In en, this message translates to:

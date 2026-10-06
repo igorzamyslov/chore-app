@@ -827,6 +827,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingAddAlreadyOnList => 'Already on the list';
 
   @override
+  String shoppingRemainingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count left',
+      zero: 'Nothing left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingSyncedAgo(String relative) {
+    return 'synced $relative';
+  }
+
+  @override
+  String get relativeTimeJustNow => 'just now';
+
+  @override
+  String relativeTimeMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count min ago',
+      one: '1 min ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours ago',
+      one: '1 hour ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeOn(String date) {
+    return 'on $date';
+  }
+
+  @override
+  String get syncPendingItemTooltip => 'Waiting to send';
+
+  @override
   String shoppingAddedCount(int count) {
     return '$count items added';
   }
