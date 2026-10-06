@@ -6,10 +6,21 @@ library;
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
 import 'package:chore_app/features/chores/recurrence_sentence.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+/// The resume day of a "Pause until" (persona review 2026-10-06 C2) as the
+/// locale's weekday + month + day, e.g. 'Mon, Oct 12' -- the same
+/// `DateFormat.MMMEd` the due chip uses for far-off dates.
+String pausedUntilText(String localeName, PlainDate until) {
+  return DateFormat.MMMEd(
+    localeName,
+  ).format(DateTime.utc(until.year, until.month, until.day));
+}
 
 /// The 'Paused' section: a collapsed-by-default [ExpansionTile] headed
 /// 'Paused (N)', holding one row per paused chore in [chores].
@@ -128,7 +139,17 @@ class _PausedRow extends StatelessWidget {
                     monthlyWeekday: recurrence.monthlyWeekday,
                   ),
                 ),
-              Text(l10n.choresPausedBadge),
+              Text(
+                switch (chore.pausedUntil) {
+                  null => l10n.choresPausedBadge,
+                  final until => l10n.choresPausedUntil(
+                    pausedUntilText(
+                      Localizations.localeOf(context).toString(),
+                      until,
+                    ),
+                  ),
+                },
+              ),
             ],
           ),
         ),

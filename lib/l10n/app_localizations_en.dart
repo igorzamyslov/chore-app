@@ -437,6 +437,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresPausedBadge => 'Paused';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Paused until $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Pause this chore';
+
+  @override
+  String get choresPauseUntilResumed => 'Until I resume it';
+
+  @override
+  String get choresPauseUntilDate => 'Until a date…';
+
+  @override
   String get choresPausedResume => 'Resume';
 
   @override

@@ -348,12 +348,19 @@ class ChoreRepository {
     });
   }
 
-  /// Pauses or unpauses a chore.
-  Future<void> setPaused(String id, {required bool paused}) async {
+  /// Pauses or unpauses a chore. [until] is the day a paused chore resumes
+  /// on by itself (`NULL` = until resumed by hand); unpausing always clears
+  /// it (plan `docs/plans/2026-10-06-persona-review-fixes.md` W3).
+  Future<void> setPaused(
+    String id, {
+    required bool paused,
+    PlainDate? until,
+  }) async {
     final now = _isoNow();
     await (db.update(db.chores)..where((tbl) => tbl.id.equals(id))).write(
       ChoresCompanion(
         pausedAt: Value(paused ? now : null),
+        pausedUntil: Value(paused ? until : null),
         updatedAt: Value(now),
         syncDirty: syncDirtyOnWrite,
       ),

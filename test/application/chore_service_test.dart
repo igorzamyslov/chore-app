@@ -1554,4 +1554,103 @@ void main() {
       );
     });
   });
+
+  // Persona review 2026-10-06 C2 ("Pause until"; plan W3, schema v19).
+  group('pause until a date', () {
+    test('pauseChore(until:) stores the day; unpauseChore clears it', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bed sheets',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(7),
+      );
+
+      await serviceOn(
+        PlainDate(2026, 1, 1),
+      ).pauseChore(chore.id, until: PlainDate(2026, 1, 10));
+      var details = await repo.getChore(chore.id);
+      expect(details!.chore.pausedAt, isNotNull);
+      expect(details.chore.pausedUntil, PlainDate(2026, 1, 10));
+      expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+
+      await serviceOn(PlainDate(2026, 1, 2)).unpauseChore(chore.id);
+      details = await repo.getChore(chore.id);
+      expect(details!.chore.pausedAt, isNull);
+      expect(details.chore.pausedUntil, isNull);
+    });
+
+    test(
+      'catchUpOverdue leaves it paused before the day, and resumes it on '
+      'the day (the day-change trigger)',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bed sheets',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).pauseChore(chore.id, until: PlainDate(2026, 1, 5));
+
+        // The day before: still paused, nothing pending.
+        expect(
+          await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId),
+          0,
+        );
+        expect((await repo.getChore(chore.id))!.chore.pausedAt, isNotNull);
+        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+
+        // The day itself: resumed, due today, and not counted as catch-up.
+        expect(
+          await serviceOn(PlainDate(2026, 1, 5)).catchUpOverdue(householdId),
+          0,
+        );
+        final details = await repo.getChore(chore.id);
+        expect(details!.chore.pausedAt, isNull);
+        expect(details.chore.pausedUntil, isNull);
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 5));
+      },
+    );
+
+    test(
+      'a resume day already in the past (the app was not opened) resumes it '
+      'at today, never behind it',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bed sheets',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).pauseChore(chore.id, until: PlainDate(2026, 1, 5));
+
+        await serviceOn(PlainDate(2026, 1, 9)).catchUpOverdue(householdId);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 9));
+      },
+    );
+
+    test('a chore paused with no date is never resumed by catch-up', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bed sheets',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(1),
+      );
+      await serviceOn(PlainDate(2026, 1, 1)).pauseChore(chore.id);
+
+      await serviceOn(PlainDate(2027, 1, 1)).catchUpOverdue(householdId);
+
+      expect((await repo.getChore(chore.id))!.chore.pausedAt, isNotNull);
+    });
+  });
 }

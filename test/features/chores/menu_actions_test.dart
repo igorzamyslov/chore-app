@@ -82,6 +82,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
       await tester.pumpAndSettle();
+      // Persona review 2026-10-06 C2: Pause asks how long first.
+      await tester.tap(find.bySemanticsIdentifier('chores.pause.indefinite'));
+      await tester.pumpAndSettle();
 
       expect(find.text('One-off chore'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
@@ -116,6 +119,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
+      await tester.pumpAndSettle();
+      // Persona review 2026-10-06 C2: Pause asks how long first.
+      await tester.tap(find.bySemanticsIdentifier('chores.pause.indefinite'));
       await tester.pumpAndSettle();
 
       expect(find.text('Paused'), findsOneWidget);

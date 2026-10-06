@@ -177,6 +177,11 @@ class ChoreService {
   /// stay overdue. Idempotent: calling this again the same day changes
   /// nothing.
   ///
+  /// Before that loop (and after ghost repair), every paused chore whose
+  /// `pausedUntil` is on or before today is resumed via [unpauseChore]
+  /// (amendment 2026-10-06, "Pause until") — the day-change trigger is what
+  /// makes a "pause until Monday" end on Monday.
+  ///
   /// Returns the number of chores it changed — i.e. how many had their
   /// pending occurrence closed as `missed` and a fresh one reinserted (0 if
   /// none, which is the common case).
@@ -207,6 +212,21 @@ class ChoreService {
         householdId,
         clock.now().toUtc().toIso8601String(),
       );
+      // "Pause until" (persona review 2026-10-06 C2): every paused chore
+      // whose resume day has come is unpaused through [unpauseChore], so it
+      // gets exactly the occurrence a hand-resume would (never before
+      // today, never resurrecting a closed slot). Before the overdue loop
+      // below, which therefore sees the fresh pending row and leaves it be
+      // (it is never behind today). Not counted in the return value: the
+      // catch-up banner explains rolled-forward overdue turns, not this.
+      for (final details in await chores.getActiveChores(householdId)) {
+        final until = details.chore.pausedUntil;
+        if (details.chore.pausedAt != null &&
+            until != null &&
+            !until.isAfter(today)) {
+          await unpauseChore(details.chore.id);
+        }
+      }
       final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
         final chore = details.chore;
@@ -248,14 +268,18 @@ class ChoreService {
   /// Pauses [choreId] and deletes its pending occurrence. History is
   /// untouched. A no-op if the chore is already paused.
   ///
+  /// [until] (persona review 2026-10-06 C2, "Pause until") is the local day
+  /// the chore resumes on by itself — [catchUpOverdue] unpauses it once
+  /// `until <= today`; `null` (the default) pauses it until resumed by hand.
+  ///
   /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
-  Future<void> pauseChore(String choreId) async {
+  Future<void> pauseChore(String choreId, {PlainDate? until}) async {
     await database.transaction(() async {
       final details = await _requireActiveChore(choreId);
       if (details.chore.pausedAt != null) {
         return;
       }
-      await chores.setPaused(choreId, paused: true);
+      await chores.setPaused(choreId, paused: true, until: until);
       await chores.deletePendingOccurrences(choreId);
     });
   }

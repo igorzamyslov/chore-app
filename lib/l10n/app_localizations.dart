@@ -716,6 +716,30 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get choresPausedBadge;
 
+  /// Paused-section row badge (instead of 'Paused') when the chore was paused until a date, and the pause snackbar in that case (persona review 2026-10-06 C2, 'Pause until'). The chore resumes by itself on that day. {date} is the locale-formatted weekday + month + day, e.g. 'Mon, Oct 12'.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused until {date}'**
+  String choresPausedUntil(String date);
+
+  /// Title of the small sheet the action sheet's 'Pause' opens (persona review C2), asking how long to pause for.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause this chore'**
+  String get choresPauseSheetTitle;
+
+  /// Pause sheet option: pause with no end date; the chore waits in the Paused section until someone taps Resume (the only behaviour before 'Pause until').
+  ///
+  /// In en, this message translates to:
+  /// **'Until I resume it'**
+  String get choresPauseUntilResumed;
+
+  /// Pause sheet option: opens a date picker (earliest day: tomorrow); the chore resumes by itself on the picked day (persona review C2, Maria: 'Pause has no resume date').
+  ///
+  /// In en, this message translates to:
+  /// **'Until a date…'**
+  String get choresPauseUntilDate;
+
   /// Paused-section row action: unpauses the chore via ChoreService.unpauseChore.
   ///
   /// In en, this message translates to:

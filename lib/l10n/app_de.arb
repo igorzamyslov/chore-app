@@ -123,6 +123,10 @@
 
   "choresPausedHeader": "{count, plural, one{Pausiert (1)} other{Pausiert ({count})}}",
   "choresPausedBadge": "Pausiert",
+  "choresPausedUntil": "Pausiert bis {date}",
+  "choresPauseSheetTitle": "Aufgabe pausieren",
+  "choresPauseUntilResumed": "Bis ich sie fortsetze",
+  "choresPauseUntilDate": "Bis zu einem Datum …",
   "choresPausedResume": "Fortsetzen",
 
   "choreFormEditTitle": "Aufgabe bearbeiten",

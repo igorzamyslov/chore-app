@@ -29,6 +29,7 @@ import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/chores/pause_chore_sheet.dart';
 import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -482,16 +483,35 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// only -- easy to miss -- recovery path. Built the same way as
   /// [_showCloseSnackbar]: [showAppSnackbar] with an action, which is
   /// `persist: false` internally so the bar still auto-dismisses.
+  ///
+  /// Persona review 2026-10-06 C2 ("Pause until"): a small sheet asks how
+  /// long first -- until resumed by hand, or until a date, after which
+  /// `ChoreService.catchUpOverdue` resumes it by itself.
   Future<void> _pause(OccurrenceWithChore occurrence) async {
     final choreId = occurrence.chore.id;
-    await ref.read(choreServiceProvider).pauseChore(choreId);
+    final choice = await showPauseChoreSheet(
+      context,
+      today: ref.read(todayProvider),
+    );
+    if (!mounted || choice == null) {
+      return;
+    }
+    final until = choice.until;
+    await ref.read(choreServiceProvider).pauseChore(choreId, until: until);
     if (!mounted) {
       return;
     }
     final l10n = AppLocalizations.of(context);
     showAppSnackbar(
       context,
-      message: l10n.choresSnackbarPaused,
+      message: until == null
+          ? l10n.choresSnackbarPaused
+          : l10n.choresPausedUntil(
+              pausedUntilText(
+                Localizations.localeOf(context).toString(),
+                until,
+              ),
+            ),
       action: SnackBarAction(
         label: l10n.choresSnackbarUndo,
         onPressed: () {

@@ -441,6 +441,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresPausedBadge => 'Pausiert';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Pausiert bis $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Aufgabe pausieren';
+
+  @override
+  String get choresPauseUntilResumed => 'Bis ich sie fortsetze';
+
+  @override
+  String get choresPauseUntilDate => 'Bis zu einem Datum …';
+
+  @override
   String get choresPausedResume => 'Fortsetzen';
 
   @override
