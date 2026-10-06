@@ -193,6 +193,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                   onOpenMenu: _openMenu,
                   onReopen: _reopen,
                   onResume: _resume,
+                  onOpenPausedMenu: _openPausedMenu,
                   onClearFilters: _clearFilters,
                 );
                 if (!syncLinked) {
@@ -349,37 +350,73 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         }
         await _showCloseSnackbar(occurrence: occurrence, skipped: true);
       case ChoreMenuAction.edit:
-        final saved = await Navigator.of(context).push<ChoreUpdateResult>(
-          MaterialPageRoute(
-            builder: (_) => ChoreFormScreen(choreId: occurrence.chore.id),
-          ),
-        );
-        if (!mounted || saved == null) {
-          return;
-        }
-        showAppSnackbar(
-          context,
-          message: choreSavedMessage(
-            AppLocalizations.of(context),
-            Localizations.localeOf(context).toString(),
-            today: ref.read(todayProvider),
-            result: saved,
-          ),
-        );
+        await _edit(occurrence.chore.id);
       case ChoreMenuAction.pause:
         await _pause(occurrence);
+      case ChoreMenuAction.resume:
+        // Only the paused variant of the sheet offers Resume.
+        break;
       case ChoreMenuAction.delete:
-        final confirmed = await showChoreDeleteDialog(
-          context,
-          choreTitle: occurrence.chore.title,
-        );
-        if (!mounted || !confirmed) {
-          return;
-        }
-        await ref
-            .read(choreRepositoryProvider)
-            .softDeleteChore(occurrence.chore.id);
+        await _delete(occurrence.chore);
     }
+  }
+
+  /// The paused row's sheet (persona review 2026-10-06 C4): Resume, Edit
+  /// and Delete, without having to resume the chore first.
+  Future<void> _openPausedMenu(ChoreWithDetails details) async {
+    final action = await showChoreActionSheet(
+      context,
+      showMarkDoneFor: false,
+      paused: true,
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case ChoreMenuAction.resume:
+        await _resume(details);
+      case ChoreMenuAction.edit:
+        await _edit(details.chore.id);
+      case ChoreMenuAction.delete:
+        await _delete(details.chore);
+      case ChoreMenuAction.markDoneFor:
+      case ChoreMenuAction.skip:
+      case ChoreMenuAction.pause:
+        // Not offered on the paused sheet: there is no open turn.
+        break;
+    }
+  }
+
+  /// Opens [choreId] in the edit form and, if it was saved, confirms the
+  /// save in words (persona review 2026-10-06 C1/C6).
+  Future<void> _edit(String choreId) async {
+    final saved = await Navigator.of(context).push<ChoreUpdateResult>(
+      MaterialPageRoute(builder: (_) => ChoreFormScreen(choreId: choreId)),
+    );
+    if (!mounted || saved == null) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: choreSavedMessage(
+        AppLocalizations.of(context),
+        Localizations.localeOf(context).toString(),
+        today: ref.read(todayProvider),
+        result: saved,
+      ),
+    );
+  }
+
+  /// Confirms, then soft-deletes [chore].
+  Future<void> _delete(Chore chore) async {
+    final confirmed = await showChoreDeleteDialog(
+      context,
+      choreTitle: chore.title,
+    );
+    if (!mounted || !confirmed) {
+      return;
+    }
+    await ref.read(choreRepositoryProvider).softDeleteChore(chore.id);
   }
 
   /// Pauses [occurrence]'s chore and confirms it with a snackbar whose
@@ -616,6 +653,7 @@ class _Body extends StatelessWidget {
     required this.onOpenMenu,
     required this.onReopen,
     required this.onResume,
+    required this.onOpenPausedMenu,
     required this.onClearFilters,
   });
 
@@ -635,6 +673,7 @@ class _Body extends StatelessWidget {
   final ValueChanged<OccurrenceWithChore> onOpenMenu;
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
   final ValueChanged<ChoreWithDetails> onResume;
+  final ValueChanged<ChoreWithDetails> onOpenPausedMenu;
 
   /// Resets both filters (spec `docs/feedback/2026-08-01-ux-audit.md` B1's
   /// "Show everything" action, wired to the filtered-empty state below).
@@ -740,7 +779,11 @@ class _Body extends StatelessWidget {
                 ),
             ],
         if (filteredPaused.isNotEmpty)
-          ChorePausedSection(chores: filteredPaused, onResume: onResume),
+          ChorePausedSection(
+            chores: filteredPaused,
+            onResume: onResume,
+            onOpenMenu: onOpenPausedMenu,
+          ),
         if (filteredClosedToday.isNotEmpty)
           ChoreDoneSection(
             occurrences: filteredClosedToday,
