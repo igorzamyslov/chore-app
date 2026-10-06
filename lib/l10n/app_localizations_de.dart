@@ -261,7 +261,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get actingManageMembers => 'Mitglieder verwalten';
 
   @override
-  String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
+  String get choresEmptyState => 'Für heute ist nichts mehr offen.';
 
   @override
   String get choresEmptyDoneHeadline => 'Für heute alles erledigt';
@@ -299,7 +299,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get choresProgressAllDoneToday => 'Alles erledigt — gut gemacht!';
+  String get choresProgressAllDoneToday => 'Das war alles für heute.';
+
+  @override
+  String choresProgressCatchUp(int count) {
+    return '$count nachzuholen';
+  }
 
   @override
   String get choresProgressFilterActive =>

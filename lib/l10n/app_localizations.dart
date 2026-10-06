@@ -464,10 +464,10 @@ abstract class AppLocalizations {
   /// **'Manage members'**
   String get actingManageMembers;
 
-  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done').
+  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done'). Plain statement, no praise: a teenager read the old 'nice work' as patronising (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'No chores pending — nice work!'**
+  /// **'Nothing left for today.'**
   String get choresEmptyState;
 
   /// Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyState when the household has chores but none are currently pending.
@@ -518,11 +518,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
   String choresProgressRemainingToday(int count);
 
-  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed.
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'That\'s everything — nice work'**
+  /// **'That\'s everything for today.'**
   String get choresProgressAllDoneToday;
+
+  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} to catch up'**
+  String choresProgressCatchUp(int count);
 
   /// Day-progress card's extra bodySmall line (spec docs/specs/theme-v2.md §4.1 item 1, changed 2026-08-07 per triage T1.1/D3), shown only while a member/category filter is active on the chores list: makes explicit that the card's N-of-M counts are the filtered subset, not the whole household's day, so a narrowed '1 of 2' is never mistaken for everyone's progress.
   ///

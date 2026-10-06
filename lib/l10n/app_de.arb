@@ -73,7 +73,7 @@
   "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
-  "choresEmptyState": "Keine Aufgaben offen — gut gemacht!",
+  "choresEmptyState": "Für heute ist nichts mehr offen.",
   "choresEmptyDoneHeadline": "Für heute alles erledigt",
   "choresEmptyFresh": "Füge mit + deine erste Aufgabe hinzu",
   "choresEmptyFreshHeadline": "Noch keine Aufgaben",
@@ -83,7 +83,8 @@
 
   "choresProgressTitle": "{n} von {m} heute erledigt",
   "choresProgressRemainingToday": "{count, plural, one{Noch 1 übrig} other{Noch {count} übrig}}",
-  "choresProgressAllDoneToday": "Alles erledigt — gut gemacht!",
+  "choresProgressAllDoneToday": "Das war alles für heute.",
+  "choresProgressCatchUp": "{count} nachzuholen",
   "choresProgressFilterActive": "Gefiltert – nicht der ganze Haushalt",
 
   "welcomeTagline": "Teile Aufgaben und eine Einkaufsliste mit deinem Haushalt.",

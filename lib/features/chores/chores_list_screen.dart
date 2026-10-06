@@ -180,8 +180,13 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
         )
         .length;
-    final pendingDueOrOverdue = filteredOccurrencesForCount
-        .where((occurrence) => !occurrence.occurrence.dueDate.isAfter(today))
+    // E5 (persona review 2026-10-06): the overdue pile is not part of
+    // "today" -- it is reported beside it as "N to catch up".
+    final pendingDueToday = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate == today)
+        .length;
+    final overdueCount = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate.isBefore(today))
         .length;
 
     return Scaffold(
@@ -220,7 +225,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           if (occurrencesAsync.hasValue)
             ChoreProgressCard(
               completedToday: completedToday,
-              pendingDueOrOverdue: pendingDueOrOverdue,
+              pendingDueToday: pendingDueToday,
+              overdueCount: overdueCount,
               today: today,
               filterActive: filterActive,
             ),

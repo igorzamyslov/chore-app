@@ -72,7 +72,7 @@ void main() {
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty.done'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty.fresh'), findsNothing);
-      expect(find.text('No chores pending — nice work!'), findsOneWidget);
+      expect(find.text('Nothing left for today.'), findsOneWidget);
       expect(
         find.descendant(
           of: find.bySemanticsIdentifier('chores.empty'),

@@ -320,9 +320,9 @@
     "description": "Final row of the acting-member switcher sheet (spec docs/feedback/2026-08-01-ux-audit.md B2), pushing the Members management screen."
   },
 
-  "choresEmptyState": "No chores pending — nice work!",
+  "choresEmptyState": "Nothing left for today.",
   "@choresEmptyState": {
-    "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done')."
+    "description": "Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done'). Plain statement, no praise: a teenager read the old 'nice work' as patronising (persona review 2026-10-06 E5)."
   },
   "choresEmptyDoneHeadline": "All done for today",
   "@choresEmptyDoneHeadline": {
@@ -373,9 +373,19 @@
       }
     }
   },
-  "choresProgressAllDoneToday": "That's everything — nice work",
+  "choresProgressAllDoneToday": "That's everything for today.",
   "@choresProgressAllDoneToday": {
-    "description": "Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed."
+    "description": "Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5)."
+  },
+  "choresProgressCatchUp": "{count} to catch up",
+  "@choresProgressCatchUp": {
+    "description": "Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
   },
   "choresProgressFilterActive": "Filtered — not the whole household",
   "@choresProgressFilterActive": {
