@@ -1217,6 +1217,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.';
 
   @override
+  String get syncRefreshErrorRejected =>
+      'Der Haushalts-Server hat eine Änderung von diesem Handy abgelehnt, sie ist also nicht angekommen. Prüfe, ob es ein App-Update gibt; deine anderen Änderungen werden weiter synchronisiert.';
+
+  @override
+  String syncPendingChanges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen warten aufs Senden',
+      one: '1 Änderung wartet aufs Senden',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get syncHealthBannerMessage =>
       'Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.';
 

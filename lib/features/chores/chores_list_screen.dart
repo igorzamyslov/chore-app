@@ -28,6 +28,7 @@ import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -539,47 +540,11 @@ class _BannerRegion extends StatelessWidget {
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
-/// `docs/specs/sync-freshness.md` §2.3).
-///
-/// Uses `refreshNow()`, not `pushDirty()`: the latter swallows every error
-/// by contract (spec `sync-backend.md` §8.3), so the indicator used to spin
-/// and stop identically whether the sync worked or the phone was offline --
-/// found by the 2026-08-07 persona walkthrough. Success stays silent; the
-/// list simply updates, which is the platform convention.
-Future<void> _refresh(BuildContext context, WidgetRef ref) async {
-  final ok = await ref.read(syncEngineProvider).refreshNow();
-  if (ok || !context.mounted) {
-    return;
-  }
-  // WHEN THIS BRANCH IS ACTUALLY REACHED, which is narrower than it looks:
-  // `syncEngineProvider` is gated on `settings.syncHouseholdId`, and the
-  // engine's own startup pull and 60s poll run this same revocation probe. So
-  // in the common case the ENGINE notices first, calls `clearSyncLink()`, and
-  // `syncEngineProvider` becomes a `NoopSyncEngine` whose `refreshNow()`
-  // returns true -- meaning a later pull-to-refresh reports success and says
-  // nothing. That is not a gap: a device that has been revoked is told so by
-  // the revocation notice (spec `docs/specs/household-lifecycle.md` §3.5),
-  // which is the primary surface. This string covers the narrower race where
-  // the user's own gesture is the first probe after the server-side removal,
-  // and it exists because in exactly that case `syncRefreshError`'s "will
-  // sync later" is a promise the app has already made false.
-  // refreshNow() returns false for two different situations, and only one of
-  // them is a delay. If the failure was a revocation, `_pullSinceInner` has
-  // ALREADY called setMembershipRevoked() and clearSyncLink() before
-  // returning -- so syncRefreshError's "will sync later" is not optimism, it
-  // is false. Read the just-written row with a one-shot query rather than
-  // settingsProvider's stream, which may not have re-emitted the write yet.
-  final revoked = (await ref.read(settingsRepositoryProvider).ensureSettings())
-      .membershipRevoked;
-  if (!context.mounted) {
-    return;
-  }
-  final l10n = AppLocalizations.of(context);
-  showAppSnackbar(
-    context,
-    message: revoked ? l10n.syncRefreshErrorRevoked : l10n.syncRefreshError,
-  );
-}
+/// `docs/specs/sync-freshness.md` §2.3) through the shared
+/// `refreshAndReport` (`lib/features/sync/refresh_outcome_snackbar.dart`),
+/// which owns the `RefreshOutcome` -> snackbar mapping for every surface.
+Future<void> _refresh(BuildContext context, WidgetRef ref) =>
+    refreshAndReport(context, ref);
 
 /// Filters [occurrences] to the active member/category filter (`null` for
 /// either means "no restriction") -- shared by the day-progress card's

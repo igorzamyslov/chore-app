@@ -20,13 +20,16 @@ import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../features/settings/fake_household_gateway.dart';
 import 'fake_sync_transport.dart';
 
-/// Collects the sources [AppLog] receives, in order.
+/// Collects the sources (and scrubbed contexts) [AppLog] receives, in
+/// order.
 class _RecordingSink implements ErrorLogSink {
   final List<String> sources = [];
+  final List<Map<String, String>?> contexts = [];
 
   @override
   Future<void> record({
@@ -34,6 +37,53 @@ class _RecordingSink implements ErrorLogSink {
     required ScrubbedError error,
   }) async {
     sources.add(source);
+    contexts.add(error.context);
+  }
+}
+
+/// A [FakeSyncTransport] whose server REJECTS any `categories` batch that
+/// contains a row named [badName] with a 23-class error, exactly as a
+/// Postgres FK/check violation would -- the whole batch fails, and only a
+/// row-by-row retry can tell which row is the offender (technical review
+/// 2026-10-06 #5).
+class _RejectsBadCategoryTransport extends FakeSyncTransport {
+  _RejectsBadCategoryTransport(this.badName);
+
+  final String badName;
+  int categoryUpserts = 0;
+
+  @override
+  Future<void> upsertRows(
+    String table,
+    List<Map<String, Object?>> rows, {
+    String? onConflict,
+  }) async {
+    if (table == 'categories') {
+      categoryUpserts++;
+      if (rows.any((row) => row['name'] == badName)) {
+        throw const PostgrestException(
+          message: 'violates check constraint',
+          code: '23514',
+        );
+      }
+    }
+    return super.upsertRows(table, rows, onConflict: onConflict);
+  }
+}
+
+/// A [FakeSyncTransport] whose `categories` push fails with an ordinary
+/// (non-rejection) error -- a dropped connection on exactly that request.
+class _CategoriesOfflineTransport extends FakeSyncTransport {
+  @override
+  Future<void> upsertRows(
+    String table,
+    List<Map<String, Object?>> rows, {
+    String? onConflict,
+  }) async {
+    if (table == 'categories') {
+      throw Exception('simulated connection drop');
+    }
+    return super.upsertRows(table, rows, onConflict: onConflict);
   }
 }
 
@@ -571,7 +621,7 @@ void main() {
 
         final result = await engine.refreshNow();
 
-        expect(result, isFalse);
+        expect(result, RefreshOutcome.offline);
         final row = await settings.ensureSettings();
         expect(row.syncHouseholdId, isNull);
         expect(row.membershipRevoked, isTrue);
@@ -579,7 +629,7 @@ void main() {
     );
 
     test(
-      'refreshNow still reports true for an ordinary successful refresh '
+      'refreshNow still reports ok for an ordinary successful refresh '
       '(membership present)',
       () async {
         await settings.setSyncLinked(
@@ -590,7 +640,7 @@ void main() {
 
         final result = await engine.refreshNow();
 
-        expect(result, isTrue);
+        expect(result, RefreshOutcome.ok);
       },
     );
   });
@@ -598,6 +648,7 @@ void main() {
   group('SupabaseSyncEngine push mechanics', () {
     late AppDatabase db;
     late HouseholdRepository households;
+    late CategoryRepository categories;
     late Household household;
     late FakeSyncTransport transport;
     late SupabaseSyncEngine engine;
@@ -605,6 +656,7 @@ void main() {
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       households = HouseholdRepository(db);
+      categories = CategoryRepository(db);
       household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
       engine = SupabaseSyncEngine(
@@ -724,6 +776,108 @@ void main() {
         expect(assigneeRow['household_id'], household.id);
         expect(assigneeRow['chore_id'], chore.id);
         expect(assigneeRow['member_id'], member.id);
+      },
+    );
+
+    test(
+      'a server-rejected row is quarantined: the rest of its table and '
+      'every later table still push, the row stays dirty, and the '
+      'rejection is logged ONCE as sync.rejected (technical review '
+      '2026-10-06 #5)',
+      () async {
+        final sink = _RecordingSink();
+        AppLog.attach(sink);
+        addTearDown(AppLog.detach);
+        final rejecting = _RejectsBadCategoryTransport('Bad');
+        final quarantineEngine = SupabaseSyncEngine(
+          db: db,
+          transport: rejecting,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+        );
+        addTearDown(quarantineEngine.stop);
+        final good = await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'Good',
+          icon: 'a',
+          color: 1,
+        );
+        final bad = await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'Bad',
+          icon: 'a',
+          color: 1,
+        );
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        await quarantineEngine.pushDirty();
+
+        final serverCategories = rejecting.serverRows['categories']!;
+        expect(serverCategories.map((row) => row['id']), [good.id]);
+        expect(
+          rejecting.serverRows['shopping_items'],
+          hasLength(1),
+          reason: 'a later table must not be blocked by the rejected one',
+        );
+        Future<bool> dirtyOf(String id) async => (await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals(id))).getSingle()).syncDirty;
+        expect(await dirtyOf(good.id), isFalse);
+        expect(await dirtyOf(bad.id), isTrue);
+        expect(
+          sink.sources.where((source) => source == 'sync.rejected'),
+          hasLength(1),
+        );
+        expect(
+          sink.contexts[sink.sources.indexOf('sync.rejected')],
+          {'table': 'categories', 'id': bad.id},
+        );
+        expect(
+          rejecting.categoryUpserts,
+          3,
+          reason: 'the batch, then one retry per row',
+        );
+
+        // The next tick retries (the row is still dirty) but does not log
+        // the same rejection again.
+        await quarantineEngine.pushDirty();
+        expect(await dirtyOf(bad.id), isTrue);
+        expect(
+          sink.sources.where((source) => source == 'sync.rejected'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
+      'an ordinary failure on one table does not stop the later tables, '
+      'and pushDirty still skips its follow-up pull (retry-later)',
+      () async {
+        final offline = _CategoriesOfflineTransport();
+        final partialEngine = SupabaseSyncEngine(
+          db: db,
+          transport: offline,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+        );
+        addTearDown(partialEngine.stop);
+        await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'C',
+          icon: 'a',
+          color: 1,
+        );
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        await partialEngine.pushDirty();
+
+        expect(offline.serverRows['categories'], isEmpty);
+        expect(offline.serverRows['shopping_items'], hasLength(1));
+        expect(offline.serverNowCalls, 0);
+        expect(await partialEngine.refreshNow(), RefreshOutcome.offline);
       },
     );
 
