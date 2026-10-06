@@ -312,6 +312,20 @@ void main() {
     );
 
     test(
+      'two concurrent pullSince() calls share one pull: the transport is '
+      'hit once (technical review 2026-10-06 #17, single in-flight pull)',
+      () async {
+        await Future.wait([engine.pullSince(), engine.pullSince()]);
+
+        expect(transport.serverNowCalls, 1);
+
+        // And a pull started AFTER the first completed is a real new pull.
+        await engine.pullSince();
+        expect(transport.serverNowCalls, 2);
+      },
+    );
+
+    test(
       'cursor advances to the fetched server now() after a successful pull',
       () async {
         transport.now = DateTime.utc(2026, 5, 1, 12);
@@ -740,6 +754,42 @@ void main() {
           db.categories,
         )..where((tbl) => tbl.id.equals('server-category'))).getSingleOrNull();
         expect(row, isNotNull);
+      },
+    );
+
+    test(
+      'a realtime event arriving right after our own push is ignored as an '
+      'echo; one arriving after the window still pulls (technical review '
+      '2026-10-06 #17)',
+      () async {
+        final echoEngine = SupabaseSyncEngine(
+          db: db,
+          transport: transport,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+          realtimeEchoWindow: const Duration(milliseconds: 150),
+        );
+        addTearDown(echoEngine.stop);
+
+        // start() pushes the household rows createLocalHousehold left
+        // dirty, then pulls once -- that push opens the echo window.
+        echoEngine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(transport.pushedTables, isNotEmpty);
+        final pullsAfterStart = transport.serverNowCalls;
+
+        transport.emitChange();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(
+          transport.serverNowCalls,
+          pullsAfterStart,
+          reason: 'the server event for rows we just wrote is our own echo',
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        transport.emitChange();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(transport.serverNowCalls, pullsAfterStart + 1);
       },
     );
   });

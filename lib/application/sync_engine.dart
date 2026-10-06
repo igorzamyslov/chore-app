@@ -24,6 +24,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/data/sync/row_mappers.dart';
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -240,6 +241,8 @@ class SupabaseSyncEngine implements SyncEngine {
     required this.householdId,
     this.pushDebounce = const Duration(seconds: 2),
     this.pollInterval = const Duration(seconds: 60),
+    this.realtimeEchoWindow = const Duration(seconds: 1),
+    this.clock = const Clock(),
   }) : _sync = SyncRepository(db);
 
   /// The local database this engine reads from and writes to.
@@ -269,7 +272,32 @@ class SupabaseSyncEngine implements SyncEngine {
   /// Tests pass a shorter value.
   final Duration pollInterval;
 
+  /// How long after our own successful push a realtime `householdChanges`
+  /// event is treated as the server echoing the rows we just wrote, and
+  /// dropped (technical review 2026-10-06 #17). The push's own follow-up
+  /// pull (spec §8.3c) already fetched those rows; the echo used to start a
+  /// SECOND pull of the same data, and with the start-time push racing the
+  /// `subscribed` tick, two interleaved pulls could move the cursor
+  /// backwards. A genuine other-device change inside this window is
+  /// caught by the next poll tick at the latest (`pollInterval`). Tests
+  /// pass a shorter value.
+  final Duration realtimeEchoWindow;
+
+  /// The DEVICE clock, used for the echo window and for tombstone stamps
+  /// -- never for the pull cursor, which is server time (spec §8.3).
+  /// Injected so tests can pin it.
+  final Clock clock;
+
   final SyncRepository _sync;
+
+  /// The pull currently running, if any (technical review 2026-10-06 #17):
+  /// [pullSince] and [refreshNow] join it instead of starting a second one,
+  /// so two pulls can never interleave and race each other's cursor write.
+  Future<bool>? _inFlightPull;
+
+  /// Until when realtime events are dropped as our own echo -- see
+  /// [realtimeEchoWindow].
+  DateTime? _ignoreRealtimeUntil;
 
   StreamSubscription<Set<TableUpdate>>? _writeSubscription;
   StreamSubscription<void>? _realtimeSubscription;
@@ -304,9 +332,15 @@ class SupabaseSyncEngine implements SyncEngine {
     // (re)subscribe (spec `docs/specs/sync-freshness.md` §2.1). Mapping
     // both to the same pull is what closes the gap a dropped-and-restored
     // socket used to leave open indefinitely.
-    _realtimeSubscription = transport
-        .householdChanges(householdId)
-        .listen((_) => unawaited(pullSince()));
+    _realtimeSubscription = transport.householdChanges(householdId).listen((
+      _,
+    ) {
+      final ignoreUntil = _ignoreRealtimeUntil;
+      if (ignoreUntil != null && clock.now().isBefore(ignoreUntil)) {
+        return;
+      }
+      unawaited(pullSince());
+    });
     // Push on start (recovers rows left dirty from a prior session that
     // never got pushed -- e.g. a cold start while linked), which itself
     // pulls afterward on success (spec §8.3a/c): this covers "pull on
@@ -398,23 +432,31 @@ class SupabaseSyncEngine implements SyncEngine {
   }
 
   /// Every table's push, in FK order (spec §8.3) -- THROWS on failure.
-  /// [pushDirty] swallows that; [refreshNow] reports it.
-  Future<void> _pushAll() async {
-    await _pushHouseholds();
-    await _pushMembers();
-    await _pushCategories();
-    await _pushChores();
-    await _pushChoreAssignees();
-    await _pushChoreOccurrences();
-    await _pushShoppingItems();
-    await _pushTombstones();
+  /// [pushDirty] swallows that; [refreshNow] reports it. Returns whether
+  /// anything at all was sent, which is what opens the realtime echo
+  /// window (see [realtimeEchoWindow]): a push with nothing to send
+  /// produces no server event to ignore.
+  Future<bool> _pushAll() async {
+    var pushedAny = false;
+    pushedAny |= await _pushHouseholds();
+    pushedAny |= await _pushMembers();
+    pushedAny |= await _pushCategories();
+    pushedAny |= await _pushChores();
+    pushedAny |= await _pushChoreAssignees();
+    pushedAny |= await _pushChoreOccurrences();
+    pushedAny |= await _pushShoppingItems();
+    pushedAny |= await _pushTombstones();
+    if (pushedAny) {
+      _ignoreRealtimeUntil = clock.now().add(realtimeEchoWindow);
+    }
+    return pushedAny;
   }
 
   @override
   Future<bool> refreshNow() async {
     try {
       await _pushAll();
-      final revoked = await _pullSinceInner();
+      final revoked = await _pull();
       // A pull that discovers revocation is not a success from the
       // caller's point of view: this is a deliberate pull-to-refresh, and
       // "true" here would tell the user "yes, working" at the exact
@@ -448,11 +490,21 @@ class SupabaseSyncEngine implements SyncEngine {
   @override
   Future<void> pullSince() async {
     try {
-      await _pullSinceInner();
+      await _pull();
     } on Object catch (error, stackTrace) {
       _logFailure('pullSince', error, stackTrace);
     }
   }
+
+  /// Runs [_pullSinceInner], or joins the one already running (technical
+  /// review 2026-10-06 #17). `whenComplete` clears the slot before the
+  /// shared future completes, so a caller that starts a pull AFTER this
+  /// one finished gets a fresh pull, while every caller that arrived during
+  /// it shares this one's result -- including its error, which each
+  /// caller's own try/catch then handles.
+  Future<bool> _pull() => _inFlightPull ??= _pullSinceInner().whenComplete(
+    () => _inFlightPull = null,
+  );
 
   /// The pull itself -- THROWS on failure. [pullSince] swallows that;
   /// [refreshNow] reports it. Returns whether this pull discovered
@@ -577,7 +629,7 @@ class SupabaseSyncEngine implements SyncEngine {
       // push.
       await _sync.repairGhostOccurrences(
         householdId,
-        DateTime.now().toUtc().toIso8601String(),
+        clock.now().toUtc().toIso8601String(),
       );
     });
 
@@ -589,12 +641,13 @@ class SupabaseSyncEngine implements SyncEngine {
   /// Households-only push (spec §8.3's grants note applied to `households`
   /// too -- see [SyncTransport.updateHousehold]'s doc comment): a plain
   /// UPDATE per dirty row, never an upsert.
-  Future<void> _pushHouseholds() async {
+  Future<bool> _pushHouseholds() async {
     final dirty = await _sync.dirtyHouseholds();
     for (final household in dirty) {
       await transport.updateHousehold(household.id, householdRow(household));
       await _sync.clearHouseholdDirty(household.id, household.updatedAt);
     }
+    return dirty.isNotEmpty;
   }
 
   /// Members-only push (spec §8.3): insert-with-ignore for every dirty row
@@ -606,10 +659,10 @@ class SupabaseSyncEngine implements SyncEngine {
   /// granted columns (name, color, role, deleted_at), so a local soft
   /// delete (`MemberService.deleteMember`) propagates as a tombstone
   /// exactly like every other field change.
-  Future<void> _pushMembers() async {
+  Future<bool> _pushMembers() async {
     final dirty = await _sync.dirtyMembers();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     await transport.insertMembersIgnoringConflicts([
       for (final member in dirty) memberRow(member),
@@ -623,12 +676,13 @@ class SupabaseSyncEngine implements SyncEngine {
       });
       await _sync.clearMemberDirty(member.id, member.updatedAt);
     }
+    return true;
   }
 
-  Future<void> _pushCategories() async {
+  Future<bool> _pushCategories() async {
     final dirty = await _sync.dirtyCategories();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     await transport.upsertRows('categories', [
       for (final category in dirty) categoryRow(category),
@@ -636,12 +690,13 @@ class SupabaseSyncEngine implements SyncEngine {
     for (final category in dirty) {
       await _sync.clearCategoryDirty(category.id, category.updatedAt);
     }
+    return true;
   }
 
-  Future<void> _pushChores() async {
+  Future<bool> _pushChores() async {
     final dirty = await _sync.dirtyChores();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     await transport.upsertRows('chores', [
       for (final chore in dirty) choreRow(chore),
@@ -649,16 +704,17 @@ class SupabaseSyncEngine implements SyncEngine {
     for (final chore in dirty) {
       await _sync.clearChoreDirty(chore.id, chore.updatedAt);
     }
+    return true;
   }
 
   /// `chore_assignees` denormalizes `household_id` (spec §2: "the client
   /// fills it on push") -- neither local row carries it directly (see
   /// `ChoreAssignees` in `lib/data/db/tables.dart`), so it's looked up via
   /// each dirty row's own chore.
-  Future<void> _pushChoreAssignees() async {
+  Future<bool> _pushChoreAssignees() async {
     final dirty = await _sync.dirtyChoreAssignees();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     final choreIds = {for (final assignee in dirty) assignee.choreId};
     final chores = await (db.select(
@@ -682,14 +738,15 @@ class SupabaseSyncEngine implements SyncEngine {
         assignee.position,
       );
     }
+    return true;
   }
 
   /// `chore_occurrences` denormalizes `household_id` the same way
   /// `chore_assignees` does; see [_pushChoreAssignees].
-  Future<void> _pushChoreOccurrences() async {
+  Future<bool> _pushChoreOccurrences() async {
     final dirty = await _sync.dirtyChoreOccurrences();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     final choreIds = {for (final occurrence in dirty) occurrence.choreId};
     final chores = await (db.select(
@@ -708,12 +765,13 @@ class SupabaseSyncEngine implements SyncEngine {
         occurrence.updatedAt,
       );
     }
+    return true;
   }
 
-  Future<void> _pushShoppingItems() async {
+  Future<bool> _pushShoppingItems() async {
     final dirty = await _sync.dirtyShoppingItems();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
     await transport.upsertRows('shopping_items', [
       for (final item in dirty) shoppingItemRow(item),
@@ -721,6 +779,7 @@ class SupabaseSyncEngine implements SyncEngine {
     for (final item in dirty) {
       await _sync.clearShoppingItemDirty(item.id, item.updatedAt);
     }
+    return true;
   }
 
   /// Pushes the hard-delete outbox (spec `docs/specs/sync-backend.md`
@@ -736,8 +795,9 @@ class SupabaseSyncEngine implements SyncEngine {
   /// rows, so the tombstone's meaning is "the pending row is gone" -- and
   /// it must not land on a row another device has since completed, which
   /// would erase that completion from the server and from every device.
-  Future<void> _pushTombstones() async {
-    for (final tombstone in await _sync.pendingTombstones()) {
+  Future<bool> _pushTombstones() async {
+    final tombstones = await _sync.pendingTombstones();
+    for (final tombstone in tombstones) {
       final memberId = tombstone.memberId;
       final isAssignee = tombstone.entity == 'chore_assignees';
       final readded = isAssignee
@@ -754,6 +814,7 @@ class SupabaseSyncEngine implements SyncEngine {
       }
       await _sync.deleteTombstone(tombstone.id);
     }
+    return tombstones.isNotEmpty;
   }
 
   /// Failure posture (spec §8.3): every engine error is swallowed into a
