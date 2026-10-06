@@ -239,6 +239,112 @@ void main() {
       expect(row.syncDirty, isFalse);
     });
 
+    group('shopping field-level merge (spec §8.8, finding A9)', () {
+      late ShoppingRepository shopping;
+      late String itemId;
+
+      Map<String, Object?> serverRow({
+        required String updatedAt,
+        String name = 'Milch',
+        String? checkedAt,
+        String? deletedAt,
+      }) => {
+        'id': itemId,
+        'household_id': household.id,
+        'name': name,
+        'quantity_note': null,
+        'category_id': null,
+        'added_by': null,
+        'checked_at': checkedAt,
+        'created_at': '2026-06-01T08:00:00.000Z',
+        'updated_at': updatedAt,
+        'deleted_at': deletedAt,
+      };
+
+      Future<ShoppingItem> localItem() => (db.select(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(itemId))).getSingle();
+
+      setUp(() async {
+        var tick = 0;
+        // Each local write lands one hour after the previous one.
+        shopping = ShoppingRepository(
+          db,
+          nowUtc: () => DateTime.utc(2026, 6, 1, 8 + tick++),
+        );
+        final item = await shopping.addItem(household.id, name: 'Milch');
+        itemId = item.id;
+        await (db.update(db.shoppingItems)
+              ..where((tbl) => tbl.id.equals(itemId)))
+            .write(const ShoppingItemsCompanion(syncDirty: Value(false)));
+      });
+
+      test('Tom clears Milch offline, his partner re-adds it online: the '
+          'item stays on the list after the pull', () async {
+        await shopping.setChecked(itemId, checked: true); // 09:00
+        await shopping.clearChecked(household.id); // 10:00, dirty
+        expect((await localItem()).deletedAt, isNotNull);
+
+        // The partner un-deleted it at 12:00 (newer than Tom's 10:00 edit).
+        transport.serverRows['shopping_items']!.add(
+          serverRow(updatedAt: '2026-06-01T12:00:00.000+00:00'),
+        );
+
+        await engine.pullSince();
+
+        final row = await localItem();
+        expect(row.deletedAt, isNull, reason: 'the newer un-delete wins');
+        expect(row.checkedAt, isNull);
+        expect(
+          row.syncDirty,
+          isTrue,
+          reason: 'still dirty: the local name/note/category must be pushed',
+        );
+      });
+
+      test('keeps the local name, note and category while taking the '
+          'pulled checkedAt/deletedAt', () async {
+        await shopping.updateItem(itemId, name: 'Milch 3,5 %'); // 09:00
+        transport.serverRows['shopping_items']!.add(
+          serverRow(
+            updatedAt: '2026-06-01T12:00:00.000+00:00',
+            name: 'Hafermilch',
+            checkedAt: '2026-06-01T11:59:00.000+00:00',
+          ),
+        );
+
+        await engine.pullSince();
+
+        final row = await localItem();
+        expect(row.name, 'Milch 3,5 %');
+        expect(row.checkedAt, '2026-06-01T11:59:00.000Z');
+        expect(row.syncDirty, isTrue);
+        expect(
+          row.updatedAt,
+          '2026-06-01T09:00:00.000Z',
+          reason:
+              'the local updatedAt is untouched so the guarded '
+              'dirty-clear after a push still matches',
+        );
+      });
+
+      test(
+        'a pulled row OLDER than the dirty local row changes nothing',
+        () async {
+          await shopping.deleteItem(itemId); // 09:00, dirty
+          transport.serverRows['shopping_items']!.add(
+            serverRow(updatedAt: '2026-06-01T08:30:00.000+00:00'),
+          );
+
+          await engine.pullSince();
+
+          final row = await localItem();
+          expect(row.deletedAt, isNotNull);
+          expect(row.syncDirty, isTrue);
+        },
+      );
+    });
+
     test(
       'pulled timestamps are normalised to the local format: a Postgres '
       '"+00:00" stamp is stored as the same instant with a "Z" suffix '

@@ -381,15 +381,51 @@ class SyncRepository {
             db.into(db.choreOccurrences).insertOnConflictUpdate(pulled),
       );
 
-  /// Applies a pulled `shopping_items` row, unless the local row is dirty.
-  Future<void> applyPulledShoppingItem(ShoppingItem pulled) => _applyPulled(
-    pulled: pulled,
-    existing: (db.select(
+  /// Applies a pulled `shopping_items` row, unless the local row is dirty --
+  /// with one field-level exception (spec `docs/specs/sync-backend.md` §8.8,
+  /// persona finding A9).
+  ///
+  /// When the local row is dirty AND the pulled row's `updatedAt` is later
+  /// than the local one, the other device edited the item after this device
+  /// did. Whole-row "dirty local wins" would then push this device's stale
+  /// `checkedAt`/`deletedAt` over that newer edit (Tom clears "Milch"
+  /// offline; his partner re-adds it; his later push deletes it again). So
+  /// the pulled `checkedAt` and `deletedAt` are written onto the local row,
+  /// while `name`, `quantityNote`, `categoryId` and `updatedAt` stay local
+  /// and `syncDirty` stays `true` (the local fields still have to be
+  /// pushed; keeping the local `updatedAt` keeps the guarded dirty-clear
+  /// after that push matching). A pulled row that is not newer, or a clean
+  /// local row, behaves exactly as in [_applyPulled].
+  Future<void> applyPulledShoppingItem(ShoppingItem pulled) async {
+    final local = await (db.select(
       db.shoppingItems,
-    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.shoppingItems).insertOnConflictUpdate(pulled),
-  );
+    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull();
+    if (local != null && local.syncDirty && local != pulled) {
+      final pulledAt = DateTime.tryParse(pulled.updatedAt);
+      final localAt = DateTime.tryParse(local.updatedAt);
+      final pulledIsNewer =
+          pulledAt != null && localAt != null && pulledAt.isAfter(localAt);
+      if (pulledIsNewer &&
+          (local.checkedAt != pulled.checkedAt ||
+              local.deletedAt != pulled.deletedAt)) {
+        await (db.update(
+          db.shoppingItems,
+        )..where((tbl) => tbl.id.equals(pulled.id))).write(
+          ShoppingItemsCompanion(
+            checkedAt: Value(pulled.checkedAt),
+            deletedAt: Value(pulled.deletedAt),
+          ),
+        );
+      }
+      return;
+    }
+    await _applyPulled(
+      pulled: pulled,
+      existing: Future.value(local),
+      isDirty: (row) => row.syncDirty,
+      write: () => db.into(db.shoppingItems).insertOnConflictUpdate(pulled),
+    );
+  }
 
   // ---------------------------------------------------------------------
   // Hard-delete tombstones (spec `docs/specs/sync-backend.md` §8.6).

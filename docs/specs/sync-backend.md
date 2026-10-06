@@ -757,3 +757,41 @@ must preserve them:
 5. **One bad row never blocks another.** Push proceeds per table and, on
    rejection, per row; the rejected row is quarantined and reported, the
    rest keep flowing, and the pull is never conditional on the push.
+
+### 8.8 Shopping field-level merge (amendment 2026-10-06, finding A9)
+
+§8.3's rule "a pulled row never overwrites a locally dirty row" is a
+whole-row, last-PUSH-wins rule: which device's version survives is decided
+by when each device manages to push, not by when the human acted. For most
+tables that is accepted at family scale. For `shopping_items` it loses data
+in an ordinary trip: Tom ticks "Milch" and presses *Clear checked* with no
+reception (row = deleted, dirty); at home his partner re-adds or un-checks
+the same item; Tom's phone reconnects and pushes its older `deleted_at`
+over her newer edit, and her request vanishes without a message on either
+phone.
+
+**Rule.** `SyncRepository.applyPulledShoppingItem`, when the local row is
+dirty AND the pulled row's `updatedAt` (already normalised by `utcIso`, and
+compared as instants) is later than the local `updatedAt`:
+
+- writes the pulled `checkedAt` and `deletedAt` onto the local row;
+- keeps the local `name`, `quantityNote`, `categoryId` and `updatedAt`;
+- keeps `syncDirty = true`, so the local fields still go out on the next push
+  (and the guarded dirty-clear, which matches on `updatedAt`, still matches).
+
+If the pulled row is not newer, or the local row is clean, the §8.3 rules
+apply unchanged (dirty local wins; clean local is replaced).
+
+**Why only those two fields.** `checkedAt` and `deletedAt` are the *state*
+of the item ("is it still wanted, is it in the cart"); the later edit of
+that state is the one that reflects the household's current intent.
+`name`, `quantityNote` and `categoryId` are descriptive; letting a pulled
+value replace a half-typed local rename would be a worse surprise than
+last-push-wins on those fields, which stay as before. Brand-new items are
+separate rows with their own UUIDs and never conflict.
+
+**Residual.** The comparison uses each device's clock for `updatedAt` on
+the local row and the server's for the pulled row, so a badly skewed device
+can pick the wrong side; this is the same exposure §8.7 invariant 1
+documents and is accepted. Test: `test/application/sync_engine_test.dart`,
+group "shopping field-level merge".
