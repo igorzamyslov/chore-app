@@ -156,6 +156,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuPause => 'Pause';
 
   @override
+  String get choresDeleteDialogShared =>
+      'Everyone in the household will see this.';
+
+  @override
   String get choresDeleteDialogTitle => 'Delete chore?';
 
   @override

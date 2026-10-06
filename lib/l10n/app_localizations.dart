@@ -302,6 +302,12 @@ abstract class AppLocalizations {
   /// **'Pause'**
   String get choresMenuPause;
 
+  /// Second paragraph of the chore delete dialog, shown only when the household has more than one member (persona review 2026-10-06 E4; Leon: 'If I delete the bins chore, does anyone even know?'). Any member can delete any chore by design (no roles, decision D1); this line discloses that the deletion is shared, not private.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone in the household will see this.'**
+  String get choresDeleteDialogShared;
+
   /// Title of the chore delete-confirmation dialog.
   ///
   /// In en, this message translates to:

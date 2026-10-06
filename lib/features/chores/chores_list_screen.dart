@@ -479,6 +479,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final confirmed = await showChoreDeleteDialog(
       context,
       choreTitle: chore.title,
+      // E4 (persona review 2026-10-06): disclose that the delete is shared.
+      shared: (ref.read(membersProvider).value?.length ?? 0) > 1,
     );
     if (!mounted || !confirmed) {
       return;
