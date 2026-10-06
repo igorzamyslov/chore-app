@@ -477,7 +477,11 @@ class ChoreService {
     final holder = pending.assignedMemberId;
     final assignees = after.assigneeMemberIds;
     final valid = switch (after.chore.assignmentMode) {
-      AssignmentMode.fixed => holder == assignees.single,
+      // `contains`, not `.single`: a fixed chore normally has exactly one
+      // assignee row, but an older or half-synced row set must not throw
+      // inside a chore edit -- an unexpected shape just counts as invalid
+      // and gets re-resolved below.
+      AssignmentMode.fixed => holder != null && assignees.contains(holder),
       AssignmentMode.rotation => holder != null && assignees.contains(holder),
       AssignmentMode.anyone => true,
     };
