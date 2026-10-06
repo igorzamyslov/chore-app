@@ -1172,6 +1172,12 @@ abstract class AppLocalizations {
   /// **'Undo'**
   String get shoppingClearedUndo;
 
+  /// Undo snackbar shown after tapping 'Put all back' in the checked-items section (persona finding F4, tom-shopping PP5): the bulk uncheck used to give no feedback at all, and sat right beside 'Clear checked', so a mis-tap silently reshuffled the whole cart. Names how many items went back; Undo re-checks exactly those.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Put 1 item back} other{Put {count} items back}}'**
+  String shoppingPutBackSnackbar(int count);
+
   /// Snackbar shown right after ticking a shopping item (persona finding F3, docs/feedback/2026-10-06-personas/tom-shopping.md PP4): the row moves into the collapsed 'In the cart' section, and without this a stray tap made the item look as if it had vanished. Carries an Undo action that unchecks the item. Phrased as the place the item went, matching the section header.
   ///
   /// In en, this message translates to:

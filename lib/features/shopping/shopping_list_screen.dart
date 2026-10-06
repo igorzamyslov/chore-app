@@ -31,6 +31,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// only the move is.
 const shoppingCheckedMoveDelay = Duration(milliseconds: 350);
 
+/// How long the Clear-checked and Put-all-back Undo snackbars stay up
+/// (persona finding F4: 4 s was gone before Tom looked up from the shelf).
+const _bulkSnackbarDuration = Duration(seconds: 8);
+
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
 /// collapsed-by-default checked section.
@@ -234,7 +238,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                         ],
                       ),
                     ),
-                    onUncheckAll: () => _uncheckAll(ref),
+                    onUncheckAll: () => unawaited(
+                      _uncheckAll(ref, [
+                        // Captured NOW for the same reason as onClear's ids:
+                        // Undo re-checks exactly what this tap put back.
+                        for (final item in items)
+                          if (item.item.checkedAt != null) item.item.id,
+                      ]),
+                    ),
                   );
                   if (!syncLinked) {
                     return body;
@@ -312,6 +323,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     showAppSnackbar(
       context,
       message: l10n.shoppingClearedSnackbar(checkedIds.length),
+      // F4: bulk actions keep their Undo up for 8 s, not 4.
+      duration: _bulkSnackbarDuration,
       action: SnackBarAction(
         label: l10n.shoppingClearedUndo,
         onPressed: () => unawaited(repository.restoreItems(checkedIds)),
@@ -319,9 +332,25 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     );
   }
 
-  Future<void> _uncheckAll(WidgetRef ref) {
+  /// Unchecks everything, then shows a counted snackbar whose Undo re-checks
+  /// exactly [checkedIds] (F4).
+  Future<void> _uncheckAll(WidgetRef ref, List<String> checkedIds) async {
     final householdId = ref.read(bootstrapProvider).requireValue;
-    return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
+    final repository = ref.read(shoppingRepositoryProvider);
+    await repository.uncheckAll(householdId);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.shoppingPutBackSnackbar(checkedIds.length),
+      duration: _bulkSnackbarDuration,
+      action: SnackBarAction(
+        label: l10n.shoppingClearedUndo,
+        onPressed: () => unawaited(repository.checkItems(checkedIds)),
+      ),
+    );
   }
 }
 

@@ -809,6 +809,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingClearedUndo => 'Rückgängig';
 
   @override
+  String shoppingPutBackSnackbar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Artikel zurückgelegt',
+      one: '1 Artikel zurückgelegt',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get shoppingCheckedSnackbar => 'Im Einkaufswagen';
 
   @override

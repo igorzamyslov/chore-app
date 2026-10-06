@@ -207,6 +207,7 @@
 
   "shoppingClearedSnackbar": "{count, plural, one{1 Artikel entfernt} other{{count} Artikel entfernt}}",
   "shoppingClearedUndo": "Rückgängig",
+  "shoppingPutBackSnackbar": "{count, plural, one{1 Artikel zurückgelegt} other{{count} Artikel zurückgelegt}}",
   "shoppingCheckedSnackbar": "Im Einkaufswagen",
 
   "shoppingAddHint": "Artikel hinzufügen…",

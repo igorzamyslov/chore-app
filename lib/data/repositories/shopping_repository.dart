@@ -510,6 +510,26 @@ class ShoppingRepository {
         );
   }
 
+  /// Re-checks exactly the items identified by [ids]: the UNDO of the 'Put
+  /// all back' bulk action (persona finding F4), over the id list the
+  /// caller captured BEFORE calling [uncheckAll]. Skips soft-deleted rows.
+  /// A no-op for an empty [ids].
+  Future<void> checkItems(List<String> ids) async {
+    if (ids.isEmpty) {
+      return;
+    }
+    final now = _isoNow();
+    await (db.update(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.isIn(ids) & tbl.deletedAt.isNull())).write(
+      ShoppingItemsCompanion(
+        checkedAt: Value(now),
+        updatedAt: Value(now),
+        syncDirty: syncDirtyOnWrite,
+      ),
+    );
+  }
+
   /// Soft-deletes active, checked items in [householdId] whose `checked_at`
   /// is strictly older than [cutoffUtc].
   ///

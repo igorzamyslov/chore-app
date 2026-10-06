@@ -153,6 +153,31 @@ void main() {
     },
   );
 
+  test(
+    'checkItems re-checks exactly the given active items and is a no-op '
+    'for an empty list',
+    () async {
+      final a = await repo.addItem(householdId, name: 'A');
+      final b = await repo.addItem(householdId, name: 'B');
+      final gone = await repo.addItem(householdId, name: 'Gone');
+      await repo.deleteItem(gone.id);
+      clock.advance(const Duration(minutes: 1));
+
+      await repo.checkItems(const []);
+      expect((await row(a.id)).checkedAt, isNull);
+
+      await repo.checkItems([a.id, gone.id]);
+      expect((await row(a.id)).checkedAt, isNotNull);
+      expect((await row(a.id)).syncDirty, isTrue);
+      expect((await row(b.id)).checkedAt, isNull);
+      expect(
+        (await row(gone.id)).checkedAt,
+        isNull,
+        reason: 'a soft-deleted row is never re-checked',
+      );
+    },
+  );
+
   test('restoreItems is a no-op for an empty id list', () async {
     final item = await repo.addItem(householdId, name: 'A');
     await repo.deleteItem(item.id);
