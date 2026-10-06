@@ -546,6 +546,10 @@
   "@choresDoneStatusSkipped": {
     "description": "Done-today section row marker for an occurrence that was skipped, as opposed to completed."
   },
+  "choresDoneEarly": "Done early",
+  "@choresDoneEarly": {
+    "description": "Small tag on a done row in the chores list's Done section when the occurrence was completed before its due date (closed on a day earlier than the due date). Neutral wording, no judgement: completing early is allowed and credited, the tag only keeps an early tick distinguishable from an on-time one (persona review 2026-10-06 E6)."
+  },
   "choresDoneClosedByLabel": "by {name}",
   "@choresDoneClosedByLabel": {
     "description": "Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).",
@@ -559,6 +563,28 @@
   "choresDoneReopen": "Reopen",
   "@choresDoneReopen": {
     "description": "Done-today section row action: undoes the close and restores the occurrence to pending, via ChoreService.reopenOccurrence."
+  },
+  "choresReopenedSnackbar": "Reopened",
+  "@choresReopenedSnackbar": {
+    "description": "Snackbar confirming that Reopen on a row of the Done section put the occurrence back on the list. Reopen used to be silent (persona review 2026-10-06 E6)."
+  },
+  "choresReopenOthersTitle": "Reopen {name}'s completion?",
+  "@choresReopenOthersTitle": {
+    "description": "Title of the confirmation shown when Reopen is tapped on a done row whose completion is credited to a member other than the one using this device. {name} is the member who completed it.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "choresReopenOthersBody": "This removes it from their history.",
+  "@choresReopenOthersBody": {
+    "description": "Body of the reopen-someone-else's-completion confirmation: says what is lost (the credit in that member's chore history), so the person does not wipe somebody's credit by accident."
+  },
+  "choresReopenOthersConfirm": "Reopen",
+  "@choresReopenOthersConfirm": {
+    "description": "Confirm button of the reopen-someone-else's-completion dialog."
   },
 
   "choresPausedHeader": "{count, plural, one{Paused (1)} other{Paused ({count})}}",

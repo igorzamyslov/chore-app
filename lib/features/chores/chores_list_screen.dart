@@ -651,10 +651,32 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     );
   }
 
-  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) {
-    return ref
+  /// Reopens a done/skipped row (persona review 2026-10-06 E6): asks first
+  /// when the completion is credited to somebody other than the person
+  /// holding this device -- it removes the credit from THEIR history --
+  /// and confirms in words afterwards (Reopen used to be silent).
+  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) async {
+    final completer = occurrence.completedByMember;
+    final actingId = ref.read(actingMemberProvider)?.id;
+    if (completer != null && completer.id != actingId) {
+      final confirmed = await showReopenOthersDialog(
+        context,
+        completerName: completer.name,
+      );
+      if (!mounted || !confirmed) {
+        return;
+      }
+    }
+    await ref
         .read(choreServiceProvider)
         .reopenOccurrence(occurrence.occurrence.id);
+    if (!mounted) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: AppLocalizations.of(context).choresReopenedSnackbar,
+    );
   }
 
   Future<void> _resume(ChoreWithDetails details) {

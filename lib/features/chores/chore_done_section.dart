@@ -136,12 +136,18 @@ class _DoneRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isDone = occurrence.occurrence.status == OccurrenceStatus.done;
-    // Skipping doesn't record a dedicated closer (`completedBy` stays
-    // null); the assignee is the closest available stand-in for "who this
-    // was on".
-    final closerName = isDone
-        ? occurrence.completedByMember?.name
-        : occurrence.assignedMember?.name;
+    // Only a done row names its closer. A skip records no closer, and the
+    // assignee is not one: "Skipped · by Leon" blamed whoever the chore was
+    // on when somebody else skipped it (persona review 2026-10-06 E6/C1).
+    final closerName = isDone ? occurrence.completedByMember?.name : null;
+    // Completed before its due date (persona review 2026-10-06 E6/A8): the
+    // tag keeps an early tick distinguishable from an on-time one without
+    // blocking or discounting it.
+    final closedOn = occurrence.occurrence.closedOn;
+    final doneEarly =
+        isDone &&
+        closedOn != null &&
+        closedOn.isBefore(occurrence.occurrence.dueDate);
 
     return ListTile(
       title: Text(
@@ -178,6 +184,20 @@ class _DoneRow extends StatelessWidget {
                 ),
               ],
             ),
+            if (doneEarly)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  l10n.choresDoneEarly,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ),
             if (closerName != null)
               Text(l10n.choresDoneClosedByLabel(closerName)),
           ],
@@ -196,4 +216,41 @@ class _DoneRow extends StatelessWidget {
           : null,
     );
   }
+}
+
+/// Asks whether to reopen [completerName]'s completion (persona review
+/// 2026-10-06 E6/A9): reopening wipes the credit from THEIR history, so it
+/// is confirmed when the completer is not the person holding this device.
+/// Resolves to whether the user confirmed (`false` when dismissed).
+Future<bool> showReopenOthersDialog(
+  BuildContext context, {
+  required String completerName,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      final l10n = AppLocalizations.of(dialogContext);
+      return AlertDialog(
+        title: Text(l10n.choresReopenOthersTitle(completerName)),
+        content: Text(l10n.choresReopenOthersBody),
+        actions: [
+          semantic(
+            'chores.reopen.cancel',
+            child: TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.commonCancel),
+            ),
+          ),
+          semantic(
+            'chores.reopen.confirm',
+            child: FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.choresReopenOthersConfirm),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+  return confirmed ?? false;
 }

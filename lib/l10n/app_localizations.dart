@@ -722,6 +722,12 @@ abstract class AppLocalizations {
   /// **'Skipped'**
   String get choresDoneStatusSkipped;
 
+  /// Small tag on a done row in the chores list's Done section when the occurrence was completed before its due date (closed on a day earlier than the due date). Neutral wording, no judgement: completing early is allowed and credited, the tag only keeps an early tick distinguishable from an on-time one (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Done early'**
+  String get choresDoneEarly;
+
   /// Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).
   ///
   /// In en, this message translates to:
@@ -733,6 +739,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reopen'**
   String get choresDoneReopen;
+
+  /// Snackbar confirming that Reopen on a row of the Done section put the occurrence back on the list. Reopen used to be silent (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Reopened'**
+  String get choresReopenedSnackbar;
+
+  /// Title of the confirmation shown when Reopen is tapped on a done row whose completion is credited to a member other than the one using this device. {name} is the member who completed it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen {name}\'s completion?'**
+  String choresReopenOthersTitle(String name);
+
+  /// Body of the reopen-someone-else's-completion confirmation: says what is lost (the credit in that member's chore history), so the person does not wipe somebody's credit by accident.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes it from their history.'**
+  String get choresReopenOthersBody;
+
+  /// Confirm button of the reopen-someone-else's-completion dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get choresReopenOthersConfirm;
 
   /// Header of the collapsed-by-default 'Paused' section, showing how many chores are paused.
   ///

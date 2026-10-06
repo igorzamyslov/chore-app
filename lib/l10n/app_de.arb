@@ -123,8 +123,13 @@
   "choresDoneHeader": "{count, plural, one{Heute erledigt (1)} other{Heute erledigt ({count})}}",
   "choresDoneStatusDone": "Erledigt",
   "choresDoneStatusSkipped": "Übersprungen",
+  "choresDoneEarly": "Vorzeitig erledigt",
   "choresDoneClosedByLabel": "von {name}",
   "choresDoneReopen": "Wieder öffnen",
+  "choresReopenedSnackbar": "Wieder geöffnet",
+  "choresReopenOthersTitle": "Erledigung von {name} zurücknehmen?",
+  "choresReopenOthersBody": "Das entfernt sie aus seinem Verlauf.",
+  "choresReopenOthersConfirm": "Zurücknehmen",
 
   "choresPausedHeader": "{count, plural, one{Pausiert (1)} other{Pausiert ({count})}}",
   "choresPausedBadge": "Pausiert",

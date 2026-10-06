@@ -426,12 +426,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresDoneStatusSkipped => 'Skipped';
 
   @override
+  String get choresDoneEarly => 'Done early';
+
+  @override
   String choresDoneClosedByLabel(String name) {
     return 'by $name';
   }
 
   @override
   String get choresDoneReopen => 'Reopen';
+
+  @override
+  String get choresReopenedSnackbar => 'Reopened';
+
+  @override
+  String choresReopenOthersTitle(String name) {
+    return 'Reopen $name\'s completion?';
+  }
+
+  @override
+  String get choresReopenOthersBody => 'This removes it from their history.';
+
+  @override
+  String get choresReopenOthersConfirm => 'Reopen';
 
   @override
   String choresPausedHeader(int count) {
