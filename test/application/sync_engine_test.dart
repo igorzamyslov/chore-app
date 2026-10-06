@@ -50,11 +50,44 @@ class _ThrowingPullTransport extends FakeSyncTransport {
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   }) {
     if (table == failOnTable) {
       throw Exception('simulated network failure');
     }
-    return super.pullTable(table, householdId: householdId, since: since);
+    return super.pullTable(
+      table,
+      householdId: householdId,
+      since: since,
+      offset: offset,
+      limit: limit,
+    );
+  }
+}
+
+/// A [FakeSyncTransport] whose [pullTable] throws on every page but the
+/// first -- a network failure partway through a multi-page table fetch
+/// (spec §8.3 amendment 2026-10-06, technical review #2).
+class _SecondPageFailsTransport extends FakeSyncTransport {
+  @override
+  Future<List<Map<String, Object?>>> pullTable(
+    String table, {
+    required String householdId,
+    required DateTime? since,
+    required int offset,
+    required int limit,
+  }) {
+    if (offset > 0) {
+      throw Exception('simulated network failure on page 2');
+    }
+    return super.pullTable(
+      table,
+      householdId: householdId,
+      since: since,
+      offset: offset,
+      limit: limit,
+    );
   }
 }
 
@@ -308,6 +341,73 @@ void main() {
         )..where((tbl) => tbl.id.equals(category.id))).getSingle();
         expect(row.syncDirty, isTrue);
         expect(row.name, 'Renamed mid-flight');
+      },
+    );
+
+    Map<String, Object?> serverCategory(int i, {required DateTime stamp}) => {
+      'id': 'cat-${i.toString().padLeft(5, '0')}',
+      'household_id': household.id,
+      'kind': 'chore',
+      'name': 'Category $i',
+      'icon': 'a',
+      'color': 1,
+      'sort_order': i,
+      'created_at': stamp.toIso8601String(),
+      'updated_at': stamp.toIso8601String(),
+      'deleted_at': null,
+    };
+
+    test(
+      'a table larger than one page is pulled in pages and applied whole '
+      '(technical review 2026-10-06 #2: PostgREST caps every read at '
+      'max_rows = 1000, silently)',
+      () async {
+        final stamp = DateTime.utc(2026, 3);
+        for (var i = 0; i < syncPageSize + 1; i++) {
+          transport.serverRows['categories']!.add(
+            serverCategory(i, stamp: stamp),
+          );
+        }
+
+        await engine.pullSince();
+
+        final local = await db.select(db.categories).get();
+        expect(
+          local.where((row) => row.id.startsWith('cat-')).length,
+          syncPageSize + 1,
+        );
+        final categoryPages = transport.pullTableCalls
+            .where((call) => call.table == 'categories')
+            .map((call) => (call.offset, call.limit))
+            .toList();
+        expect(categoryPages, [
+          (0, syncPageSize),
+          (syncPageSize, syncPageSize),
+        ]);
+      },
+    );
+
+    test(
+      'a failure on a later page leaves the cursor unchanged and applies '
+      'nothing (the pull is all-or-nothing)',
+      () async {
+        final pagingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _SecondPageFailsTransport()
+            ..serverRows['categories']!.addAll([
+              for (var i = 0; i < syncPageSize + 1; i++)
+                serverCategory(i, stamp: DateTime.utc(2026, 3)),
+            ]),
+          settings: settings,
+          householdId: household.id,
+        );
+        addTearDown(pagingEngine.stop);
+
+        await pagingEngine.pullSince();
+
+        expect((await settings.ensureSettings()).syncLastPulledAt, isNull);
+        final local = await db.select(db.categories).get();
+        expect(local.where((row) => row.id.startsWith('cat-')), isEmpty);
       },
     );
 

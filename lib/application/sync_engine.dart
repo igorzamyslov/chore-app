@@ -41,6 +41,26 @@ const List<String> syncedTablesInFkOrder = [
   'shopping_items',
 ];
 
+/// How many rows one server read asks for (spec §8.3 amendment
+/// 2026-10-06, technical review #2). PostgREST silently truncates EVERY
+/// response at its `max_rows` setting -- 1000 in `supabase/config.toml` and
+/// on the hosted project -- with no error and no marker, so a bare
+/// `select()` over a household's year of `chore_occurrences` returned the
+/// first thousand rows in heap order and dropped the rest, and the cursor
+/// then advanced past them forever. Every full-table read ([SyncTransport
+/// .pullTable] and `HouseholdGateway.downloadHousehold`) therefore asks for
+/// exactly this many rows at a time, ordered by `updated_at` then primary
+/// key, and keeps going until a page comes back shorter than this. Equal to
+/// `max_rows` on purpose: a larger value would be truncated to it anyway,
+/// and the short-page stop condition would then never fire.
+const int syncPageSize = 1000;
+
+/// The columns that, after `updated_at`, make a page order total for
+/// [table] -- its primary key. `chore_assignees` is keyed by
+/// `(chore_id, member_id)` and has no `id`.
+List<String> pageOrderKeyColumns(String table) =>
+    table == 'chore_assignees' ? const ['chore_id', 'member_id'] : const ['id'];
+
 /// App-facing sync engine seam (spec §8.2): [pushDirty] upserts every
 /// locally-dirty row; [pullSince] fetches and applies everything the server
 /// has changed since the last pull; [start]/[stop] arm/disarm the ongoing
@@ -142,13 +162,19 @@ abstract class SyncTransport {
   /// never the device clock).
   Future<DateTime> serverNow();
 
-  /// Rows of [table] belonging to [householdId] with `updated_at >`
-  /// [since], or every row if [since] is `null` (this device's first
-  /// pull). RLS (or the fake) scopes access to [householdId]'s own rows.
+  /// ONE PAGE of the rows of [table] belonging to [householdId] with
+  /// `updated_at >` [since], or of every row if [since] is `null` (this
+  /// device's first pull): rows `[offset, offset + limit)` of the matching
+  /// set ordered by `updated_at`, then primary key ([pageOrderKeyColumns]).
+  /// The engine keeps calling with a growing [offset] until a page comes
+  /// back shorter than [limit] (see [syncPageSize]). RLS (or the fake)
+  /// scopes access to [householdId]'s own rows.
   Future<List<Map<String, Object?>>> pullTable(
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   });
 
   /// Upserts [rows] into [table] -- the ordinary push path for every synced
@@ -539,41 +565,13 @@ class SupabaseSyncEngine implements SyncEngine {
     // a possible harmless re-apply, never a missed row.
     final serverNow = await transport.serverNow();
 
-    final householdRows = await transport.pullTable(
-      'households',
-      householdId: householdId,
-      since: since,
-    );
-    final memberRows = await transport.pullTable(
-      'members',
-      householdId: householdId,
-      since: since,
-    );
-    final categoryRows = await transport.pullTable(
-      'categories',
-      householdId: householdId,
-      since: since,
-    );
-    final choreRows = await transport.pullTable(
-      'chores',
-      householdId: householdId,
-      since: since,
-    );
-    final assigneeRows = await transport.pullTable(
-      'chore_assignees',
-      householdId: householdId,
-      since: since,
-    );
-    final occurrenceRows = await transport.pullTable(
-      'chore_occurrences',
-      householdId: householdId,
-      since: since,
-    );
-    final itemRows = await transport.pullTable(
-      'shopping_items',
-      householdId: householdId,
-      since: since,
-    );
+    final householdRows = await _pullAllPages('households', since);
+    final memberRows = await _pullAllPages('members', since);
+    final categoryRows = await _pullAllPages('categories', since);
+    final choreRows = await _pullAllPages('chores', since);
+    final assigneeRows = await _pullAllPages('chore_assignees', since);
+    final occurrenceRows = await _pullAllPages('chore_occurrences', since);
+    final itemRows = await _pullAllPages('shopping_items', since);
 
     // Apply in FK order, in ONE local transaction (spec §8.3).
     await db.transaction(() async {
@@ -636,6 +634,32 @@ class SupabaseSyncEngine implements SyncEngine {
     // Cursor stored only after the transaction above commits (spec §8.3).
     await settings.setSyncLastPulledAt(serverNow);
     return false;
+  }
+
+  /// Every matching row of [table], fetched [syncPageSize] at a time until
+  /// a short page (see [syncPageSize] for why). Throws like any other pull
+  /// step: a failure on any page fails the whole pull, so the cursor never
+  /// advances past rows that were not fetched.
+  Future<List<Map<String, Object?>>> _pullAllPages(
+    String table,
+    DateTime? since,
+  ) async {
+    final rows = <Map<String, Object?>>[];
+    var offset = 0;
+    while (true) {
+      final page = await transport.pullTable(
+        table,
+        householdId: householdId,
+        since: since,
+        offset: offset,
+        limit: syncPageSize,
+      );
+      rows.addAll(page);
+      if (page.length < syncPageSize) {
+        return rows;
+      }
+      offset += syncPageSize;
+    }
   }
 
   /// Households-only push (spec §8.3's grants note applied to `households`
@@ -853,6 +877,8 @@ class SupabaseSyncTransport implements SyncTransport {
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   }) async {
     // `households` is scoped by its own `id`; every other synced table
     // carries (or, for chore_assignees/chore_occurrences, denormalizes)
@@ -862,7 +888,14 @@ class SupabaseSyncTransport implements SyncTransport {
     if (since != null) {
       query = query.gt('updated_at', since.toUtc().toIso8601String());
     }
-    final rows = await query;
+    // A total order is what makes `range` pages disjoint and complete
+    // (see [syncPageSize]): `updated_at` alone has ties (one bulk upsert
+    // stamps every row with the same `now()`), so the primary key follows.
+    var ordered = query.order('updated_at', ascending: true);
+    for (final column in pageOrderKeyColumns(table)) {
+      ordered = ordered.order(column, ascending: true);
+    }
+    final rows = await ordered.range(offset, offset + limit - 1);
     return [for (final row in rows) Map<String, Object?>.from(row)];
   }
 

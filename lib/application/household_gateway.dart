@@ -21,6 +21,8 @@
 /// engine rather than duplicated here.
 library;
 
+import 'package:chore_app/application/sync_engine.dart'
+    show pageOrderKeyColumns, syncPageSize;
 import 'package:chore_app/data/repositories/household_repository.dart'
     show HouseholdSnapshot;
 import 'package:chore_app/data/sync/row_mappers.dart' as row_mappers;
@@ -537,38 +539,54 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
         .select()
         .eq('id', householdId)
         .limit(1);
-    final members = await _client
-        .from('members')
-        .select()
-        .eq('household_id', householdId);
-    final categories = await _client
-        .from('categories')
-        .select()
-        .eq('household_id', householdId);
-    final chores = await _client
-        .from('chores')
-        .select()
-        .eq('household_id', householdId);
-    final choreAssignees = await _client
-        .from('chore_assignees')
-        .select()
-        .eq('household_id', householdId)
-        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
-        // hard-deleted locally and must not be downloaded. `isFilter`, never
-        // `.eq(..., null)`, which renders `= null` and matches nothing.
-        .isFilter('deleted_at', null);
-    final choreOccurrences = await _client
-        .from('chore_occurrences')
-        .select()
-        .eq('household_id', householdId)
-        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
-        // hard-deleted locally and must not be downloaded. `isFilter`, never
-        // `.eq(..., null)`, which renders `= null` and matches nothing.
-        .isFilter('deleted_at', null);
-    final shoppingItems = await _client
-        .from('shopping_items')
-        .select()
-        .eq('household_id', householdId);
+    // Every per-table read below is PAGED (spec `docs/specs/sync-backend.md`
+    // §8.3 amendment 2026-10-06, technical review #2): PostgREST silently
+    // caps a response at `max_rows` (1000), so a bare `select()` over a
+    // household's history handed a joining device the oldest thousand rows
+    // of each table and dropped the current ones -- see `syncPageSize`.
+    final members = await _selectAllPages(
+      'members',
+      () => _client.from('members').select().eq('household_id', householdId),
+    );
+    final categories = await _selectAllPages(
+      'categories',
+      () => _client.from('categories').select().eq('household_id', householdId),
+    );
+    final chores = await _selectAllPages(
+      'chores',
+      () => _client.from('chores').select().eq('household_id', householdId),
+    );
+    final choreAssignees = await _selectAllPages(
+      'chore_assignees',
+      () => _client
+          .from('chore_assignees')
+          .select()
+          .eq('household_id', householdId)
+          // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+          // hard-deleted locally and must not be downloaded. `isFilter`,
+          // never `.eq(..., null)`, which renders `= null` and matches
+          // nothing.
+          .isFilter('deleted_at', null),
+    );
+    final choreOccurrences = await _selectAllPages(
+      'chore_occurrences',
+      () => _client
+          .from('chore_occurrences')
+          .select()
+          .eq('household_id', householdId)
+          // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+          // hard-deleted locally and must not be downloaded. `isFilter`,
+          // never `.eq(..., null)`, which renders `= null` and matches
+          // nothing.
+          .isFilter('deleted_at', null),
+    );
+    final shoppingItems = await _selectAllPages(
+      'shopping_items',
+      () => _client
+          .from('shopping_items')
+          .select()
+          .eq('household_id', householdId),
+    );
 
     return HouseholdSnapshot(
       household: householdRows.isEmpty
@@ -590,6 +608,30 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
         for (final row in shoppingItems) row_mappers.shoppingItemFromRow(row),
       ],
     );
+  }
+
+  /// Every row [query] matches, fetched `syncPageSize` at a time in
+  /// `updated_at` + primary-key order until a short page -- the same paging
+  /// contract as `SupabaseSyncTransport.pullTable`. [query] is a factory
+  /// because a PostgREST builder is consumed by its transform calls.
+  Future<List<Map<String, dynamic>>> _selectAllPages(
+    String table,
+    supabase.PostgrestFilterBuilder<supabase.PostgrestList> Function() query,
+  ) async {
+    final rows = <Map<String, dynamic>>[];
+    var offset = 0;
+    while (true) {
+      var ordered = query().order('updated_at', ascending: true);
+      for (final column in pageOrderKeyColumns(table)) {
+        ordered = ordered.order(column, ascending: true);
+      }
+      final page = await ordered.range(offset, offset + syncPageSize - 1);
+      rows.addAll(page);
+      if (page.length < syncPageSize) {
+        return rows;
+      }
+      offset += syncPageSize;
+    }
   }
 
   /// **The `deleted_at` predicates here are defense in depth, and are
