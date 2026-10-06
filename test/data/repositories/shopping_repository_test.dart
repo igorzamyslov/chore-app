@@ -790,4 +790,80 @@ void main() {
       },
     );
   });
+
+  group('compactHistory', () {
+    Future<void> softDelete(
+      String id,
+      String deletedAt, {
+      required bool dirty,
+    }) {
+      return (db.update(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(id))).write(
+        ShoppingItemsCompanion(
+          deletedAt: Value(deletedAt),
+          syncDirty: Value(dirty),
+        ),
+      );
+    }
+
+    Future<bool> exists(String id) async => (await (db.select(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.equals(id))).get()).isNotEmpty;
+
+    test('hard-deletes only old, already-synced soft-deleted rows', () async {
+      final cutoff = DateTime.utc(2026, 6);
+      final oldSynced = await repo.addItem(householdId, name: 'Old synced');
+      final oldDirty = await repo.addItem(householdId, name: 'Old dirty');
+      final recent = await repo.addItem(householdId, name: 'Recent');
+      final active = await repo.addItem(householdId, name: 'Active');
+      await softDelete(
+        oldSynced.id,
+        DateTime.utc(2025, 5).toIso8601String(),
+        dirty: false,
+      );
+      // Server-style offset notation must compare by instant, not as text.
+      await softDelete(
+        oldDirty.id,
+        '2025-05-01T00:00:00+00:00',
+        dirty: true,
+      );
+      await softDelete(
+        recent.id,
+        DateTime.utc(2026, 7).toIso8601String(),
+        dirty: false,
+      );
+      await (db.update(db.shoppingItems)
+            ..where((tbl) => tbl.id.equals(active.id)))
+          .write(const ShoppingItemsCompanion(syncDirty: Value(false)));
+
+      final removed = await repo.compactHistory(before: cutoff);
+
+      expect(removed, 1);
+      expect(await exists(oldSynced.id), isFalse);
+      expect(await exists(oldDirty.id), isTrue);
+      expect(await exists(recent.id), isTrue);
+      expect(await exists(active.id), isTrue);
+    });
+
+    test('parses offset timestamps by instant', () async {
+      final item = await repo.addItem(householdId, name: 'Server written');
+      await softDelete(item.id, '2025-05-01T00:00:00+00:00', dirty: false);
+
+      expect(await repo.compactHistory(before: DateTime.utc(2026)), 1);
+      expect(await exists(item.id), isFalse);
+    });
+
+    test('a cutoff before everything removes nothing', () async {
+      final item = await repo.addItem(householdId, name: 'Kept');
+      await softDelete(
+        item.id,
+        DateTime.utc(2025, 5).toIso8601String(),
+        dirty: false,
+      );
+
+      expect(await repo.compactHistory(before: DateTime.utc(2025)), 0);
+      expect(await exists(item.id), isTrue);
+    });
+  });
 }

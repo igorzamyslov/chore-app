@@ -361,51 +361,65 @@ class _BottomTabBar extends ConsumerWidget {
         color: famdo.navBarBackground,
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 72,
-            child: Row(
-              children: [
-                for (final tab in _AppTab.values)
-                  Expanded(
-                    child: semantic(
-                      'shell.tab.${tab.name}',
-                      // The hand-rolled bar must carry the traits
-                      // NavigationBar would have provided: without
-                      // `selected`, screen readers can't tell which tab is
-                      // active (the visual cue is color/icon only).
-                      child: Semantics(
-                        button: true,
-                        selected: tab == selected,
-                        // Field feedback 2026-08-07 C2: a bare InkWell
-                        // rippled a grey RECTANGLE across the whole tab
-                        // column while the active state is a rounded pill --
-                        // the two shapes fought each other. InkResponse with
-                        // a bounded radius keeps the splash inside a pill
-                        // roughly the size of the active one, and tints it
-                        // with the accent instead of the default grey.
-                        child: InkResponse(
-                          onTap: () => onSelected(tab),
-                          radius: 44,
-                          containedInkWell: true,
-                          highlightShape: BoxShape.rectangle,
-                          borderRadius: BorderRadius.circular(16),
-                          splashColor: colorScheme.primary.withValues(
-                            alpha: 0.12,
+          // G2 (persona review 2026-10-06): the bar is a fixed 72dp, so its
+          // labels are capped at 2x -- beyond that the icon + label column
+          // would overflow, and the bar is navigation chrome, not content
+          // the user is trying to read at length.
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 2,
+            child: SizedBox(
+              height: 72,
+              child: Row(
+                children: [
+                  for (final tab in _AppTab.values)
+                    Expanded(
+                      child: semantic(
+                        'shell.tab.${tab.name}',
+                        // The hand-rolled bar must carry the traits
+                        // NavigationBar would have provided: without
+                        // `selected`, screen readers can't tell which tab is
+                        // active (the visual cue is color/icon only).
+                        child: Semantics(
+                          button: true,
+                          selected: tab == selected,
+                          // G1: "Tab 1 of 3" (the platform's own phrase, from
+                          // MaterialLocalizations) joins the tab's text, as
+                          // NavigationBar would announce it.
+                          label: MaterialLocalizations.of(context).tabLabel(
+                            tabIndex: tab.index + 1,
+                            tabCount: _AppTab.values.length,
                           ),
-                          highlightColor: colorScheme.primary.withValues(
-                            alpha: 0.06,
-                          ),
-                          child: _TabContent(
-                            tab: tab,
-                            isSelected: tab == selected,
-                            showAttentionBadge:
-                                tab == _AppTab.settings && showAttentionBadge,
+                          // Field feedback 2026-08-07 C2: a bare InkWell
+                          // rippled a grey RECTANGLE across the whole tab
+                          // column while the active state is a rounded pill --
+                          // the two shapes fought each other. InkResponse with
+                          // a bounded radius keeps the splash inside a pill
+                          // roughly the size of the active one, and tints it
+                          // with the accent instead of the default grey.
+                          child: InkResponse(
+                            onTap: () => onSelected(tab),
+                            radius: 44,
+                            containedInkWell: true,
+                            highlightShape: BoxShape.rectangle,
+                            borderRadius: BorderRadius.circular(16),
+                            splashColor: colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                            highlightColor: colorScheme.primary.withValues(
+                              alpha: 0.06,
+                            ),
+                            child: _TabContent(
+                              tab: tab,
+                              isSelected: tab == selected,
+                              showAttentionBadge:
+                                  tab == _AppTab.settings && showAttentionBadge,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

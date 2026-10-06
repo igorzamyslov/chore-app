@@ -15,7 +15,8 @@ import '../../test_utils/pump_app.dart';
 /// occurrences completed today. The overdue pile is NOT part of `M`: it is
 /// reported separately as "N to catch up" on the sub-line (persona review
 /// 2026-10-06 E5, amending the original due-or-overdue rule). The card is
-/// hidden entirely when `M == 0`.
+/// hidden entirely when `M == 0` AND nothing is overdue; with only an
+/// overdue pile its headline is the catch-up line and it has no ring.
 ///
 /// **Changed 2026-08-07** (triage T1.1/D3): `M`/`N` are now computed from
 /// the SAME member/category-filtered collections the sections below render
@@ -165,8 +166,8 @@ void main() {
   );
 
   testChoreApp(
-    'E5: only an overdue pile and nothing due today hides the card; the '
-    'overdue tiles still show in their own section',
+    'E5: only an overdue pile and nothing due today still shows the card, '
+    'headlined by the catch-up line with no ring; the tiles show too',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -183,7 +184,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('chores.progress'), findsNothing);
+      expect(find.bySemanticsIdentifier('chores.progress'), findsOneWidget);
+      expect(find.text('1 to catch up'), findsOneWidget);
+      // No "N of M" headline, no sub-line and no ring when nothing is due
+      // today.
+      expect(find.textContaining('done today'), findsNothing);
+      expect(find.textContaining('still to go'), findsNothing);
+      expect(find.text('0%'), findsNothing);
       expect(find.text('Long overdue'), findsOneWidget);
 
       handle.dispose();

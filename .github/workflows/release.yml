@@ -30,6 +30,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify the tag matches pubspec.yaml
+        # Technical review 2026-10-06 #10: nothing tied the pushed tag to the
+        # version the APK is built with, so tagging v0.15.0 while pubspec
+        # still said 0.14.0+21 would publish an APK that calls itself 0.14.0
+        # under a v0.15.0 release (and Obtainium/F-Droid would then offer an
+        # "update" that never goes away). Runs first, before the toolchain
+        # and the build, so a mismatch costs seconds, not minutes.
+        #
+        # `pubspec.yaml` is read with awk straight from the file -- no pipe
+        # into `grep -q` (see the INTERNET check below for why). The build
+        # number after `+` is not part of the tag: `0.15.0+22` -> `v0.15.0`.
+        run: |
+          version="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read version: from pubspec.yaml"
+            exit 1
+          fi
+          expected="v${version%%+*}"
+          if [ "$expected" != "${{ github.ref_name }}" ]; then
+            echo "::error::Tag ${{ github.ref_name }} does not match pubspec.yaml version $version (expected tag $expected) — bump pubspec.yaml or retag"
+            exit 1
+          fi
+          echo "Tag ${{ github.ref_name }} matches pubspec.yaml version $version"
       - uses: subosito/flutter-action@v2
         with:
           # PINNED, not floating `stable` (2026-08-13). An unpinned stable

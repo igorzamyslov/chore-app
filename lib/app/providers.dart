@@ -900,6 +900,22 @@ final bootstrapProvider = FutureProvider<String>((ref) async {
   await ref
       .watch(shoppingRepositoryProvider)
       .clearCheckedOlderThan(householdId, cutoffUtc: cutoffUtc);
+  // Retention (technical review 2026-10-06 #14): year-old, already-synced
+  // shopping tombstones leave the device. Housekeeping must never block
+  // startup, so a failure is logged and swallowed.
+  try {
+    await ref
+        .watch(shoppingRepositoryProvider)
+        .compactHistory(
+          before: ref
+              .watch(clockProvider)
+              .now()
+              .toUtc()
+              .subtract(const Duration(days: 365)),
+        );
+  } on Object catch (error, stackTrace) {
+    AppLog.error('bootstrap.compactShoppingHistory', error, stackTrace);
+  }
   return householdId;
 });
 

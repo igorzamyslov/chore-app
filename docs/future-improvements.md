@@ -35,7 +35,7 @@ never sets its own. F12 was deliberately excluded and stays deferred here.
 | --- | --- | --- |
 | F9 | **Leave a household** (as distinct from Disconnect, which only unlinks this device) | server-side membership change |
 | F10 | **Remove a claimed member** — today only unclaimed profiles can be deleted | needs a rule for their history |
-| F11 | **Delete account** (GDPR erasure) — spec'd in `sync-backend.md` §2 as `delete_account()` + an edge function; no UI yet | |
+| F11 | ~~**Delete account** (GDPR erasure)~~ — **Closed 2026-10-06:** shipped (the "Delete my account" row in Settings, `delete_account()`); the stale "no UI yet" was found by the persona review (B1/§10) | |
 | F12 | **Restore from a backup file** — export exists, import does not | |
 | F13 | **Orphan household cleanup** — households whose last claimed member left | server-side |
 
@@ -43,7 +43,7 @@ never sets its own. F12 was deliberately excluded and stays deferred here.
 
 | # | Item | Notes |
 | --- | --- | --- |
-| F14 | **Repeat-form structural redesign** (G3 stage 2) — the wording was fixed, the structure was not | |
+| F14 | ~~**Repeat-form structural redesign** (G3 stage 2)~~ — **Closed 2026-10-06:** shipped as backlog G-2 on 2026-08-29 (the repeat block is one sentence); found stale by the persona review (§10) | |
 | F15 | **Custom avatars** (photo or colour-as-border) | user request, round 1 |
 | F16 | **Finer-grained notifications** (N2: per-chore reminders, evening re-reminder) | |
 | F17 | **More category icons and colours** | user request, round 1 |

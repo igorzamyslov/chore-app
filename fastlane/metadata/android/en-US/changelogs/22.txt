@@ -1,0 +1,3 @@
+Your history is safer, and joining is clearer.
+
+Sync no longer loses completed chores, handles long histories and tells you when changes are still waiting to send. Joining says whose household you're entering. New: reassign this turn, pause a chore until a date, tap a chore to open it, undo a shopping tick, and a "synced" line on Shopping. Plainer wording about what is stored and deleted, plus better screen-reader labels.

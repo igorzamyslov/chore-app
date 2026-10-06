@@ -208,8 +208,10 @@ the whole bug report.
 >   occurrences due **today** + occurrences completed today; the overdue pile
 >   is no longer part of it. Overdue is shown beside the sub-line as
 >   `choresProgressCatchUp` ("{count} to catch up" / "{count} nachzuholen"),
->   never moves the ring, and does not keep the card visible on its own
->   (`M == 0` still hides it; the Overdue section is right below). The praise
+>   never moves the ring. *Amended 2026-10-07 (E5 follow-up):* an overdue
+>   pile now keeps the card visible on its own — the card hides only when
+>   `M == 0` AND nothing is overdue; with `M == 0` and overdue > 0 the headline
+>   is just the catch-up line and the ring is omitted. The praise
 >   copy is replaced by plain statements: `choresEmptyState` "Nothing left
 >   for today." / "Für heute ist nichts mehr offen.",
 >   `choresProgressAllDoneToday` "That's everything for today." / "Das war

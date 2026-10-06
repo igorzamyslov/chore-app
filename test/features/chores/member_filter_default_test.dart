@@ -118,6 +118,55 @@ void main() {
   );
 
   testChoreApp(
+    'pinned with an explicit stored "All members": stays All, no default',
+    today: today,
+    overrides: [authOverride],
+    seed: (database) async {
+      await seed(database, pinned: true);
+      await UiStateRepository(database).setChoresFilters(
+        memberId: UiStateRepository.allMembersFilter,
+        categoryId: null,
+      );
+    },
+    (tester, database) async {
+      expect(find.text('Mine'), findsOneWidget);
+      expect(find.text('Annas'), findsOneWidget);
+      expect(find.text('Free'), findsOneWidget);
+      expect(
+        await storedMemberFilter(tester, database),
+        UiStateRepository.allMembersFilter,
+      );
+    },
+  );
+
+  testChoreApp(
+    'a pinned user choosing All members stores it, so it survives a restart',
+    today: today,
+    overrides: [authOverride],
+    seed: (database) async {
+      await seed(database, pinned: true);
+    },
+    (tester, database) async {
+      // Opens on "mine" (the default); pick "All members".
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PopupMenuItem<String?>),
+          matching: find.text('All members'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Annas'), findsOneWidget);
+      expect(
+        await storedMemberFilter(tester, database),
+        UiStateRepository.allMembersFilter,
+      );
+    },
+  );
+
+  testChoreApp(
     'a local (switching) household still opens unfiltered',
     today: today,
     (tester, database) async {
