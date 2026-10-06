@@ -108,4 +108,54 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'G2: above 1.3x text scale a chore note may wrap to two lines; at 1x it '
+    'stays one',
+    today: today,
+    (tester, database) async {
+      final householdId = await currentHouseholdId(database);
+      await ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      ).createChore(
+        householdId: householdId,
+        title: 'Noted chore',
+        startDate: PlainDate(2026, 7, 24),
+        assignmentMode: AssignmentMode.anyone,
+        notes: 'A fairly long note that explains how this chore is done',
+      );
+      await tester.pumpAndSettle();
+
+      int noteMaxLines() => tester
+          .widget<Text>(find.textContaining('A fairly long note'))
+          .maxLines!;
+      expect(noteMaxLines(), 1);
+
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      expect(noteMaxLines(), 2);
+    },
+  );
+
+  testChoreApp(
+    'G2: the bottom bar clamps text scaling at 2.0 while the rest follows '
+    'the system',
+    today: today,
+    (tester, database) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+
+      double scaleOf(Finder finder) =>
+          MediaQuery.textScalerOf(tester.element(finder.first)).scale(1);
+
+      // The screen body follows the system scale; the tab label does not.
+      expect(scaleOf(find.byType(Scaffold)), 3);
+      expect(scaleOf(find.text('Shopping')), 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

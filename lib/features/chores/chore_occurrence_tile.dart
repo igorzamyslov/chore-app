@@ -451,7 +451,10 @@ class _NoteLine extends StatelessWidget {
         Expanded(
           child: Text(
             note,
-            maxLines: 1,
+            // G2 (persona review 2026-10-06): at large text sizes one
+            // ellipsized line shows barely a word, so the note gets a
+            // second line.
+            maxLines: MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 2 : 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(color: color),
           ),
