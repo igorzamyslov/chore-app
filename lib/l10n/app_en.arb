@@ -369,9 +369,9 @@
   "@welcomeJoinTitle": {
     "description": "Title of the welcome screen's secondary card (id welcome.join), and the app bar title of the welcome-join subpage it opens. Hidden entirely when Supabase isn't configured (offline/F-Droid builds, tests)."
   },
-  "welcomeJoinSubtitle": "Sign in and use an invite code from a family member's device.",
+  "welcomeJoinSubtitle": "Got an invite code? Sign in and enter it here.",
   "@welcomeJoinSubtitle": {
-    "description": "Subtitle of the welcome screen's secondary join card."
+    "description": "Subtitle of the welcome screen's join card (id welcome.join). Speaks to the person already holding a code (persona review 2026-10-06 D1, Leon A1): the old 'from a family member's device' wording read as a step for someone else, so joiners set up a solo household instead."
   },
   "welcomeJoinReconnectSubtitle": "This device isn't connected to it yet.",
   "@welcomeJoinReconnectSubtitle": {

@@ -524,10 +524,10 @@ abstract class AppLocalizations {
   /// **'Join my family\'s household'**
   String get welcomeJoinTitle;
 
-  /// Subtitle of the welcome screen's secondary join card.
+  /// Subtitle of the welcome screen's join card (id welcome.join). Speaks to the person already holding a code (persona review 2026-10-06 D1, Leon A1): the old 'from a family member's device' wording read as a step for someone else, so joiners set up a solo household instead.
   ///
   /// In en, this message translates to:
-  /// **'Sign in and use an invite code from a family member\'s device.'**
+  /// **'Got an invite code? Sign in and enter it here.'**
   String get welcomeJoinSubtitle;
 
   /// Subtitle under the welcome-join subpage's reconnect offer (id welcome.join.reconnect, spec docs/specs/onboarding-v2.md §1/sync-backend.md §7.6), shown when findMyMembership finds the signed-in account already has a membership -- unlike the Settings Account section's equivalent copy (settingsAccountReconnectIntro), this never mentions replacing local data: nothing local exists yet on the welcome path.

@@ -299,7 +299,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeJoinSubtitle =>
-      'Sign in and use an invite code from a family member\'s device.';
+      'Got an invite code? Sign in and enter it here.';
 
   @override
   String get welcomeJoinReconnectSubtitle =>

@@ -1,4 +1,5 @@
 import 'package:chore_app/app/app.dart';
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -55,6 +56,33 @@ void main() {
       final handle = tester.ensureSemantics();
 
       expect(find.bySemanticsIdentifier('welcome.join'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testFreshChoreApp(
+    'the create and join cards render identically -- same elevation, same '
+    'outline (onboarding-v2 §1 amendment 2026-10-06, persona review D1)',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      DepthCard cardOf(String id) => tester.widget<DepthCard>(
+        find.ancestor(
+          of: find.bySemanticsIdentifier(id),
+          matching: find.byType(DepthCard),
+        ),
+      );
+      final create = cardOf('welcome.create');
+      final join = cardOf('welcome.join');
+      expect(create.shadow, join.shadow);
+      expect(create.borderColor, join.borderColor);
+      expect(
+        find.text('Got an invite code? Sign in and enter it here.'),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },

@@ -211,7 +211,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             icon: Icons.home_outlined,
             title: l10n.welcomeCreateTitle,
             subtitle: l10n.welcomeCreateSubtitle,
-            emphasized: true,
             onTap: () => setState(() => _creatingHousehold = true),
           ),
           if (joinEnabled) ...[
@@ -369,10 +368,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 /// language (spec `docs/specs/design-language.md`) rather than bespoke
 /// chrome.
 ///
-/// [emphasized] makes this the raised, `primaryOutline`-bordered primary
-/// card (spec `docs/specs/theme-v2.md` §4.5: "create is a raised
-/// primaryOutline card"); otherwise it renders as the quiet secondary row
-/// the join option calls for.
+/// Both cards render identically -- same elevation, same outline (spec
+/// `docs/specs/onboarding-v2.md` §1, amendment 2026-10-06): a raised
+/// "create" card next to a quiet "join" row sent people who were holding an
+/// invite code into a solo household (persona review D1, Leon A1).
 class _WelcomeCard extends StatelessWidget {
   const _WelcomeCard({
     required this.id,
@@ -380,7 +379,6 @@ class _WelcomeCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.emphasized = false,
   });
 
   final String id;
@@ -388,16 +386,12 @@ class _WelcomeCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final famdo = famdoColors(context);
     return DepthCard(
       margin: EdgeInsets.zero,
-      shadow: emphasized,
-      borderColor: emphasized ? famdo.primaryOutline : null,
       child: semantic(
         id,
         child: InkWell(

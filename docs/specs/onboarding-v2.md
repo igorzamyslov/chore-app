@@ -84,6 +84,15 @@ the same reconnect-offer path a returning device uses (spec
 account is already a claimed member server-side, whether or not the local
 device finished applying it.
 
+> **Amendment 2026-10-06 (persona review D1, Leon A1) — symmetric cards.**
+> The "Primary card" / "Secondary card" split above is retired: both cards
+> render identically (same elevation, same outline), order unchanged
+> (Create, then Join), ids `welcome.create` / `welcome.join` unchanged. A
+> teen holding an invite code read the raised "Set up a new household" as
+> the expected path, landed in a solo household, and the only way back was
+> a "replaces your local data" warning. The join subtitle now speaks to the
+> code holder: "Got an invite code? Sign in and enter it here."
+
 ## 2. App-spine changes
 
 - `bootstrapProvider` no longer CREATES anything. Split:

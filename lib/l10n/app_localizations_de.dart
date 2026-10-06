@@ -302,7 +302,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get welcomeJoinSubtitle =>
-      'Melde dich an und nutze einen Einladungscode vom Gerät eines Familienmitglieds.';
+      'Hast du einen Einladungscode? Melde dich an und gib ihn hier ein.';
 
   @override
   String get welcomeJoinReconnectSubtitle =>
