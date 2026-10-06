@@ -4,6 +4,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:clock/clock.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
@@ -169,8 +170,7 @@ void main() {
       await openDeleteDialog(cleaning.id);
       expect(
         find.text(
-          "This deletes 'Cleaning'. 1 chore uses it and will become "
-          'uncategorized.',
+          "This deletes 'Cleaning'. 1 chore uses it.",
         ),
         findsOneWidget,
       );
@@ -184,8 +184,7 @@ void main() {
       await openDeleteDialog(cleaning.id);
       expect(
         find.text(
-          "This deletes 'Cleaning'. 3 chores use it and will become "
-          'uncategorized.',
+          "This deletes 'Cleaning'. 3 chores use it.",
         ),
         findsOneWidget,
       );
@@ -225,12 +224,131 @@ void main() {
       await openDeleteDialog(dairy.id);
       expect(
         find.text(
-          "This deletes 'Dairy'. 2 shopping items use it and will become "
-          'uncategorized.',
+          "This deletes 'Dairy'. 2 shopping items use it.",
         ),
         findsOneWidget,
       );
       await cancelAndCloseSheet();
+
+      handle.dispose();
+    },
+  );
+
+  // Persona review 2026-10-06 C10 (Maria P3-M): "I want to merge Kitchen
+  // into Cleaning. I'd have to re-tag every chore by hand."
+  testChoreApp(
+    'category rows say how many chores use them',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final categories = await activeCategories(
+        database,
+        householdId,
+        CategoryKind.chore,
+      );
+      final cleaning = categories.firstWhere((c) => c.name == 'Cleaning');
+      final other = categories.firstWhere((c) => c.id != cleaning.id);
+      final choreService = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      for (final title in ['Vacuum', 'Mop']) {
+        await choreService.createChore(
+          householdId: householdId,
+          title: title,
+          startDate: PlainDate.fromDateTime(today),
+          assignmentMode: AssignmentMode.anyone,
+          categoryId: cleaning.id,
+        );
+      }
+
+      await openManageCategories(tester);
+
+      String usageOf(String categoryId) => tester
+          .widget<Text>(
+            find.descendant(
+              of: find.bySemanticsIdentifier(
+                'settings.categories.$categoryId.usage',
+              ),
+              matching: find.byType(Text),
+            ),
+          )
+          .data!;
+      expect(usageOf(cleaning.id), 'Used by 2 chores');
+      expect(usageOf(other.id), 'Not used yet');
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'delete with "Move them to" another category moves its chores there',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final categories = await activeCategories(
+        database,
+        householdId,
+        CategoryKind.chore,
+      );
+      final cleaning = categories.firstWhere((c) => c.name == 'Cleaning');
+      final target = categories.firstWhere((c) => c.id != cleaning.id);
+      final chore =
+          await ChoreService(
+            database: database,
+            chores: ChoreRepository(database),
+            clock: Clock.fixed(today),
+          ).createChore(
+            householdId: householdId,
+            title: 'Vacuum',
+            startDate: PlainDate.fromDateTime(today),
+            assignmentMode: AssignmentMode.anyone,
+            categoryId: cleaning.id,
+          );
+
+      await openManageCategories(tester);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.categories.${cleaning.id}'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.categories.delete'),
+      );
+      await tester.pumpAndSettle();
+
+      // Defaults to Uncategorized; pick the other category instead.
+      expect(find.text('Move them to'), findsOneWidget);
+      expect(find.text('Uncategorized'), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.categories.delete.moveTo'),
+      );
+      await tester.pumpAndSettle();
+      // The dropdown's own menu shows its items once more on top of the
+      // field; tap the menu's copy.
+      await tester.tap(
+        find
+            .bySemanticsIdentifier(
+              'settings.categories.delete.moveTo.${target.id}',
+            )
+            .last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.categories.delete.confirm'),
+      );
+      await tester.pumpAndSettle();
+
+      final choreRow = await (database.select(
+        database.chores,
+      )..where((tbl) => tbl.id.equals(chore.id))).getSingle();
+      expect(choreRow.categoryId, target.id);
+      final deleted = await (database.select(
+        database.categories,
+      )..where((tbl) => tbl.id.equals(cleaning.id))).getSingle();
+      expect(deleted.deletedAt, isNotNull);
 
       handle.dispose();
     },

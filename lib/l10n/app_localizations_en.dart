@@ -130,6 +130,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Mark done for…';
 
   @override
+  String get choresMenuReassign => 'Reassign this turn…';
+
+  @override
+  String get choresReassignTitle => 'Who takes this turn?';
+
+  @override
+  String choresReassignedSnackbar(String name) {
+    return 'Reassigned to $name';
+  }
+
+  @override
   String get choresMarkDoneForTitle => 'Who did this one?';
 
   @override
@@ -139,7 +150,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuEdit => 'Edit';
 
   @override
+  String get choresMenuDuplicate => 'Duplicate';
+
+  @override
   String get choresMenuPause => 'Pause';
+
+  @override
+  String get choresDeleteDialogShared =>
+      'Everyone in the household will see this.';
 
   @override
   String get choresDeleteDialogTitle => 'Delete chore?';
@@ -221,6 +239,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
+
+  @override
+  String get choresActingMemberHint =>
+      'Credit and your daily summary follow this person.';
 
   @override
   String actingMemberSignedInAs(String name) {
@@ -355,8 +377,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String choresSnackbarDoneBy(String name) {
+  String choresDoneCredited(String name) {
     return 'Done — credited to $name';
+  }
+
+  @override
+  String choresDoneCreditedNextDue(String name, String date) {
+    return 'Done — credited to $name, next due $date';
   }
 
   @override
@@ -417,10 +444,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresPausedBadge => 'Paused';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Paused until $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Pause this chore';
+
+  @override
+  String get choresPauseUntilResumed => 'Until I resume it';
+
+  @override
+  String get choresPauseUntilDate => 'Until a date…';
+
+  @override
   String get choresPausedResume => 'Resume';
 
   @override
   String get choreFormEditTitle => 'Edit chore';
+
+  @override
+  String get choreSavedSnackbar => 'Saved';
+
+  @override
+  String choreSavedNextDue(String date) {
+    return 'Saved — next due $date';
+  }
+
+  @override
+  String choreSavedReassigned(String name) {
+    return 'Saved — today\'s turn is now $name\'s';
+  }
 
   @override
   String get choreFormNewTitle => 'New chore';
@@ -715,6 +769,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get choreFormAssignmentAnyone => 'Anyone';
+
+  @override
+  String get choreFormAssignmentHelpFixed => 'Always the same person.';
+
+  @override
+  String get choreFormAssignmentHelpRotation =>
+      'Takes turns in this order, starting at 1.';
+
+  @override
+  String get choreFormAssignmentHelpAnyone => 'Whoever gets to it.';
 
   @override
   String choreFormAssigneeOrderLabel(int order, String name) {
@@ -1132,6 +1196,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryEditColorLabel => 'Color';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count chores',
+      one: 'Used by 1 chore',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count items',
+      one: 'Used by 1 item',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Move them to';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Uncategorized';
+
+  @override
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
@@ -1144,10 +1238,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count chores use it.',
+      one: 'This deletes \'$categoryName\'. 1 chore uses it.',
     );
     return '$_temp0';
   }
@@ -1162,10 +1254,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count shopping items use it.',
+      one: 'This deletes \'$categoryName\'. 1 shopping item uses it.',
     );
     return '$_temp0';
   }

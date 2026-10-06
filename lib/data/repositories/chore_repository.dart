@@ -348,12 +348,19 @@ class ChoreRepository {
     });
   }
 
-  /// Pauses or unpauses a chore.
-  Future<void> setPaused(String id, {required bool paused}) async {
+  /// Pauses or unpauses a chore. [until] is the day a paused chore resumes
+  /// on by itself (`NULL` = until resumed by hand); unpausing always clears
+  /// it (plan `docs/plans/2026-10-06-persona-review-fixes.md` W3).
+  Future<void> setPaused(
+    String id, {
+    required bool paused,
+    PlainDate? until,
+  }) async {
     final now = _isoNow();
     await (db.update(db.chores)..where((tbl) => tbl.id.equals(id))).write(
       ChoresCompanion(
         pausedAt: Value(paused ? now : null),
+        pausedUntil: Value(paused ? until : null),
         updatedAt: Value(now),
         syncDirty: syncDirtyOnWrite,
       ),
@@ -532,6 +539,27 @@ class ChoreRepository {
           ])
           ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Sets [occurrenceId]'s `assignedMemberId` to [memberId] (null =
+  /// unassigned), marking the row dirty so the change syncs.
+  ///
+  /// Only ever applied to a PENDING occurrence by its callers
+  /// (`ChoreService.updateChore`'s holder re-resolution and
+  /// `ChoreService.reassignOccurrence`); history is never rewritten.
+  Future<void> setOccurrenceAssignee(
+    String occurrenceId,
+    String? memberId,
+  ) async {
+    await (db.update(
+      db.choreOccurrences,
+    )..where((tbl) => tbl.id.equals(occurrenceId))).write(
+      ChoreOccurrencesCompanion(
+        assignedMemberId: Value(memberId),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
+    );
   }
 
   /// Clears `assignedMemberId` on every PENDING occurrence currently

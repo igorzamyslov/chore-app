@@ -241,35 +241,164 @@ void main() {
     );
 
     test(
-      'changing assignmentMode/assignees alone (no recurrence/startDate '
-      'change) still leaves the pending occurrence untouched',
+      'an unchanged edit reports neither a next due date nor a reassignment',
       () async {
-        final m1 = await _insertMember(db, 'm1', householdId);
-        final m2 = await _insertMember(db, 'm2', householdId);
         final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
           householdId: householdId,
-          title: 'Fixed',
+          title: 'Anyone',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+
+        final result = await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).updateChore(chore.id, title: 'Anyone (renamed)');
+
+        expect(result.nextDue, isNull);
+        expect(result.reassignedToName, isNull);
+      },
+    );
+  });
+
+  // Persona review 2026-10-06 C1 (Maria P1-A): "I took Anna off the bins,
+  // saved, and the list still says Anna." An assignment edit that leaves the
+  // open turn's holder INVALID re-resolves that one turn in place; a still-
+  // valid holder is never moved (the rotation-reorder rule above stands).
+  group('holder no longer valid after an assignment edit (C1)', () {
+    test(
+      'fixed Anna -> Ben moves the pending occurrence to Ben, in place',
+      () async {
+        final anna = await _insertMember(db, 'anna', householdId);
+        final ben = await _insertMember(db, 'ben', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bins',
           startDate: PlainDate(2026, 1, 1),
           assignmentMode: AssignmentMode.fixed,
           recurrence: Recurrence.everyNDays(1),
-          assigneeMemberIds: [m1],
+          assigneeMemberIds: [anna],
         );
         final before = await repo.pendingOccurrenceOf(chore.id);
-        expect(before!.assignedMemberId, m1);
+        expect(before!.assignedMemberId, anna);
 
-        await serviceOn(PlainDate(2026, 1, 5)).updateChore(
+        final result = await serviceOn(PlainDate(2026, 1, 1)).updateChore(
           chore.id,
           assignmentMode: AssignmentMode.fixed,
-          assigneeMemberIds: [m2],
+          assigneeMemberIds: [ben],
         );
 
         final pending = await repo.pendingOccurrenceOf(chore.id);
+        // Same row (not regenerated): same id, same due date.
         expect(pending!.id, before.id);
-        // The occurrence itself is untouched even though the chore's
-        // assignee list changed underneath it.
-        expect(pending.assignedMemberId, m1);
-        final details = await repo.getChore(chore.id);
-        expect(details!.assigneeMemberIds, [m2]);
+        expect(pending.dueDate, before.dueDate);
+        expect(pending.assignedMemberId, ben);
+        expect(pending.syncDirty, isTrue);
+        expect(result.reassignedToName, 'Member ben');
+        expect(result.nextDue, isNull);
+      },
+    );
+
+    test(
+      'removing the current holder from a rotation moves the turn to whose '
+      'turn it would be, given the latest closed occurrence',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        final first = await repo.pendingOccurrenceOf(chore.id);
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).completeOccurrence(first!.id, completedBy: a);
+        final bTurn = await repo.pendingOccurrenceOf(chore.id);
+        expect(bTurn!.assignedMemberId, b);
+
+        // B is ill: take B out of the rotation.
+        final result = await serviceOn(PlainDate(2026, 1, 2)).updateChore(
+          chore.id,
+          assignmentMode: AssignmentMode.rotation,
+          assigneeMemberIds: [a, c],
+        );
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, bTurn.id);
+        // A did the last turn, so under [a, c] it is C's turn.
+        expect(pending.assignedMemberId, c);
+        expect(result.reassignedToName, 'Member c');
+      },
+    );
+
+    test('switching to anyone leaves the holder where it is', () async {
+      final anna = await _insertMember(db, 'anna', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.fixed,
+        recurrence: Recurrence.everyNDays(1),
+        assigneeMemberIds: [anna],
+      );
+      final before = await repo.pendingOccurrenceOf(chore.id);
+
+      final result = await serviceOn(PlainDate(2026, 1, 1)).updateChore(
+        chore.id,
+        assignmentMode: AssignmentMode.anyone,
+        assigneeMemberIds: const [],
+      );
+
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.id, before!.id);
+      expect(pending.assignedMemberId, anna);
+      expect(result.reassignedToName, isNull);
+    });
+
+    test('anyone -> fixed hands the open turn to the new assignee', () async {
+      final ben = await _insertMember(db, 'ben', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(1),
+      );
+
+      final result = await serviceOn(PlainDate(2026, 1, 1)).updateChore(
+        chore.id,
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [ben],
+      );
+
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      expect(pending!.assignedMemberId, ben);
+      expect(result.reassignedToName, 'Member ben');
+    });
+
+    test(
+      'a schedule edit reports the regenerated next due date',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Weekly-ish',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(7),
+        );
+
+        final result = await serviceOn(PlainDate(2026, 1, 3)).updateChore(
+          chore.id,
+          recurrence: Value(Recurrence.everyNDays(3)),
+        );
+
+        expect(result.nextDue, PlainDate(2026, 1, 4));
+        expect(result.reassignedToName, isNull);
       },
     );
 

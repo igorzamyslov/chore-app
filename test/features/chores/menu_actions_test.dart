@@ -1,6 +1,7 @@
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
@@ -82,6 +83,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
       await tester.pumpAndSettle();
+      // Persona review 2026-10-06 C2: Pause asks how long first.
+      await tester.tap(find.bySemanticsIdentifier('chores.pause.indefinite'));
+      await tester.pumpAndSettle();
 
       expect(find.text('One-off chore'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
@@ -116,6 +120,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('chores.menu.pause'));
+      await tester.pumpAndSettle();
+      // Persona review 2026-10-06 C2: Pause asks how long first.
+      await tester.tap(find.bySemanticsIdentifier('chores.pause.indefinite'));
       await tester.pumpAndSettle();
 
       expect(find.text('Paused'), findsOneWidget);
@@ -223,6 +230,98 @@ void main() {
       expect(find.textContaining('history is kept'), findsOneWidget);
       expect(find.textContaining('Chore history'), findsOneWidget);
       expect(find.textContaining("can't view it again yet"), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  // Persona review 2026-10-06 C3: tapping a chore used to do nothing; the
+  // sheet lived behind the kebab and a long-press only.
+  testChoreApp(
+    'tapping the tile body opens the action sheet; long-press still does',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      ).createChore(
+        householdId: householdId,
+        title: 'Take out bins',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Take out bins'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsOneWidget);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsNothing);
+
+      await tester.longPress(find.text('Take out bins'));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('chores.menu.edit'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  // Persona review 2026-10-06 E4 (Leon A7: "If I delete the bins chore,
+  // does anyone even know?"): any member can delete; the dialog says so.
+  testChoreApp(
+    'with more than one member the delete dialog says everyone will see it; '
+    'alone it does not',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final chore =
+          await ChoreService(
+            database: database,
+            chores: ChoreRepository(database),
+            clock: Clock.fixed(today),
+          ).createChore(
+            householdId: householdId,
+            title: 'Bins',
+            startDate: PlainDate(2026, 7, 22),
+            assignmentMode: AssignmentMode.anyone,
+          );
+      await tester.pumpAndSettle();
+
+      Future<void> openDelete() async {
+        await tester.tap(
+          find.bySemanticsIdentifier('chores.occurrence.${chore.id}.menu'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsIdentifier('chores.menu.delete'));
+        await tester.pumpAndSettle();
+      }
+
+      await openDelete();
+      expect(
+        find.textContaining('Everyone in the household will see this.'),
+        findsNothing,
+      );
+      await tester.tap(find.bySemanticsIdentifier('chores.delete.cancel'));
+      await tester.pumpAndSettle();
+
+      await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Leon', color: 0xFF112233);
+      await tester.pumpAndSettle();
+
+      await openDelete();
+      expect(
+        find.textContaining('Everyone in the household will see this.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.bySemanticsIdentifier('chores.delete.cancel'));
+      await tester.pumpAndSettle();
 
       handle.dispose();
     },

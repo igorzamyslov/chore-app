@@ -131,6 +131,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Für jemand anderen erledigen …';
 
   @override
+  String get choresMenuReassign => 'Diese Runde übergeben …';
+
+  @override
+  String get choresReassignTitle => 'Wer übernimmt diese Runde?';
+
+  @override
+  String choresReassignedSnackbar(String name) {
+    return 'An $name übergeben';
+  }
+
+  @override
   String get choresMarkDoneForTitle => 'Wer hat das gemacht?';
 
   @override
@@ -140,7 +151,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuEdit => 'Bearbeiten';
 
   @override
+  String get choresMenuDuplicate => 'Duplizieren';
+
+  @override
   String get choresMenuPause => 'Pausieren';
+
+  @override
+  String get choresDeleteDialogShared => 'Alle im Haushalt sehen das.';
 
   @override
   String get choresDeleteDialogTitle => 'Aufgabe löschen?';
@@ -222,6 +239,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get actingMemberSheetTitle => 'Wer ist gerade dran?';
+
+  @override
+  String get choresActingMemberHint =>
+      'Gutschrift und deine Tagesübersicht richten sich nach dieser Person.';
 
   @override
   String actingMemberSignedInAs(String name) {
@@ -359,8 +380,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String choresSnackbarDoneBy(String name) {
-    return 'Erledigt — $name gutgeschrieben';
+  String choresDoneCredited(String name) {
+    return 'Erledigt — gutgeschrieben für $name';
+  }
+
+  @override
+  String choresDoneCreditedNextDue(String name, String date) {
+    return 'Erledigt — gutgeschrieben für $name, als Nächstes fällig $date';
   }
 
   @override
@@ -421,10 +447,37 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresPausedBadge => 'Pausiert';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Pausiert bis $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Aufgabe pausieren';
+
+  @override
+  String get choresPauseUntilResumed => 'Bis ich sie fortsetze';
+
+  @override
+  String get choresPauseUntilDate => 'Bis zu einem Datum …';
+
+  @override
   String get choresPausedResume => 'Fortsetzen';
 
   @override
   String get choreFormEditTitle => 'Aufgabe bearbeiten';
+
+  @override
+  String get choreSavedSnackbar => 'Gespeichert';
+
+  @override
+  String choreSavedNextDue(String date) {
+    return 'Gespeichert — als Nächstes fällig $date';
+  }
+
+  @override
+  String choreSavedReassigned(String name) {
+    return 'Gespeichert — heute ist jetzt $name dran';
+  }
 
   @override
   String get choreFormNewTitle => 'Neue Aufgabe';
@@ -719,6 +772,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get choreFormAssignmentAnyone => 'Beliebig';
+
+  @override
+  String get choreFormAssignmentHelpFixed => 'Immer dieselbe Person.';
+
+  @override
+  String get choreFormAssignmentHelpRotation =>
+      'Reihum in dieser Reihenfolge, beginnend bei 1.';
+
+  @override
+  String get choreFormAssignmentHelpAnyone => 'Wer zuerst dazu kommt.';
 
   @override
   String choreFormAssigneeOrderLabel(int order, String name) {
@@ -1139,6 +1202,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryEditColorLabel => 'Farbe';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Aufgaben verwendet',
+      one: 'Von 1 Aufgabe verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Artikeln verwendet',
+      one: 'Von 1 Artikel verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Verschieben nach';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Ohne Kategorie';
+
+  @override
   String get categoryDeleteDialogTitle => 'Kategorie löschen?';
 
   @override
@@ -1152,9 +1245,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie.',
     );
     return '$_temp0';
   }
@@ -1170,9 +1262,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie.',
     );
     return '$_temp0';
   }

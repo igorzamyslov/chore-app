@@ -14,6 +14,18 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// How many active chores / shopping items use each category of the given
+/// kind, keyed by category id (persona review 2026-10-06 C10: the rows'
+/// "Used by N chores" subtitle). Same rule as the delete dialog's count.
+final AutoDisposeStreamProviderFamily<Map<String, int>, CategoryKind>
+_categoryUsageCountsProvider = StreamProvider.autoDispose
+    .family<Map<String, int>, CategoryKind>((ref, kind) async* {
+      final householdId = await ref.watch(bootstrapProvider.future);
+      yield* ref
+          .watch(categoryRepositoryProvider)
+          .watchActiveReferenceCounts(householdId, kind);
+    });
+
 /// Manages the active categories of one [CategoryKind] at a time, switched
 /// via a segmented control.
 ///
@@ -57,6 +69,9 @@ class _ManageCategoriesScreenState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final categoriesAsync = ref.watch(_activeProvider);
+    final usageCounts =
+        ref.watch(_categoryUsageCountsProvider(_kind)).value ??
+        const <String, int>{};
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageCategoriesTitle)),
@@ -94,6 +109,7 @@ class _ManageCategoriesScreenState
                   : _CategoryList(
                       key: ValueKey(_kind),
                       categories: categories,
+                      usageCounts: usageCounts,
                       onReorder: (oldIndex, newIndex) =>
                           _reorder(categories, oldIndex, newIndex),
                       onTapCategory: (category) => showCategoryEditSheet(
@@ -142,12 +158,14 @@ class _ManageCategoriesScreenState
 class _CategoryList extends StatelessWidget {
   const _CategoryList({
     required this.categories,
+    required this.usageCounts,
     required this.onReorder,
     required this.onTapCategory,
     super.key,
   });
 
   final List<Category> categories;
+  final Map<String, int> usageCounts;
   final void Function(int oldIndex, int newIndex) onReorder;
   final ValueChanged<Category> onTapCategory;
 
@@ -162,6 +180,7 @@ class _CategoryList extends StatelessWidget {
         return _CategoryRow(
           key: ValueKey(category.id),
           category: category,
+          usageCount: usageCounts[category.id] ?? 0,
           index: index,
           onTap: () => onTapCategory(category),
         );
@@ -172,16 +191,19 @@ class _CategoryList extends StatelessWidget {
 }
 
 /// One category row: a drag handle (>= 48dp target), its icon + name in the
-/// category's color, tappable to open the edit sheet.
+/// category's color with a "Used by N chores" line under the name (persona
+/// review 2026-10-06 C10), tappable to open the edit sheet.
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({
     required this.category,
+    required this.usageCount,
     required this.index,
     required this.onTap,
     super.key,
   });
 
   final Category category;
+  final int usageCount;
   final int index;
   final VoidCallback onTap;
 
@@ -220,9 +242,32 @@ class _CategoryRow extends StatelessWidget {
                       Icon(categoryIcon(category.icon), color: color),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Text(
-                          category.name,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.name,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            semantic(
+                              'settings.categories.${category.id}.usage',
+                              child: Text(
+                                category.kind == CategoryKind.chore
+                                    ? AppLocalizations.of(
+                                        context,
+                                      ).categoryUsageCount(usageCount)
+                                    : AppLocalizations.of(
+                                        context,
+                                      ).categoryUsageCountShopping(usageCount),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

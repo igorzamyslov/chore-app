@@ -1826,6 +1826,15 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<PlainDate?, String> pausedUntil =
+      GeneratedColumn<String>(
+        'paused_until',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<PlainDate?>($ChoresTable.$converterpausedUntil);
   static const VerificationMeta _reminderMinutesMeta = const VerificationMeta(
     'reminderMinutes',
   );
@@ -1896,6 +1905,7 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    pausedUntil,
     reminderMinutes,
     createdBy,
     createdAt,
@@ -2054,6 +2064,12 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
         DriftSqlType.string,
         data['${effectivePrefix}paused_at'],
       ),
+      pausedUntil: $ChoresTable.$converterpausedUntil.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}paused_until'],
+        ),
+      ),
       reminderMinutes: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}reminder_minutes'],
@@ -2088,6 +2104,8 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
       const PlainDateConverter();
   static JsonTypeConverter2<AssignmentMode, String, String>
   $converterassignmentMode = const EnumNameConverter(AssignmentMode.values);
+  static TypeConverter<PlainDate?, String?> $converterpausedUntil =
+      const NullAwareTypeConverter.wrap(PlainDateConverter());
 }
 
 class Chore extends DataClass implements Insertable<Chore> {
@@ -2124,6 +2142,16 @@ class Chore extends DataClass implements Insertable<Chore> {
 
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   final String? pausedAt;
+
+  /// The local calendar day a paused chore resumes on by itself, or `NULL`
+  /// for "until I resume it" (and always `NULL` on an unpaused chore).
+  /// Plain date `yyyy-MM-dd`, not a timestamp: "until Monday" is a day in
+  /// the household's calendar. `ChoreService.catchUpOverdue` (bootstrap and
+  /// day change) unpauses every chore whose `pausedUntil <= today` (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` W3, persona review
+  /// C2). Household data, synced as `chores.paused_until`. Added in
+  /// schemaVersion 19.
+  final PlainDate? pausedUntil;
 
   /// The per-chore individual reminder's fire time, as minutes since local
   /// midnight, or `NULL` for "no individual reminder" (spec
@@ -2164,6 +2192,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     required this.startDate,
     required this.assignmentMode,
     this.pausedAt,
+    this.pausedUntil,
     this.reminderMinutes,
     this.createdBy,
     required this.createdAt,
@@ -2201,6 +2230,11 @@ class Chore extends DataClass implements Insertable<Chore> {
     if (!nullToAbsent || pausedAt != null) {
       map['paused_at'] = Variable<String>(pausedAt);
     }
+    if (!nullToAbsent || pausedUntil != null) {
+      map['paused_until'] = Variable<String>(
+        $ChoresTable.$converterpausedUntil.toSql(pausedUntil),
+      );
+    }
     if (!nullToAbsent || reminderMinutes != null) {
       map['reminder_minutes'] = Variable<int>(reminderMinutes);
     }
@@ -2235,6 +2269,9 @@ class Chore extends DataClass implements Insertable<Chore> {
       pausedAt: pausedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(pausedAt),
+      pausedUntil: pausedUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntil),
       reminderMinutes: reminderMinutes == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderMinutes),
@@ -2267,6 +2304,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         serializer.fromJson<String>(json['assignmentMode']),
       ),
       pausedAt: serializer.fromJson<String?>(json['pausedAt']),
+      pausedUntil: serializer.fromJson<PlainDate?>(json['pausedUntil']),
       reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
       createdBy: serializer.fromJson<String?>(json['createdBy']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
@@ -2290,6 +2328,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         $ChoresTable.$converterassignmentMode.toJson(assignmentMode),
       ),
       'pausedAt': serializer.toJson<String?>(pausedAt),
+      'pausedUntil': serializer.toJson<PlainDate?>(pausedUntil),
       'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
       'createdBy': serializer.toJson<String?>(createdBy),
       'createdAt': serializer.toJson<String>(createdAt),
@@ -2309,6 +2348,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     PlainDate? startDate,
     AssignmentMode? assignmentMode,
     Value<String?> pausedAt = const Value.absent(),
+    Value<PlainDate?> pausedUntil = const Value.absent(),
     Value<int?> reminderMinutes = const Value.absent(),
     Value<String?> createdBy = const Value.absent(),
     String? createdAt,
@@ -2325,6 +2365,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate: startDate ?? this.startDate,
     assignmentMode: assignmentMode ?? this.assignmentMode,
     pausedAt: pausedAt.present ? pausedAt.value : this.pausedAt,
+    pausedUntil: pausedUntil.present ? pausedUntil.value : this.pausedUntil,
     reminderMinutes: reminderMinutes.present
         ? reminderMinutes.value
         : this.reminderMinutes,
@@ -2353,6 +2394,9 @@ class Chore extends DataClass implements Insertable<Chore> {
           ? data.assignmentMode.value
           : this.assignmentMode,
       pausedAt: data.pausedAt.present ? data.pausedAt.value : this.pausedAt,
+      pausedUntil: data.pausedUntil.present
+          ? data.pausedUntil.value
+          : this.pausedUntil,
       reminderMinutes: data.reminderMinutes.present
           ? data.reminderMinutes.value
           : this.reminderMinutes,
@@ -2376,6 +2420,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('pausedUntil: $pausedUntil, ')
           ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
@@ -2397,6 +2442,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    pausedUntil,
     reminderMinutes,
     createdBy,
     createdAt,
@@ -2417,6 +2463,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           other.startDate == this.startDate &&
           other.assignmentMode == this.assignmentMode &&
           other.pausedAt == this.pausedAt &&
+          other.pausedUntil == this.pausedUntil &&
           other.reminderMinutes == this.reminderMinutes &&
           other.createdBy == this.createdBy &&
           other.createdAt == this.createdAt &&
@@ -2435,6 +2482,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   final Value<PlainDate> startDate;
   final Value<AssignmentMode> assignmentMode;
   final Value<String?> pausedAt;
+  final Value<PlainDate?> pausedUntil;
   final Value<int?> reminderMinutes;
   final Value<String?> createdBy;
   final Value<String> createdAt;
@@ -2452,6 +2500,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     this.startDate = const Value.absent(),
     this.assignmentMode = const Value.absent(),
     this.pausedAt = const Value.absent(),
+    this.pausedUntil = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2470,6 +2519,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     required PlainDate startDate,
     required AssignmentMode assignmentMode,
     this.pausedAt = const Value.absent(),
+    this.pausedUntil = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     required String createdAt,
@@ -2494,6 +2544,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Expression<String>? startDate,
     Expression<String>? assignmentMode,
     Expression<String>? pausedAt,
+    Expression<String>? pausedUntil,
     Expression<int>? reminderMinutes,
     Expression<String>? createdBy,
     Expression<String>? createdAt,
@@ -2512,6 +2563,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       if (startDate != null) 'start_date': startDate,
       if (assignmentMode != null) 'assignment_mode': assignmentMode,
       if (pausedAt != null) 'paused_at': pausedAt,
+      if (pausedUntil != null) 'paused_until': pausedUntil,
       if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'created_at': createdAt,
@@ -2532,6 +2584,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Value<PlainDate>? startDate,
     Value<AssignmentMode>? assignmentMode,
     Value<String?>? pausedAt,
+    Value<PlainDate?>? pausedUntil,
     Value<int?>? reminderMinutes,
     Value<String?>? createdBy,
     Value<String>? createdAt,
@@ -2550,6 +2603,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       startDate: startDate ?? this.startDate,
       assignmentMode: assignmentMode ?? this.assignmentMode,
       pausedAt: pausedAt ?? this.pausedAt,
+      pausedUntil: pausedUntil ?? this.pausedUntil,
       reminderMinutes: reminderMinutes ?? this.reminderMinutes,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
@@ -2598,6 +2652,11 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     if (pausedAt.present) {
       map['paused_at'] = Variable<String>(pausedAt.value);
     }
+    if (pausedUntil.present) {
+      map['paused_until'] = Variable<String>(
+        $ChoresTable.$converterpausedUntil.toSql(pausedUntil.value),
+      );
+    }
     if (reminderMinutes.present) {
       map['reminder_minutes'] = Variable<int>(reminderMinutes.value);
     }
@@ -2632,6 +2691,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('pausedUntil: $pausedUntil, ')
           ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
@@ -9725,6 +9785,7 @@ typedef $$ChoresTableCreateCompanionBuilder =
       required PlainDate startDate,
       required AssignmentMode assignmentMode,
       Value<String?> pausedAt,
+      Value<PlainDate?> pausedUntil,
       Value<int?> reminderMinutes,
       Value<String?> createdBy,
       required String createdAt,
@@ -9744,6 +9805,7 @@ typedef $$ChoresTableUpdateCompanionBuilder =
       Value<PlainDate> startDate,
       Value<AssignmentMode> assignmentMode,
       Value<String?> pausedAt,
+      Value<PlainDate?> pausedUntil,
       Value<int?> reminderMinutes,
       Value<String?> createdBy,
       Value<String> createdAt,
@@ -9896,6 +9958,12 @@ class $$ChoresTableFilterComposer
   ColumnFilters<String> get pausedAt => $composableBuilder(
     column: $table.pausedAt,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<PlainDate?, PlainDate, String>
+  get pausedUntil => $composableBuilder(
+    column: $table.pausedUntil,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<int> get reminderMinutes => $composableBuilder(
@@ -10087,6 +10155,11 @@ class $$ChoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pausedUntil => $composableBuilder(
+    column: $table.pausedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get reminderMinutes => $composableBuilder(
     column: $table.reminderMinutes,
     builder: (column) => ColumnOrderings(column),
@@ -10215,6 +10288,12 @@ class $$ChoresTableAnnotationComposer
 
   GeneratedColumn<String> get pausedAt =>
       $composableBuilder(column: $table.pausedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<PlainDate?, String> get pausedUntil =>
+      $composableBuilder(
+        column: $table.pausedUntil,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<int> get reminderMinutes => $composableBuilder(
     column: $table.reminderMinutes,
@@ -10394,6 +10473,7 @@ class $$ChoresTableTableManager
                 Value<PlainDate> startDate = const Value.absent(),
                 Value<AssignmentMode> assignmentMode = const Value.absent(),
                 Value<String?> pausedAt = const Value.absent(),
+                Value<PlainDate?> pausedUntil = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
@@ -10411,6 +10491,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                pausedUntil: pausedUntil,
                 reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,
@@ -10430,6 +10511,7 @@ class $$ChoresTableTableManager
                 required PlainDate startDate,
                 required AssignmentMode assignmentMode,
                 Value<String?> pausedAt = const Value.absent(),
+                Value<PlainDate?> pausedUntil = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 required String createdAt,
@@ -10447,6 +10529,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                pausedUntil: pausedUntil,
                 reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,

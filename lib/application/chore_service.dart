@@ -17,6 +17,26 @@ import 'package:chore_app/domain/rotation.dart';
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 
+/// What [ChoreService.updateChore] did to the chore's open turn, so the
+/// form can confirm the save in words (persona review 2026-10-06 C1/C6).
+///
+/// At most one of the two is set: a schedule edit regenerates the pending
+/// occurrence (its due date is [nextDue]); an assignment-only edit may move
+/// the open turn to a new holder ([reassignedToName]). Both `null` means the
+/// open turn is exactly where it was.
+class ChoreUpdateResult {
+  /// Creates a result; both fields default to "nothing to report".
+  const ChoreUpdateResult({this.nextDue, this.reassignedToName});
+
+  /// The due date of the regenerated pending occurrence, when the edit
+  /// changed the schedule and one was inserted.
+  final PlainDate? nextDue;
+
+  /// The name of the member the open turn moved to, when the edit left its
+  /// previous holder invalid.
+  final String? reassignedToName;
+}
+
 /// Orchestrates chore/occurrence lifecycle rules on top of [ChoreRepository]
 /// primitives.
 ///
@@ -157,6 +177,11 @@ class ChoreService {
   /// stay overdue. Idempotent: calling this again the same day changes
   /// nothing.
   ///
+  /// Before that loop (and after ghost repair), every paused chore whose
+  /// `pausedUntil` is on or before today is resumed via [unpauseChore]
+  /// (amendment 2026-10-06, "Pause until") — the day-change trigger is what
+  /// makes a "pause until Monday" end on Monday.
+  ///
   /// Returns the number of chores it changed — i.e. how many had their
   /// pending occurrence closed as `missed` and a fresh one reinserted (0 if
   /// none, which is the common case).
@@ -187,6 +212,21 @@ class ChoreService {
         householdId,
         clock.now().toUtc().toIso8601String(),
       );
+      // "Pause until" (persona review 2026-10-06 C2): every paused chore
+      // whose resume day has come is unpaused through [unpauseChore], so it
+      // gets exactly the occurrence a hand-resume would (never before
+      // today, never resurrecting a closed slot). Before the overdue loop
+      // below, which therefore sees the fresh pending row and leaves it be
+      // (it is never behind today). Not counted in the return value: the
+      // catch-up banner explains rolled-forward overdue turns, not this.
+      for (final details in await chores.getActiveChores(householdId)) {
+        final until = details.chore.pausedUntil;
+        if (details.chore.pausedAt != null &&
+            until != null &&
+            !until.isAfter(today)) {
+          await unpauseChore(details.chore.id);
+        }
+      }
       final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
         final chore = details.chore;
@@ -228,14 +268,18 @@ class ChoreService {
   /// Pauses [choreId] and deletes its pending occurrence. History is
   /// untouched. A no-op if the chore is already paused.
   ///
+  /// [until] (persona review 2026-10-06 C2, "Pause until") is the local day
+  /// the chore resumes on by itself — [catchUpOverdue] unpauses it once
+  /// `until <= today`; `null` (the default) pauses it until resumed by hand.
+  ///
   /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
-  Future<void> pauseChore(String choreId) async {
+  Future<void> pauseChore(String choreId, {PlainDate? until}) async {
     await database.transaction(() async {
       final details = await _requireActiveChore(choreId);
       if (details.chore.pausedAt != null) {
         return;
       }
-      await chores.setPaused(choreId, paused: true);
+      await chores.setPaused(choreId, paused: true, until: until);
       await chores.deletePendingOccurrences(choreId);
     });
   }
@@ -318,9 +362,16 @@ class ChoreService {
   ///   [_regeneratedAssignee]).
   ///
   /// An edit that changes NEITHER `recurrence` nor `startDate` leaves the
-  /// pending occurrence — and its assignee — completely untouched, no
-  /// matter what else changed (title, notes, category, assignment
-  /// mode/assignees, [reminderMinutes]).
+  /// pending occurrence's row and due date untouched, no matter what else
+  /// changed (title, notes, category, assignment mode/assignees,
+  /// [reminderMinutes]) — with ONE exception (amendment 2026-10-06, persona
+  /// review C1): if the assignment edit leaves the open turn's holder
+  /// invalid (`fixed`: not the fixed member; `rotation`: not in the new
+  /// order; `anyone`: always valid), that turn's assignee is re-resolved in
+  /// place via [_regeneratedAssignee]. A still-valid holder is never moved,
+  /// so a plain rotation reorder keeps today's turn where it is.
+  ///
+  /// Returns a [ChoreUpdateResult] saying what happened to the open turn.
   ///
   /// [reminderMinutes] follows the same "omit to leave unchanged"
   /// convention as [notes] and [categoryId]: `Value.absent()` leaves the
@@ -337,7 +388,7 @@ class ChoreService {
   /// decision D5 draws for snooze.
   ///
   /// Throws [StateError] if the chore doesn't exist or is soft-deleted.
-  Future<void> updateChore(
+  Future<ChoreUpdateResult> updateChore(
     String choreId, {
     String? title,
     Value<String?> notes = const Value.absent(),
@@ -349,7 +400,7 @@ class ChoreService {
     List<String>? assigneeMemberIds,
   }) async {
     final today = _today;
-    await database.transaction(() async {
+    return database.transaction(() async {
       final before = await _requireActiveChore(choreId);
       // Value equality, straight from `Recurrence.==` (backlog E-4).
       // This used to compare `jsonEncode(a.toJson())` strings because
@@ -376,13 +427,15 @@ class ChoreService {
       );
 
       if (!recurrenceChanged && !startDateChanged) {
-        return;
+        return ChoreUpdateResult(
+          reassignedToName: await _reresolveInvalidHolder(choreId),
+        );
       }
 
       await chores.deletePendingOccurrences(choreId);
       final after = await _requireChore(choreId);
       if (after.chore.pausedAt != null) {
-        return;
+        return const ChoreUpdateResult();
       }
 
       final latestClosed = await chores.latestClosedOccurrence(choreId);
@@ -392,7 +445,7 @@ class ChoreService {
         latestClosed: latestClosed,
       );
       if (dueDate == null) {
-        return;
+        return const ChoreUpdateResult();
       }
       final assignedMemberId = _regeneratedAssignee(
         mode: after.chore.assignmentMode,
@@ -404,6 +457,72 @@ class ChoreService {
         dueDate: dueDate,
         assignedMemberId: assignedMemberId,
       );
+      return ChoreUpdateResult(nextDue: dueDate);
+    });
+  }
+
+  /// [updateChore]'s C1 step (amendment 2026-10-06): if [choreId]'s pending
+  /// occurrence is held by someone the chore's CURRENT assignment no longer
+  /// allows, moves that turn — in place, same row and due date — to whoever
+  /// [_regeneratedAssignee] picks, and returns their name. Returns `null`
+  /// (and writes nothing) when there is no pending occurrence or its holder
+  /// is still valid. Must run inside [updateChore]'s transaction, after the
+  /// repository update.
+  Future<String?> _reresolveInvalidHolder(String choreId) async {
+    final pending = await chores.pendingOccurrenceOf(choreId);
+    if (pending == null) {
+      return null;
+    }
+    final after = await _requireChore(choreId);
+    final holder = pending.assignedMemberId;
+    final assignees = after.assigneeMemberIds;
+    final valid = switch (after.chore.assignmentMode) {
+      AssignmentMode.fixed => holder == assignees.single,
+      AssignmentMode.rotation => holder != null && assignees.contains(holder),
+      AssignmentMode.anyone => true,
+    };
+    if (valid) {
+      return null;
+    }
+    final newHolder = _regeneratedAssignee(
+      mode: after.chore.assignmentMode,
+      orderedMemberIds: assignees,
+      latestClosed: await chores.latestClosedOccurrence(choreId),
+    );
+    await chores.setOccurrenceAssignee(pending.id, newHolder);
+    return _memberName(newHolder);
+  }
+
+  /// [memberId]'s display name, or `null` for a null/unknown id.
+  Future<String?> _memberName(String? memberId) async {
+    if (memberId == null) {
+      return null;
+    }
+    final member = await (database.select(
+      database.members,
+    )..where((tbl) => tbl.id.equals(memberId))).getSingleOrNull();
+    return member?.name;
+  }
+
+  /// Hands the open turn [occurrenceId] to [memberId] (`null` = nobody,
+  /// which is only ever the Undo of reassigning an unassigned `anyone`
+  /// turn) — persona review 2026-10-06 C2 ("Anna's ill, Ben takes her turn
+  /// this week"). Writes `assigned_member_id` on that one pending row and
+  /// marks it dirty; the chore's own assignment is untouched.
+  ///
+  /// Rotation afterwards needs no special case: [_closeAndAdvance] advances
+  /// from the closed occurrence's `assigned_member_id`, so the next turn is
+  /// the member after the REASSIGNED holder in order, and the cover rule
+  /// (whoever completes it is skipped for the next turn) applies as usual.
+  ///
+  /// Throws [StateError] if [occurrenceId] doesn't exist or isn't pending.
+  Future<void> reassignOccurrence(String occurrenceId, String? memberId) {
+    return database.transaction(() async {
+      final occurrence = await _findOccurrence(occurrenceId);
+      if (occurrence == null || occurrence.status != OccurrenceStatus.pending) {
+        throw StateError('Occurrence $occurrenceId is not pending');
+      }
+      await chores.setOccurrenceAssignee(occurrenceId, memberId);
     });
   }
 

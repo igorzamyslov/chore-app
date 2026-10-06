@@ -8,6 +8,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -28,6 +29,7 @@ import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/chores/pause_chore_sheet.dart';
 import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -192,6 +194,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                   onOpenMenu: _openMenu,
                   onReopen: _reopen,
                   onResume: _resume,
+                  onOpenPausedMenu: _openPausedMenu,
                   onClearFilters: _clearFilters,
                 );
                 if (!syncLinked) {
@@ -285,7 +288,19 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     if (!mounted) {
       return;
     }
-    await _showCloseSnackbar(occurrence: occurrence, skipped: false);
+    // C5 (persona review 2026-10-06): in a household of more than one the
+    // Done snackbar names who got the credit -- the acting member can be
+    // switched from the app bar, so a bare "Done" hid whose name it went
+    // under. A household of one has nobody else it could have gone to.
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final credited = members.length > 1
+        ? members.where((m) => m.id == completedBy).firstOrNull
+        : null;
+    await _showCloseSnackbar(
+      occurrence: occurrence,
+      skipped: false,
+      creditedTo: credited,
+    );
   }
 
   /// The rare "I finished something for someone else" path (A-5, spec
@@ -299,10 +314,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// `settings.actingMemberId` — crediting somebody is not becoming them.
   Future<void> _markDoneFor(OccurrenceWithChore occurrence) async {
     final members = ref.read(membersProvider).value ?? const <Member>[];
+    // The person holding the phone: the claimed member when signed in to
+    // a linked household, else the local acting member (C5 offers this row
+    // in local households too).
     final picked = await showMarkDoneForSheet(
       context,
       members: members,
-      excludeMemberId: ref.read(claimedMemberProvider)?.id,
+      excludeMemberId:
+          ref.read(claimedMemberProvider)?.id ??
+          ref.read(actingMemberProvider)?.id,
     );
     if (!mounted || picked == null) {
       return;
@@ -322,16 +342,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
-    // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
-    // "Mark done for…" replaces the app-bar switcher, so it is offered in
-    // exactly the state where that switcher is gone -- and only when there
-    // is somebody else to credit.
-    final pinned =
-        ref.read(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+    // A-5 (spec docs/feedback/2026-08-07-field-feedback.md B1), widened by
+    // persona review 2026-10-06 C5: "Mark done for…" is offered whenever
+    // there is somebody else to credit, linked or not. In a local household
+    // it is the way to credit someone WITHOUT switching the app-bar avatar,
+    // which also re-scopes this device's daily summary and reminders.
     final memberCount = ref.read(membersProvider).value?.length ?? 0;
     final action = await showChoreActionSheet(
       context,
-      showMarkDoneFor: pinned && memberCount > 1,
+      showMarkDoneFor: memberCount > 1,
+      // C2 (persona review 2026-10-06): same gate -- somebody else to hand
+      // the turn to.
+      showReassign: memberCount > 1,
     );
     if (!mounted || action == null) {
       return;
@@ -339,6 +361,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     switch (action) {
       case ChoreMenuAction.markDoneFor:
         await _markDoneFor(occurrence);
+      case ChoreMenuAction.reassign:
+        await _reassign(occurrence);
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)
@@ -348,25 +372,120 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         }
         await _showCloseSnackbar(occurrence: occurrence, skipped: true);
       case ChoreMenuAction.edit:
+        await _edit(occurrence.chore.id);
+      case ChoreMenuAction.duplicate:
+        // C9 (persona review 2026-10-06): the create form, prefilled.
+        // Saving creates a second chore; like any create, it pops silently.
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
-            builder: (_) => ChoreFormScreen(choreId: occurrence.chore.id),
+            builder: (_) =>
+                ChoreFormScreen(duplicateOfChoreId: occurrence.chore.id),
           ),
         );
       case ChoreMenuAction.pause:
         await _pause(occurrence);
+      case ChoreMenuAction.resume:
+        // Only the paused variant of the sheet offers Resume.
+        break;
       case ChoreMenuAction.delete:
-        final confirmed = await showChoreDeleteDialog(
-          context,
-          choreTitle: occurrence.chore.title,
-        );
-        if (!mounted || !confirmed) {
-          return;
-        }
-        await ref
-            .read(choreRepositoryProvider)
-            .softDeleteChore(occurrence.chore.id);
+        await _delete(occurrence.chore);
     }
+  }
+
+  /// The paused row's sheet (persona review 2026-10-06 C4): Resume, Edit
+  /// and Delete, without having to resume the chore first.
+  Future<void> _openPausedMenu(ChoreWithDetails details) async {
+    final action = await showChoreActionSheet(
+      context,
+      showMarkDoneFor: false,
+      paused: true,
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case ChoreMenuAction.resume:
+        await _resume(details);
+      case ChoreMenuAction.edit:
+        await _edit(details.chore.id);
+      case ChoreMenuAction.delete:
+        await _delete(details.chore);
+      case ChoreMenuAction.markDoneFor:
+      case ChoreMenuAction.reassign:
+      case ChoreMenuAction.skip:
+      case ChoreMenuAction.duplicate:
+      case ChoreMenuAction.pause:
+        // Not offered on the paused sheet: there is no open turn.
+        break;
+    }
+  }
+
+  /// "Reassign this turn…" (persona review 2026-10-06 C2): pick a member,
+  /// hand them this one open turn, confirm with an Undo that hands it back.
+  /// The chore's own assignment is untouched; rotation continues from the
+  /// new holder (spec `docs/specs/occurrence-lifecycle.md`,
+  /// reassignOccurrence).
+  Future<void> _reassign(OccurrenceWithChore occurrence) async {
+    final previous = occurrence.occurrence.assignedMemberId;
+    final picked = await showReassignTurnSheet(
+      context,
+      members: ref.read(membersProvider).value ?? const <Member>[],
+      currentHolderId: previous,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    final occurrenceId = occurrence.occurrence.id;
+    final service = ref.read(choreServiceProvider);
+    await service.reassignOccurrence(occurrenceId, picked.id);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.choresReassignedSnackbar(picked.name),
+      action: SnackBarAction(
+        label: l10n.choresSnackbarUndo,
+        onPressed: () {
+          unawaited(service.reassignOccurrence(occurrenceId, previous));
+        },
+      ),
+    );
+  }
+
+  /// Opens [choreId] in the edit form and, if it was saved, confirms the
+  /// save in words (persona review 2026-10-06 C1/C6).
+  Future<void> _edit(String choreId) async {
+    final saved = await Navigator.of(context).push<ChoreUpdateResult>(
+      MaterialPageRoute(builder: (_) => ChoreFormScreen(choreId: choreId)),
+    );
+    if (!mounted || saved == null) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: choreSavedMessage(
+        AppLocalizations.of(context),
+        Localizations.localeOf(context).toString(),
+        today: ref.read(todayProvider),
+        result: saved,
+      ),
+    );
+  }
+
+  /// Confirms, then soft-deletes [chore].
+  Future<void> _delete(Chore chore) async {
+    final confirmed = await showChoreDeleteDialog(
+      context,
+      choreTitle: chore.title,
+      // E4 (persona review 2026-10-06): disclose that the delete is shared.
+      shared: (ref.read(membersProvider).value?.length ?? 0) > 1,
+    );
+    if (!mounted || !confirmed) {
+      return;
+    }
+    await ref.read(choreRepositoryProvider).softDeleteChore(chore.id);
   }
 
   /// Pauses [occurrence]'s chore and confirms it with a snackbar whose
@@ -376,16 +495,35 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// only -- easy to miss -- recovery path. Built the same way as
   /// [_showCloseSnackbar]: [showAppSnackbar] with an action, which is
   /// `persist: false` internally so the bar still auto-dismisses.
+  ///
+  /// Persona review 2026-10-06 C2 ("Pause until"): a small sheet asks how
+  /// long first -- until resumed by hand, or until a date, after which
+  /// `ChoreService.catchUpOverdue` resumes it by itself.
   Future<void> _pause(OccurrenceWithChore occurrence) async {
     final choreId = occurrence.chore.id;
-    await ref.read(choreServiceProvider).pauseChore(choreId);
+    final choice = await showPauseChoreSheet(
+      context,
+      today: ref.read(todayProvider),
+    );
+    if (!mounted || choice == null) {
+      return;
+    }
+    final until = choice.until;
+    await ref.read(choreServiceProvider).pauseChore(choreId, until: until);
     if (!mounted) {
       return;
     }
     final l10n = AppLocalizations.of(context);
     showAppSnackbar(
       context,
-      message: l10n.choresSnackbarPaused,
+      message: until == null
+          ? l10n.choresSnackbarPaused
+          : l10n.choresPausedUntil(
+              pausedUntilText(
+                Localizations.localeOf(context).toString(),
+                until,
+              ),
+            ),
       action: SnackBarAction(
         label: l10n.choresSnackbarUndo,
         onPressed: () {
@@ -417,29 +555,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
 
     final l10n = AppLocalizations.of(context);
-    // A-5: on the "Mark done for…" path the credited member is NOT the
-    // person holding the phone, so the confirmation says whose credit it
-    // was. The next-due variants are skipped here deliberately — WHO got
-    // the credit is the fact worth confirming on this path, and the chore's
-    // next occurrence is visible in the list behind the bar anyway.
-    if (creditedTo != null) {
-      showAppSnackbar(
-        context,
-        message: l10n.choresSnackbarDoneBy(creditedTo.name),
-        action: SnackBarAction(
-          label: l10n.choresSnackbarUndo,
-          onPressed: () {
-            unawaited(
-              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
-            );
-          },
-        ),
-      );
-      return;
-    }
+    // [creditedTo] is set on the "Mark done for…" path (A-5) and, since
+    // persona review 2026-10-06 C5, on every completion in a household of
+    // more than one: the confirmation says whose credit it was, then (for a
+    // recurring chore) when it is next due. Every variant keeps the leading
+    // "Done" that E2E substring checks rely on.
     final String message;
     if (nextPending == null) {
-      message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
+      message = skipped
+          ? l10n.choresSnackbarSkipped
+          : creditedTo != null
+          ? l10n.choresDoneCredited(creditedTo.name)
+          : l10n.choresSnackbarDone;
     } else {
       final localeName = Localizations.localeOf(context).toString();
       // The same "today" the list itself is bucketing on, so the snackbar's
@@ -454,6 +581,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       );
       message = skipped
           ? l10n.choresSnackbarSkippedNextDue(dueText)
+          : creditedTo != null
+          ? l10n.choresDoneCreditedNextDue(creditedTo.name, dueText)
           : l10n.choresSnackbarDoneNextDue(dueText);
     }
 
@@ -603,6 +732,7 @@ class _Body extends StatelessWidget {
     required this.onOpenMenu,
     required this.onReopen,
     required this.onResume,
+    required this.onOpenPausedMenu,
     required this.onClearFilters,
   });
 
@@ -622,6 +752,7 @@ class _Body extends StatelessWidget {
   final ValueChanged<OccurrenceWithChore> onOpenMenu;
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
   final ValueChanged<ChoreWithDetails> onResume;
+  final ValueChanged<ChoreWithDetails> onOpenPausedMenu;
 
   /// Resets both filters (spec `docs/feedback/2026-08-01-ux-audit.md` B1's
   /// "Show everything" action, wired to the filtered-empty state below).
@@ -727,7 +858,11 @@ class _Body extends StatelessWidget {
                 ),
             ],
         if (filteredPaused.isNotEmpty)
-          ChorePausedSection(chores: filteredPaused, onResume: onResume),
+          ChorePausedSection(
+            chores: filteredPaused,
+            onResume: onResume,
+            onOpenMenu: onOpenPausedMenu,
+          ),
         if (filteredClosedToday.isNotEmpty)
           ChoreDoneSection(
             occurrences: filteredClosedToday,

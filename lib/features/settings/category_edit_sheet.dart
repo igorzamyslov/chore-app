@@ -206,16 +206,34 @@ class _CategoryEditSheetState extends ConsumerState<_CategoryEditSheet> {
     if (!mounted) {
       return;
     }
-    final confirmed = await showCategoryDeleteDialog(
+    // C10 (persona review 2026-10-06): the dialog offers the other active
+    // categories of the same kind as a "Move them to" target.
+    final sameKind =
+        ref
+            .read(
+              existing.kind == CategoryKind.chore
+                  ? choreCategoriesProvider
+                  : shoppingCategoriesProvider,
+            )
+            .value ??
+        const <Category>[];
+    final choice = await showCategoryDeleteDialog(
       context,
       categoryName: existing.name,
       kind: existing.kind,
       referenceCount: referenceCount,
+      moveTargets: [
+        for (final category in sameKind)
+          if (category.id != existing.id) category,
+      ],
     );
-    if (!confirmed) {
+    if (choice == null) {
       return;
     }
-    await repo.softDeleteCategory(existing.id);
+    await repo.softDeleteCategory(
+      existing.id,
+      moveToCategoryId: choice.moveToCategoryId,
+    );
     if (!mounted) {
       return;
     }

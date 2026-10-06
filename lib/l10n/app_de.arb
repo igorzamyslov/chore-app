@@ -31,13 +31,18 @@
   "categoryPickerManageTooltip": "Kategorien bearbeiten",
 
   "choresMenuMarkDoneFor": "Für jemand anderen erledigen …",
+  "choresMenuReassign": "Diese Runde übergeben …",
+  "choresReassignTitle": "Wer übernimmt diese Runde?",
+  "choresReassignedSnackbar": "An {name} übergeben",
   "choresMarkDoneForTitle": "Wer hat das gemacht?",
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",
+  "choresMenuDuplicate": "Duplizieren",
   "choresMenuPause": "Pausieren",
 
   "choresDeleteDialogTitle": "Aufgabe löschen?",
   "choresDeleteDialogBody": "Damit entfernst du '{choreTitle}' aus deinen Listen. Der Verlauf bleibt erhalten — du findest ihn unter Einstellungen › Aufgaben-Verlauf.",
+  "choresDeleteDialogShared": "Alle im Haushalt sehen das.",
 
   "choresOccurrenceCompleteTooltip": "Erledigen",
   "choresOccurrenceMoreActionsTooltip": "Weitere Aktionen",
@@ -62,6 +67,7 @@
 
   "actingMemberButtonTooltip": "Aktives Mitglied wechseln",
   "actingMemberSheetTitle": "Wer ist gerade dran?",
+  "choresActingMemberHint": "Gutschrift und deine Tagesübersicht richten sich nach dieser Person.",
   "actingMemberSignedInAs": "Du bist als {name} angemeldet",
   "actingManageMembers": "Mitglieder verwalten",
 
@@ -103,7 +109,8 @@
 
   "choresSnackbarDone": "Erledigt",
   "choresSnackbarDoneNextDue": "Erledigt — nächste Fälligkeit {dueText}",
-  "choresSnackbarDoneBy": "Erledigt — {name} gutgeschrieben",
+  "choresDoneCredited": "Erledigt — gutgeschrieben für {name}",
+  "choresDoneCreditedNextDue": "Erledigt — gutgeschrieben für {name}, als Nächstes fällig {date}",
   "choresSnackbarSkipped": "Übersprungen",
   "choresSnackbarSkippedNextDue": "Übersprungen — nächste Fälligkeit {dueText}",
   "choresSnackbarUndo": "Rückgängig",
@@ -118,9 +125,16 @@
 
   "choresPausedHeader": "{count, plural, one{Pausiert (1)} other{Pausiert ({count})}}",
   "choresPausedBadge": "Pausiert",
+  "choresPausedUntil": "Pausiert bis {date}",
+  "choresPauseSheetTitle": "Aufgabe pausieren",
+  "choresPauseUntilResumed": "Bis ich sie fortsetze",
+  "choresPauseUntilDate": "Bis zu einem Datum …",
   "choresPausedResume": "Fortsetzen",
 
   "choreFormEditTitle": "Aufgabe bearbeiten",
+  "choreSavedSnackbar": "Gespeichert",
+  "choreSavedNextDue": "Gespeichert — als Nächstes fällig {date}",
+  "choreSavedReassigned": "Gespeichert — heute ist jetzt {name} dran",
   "choreFormNewTitle": "Neue Aufgabe",
   "choreFormTitleLabel": "Titel",
   "choreFormNotesLabel": "Notizen",
@@ -177,6 +191,9 @@
   "choreFormAssignmentFixed": "Fest",
   "choreFormAssignmentRotation": "Rotation",
   "choreFormAssignmentAnyone": "Beliebig",
+  "choreFormAssignmentHelpFixed": "Immer dieselbe Person.",
+  "choreFormAssignmentHelpRotation": "Reihum in dieser Reihenfolge, beginnend bei 1.",
+  "choreFormAssignmentHelpAnyone": "Wer zuerst dazu kommt.",
   "choreFormAssigneeOrderLabel": "{order}. {name}",
   "choreFormAssignmentNeedsOneError": "Wähle ein Mitglied aus",
   "choreFormAssignmentNeedsTwoError": "Wähle mindestens zwei aus",
@@ -302,11 +319,15 @@
   "categoryEditIconLabel": "Symbol",
   "categoryEditColorLabel": "Farbe",
 
+  "categoryUsageCount": "{count, plural, =0{Noch nicht verwendet} one{Von 1 Aufgabe verwendet} other{Von {count} Aufgaben verwendet}}",
+  "categoryUsageCountShopping": "{count, plural, =0{Noch nicht verwendet} one{Von 1 Artikel verwendet} other{Von {count} Artikeln verwendet}}",
+  "categoryDeleteMoveTo": "Verschieben nach",
+  "categoryDeleteMoveToNone": "Ohne Kategorie",
   "categoryDeleteDialogTitle": "Kategorie löschen?",
   "categoryDeleteDialogBodyChoresZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keiner Aufgabe verwendet.",
-  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie noch und sind danach ohne Kategorie.}}",
+  "categoryDeleteDialogBodyChoresCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Aufgabe verwendet sie.} other{Damit löschst du '{categoryName}'. {count} Aufgaben verwenden sie.}}",
   "categoryDeleteDialogBodyShoppingZero": "Damit löschst du '{categoryName}'. Sie wird gerade von keinem Artikel verwendet.",
-  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie noch und sind danach ohne Kategorie.}}",
+  "categoryDeleteDialogBodyShoppingCount": "{count, plural, one{Damit löschst du '{categoryName}'. 1 Artikel verwendet sie.} other{Damit löschst du '{categoryName}'. {count} Artikel verwenden sie.}}",
 
   "settingsPreferencesSectionTitle": "Präferenzen",
   "settingsLanguageEntry": "Sprache",

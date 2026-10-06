@@ -254,6 +254,24 @@ abstract class AppLocalizations {
   /// **'Mark done for…'**
   String get choresMenuMarkDoneFor;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C2, Maria: 'Anna's ill, I just want Ben to take her turn'): hand just this open turn to another member without completing, skipping or editing the chore. Shown when the household has more than one member. 'Turn' because only the current one moves; the chore's assignment stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassign this turn…'**
+  String get choresMenuReassign;
+
+  /// Title of the member picker opened by 'Reassign this turn…' (persona review C2). The member the turn is with now is not listed.
+  ///
+  /// In en, this message translates to:
+  /// **'Who takes this turn?'**
+  String get choresReassignTitle;
+
+  /// Snackbar after handing an open turn to another member (persona review C2); its Undo hands the turn back to whoever had it before.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassigned to {name}'**
+  String choresReassignedSnackbar(String name);
+
   /// Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is.
   ///
   /// In en, this message translates to:
@@ -272,11 +290,23 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get choresMenuEdit;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C9, Maria: 'I'm typing six chores from scratch'): opens the new-chore form prefilled with every field of this chore, title included; saving creates a second chore.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get choresMenuDuplicate;
+
   /// Chore occurrence action-sheet entry: pause the chore.
   ///
   /// In en, this message translates to:
   /// **'Pause'**
   String get choresMenuPause;
+
+  /// Second paragraph of the chore delete dialog, shown only when the household has more than one member (persona review 2026-10-06 E4; Leon: 'If I delete the bins chore, does anyone even know?'). Any member can delete any chore by design (no roles, decision D1); this line discloses that the deletion is shared, not private.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone in the household will see this.'**
+  String get choresDeleteDialogShared;
 
   /// Title of the chore delete-confirmation dialog.
   ///
@@ -403,6 +433,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
+
+  /// Second line under the acting-member switcher's title (persona review 2026-10-06 C5, Maria P2-F): switching the avatar also changes whose chores the daily summary and reminders cover on this device, which the title alone never said.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit and your daily summary follow this person.'**
+  String get choresActingMemberHint;
 
   /// Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.
   ///
@@ -608,11 +644,17 @@ abstract class AppLocalizations {
   /// **'Done — next due {dueText}'**
   String choresSnackbarDoneNextDue(String dueText);
 
-  /// Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.
+  /// Undo snackbar after completing a one-off occurrence in a household of more than one member, or via 'Mark done for…' (persona review 2026-10-06 C5, replacing choresSnackbarDoneBy): names who got the credit, because the app-bar avatar can be switched and a bare 'Done' hid whose name it went under. The UNDO action reopens the occurrence.
   ///
   /// In en, this message translates to:
   /// **'Done — credited to {name}'**
-  String choresSnackbarDoneBy(String name);
+  String choresDoneCredited(String name);
+
+  /// Undo snackbar after completing a RECURRING occurrence in a household of more than one member, or via 'Mark done for…' (persona review C5): who got the credit, then when the chore is next due. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31'). Keeps the leading 'Done' so 'Done'-substring checks still match.
+  ///
+  /// In en, this message translates to:
+  /// **'Done — credited to {name}, next due {date}'**
+  String choresDoneCreditedNextDue(String name, String date);
 
   /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
   ///
@@ -686,6 +728,30 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get choresPausedBadge;
 
+  /// Paused-section row badge (instead of 'Paused') when the chore was paused until a date, and the pause snackbar in that case (persona review 2026-10-06 C2, 'Pause until'). The chore resumes by itself on that day. {date} is the locale-formatted weekday + month + day, e.g. 'Mon, Oct 12'.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused until {date}'**
+  String choresPausedUntil(String date);
+
+  /// Title of the small sheet the action sheet's 'Pause' opens (persona review C2), asking how long to pause for.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause this chore'**
+  String get choresPauseSheetTitle;
+
+  /// Pause sheet option: pause with no end date; the chore waits in the Paused section until someone taps Resume (the only behaviour before 'Pause until').
+  ///
+  /// In en, this message translates to:
+  /// **'Until I resume it'**
+  String get choresPauseUntilResumed;
+
+  /// Pause sheet option: opens a date picker (earliest day: tomorrow); the chore resumes by itself on the picked day (persona review C2, Maria: 'Pause has no resume date').
+  ///
+  /// In en, this message translates to:
+  /// **'Until a date…'**
+  String get choresPauseUntilDate;
+
   /// Paused-section row action: unpauses the chore via ChoreService.unpauseChore.
   ///
   /// In en, this message translates to:
@@ -697,6 +763,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit chore'**
   String get choreFormEditTitle;
+
+  /// Snackbar on the chores list after saving an edit that left the chore's open turn exactly where it was (persona review 2026-10-06 C6: saving used to be silent). One word, matching the 'Done'/'Skipped' snackbars.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get choreSavedSnackbar;
+
+  /// Snackbar on the chores list after saving an edit that changed the schedule and so regenerated the open turn (persona review C6): says where the chore went, since the tile may jump sections. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Oct 10'), same as the Done snackbar's.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — next due {date}'**
+  String choreSavedNextDue(String date);
+
+  /// Snackbar on the chores list after an assignment edit removed the person holding the open turn, so the app moved that turn (persona review C1, Maria: 'I took Anna off the bins and the list still says Anna'). Names who has it now so the change is visible, not silent.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — today\'s turn is now {name}\'s'**
+  String choreSavedReassigned(String name);
 
   /// Chore form app bar title when creating a new chore.
   ///
@@ -1039,6 +1123,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Anyone'**
   String get choreFormAssignmentAnyone;
+
+  /// Helper line under the chore form's assignment-mode control while 'Fixed' is selected (persona review 2026-10-06 C7: the three modes were unexplained).
+  ///
+  /// In en, this message translates to:
+  /// **'Always the same person.'**
+  String get choreFormAssignmentHelpFixed;
+
+  /// Helper line under the assignment-mode control while 'Rotation' is selected (persona review C7): the numbered list below IS the turn order, and the member numbered 1 gets the first turn.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes turns in this order, starting at 1.'**
+  String get choreFormAssignmentHelpRotation;
+
+  /// Helper line under the assignment-mode control while 'Anyone' is selected (persona review C7): nobody is assigned; whoever does it gets the credit.
+  ///
+  /// In en, this message translates to:
+  /// **'Whoever gets to it.'**
+  String get choreFormAssignmentHelpAnyone;
 
   /// Rotation-mode assignee chip label showing the member's tap order before their name, e.g. '1. Alex'.
   ///
@@ -1670,6 +1772,30 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get categoryEditColorLabel;
 
+  /// Subtitle of a chore category's row on the Categories screen (persona review 2026-10-06 C10, Maria: 'I want to merge Kitchen into Cleaning'): how many active chores use it, so a merge or delete can be judged before opening it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 chore} other{Used by {count} chores}}'**
+  String categoryUsageCount(int count);
+
+  /// Subtitle of a shopping category's row on the Categories screen (persona review C10): how many shopping items (checked or not) use it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 item} other{Used by {count} items}}'**
+  String categoryUsageCountShopping(int count);
+
+  /// Label of the dropdown in the category delete dialog, shown when chores or items use the category (persona review C10): where those chores/items go. Defaults to 'Uncategorized'; lists the other categories of the same kind, so deleting can merge one category into another.
+  ///
+  /// In en, this message translates to:
+  /// **'Move them to'**
+  String get categoryDeleteMoveTo;
+
+  /// The default entry of the category delete dialog's 'Move them to' dropdown: the chores/items keep no category.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get categoryDeleteMoveToNone;
+
   /// Title of the category delete-confirmation dialog.
   ///
   /// In en, this message translates to:
@@ -1682,10 +1808,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
   String categoryDeleteDialogBodyChoresZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10; it used to say they would all lose their category).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it.} other{This deletes \'{categoryName}\'. {count} chores use it.}}'**
   String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
 
   /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
@@ -1694,10 +1820,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
   String categoryDeleteDialogBodyShoppingZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it.} other{This deletes \'{categoryName}\'. {count} shopping items use it.}}'**
   String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).

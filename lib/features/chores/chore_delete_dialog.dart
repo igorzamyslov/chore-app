@@ -13,9 +13,14 @@ import 'package:flutter/material.dart';
 /// title (spec `docs/specs/theme-v2.md` §4.5); title = the consequence,
 /// body = one line, actions are Cancel (text) + Delete (filled,
 /// `error`/`onError`).
+///
+/// [shared] (the household has more than one member) appends "Everyone in
+/// the household will see this." (persona review 2026-10-06 E4): any member
+/// can delete any chore, so the dialog says the deletion is not private.
 Future<bool> showChoreDeleteDialog(
   BuildContext context, {
   required String choreTitle,
+  bool shared = false,
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -41,7 +46,12 @@ Future<bool> showChoreDeleteDialog(
             Text(l10n.choresDeleteDialogTitle),
           ],
         ),
-        content: Text(l10n.choresDeleteDialogBody(choreTitle)),
+        content: Text(
+          shared
+              ? '${l10n.choresDeleteDialogBody(choreTitle)}\n\n'
+                    '${l10n.choresDeleteDialogShared}'
+              : l10n.choresDeleteDialogBody(choreTitle),
+        ),
         actions: [
           semantic(
             'chores.delete.cancel',

@@ -65,9 +65,9 @@ String overdueDueText(
 /// Tiles due today or overdue additionally tint their container (design
 /// option C, see [dueTone]): a container ground, an outline border, and a
 /// 3dp accent left edge -- success when due today, warning when overdue by
-/// fewer than 7 days, error from 7 days on. Tapping the trailing menu
-/// button or long-pressing anywhere on the tile opens the
-/// skip/edit/pause/delete action sheet via [onOpenMenu].
+/// fewer than 7 days, error from 7 days on. Tapping the tile body or the
+/// trailing menu button, or long-pressing anywhere on the tile, opens the
+/// action sheet via [onOpenMenu] (tap added 2026-10-06, persona review C3).
 class ChoreOccurrenceTile extends StatelessWidget {
   /// Creates a tile for [occurrence].
   const ChoreOccurrenceTile({
@@ -95,8 +95,8 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// Called when the leading complete button is tapped.
   final VoidCallback onComplete;
 
-  /// Called when the trailing menu button is tapped, or the tile is
-  /// long-pressed.
+  /// Called when the tile body or the trailing menu button is tapped, or
+  /// the tile is long-pressed.
   final VoidCallback onOpenMenu;
 
   @override
@@ -118,6 +118,11 @@ class ChoreOccurrenceTile extends StatelessWidget {
     final tile = semantic(
       'chores.occurrence.${chore.id}',
       child: InkWell(
+        // Persona review 2026-10-06 C3: a tap on the body opens the same
+        // sheet as the kebab -- tapping a chore to change it is the first
+        // thing people try, and shopping rows already open on tap. The
+        // complete ring and the kebab keep their own tap targets.
+        onTap: onOpenMenu,
         onLongPress: onOpenMenu,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),

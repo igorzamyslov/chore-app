@@ -423,6 +423,18 @@ class Chores extends Table with SyncDirtyColumn {
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   TextColumn get pausedAt => text().nullable()();
 
+  /// The local calendar day a paused chore resumes on by itself, or `NULL`
+  /// for "until I resume it" (and always `NULL` on an unpaused chore).
+  /// Plain date `yyyy-MM-dd`, not a timestamp: "until Monday" is a day in
+  /// the household's calendar. `ChoreService.catchUpOverdue` (bootstrap and
+  /// day change) unpauses every chore whose `pausedUntil <= today` (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` W3, persona review
+  /// C2). Household data, synced as `chores.paused_until`. Added in
+  /// schemaVersion 19.
+  TextColumn get pausedUntil => text().nullable().map(
+    const NullAwareTypeConverter.wrap(PlainDateConverter()),
+  )();
+
   /// The per-chore individual reminder's fire time, as minutes since local
   /// midnight, or `NULL` for "no individual reminder" (spec
   /// `docs/specs/notifications-n2.md` D1, §2.1).

@@ -192,6 +192,14 @@ Future<void> _dropV18SettingsColumns(AppDatabase seed) async {
   await seed.customStatement('ALTER TABLE settings DROP COLUMN sync_left_at');
 }
 
+/// Drops the schema v19 `chores.paused_until` column (plan
+/// `docs/plans/2026-10-06-persona-review-fixes.md` §1, W3) on [seed]. Needed
+/// by EVERY seed that rewinds to 1..18: `chores` has existed since
+/// schemaVersion 1, so no seed ever drops the whole table.
+Future<void> _dropChorePausedUntilColumn(AppDatabase seed) async {
+  await seed.customStatement('ALTER TABLE chores DROP COLUMN paused_until');
+}
+
 const _settingsColumnsAddedAfterV2 = [
   'acting_member_id', // v3
   'locale', // v4
@@ -280,6 +288,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
@@ -449,6 +458,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
@@ -568,6 +578,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
@@ -662,6 +673,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
@@ -761,6 +773,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
@@ -933,6 +946,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
@@ -1084,6 +1098,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
@@ -1171,6 +1186,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 9');
       await seed.close();
 
@@ -1240,6 +1256,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 10');
       await seed.close();
 
@@ -1315,6 +1332,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 11');
       await seed.close();
 
@@ -1430,6 +1448,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 12');
       await seed.close();
 
@@ -1536,6 +1555,7 @@ void main() {
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
       await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 13');
       await seed.close();
 
@@ -1588,6 +1608,7 @@ void main() {
       await _dropErrorReportsEnabledColumn(seed);
       await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 14');
       await seed.close();
 
@@ -1639,6 +1660,7 @@ void main() {
       await _dropErrorReportsEnabledColumn(seed);
       await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 15');
       await seed.close();
 
@@ -1698,6 +1720,7 @@ void main() {
           );
       await _dropChoresFilterColumns(seed);
       await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 16');
       await seed.close();
 
@@ -1749,6 +1772,7 @@ void main() {
             ),
           );
       await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 17');
       await seed.close();
 
@@ -1765,6 +1789,62 @@ void main() {
       expect(settings.actingMemberId, 'member-1');
       expect(settings.syncHouseholdId, 'hh-1');
       expect(settings.errorReportsEnabled, isFalse);
+    },
+  );
+
+  test(
+    'an 18 -> 19 upgrade adds chores.pausedUntil (NULL) and leaves a paused '
+    'chore paused',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v19_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v18 install: the current schema minus the v19 column, with
+      // `user_version` rolled back to 18 and a paused chore in place.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.households)
+          .insert(
+            HouseholdsCompanion.insert(
+              id: 'hh-1',
+              name: 'H',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await seed
+          .into(seed.chores)
+          .insert(
+            ChoresCompanion.insert(
+              id: 'chore-1',
+              householdId: 'hh-1',
+              title: 'Bed sheets',
+              startDate: PlainDate(2026, 10, 1),
+              assignmentMode: AssignmentMode.anyone,
+              pausedAt: const Value('2026-10-05T08:00:00.000Z'),
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await _dropChorePausedUntilColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 18');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(await _columnNames(upgraded, 'chores'), contains('paused_until'));
+      final chore = await upgraded.select(upgraded.chores).getSingle();
+      expect(chore.pausedUntil, isNull);
+      expect(chore.pausedAt, '2026-10-05T08:00:00.000Z');
+      expect(chore.title, 'Bed sheets');
     },
   );
 }
