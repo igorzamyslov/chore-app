@@ -4,7 +4,11 @@ library;
 import 'package:flutter/material.dart';
 
 /// Shows a snackbar with [message] (and optional [action]) via the nearest
-/// [ScaffoldMessenger].
+/// [ScaffoldMessenger], for [duration] (default 4 s).
+///
+/// Bulk actions (Clear checked, Put all back) pass a longer [duration] so
+/// the Undo stays reachable while the person looks up from the phone
+/// (persona finding F4).
 ///
 /// Latest-wins: [ScaffoldMessengerState.showSnackBar] normally QUEUES
 /// snackbars, so completing several chores (or quick-adding several
@@ -36,6 +40,7 @@ void showAppSnackbar(
   BuildContext context, {
   required String message,
   SnackBarAction? action,
+  Duration duration = const Duration(seconds: 4),
 }) {
   // Style (spec docs/specs/theme-v2.md §4.5): a leading check_circle glyph
   // in `inversePrimary` ahead of the message. Ground color, radius, and
@@ -54,10 +59,7 @@ void showAppSnackbar(
             Expanded(child: Text(message)),
           ],
         ),
-        // Matches SnackBar's own default — spelled out because it's a
-        // deliberate choice this helper documents, not an incidental one.
-        // ignore: avoid_redundant_argument_values
-        duration: const Duration(seconds: 4),
+        duration: duration,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         action: action,
