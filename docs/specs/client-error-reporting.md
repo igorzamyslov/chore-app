@@ -67,6 +67,21 @@ Unit-test the scrubber with real-shaped inputs: a PostgrestException with a
 chore title in `details`, an exception string with an email and a quoted
 member name, a UUID next to a long number, a 10 KB stack.
 
+> **Amendment 2026-10-06 (technical review #16 / H8) — the context rule is
+> enforced, and `FormatException` is reduced.** (a) The `context` rule above
+> ("call sites may only put ids, enum names, table names and counts") used
+> to be a convention the scrubber merely bounded. Every context VALUE now
+> also runs through the same message rules as §2's step 3 (statement cut,
+> emails → `<email>`, quoted spans → `<str>`, 6+ digit runs → `<num>`, UUIDs
+> kept), then is capped at 100 characters; keys are only capped. A call site
+> that slips a name in still leaks nothing quoted or emailed, but the rule
+> for call sites is unchanged. (b) `FormatException.toString()` appends the
+> offending SOURCE text (a pasted invite code, a JSON body with chore
+> titles), which the quote rule cannot be trusted to catch. For a
+> `FormatException` the message is `error.message` alone (still run through
+> the rules), never the source or offset. Tests: `test/domain/
+> error_scrubber_test.dart`.
+
 ## 3. Local storage and `AppLog`
 
 ### 3.1 Table `client_errors` (drift `ClientErrors`, schemaVersion 15 → 16)
@@ -171,8 +186,21 @@ add in a table in this section when implementing.
 | `ui.exportData` | `export_row.dart` |
 | `ui.joinHouseholdSheet` | `join_household_sheet.dart` join step, any failure except `HouseholdSnapshotUnavailable` (expected outcome) |
 | `ui.welcomeJoin` | `welcome_join_page.dart` join step, same exception |
-| `app.notificationAction` | `notification_action_handler.dart` (background isolate: no sink is attached there, so this only reaches `debugPrint`) |
+| `app.notificationAction` | `notification_action_handler.dart` (background isolate; since the 2026-10-06 amendment below it attaches its own `DatabaseErrorLogSink`, so it is recorded like every other source) |
 | `app.deleteAccountSignOut` | `household_exit_service.dart` best-effort sign-out after account erasure |
+
+> **Amendment 2026-10-06 (technical review #13 / H5) — the isolate sink.**
+> The `app.notificationAction` row above is superseded: its "no sink is
+> attached there" was a gap, not a design. `notification_action_handler.dart`'s
+> `_run` now attaches a `DatabaseErrorLogSink` over the isolate's own
+> `AppDatabase` BEFORE its `try` (statics are per-isolate, so this does not
+> touch the main isolate's sink) and detaches it in `finally`, after waiting
+> for the fire-and-forget writes it started so the connection does not close
+> underneath them. A failure in the Done action is therefore recorded in the
+> same `client_errors` buffer and uploaded by the next flush from the main
+> isolate. `openConnection()` is not reachable from `flutter test`, so this
+> is covered by a manual check (documented in that file's "UNVERIFIED
+> GROUND" note), not a unit test.
 
 Deliberately NOT logged (expected outcomes or errors that are rethrown /
 wrapped rather than swallowed): `ClaimedMemberRemovalFailure`
