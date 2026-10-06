@@ -9,6 +9,7 @@ library;
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:chore_app/domain/recurrence/recurrence_engine.dart';
@@ -173,6 +174,19 @@ class ChoreService {
     final today = _today;
     var changedCount = 0;
     await database.transaction(() async {
+      // Ghost repair FIRST (spec `docs/specs/sync-backend.md` §8.6.6, made
+      // reachable from here by the 2026-10-06 amendment): the pull-side
+      // repair only runs on a LINKED device inside a pull transaction, so a
+      // device that was once linked, or a join-import copy racing a pull,
+      // can hold two pending rows for one chore. Repairing here keeps the
+      // "at most one pending occurrence per chore" invariant true before
+      // the loop below relies on it, and records tombstones for whatever
+      // it removes so the other device converges on the next push
+      // (technical review 2026-10-06 #6).
+      await SyncRepository(database).repairGhostOccurrences(
+        householdId,
+        clock.now().toUtc().toIso8601String(),
+      );
       final activeChores = await chores.getActiveChores(householdId);
       for (final details in activeChores) {
         final chore = details.chore;
