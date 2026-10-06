@@ -894,6 +894,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsMembersInviteEntry => 'Einladen';
 
   @override
+  String get settingsMembersInviteLocalTitle => 'Einladen';
+
+  @override
+  String get settingsMembersInviteLocalSubtitle =>
+      'Melde dich zuerst an, um deine Familie einzuladen';
+
+  @override
   String get settingsMembersInviteSheetTitle => 'Haushaltsmitglied einladen';
 
   @override
@@ -927,7 +934,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String settingsMembersInviteShareText(String code) {
-    return 'Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code $code ein.';
+    return 'Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code $code ein. Die App gibt\'s hier: https://github.com/igorzamyslov/chore-app/releases/latest';
   }
 
   @override
@@ -1274,7 +1281,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountAdoptIntro =>
-      'Macht deinen Haushalt auf deinen anderen Geräten verfügbar.';
+      'Stell ihn online, damit deine Familie per Einladungscode beitreten kann. Hält auch deine anderen Handys auf dem gleichen Stand.';
+
+  @override
+  String settingsAccountAdoptConfirmTitle(String household) {
+    return '\'$household\' online stellen?';
+  }
+
+  @override
+  String get settingsAccountAdoptConfirmBody =>
+      'Das lädt deine Mitglieder, Aufgaben, den Erledigt-Verlauf, Notizen und die Einkaufsliste auf den Sync-Server hoch, unter deinem Konto. Rückgängig machst du es mit Konto löschen oder Haushalt verlassen.';
+
+  @override
+  String get settingsAccountAdoptConfirmAction => 'Online stellen';
 
   @override
   String get settingsAccountAdoptRetry => 'Erneut versuchen';

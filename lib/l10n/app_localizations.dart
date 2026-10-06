@@ -1310,6 +1310,18 @@ abstract class AppLocalizations {
   /// **'Invite'**
   String get settingsMembersInviteEntry;
 
+  /// Title of the disabled Invite row on the Members screen of a LOCAL (not yet online) household (id settings.members.inviteLocal, persona review D6): shows where inviting will live, instead of hiding the option entirely.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get settingsMembersInviteLocalTitle;
+
+  /// Subtitle of the disabled local-household Invite row: the one step that unlocks inviting.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in first to invite your family'**
+  String get settingsMembersInviteLocalSubtitle;
+
   /// Heading of the bottom sheet opened from the Invite row, showing the newly created code.
   ///
   /// In en, this message translates to:
@@ -1364,10 +1376,10 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get settingsMembersInviteShare;
 
-  /// The message text handed to the OS share sheet when the invite-code sheet's share button is tapped.
+  /// The message text handed to the OS share sheet when the invite-code sheet's share button is tapped. Ends with the install link (persona review D7: the recipient may not have the app yet, and Famdo is not in an app store).
   ///
   /// In en, this message translates to:
-  /// **'Join my household on Famdo — enter the code {code} when you sign in.'**
+  /// **'Join my household on Famdo — enter the code {code} when you sign in. Get the app: https://github.com/igorzamyslov/chore-app/releases/latest'**
   String settingsMembersInviteShareText(String code);
 
   /// Snackbar shown when creating an invite code fails; the sheet is never opened in that case.
@@ -1910,11 +1922,29 @@ abstract class AppLocalizations {
   /// **'Put my household online'**
   String get settingsAccountAdoptTitle;
 
-  /// One-line explanatory copy under the adopt row's title, in its normal (non-error) state.
+  /// One-line explanatory copy under the adopt row's title, in its normal (non-error) state. Leads with inviting family, the reason most people put a household online (persona review B6/D6: the old 'other devices' wording hid the invite path).
   ///
   /// In en, this message translates to:
-  /// **'Makes your household available on your other devices.'**
+  /// **'Put it online so your family can join with an invite code. Also keeps your other phones in step.'**
   String get settingsAccountAdoptIntro;
+
+  /// Title of the confirm sheet the adopt row opens before uploading anything (persona review B6: adopting used to upload everything on one tap).
+  ///
+  /// In en, this message translates to:
+  /// **'Put \'{household}\' online?'**
+  String settingsAccountAdoptConfirmTitle(String household);
+
+  /// Body of the adopt confirm sheet: what goes up, where, and how to undo it.
+  ///
+  /// In en, this message translates to:
+  /// **'This uploads your members, chores, completion history, notes and shopping list to the sync server, under your account. You can take it down again with Delete my account or Leave the household.'**
+  String get settingsAccountAdoptConfirmBody;
+
+  /// Confirm button of the adopt confirm sheet (id settings.account.adopt.confirm); Cancel is commonCancel (id settings.account.adopt.cancel).
+  ///
+  /// In en, this message translates to:
+  /// **'Put online'**
+  String get settingsAccountAdoptConfirmAction;
 
   /// Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe.
   ///

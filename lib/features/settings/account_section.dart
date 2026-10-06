@@ -861,9 +861,17 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
   /// server member row). No schema change, no stored flag.
   bool _blocked = false;
 
+  /// The household's name for the confirm sheet title, kept resolved by
+  /// watching it here: nothing else on the unlinked branch watches
+  /// `currentHouseholdProvider`, so a one-off read at tap time could still
+  /// see it loading.
+  String _householdName = '';
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    _householdName =
+        ref.watch(currentHouseholdProvider).valueOrNull?.name ?? '';
     // Four states share one semantic id -- idle, running, failed-retryable,
     // and blocked -- because this is one row, not four. `_blocked` is
     // checked first: it is terminal, so it outranks the retryable error.
@@ -897,9 +905,72 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
               : null,
         ),
         enabled: !_running && !_blocked,
-        onTap: _running || _blocked ? null : _adopt,
+        onTap: _running || _blocked ? null : _confirmAndAdopt,
       ),
     );
+  }
+
+  /// Persona review B6: putting a household online uploads everything, so it
+  /// is never one tap. A confirm sheet says what goes up, where, and how to
+  /// take it down again; only "Put online" runs [_adopt]. A retry after a
+  /// failure skips it -- the user already agreed, and the service resumes a
+  /// half-finished upload.
+  Future<void> _confirmAndAdopt() async {
+    if (_failed) {
+      await _adopt();
+      return;
+    }
+    final householdName = _householdName;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final l10n = AppLocalizations.of(sheetContext);
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsAccountAdoptConfirmTitle(householdName),
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                Text(l10n.settingsAccountAdoptConfirmBody),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    semantic(
+                      'settings.account.adopt.cancel',
+                      child: TextButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(false),
+                        child: Text(l10n.commonCancel),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    semantic(
+                      'settings.account.adopt.confirm',
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(true),
+                        child: Text(l10n.settingsAccountAdoptConfirmAction),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if ((confirmed ?? false) && mounted) {
+      await _adopt();
+    }
   }
 
   Future<void> _adopt() async {

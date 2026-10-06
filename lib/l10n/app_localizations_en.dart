@@ -889,6 +889,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMembersInviteEntry => 'Invite';
 
   @override
+  String get settingsMembersInviteLocalTitle => 'Invite';
+
+  @override
+  String get settingsMembersInviteLocalSubtitle =>
+      'Sign in first to invite your family';
+
+  @override
   String get settingsMembersInviteSheetTitle => 'Invite a household member';
 
   @override
@@ -922,7 +929,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsMembersInviteShareText(String code) {
-    return 'Join my household on Famdo — enter the code $code when you sign in.';
+    return 'Join my household on Famdo — enter the code $code when you sign in. Get the app: https://github.com/igorzamyslov/chore-app/releases/latest';
   }
 
   @override
@@ -1266,7 +1273,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountAdoptIntro =>
-      'Makes your household available on your other devices.';
+      'Put it online so your family can join with an invite code. Also keeps your other phones in step.';
+
+  @override
+  String settingsAccountAdoptConfirmTitle(String household) {
+    return 'Put \'$household\' online?';
+  }
+
+  @override
+  String get settingsAccountAdoptConfirmBody =>
+      'This uploads your members, chores, completion history, notes and shopping list to the sync server, under your account. You can take it down again with Delete my account or Leave the household.';
+
+  @override
+  String get settingsAccountAdoptConfirmAction => 'Put online';
 
   @override
   String get settingsAccountAdoptRetry => 'Try again';

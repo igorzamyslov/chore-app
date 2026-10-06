@@ -641,8 +641,31 @@ void main() {
         find.bySemanticsIdentifier('settings.account.adopt'),
         findsOneWidget,
       );
+      expect(
+        find.text(
+          'Put it online so your family can join with an invite code. Also '
+          'keeps your other phones in step.',
+        ),
+        findsOneWidget,
+      );
+
+      // Persona review B6: never one tap. The confirm sheet says what goes
+      // up; Cancel uploads nothing.
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      expect(find.text("Put 'My household' online?"), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.cancel'),
+      );
+      await tester.pumpAndSettle();
+      expect(happyPathGateway.createHouseholdCalls, isEmpty);
+      expect(happyPathGateway.uploadHouseholdDataCalls, isEmpty);
 
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -702,6 +725,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       // First attempt: createHousehold succeeds, upload fails -> inline
@@ -773,6 +800,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('This household is already online'), findsOneWidget);
@@ -850,6 +881,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(

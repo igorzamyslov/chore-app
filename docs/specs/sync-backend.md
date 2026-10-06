@@ -315,6 +315,22 @@ A3 -- one live code per household, so creating a new one is how you
 revoke the old one) → `createInvite` → bottom sheet with the code in
 large type + a share button (share_plus).
 
+> **Amendment 2026-10-06 (persona review B6, D6, D7) — signposting.** The
+> adopt row's subtitle now leads with the family: "Put it online so your
+> family can join with an invite code. Also keeps your other phones in
+> step." Adopt is no longer one tap: a confirm sheet "Put '{household}'
+> online?" states what is uploaded (members, chores, completion history,
+> notes, shopping list), where (the sync server, under your account) and how
+> to take it down (Delete my account / Leave the household); only "Put
+> online" (`settings.account.adopt.confirm`; Cancel is
+> `settings.account.adopt.cancel`) runs `HouseholdLinkService.adopt`. A
+> "Try again" after a failed attempt skips the sheet. A LOCAL household's
+> Members screen shows a disabled Invite row (`settings.members.inviteLocal`,
+> "Sign in first to invite your family", no `onTap`) where the real one will
+> be — hidden under the Noop gateway, which has no sign-in. The invite share
+> text ends with the install link
+> `https://github.com/igorzamyslov/chore-app/releases/latest`.
+
 > **Amendment 2026-10-06 (persona review D5) — invite code lifecycle.**
 > `runInviteFlow` first asks `HouseholdGateway.activeInvite(householdId)`
 > (a plain select on `household_invites`: `revoked_at is null and

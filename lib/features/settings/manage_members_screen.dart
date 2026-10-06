@@ -8,6 +8,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/features/settings/household_rename_sheet.dart';
@@ -32,22 +33,29 @@ class ManageMembersScreen extends ConsumerWidget {
     final linked =
         ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
     final myUserId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
+    // Persona review D6: a local household shows WHERE inviting lives (a
+    // disabled row naming the missing step) instead of hiding it. Not under
+    // the Noop gateway -- there is no sign-in to point at in those builds.
+    final showLocalInvite =
+        !linked && ref.watch(authGatewayProvider) is! NoopAuthGateway;
+    final hasInviteRow = linked || showLocalInvite;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageMembersTitle)),
       body: membersAsync.when(
         data: (members) => ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: members.length + 1 + (linked ? 1 : 0),
+          itemCount: members.length + 1 + (hasInviteRow ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == 0) {
               return const _HouseholdNameRow();
             }
             final afterHeader = index - 1;
-            if (linked && afterHeader == 0) {
-              return const _InviteRow();
+            if (hasInviteRow && afterHeader == 0) {
+              return linked ? const _InviteRow() : const _InviteLocalRow();
             }
-            final member = members[linked ? afterHeader - 1 : afterHeader];
+            final member =
+                members[hasInviteRow ? afterHeader - 1 : afterHeader];
             return _MemberRow(
               member: member,
               status: linked
@@ -144,6 +152,26 @@ class _InviteRow extends ConsumerWidget {
       return;
     }
     await runInviteFlow(context, ref, householdId);
+  }
+}
+
+/// The local-household stand-in for [_InviteRow] (persona review D6):
+/// disabled, no `onTap`, naming the one step that unlocks inviting.
+class _InviteLocalRow extends StatelessWidget {
+  const _InviteLocalRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.members.inviteLocal',
+      child: ListTile(
+        enabled: false,
+        leading: const Icon(Icons.person_add_alt_outlined),
+        title: Text(l10n.settingsMembersInviteLocalTitle),
+        subtitle: Text(l10n.settingsMembersInviteLocalSubtitle),
+      ),
+    );
   }
 }
 

@@ -14,10 +14,12 @@ import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
 
 import '../../test_utils/pump_app.dart';
 import 'fake_auth_gateway.dart';
 import 'fake_household_gateway.dart';
+import 'fake_share_platform.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the manage-members screen (spec
@@ -31,6 +33,10 @@ import 'settings_test_utils.dart';
 /// per A3), household rename (A2), and member deletion (A1).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
+  // One fake for the whole file -- see FakeSharePlatform's doc comment.
+  final fakeShare = FakeSharePlatform();
+  SharePlatform.instance = fakeShare;
+  setUp(fakeShare.reset);
 
   Future<Member> soleBootstrapMember(AppDatabase database) async {
     final householdId = await currentHouseholdId(database);
@@ -317,6 +323,33 @@ void main() {
     },
   );
 
+  testChoreApp(
+    'local household with sign-in available: a disabled Invite row names '
+    'the missing step instead of hiding inviting (persona review D6)',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite'),
+        findsNothing,
+      );
+      final row = tester.widget<ListTile>(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.members.inviteLocal'),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(row.enabled, isFalse);
+      expect(row.onTap, isNull);
+      expect(find.text('Sign in first to invite your family'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
   final inviteGateway = FakeHouseholdGateway();
   testChoreApp(
     'invite row visible once linked; tap revokes any previous invite THEN '
@@ -381,6 +414,18 @@ void main() {
 
       expect(find.text('OLDCODE1'), findsOneWidget);
       expect(find.text('Valid until Jul 31, 2026'), findsOneWidget);
+
+      // The share text carries the install link (persona review D7).
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.share'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        fakeShare.lastParams?.text,
+        'Join my household on Famdo — enter the code OLDCODE1 when you sign '
+        'in. Get the app: '
+        'https://github.com/igorzamyslov/chore-app/releases/latest',
+      );
       expect(activeInviteGateway.activeInviteCalls, [householdId]);
       expect(activeInviteGateway.inviteCallOrder, isEmpty);
 
