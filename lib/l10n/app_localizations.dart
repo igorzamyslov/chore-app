@@ -1478,6 +1478,12 @@ abstract class AppLocalizations {
   /// **'Only if something is still open today'**
   String get settingsEveningToggleSubtitle;
 
+  /// Label of the device-level master switch for per-chore reminders, in Settings' notifications group (persona review 2026-10-06 E3). Off means no chore reminder rings on THIS phone, whatever the chores say; the daily summary and the evening reminder have their own switches. Ships on, since reminders are opt-in per chore already.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore reminders'**
+  String get settingsChoreRemindersTitle;
+
   /// Title of the settings row holding the evening re-reminder's fire time, revealed under settingsEveningToggle. Shows the chosen time as trailing text via TimeOfDay.format and opens a time picker on tap. Default 20:00, which sits an hour clear of the 22:00 quiet-hours default so the shipped combination does not collide.
   ///
   /// In en, this message translates to:

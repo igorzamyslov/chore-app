@@ -85,6 +85,7 @@ NotificationPlanSet buildNotificationPlans({
 
   // 1. Reminders first -- everything below reads the armed set.
   final reminderResult = planReminders(
+    enabled: settings.choreRemindersEnabled,
     now: now,
     occurrences: occurrences,
     recipientMemberId: recipientMemberId,

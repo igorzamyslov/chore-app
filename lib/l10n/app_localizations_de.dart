@@ -1016,6 +1016,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur wenn heute noch etwas offen ist';
 
   @override
+  String get settingsChoreRemindersTitle => 'Aufgaben-Erinnerungen';
+
+  @override
   String get settingsEveningTime => 'Abends um';
 
   @override

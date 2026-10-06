@@ -187,6 +187,20 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       onChanged: settingsRepository.setEveningReminderTime,
                     ),
+                  // Device-level master switch for per-chore reminders
+                  // (persona review 2026-10-06 E3). Placed with the other
+                  // notification rows but AFTER the evening pair, so D12's
+                  // "evening sits directly beneath the digest time" holds.
+                  semantic(
+                    'settings.choreReminders.toggle',
+                    child: SettingsRow(
+                      icon: Icons.alarm_outlined,
+                      label: l10n.settingsChoreRemindersTitle,
+                      switchValue: settings.choreRemindersEnabled,
+                      onSwitchChanged: (enabled) => settingsRepository
+                          .setChoreRemindersEnabled(enabled: enabled),
+                    ),
+                  ),
                   QuietHoursToggleTile(
                     value: settings.quietHoursEnabled,
                     // A direct comparison rather than a call into

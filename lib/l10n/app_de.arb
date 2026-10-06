@@ -261,6 +261,7 @@
 
   "settingsEveningToggle": "Abends noch mal erinnern",
   "settingsEveningToggleSubtitle": "Nur wenn heute noch etwas offen ist",
+  "settingsChoreRemindersTitle": "Aufgaben-Erinnerungen",
   "settingsEveningTime": "Abends um",
   "settingsEveningInQuietHoursHint": "Liegt in deinen Ruhezeiten — wird nicht zugestellt",
   "settingsQuietHoursToggle": "Ruhezeiten",
