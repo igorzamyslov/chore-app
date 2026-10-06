@@ -23,6 +23,7 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
@@ -959,14 +960,11 @@ class _ReconnectRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }
@@ -1206,14 +1204,11 @@ class _JoinRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }

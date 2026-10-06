@@ -23,6 +23,7 @@ import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
 import 'package:chore_app/application/data_reset.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -128,7 +129,10 @@ Future<void> confirmAndResetAppData(
     }
     return;
   }
-  ref.invalidate(settingsProvider);
+  // The wipe also deleted every saved copy of an earlier household.
+  ref
+    ..invalidate(settingsProvider)
+    ..invalidate(householdArchivesProvider);
 }
 
 /// Cancels EVERY scheduled notification -- the digest horizon, every

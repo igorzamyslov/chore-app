@@ -113,6 +113,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonRetry => 'Erneut versuchen';
 
   @override
+  String get commonShare => 'Teilen …';
+
+  @override
   String get choresTabLabel => 'Aufgaben';
 
   @override
@@ -1018,6 +1021,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsExportEntry => 'Daten exportieren';
 
   @override
+  String settingsArchivesRow(int count) {
+    return 'Gesicherte Kopien früherer Haushalte ($count)';
+  }
+
+  @override
+  String get settingsArchivesTitle => 'Gesicherte Kopien';
+
+  @override
+  String get settingsArchivesIntro =>
+      'Jede Kopie ist eine JSON-Datei mit allem, was dieses Gerät vor dem Beitritt oder der Wiederverbindung mit einem Haushalt gespeichert hatte. Die App kann sie nicht selbst öffnen — teile eine Kopie, um sie woanders aufzubewahren, oder lösche die, die du nicht mehr brauchst.';
+
+  @override
+  String settingsArchivesItemTitle(String when) {
+    return 'Gesichert am $when';
+  }
+
+  @override
+  String get settingsArchivesDeleteConfirmTitle =>
+      'Diese gesicherte Kopie löschen?';
+
+  @override
+  String get settingsArchivesDeleteConfirmBody =>
+      'Die Kopie wird von diesem Gerät gelöscht und lässt sich nicht wiederherstellen.';
+
+  @override
+  String get settingsArchivesShareError =>
+      'Diese gesicherte Kopie konnte nicht geteilt werden. Bitte versuche es erneut.';
+
+  @override
+  String get settingsArchivesDeleteError =>
+      'Diese gesicherte Kopie konnte nicht gelöscht werden. Bitte versuche es erneut.';
+
+  @override
   String get settingsExportSubtitle =>
       'JSON-Datei mit Mitgliedern, Aufgaben, Verlauf und Einkaufsliste. Die App kann sie noch nicht importieren.';
 
@@ -1493,7 +1529,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Ersetzt deine lokalen Daten — sie werden in einer Sicherungsdatei auf diesem Gerät gespeichert.';
+      'Ersetzt deine lokalen Daten — sie bleiben als gesicherte Kopie in der App erhalten (Einstellungen → Daten).';
 
   @override
   String get settingsAccountAdoptTitle => 'Meinen Haushalt online stellen';
@@ -1580,9 +1616,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nutze einen Einladungscode von einem anderen Gerät — das ersetzt deine lokalen Daten.';
 
   @override
-  String settingsAccountJoinSuccessSnackbar(String fileName) {
-    return 'Deine alten Daten wurden in $fileName gespeichert.';
-  }
+  String get settingsAccountJoinSuccessSnackbar =>
+      'Deine bisherigen Daten wurden in der App gesichert';
 
   @override
   String get joinHouseholdCodeTitle => 'Gib deinen Einladungscode ein';
@@ -1646,7 +1681,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt wird in einer Sicherungsdatei auf diesem Gerät gespeichert.';
+      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt bleibt als gesicherte Kopie in der App erhalten (Einstellungen → Daten).';
 
   @override
   String get joinHouseholdImportAccept => 'Mitnehmen';

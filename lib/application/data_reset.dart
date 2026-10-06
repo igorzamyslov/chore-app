@@ -2,6 +2,8 @@
 /// B2): wipes every row from every table in one transaction.
 library;
 
+import 'package:chore_app/application/app_log.dart';
+import 'package:chore_app/application/household_archive.dart';
 import 'package:chore_app/data/db/app_database.dart';
 
 /// Deletes every row from every table, in one transaction, in the FK-safe
@@ -10,6 +12,13 @@ import 'package:chore_app/data/db/app_database.dart';
 /// remembered last tab, spec `docs/specs/last-tab-restore.md` §2), sync
 /// tombstones, client errors,
 /// households.
+///
+/// Then deletes every saved copy of an earlier household
+/// (`famdo-archive-*.json`, `lib/application/household_archive.dart`, persona
+/// review B3): they are full exports of data the person just asked to erase,
+/// so a "clean device" must not keep them. That step is best-effort -- a file
+/// that cannot be removed is logged (`app.resetArchives`) but never undoes or
+/// fails the wipe that already committed.
 ///
 /// Leaves the database schema itself untouched -- only rows are removed.
 /// Wiping the `households` table flips `householdGateProvider`'s stream to
@@ -29,8 +38,8 @@ import 'package:chore_app/data/db/app_database.dart';
 /// Keeping this function DB-only means its own tests
 /// (`test/application/data_reset_test.dart`) never need an `AuthGateway`
 /// or `NotificationScheduler` fake.
-Future<void> resetAppData(AppDatabase database) {
-  return database.transaction(() async {
+Future<void> resetAppData(AppDatabase database) async {
+  await database.transaction(() async {
     // Before `chore_occurrences`, whose cascade would take these rows out
     // anyway (spec `docs/specs/notifications-n2.md` §4.2) -- explicit
     // because "the wipe deletes every table" is the guarantee this
@@ -55,4 +64,9 @@ Future<void> resetAppData(AppDatabase database) {
     await database.delete(database.clientErrors).go();
     await database.delete(database.households).go();
   });
+  try {
+    await deleteAllHouseholdArchives();
+  } on Object catch (e, st) {
+    AppLog.error('app.resetArchives', e, st);
+  }
 }

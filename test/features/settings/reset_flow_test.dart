@@ -1,6 +1,7 @@
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/household_archive.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/household_repository.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../application/fake_digest_notification_plugin.dart';
 import '../../test_utils/pump_app.dart';
+import 'fake_archive_file_writer.dart';
 import 'fake_auth_gateway.dart';
 import 'settings_test_utils.dart';
 
@@ -20,6 +22,13 @@ import 'settings_test_utils.dart';
 /// B2).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
+  final realWriter = ArchiveFileWriter.instance;
+
+  // `resetAppData` also sweeps the saved copies of earlier households (B3),
+  // which reaches for path_provider -- a real platform call a widget test's
+  // fake clock never sees complete. The in-memory fake keeps it synchronous.
+  setUp(() => ArchiveFileWriter.instance = FakeArchiveFileWriter());
+  tearDown(() => ArchiveFileWriter.instance = realWriter);
 
   /// Adds a second member, a chore (with its pending occurrence), and a
   /// shopping item to the bootstrap household, and marks both shown-once

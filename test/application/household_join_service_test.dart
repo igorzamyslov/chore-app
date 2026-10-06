@@ -65,7 +65,7 @@ void main() {
     );
 
     expect(result.householdId, 'joined-hh');
-    expect(result.archiveFileName, 'famdo-archive-2026-07-24.json');
+    expect(result.archiveFileName, 'famdo-archive-2026-07-24-000000.json');
 
     final households = await db.select(db.households).get();
     expect(households.map((h) => h.id), ['joined-hh']);

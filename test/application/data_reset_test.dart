@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:chore_app/application/data_reset.dart';
+import 'package:chore_app/application/household_archive.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../features/settings/fake_archive_file_writer.dart';
 
 /// Seeds one row of every table, mirroring
 /// `test/application/data_export_test.dart`'s seed but simpler (no
@@ -133,13 +138,20 @@ Future<void> _seed(AppDatabase db) async {
 
 void main() {
   late AppDatabase db;
+  final realWriter = ArchiveFileWriter.instance;
 
   setUp(() async {
+    // No real path_provider channel in a plain test: reset's archive sweep
+    // goes through the in-memory fake.
+    ArchiveFileWriter.instance = FakeArchiveFileWriter();
     db = AppDatabase(NativeDatabase.memory());
     await _seed(db);
   });
 
-  tearDown(() => db.close());
+  tearDown(() async {
+    ArchiveFileWriter.instance = realWriter;
+    await db.close();
+  });
 
   test('resetAppData deletes every row from every table', () async {
     // Sanity check: every table actually has a row before the reset, so
@@ -186,4 +198,33 @@ void main() {
 
     expect(await db.select(db.households).get(), isEmpty);
   });
+
+  test(
+    'resetAppData deletes every saved household copy (B3), and only those',
+    () async {
+      final writer = FakeArchiveFileWriter();
+      ArchiveFileWriter.instance = writer;
+      writer.writtenFiles
+        ..['/fake-docs/famdo-archive-2026-08-01-090000.json'] = '{}'
+        ..['/fake-docs/famdo-archive-2026-09-15-181530.json'] = '{}'
+        ..['/fake-docs/chore_app.sqlite'] = 'x';
+
+      await resetAppData(db);
+
+      expect(writer.writtenFiles.keys, ['/fake-docs/chore_app.sqlite']);
+    },
+  );
+
+  test('a failing archive delete does not fail the wipe', () async {
+    ArchiveFileWriter.instance = _ThrowingArchiveWriter();
+
+    await resetAppData(db);
+
+    expect(await db.select(db.households).get(), isEmpty);
+  });
+}
+
+class _ThrowingArchiveWriter extends FakeArchiveFileWriter {
+  @override
+  Future<List<String>> list() async => throw const FileSystemException('x');
 }

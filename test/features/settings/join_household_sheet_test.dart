@@ -14,6 +14,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../../test_utils/pump_app.dart';
@@ -21,6 +22,7 @@ import 'fake_archive_file_writer.dart';
 import 'fake_auth_gateway.dart';
 import 'fake_household_gateway.dart';
 import 'fake_path_provider_platform.dart';
+import 'fake_share_platform.dart';
 import 'settings_test_utils.dart';
 
 Finder _fieldFor(String identifier) {
@@ -57,8 +59,12 @@ void main() {
   ];
 
   late FakeArchiveFileWriter archiveWriter;
+  // One fake, installed once -- see FakeSharePlatform's doc comment.
+  final fakeShare = FakeSharePlatform();
+  SharePlatform.instance = fakeShare;
 
   setUp(() {
+    fakeShare.reset();
     PathProviderPlatform.instance = FakePathProviderPlatform('/fake-docs');
     archiveWriter = FakeArchiveFileWriter();
     ArchiveFileWriter.instance = archiveWriter;
@@ -173,14 +179,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Sheet closed; success snackbar names the archive file.
+      // Sheet closed; the success snackbar says the old data was saved in-app.
       expect(
         find.bySemanticsIdentifier('settings.account.join.sheet'),
         findsNothing,
       );
       expect(
-        find.textContaining('famdo-archive-2026-07-24.json'),
+        find.text('Your previous data was saved inside the app'),
         findsOneWidget,
+      );
+      expect(find.text('Share…'), findsOneWidget);
+      // The action opens the share sheet for exactly that saved copy.
+      await tester.tap(find.text('Share…'));
+      await tester.pumpAndSettle();
+      expect(
+        fakeShare.lastParams!.files!.single.path,
+        '/fake-docs/famdo-archive-2026-07-24-090000.json',
       );
 
       expect(claimGateway.listClaimableMembersCalls, ['ABC12345']);
@@ -192,7 +206,7 @@ void main() {
 
       expect(
         archiveWriter.writtenFiles.keys,
-        contains('/fake-docs/famdo-archive-2026-07-24.json'),
+        contains('/fake-docs/famdo-archive-2026-07-24-090000.json'),
       );
 
       final settings = await database.select(database.settings).getSingle();

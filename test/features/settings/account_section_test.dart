@@ -1015,15 +1015,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Sheet closed; success snackbar names the archive file.
+      // Sheet closed; the success snackbar says the old data was saved in-app.
       expect(
         find.bySemanticsIdentifier('settings.account.reconnect.sheet'),
         findsNothing,
       );
       expect(
-        find.textContaining('famdo-archive-2026-07-24.json'),
+        find.text('Your previous data was saved inside the app'),
         findsOneWidget,
       );
+      expect(find.text('Share…'), findsOneWidget);
 
       // No claim/join RPC at all -- reconnect already knows its household
       // and member ids.
@@ -1032,7 +1033,7 @@ void main() {
       expect(reconnectGateway.downloadHouseholdCalls, ['joined-hh']);
       expect(
         archiveWriter.writtenFiles.keys,
-        contains('/fake-docs/famdo-archive-2026-07-24.json'),
+        contains('/fake-docs/famdo-archive-2026-07-24-090000.json'),
       );
 
       final settings = await database.select(database.settings).getSingle();
