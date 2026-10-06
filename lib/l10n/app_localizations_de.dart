@@ -1701,6 +1701,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String statsSince(String date) {
+    return 'seit $date';
+  }
+
+  @override
   String statsTotalDone(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

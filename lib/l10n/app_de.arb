@@ -448,6 +448,7 @@
   "statsTitle": "Aufgaben-Verlauf",
   "statsWindowLast30Days": "In den letzten 30 Tagen",
   "statsWindowSinceStart": "Seit deinem Start am {date}",
+  "statsSince": "seit {date}",
   "statsTotalDone": "{count, plural, one{1 Aufgabe erledigt} other{{count} Aufgaben erledigt}}",
   "statsShareUnknownMember": "Jemand anderes",
   "statsChoresSectionTitle": "Aufgaben",

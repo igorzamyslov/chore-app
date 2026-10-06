@@ -2184,6 +2184,16 @@
       }
     }
   },
+  "statsSince": "since {date}",
+  "@statsSince": {
+    "description": "Small line under a member's name on the chore-history share card when that member joined partway through the 30-day window (persona review 2026-10-06 E7): their own window starts at the day they joined, so a low count reads as 'just arrived', not 'does nothing'. {date} is a locale-formatted month and day.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "August 6"
+      }
+    }
+  },
   "statsTotalDone": "{count, plural, one{1 chore done} other{{count} chores done}}",
   "@statsTotalDone": {
     "description": "Total completions in the share window; also the single-member household's replacement for the whole share card.",

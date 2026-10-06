@@ -2522,6 +2522,12 @@ abstract class AppLocalizations {
   /// **'Since you started, {date}'**
   String statsWindowSinceStart(String date);
 
+  /// Small line under a member's name on the chore-history share card when that member joined partway through the 30-day window (persona review 2026-10-06 E7): their own window starts at the day they joined, so a low count reads as 'just arrived', not 'does nothing'. {date} is a locale-formatted month and day.
+  ///
+  /// In en, this message translates to:
+  /// **'since {date}'**
+  String statsSince(String date);
+
   /// Total completions in the share window; also the single-member household's replacement for the whole share card.
   ///
   /// In en, this message translates to:
