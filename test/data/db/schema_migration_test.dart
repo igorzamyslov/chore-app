@@ -180,6 +180,18 @@ Future<void> _dropChoresFilterColumns(AppDatabase seed) async {
   );
 }
 
+/// Drops the two schema v18 `settings` columns (`chore_reminders_enabled`,
+/// `sync_left_at`; plan `docs/plans/2026-10-06-persona-review-fixes.md` §1)
+/// on [seed] -- the same collateral-drop pattern as
+/// `_dropErrorReportsEnabledColumn`. Needed by every seed that rewinds to
+/// 2..17 while KEEPING `settings`.
+Future<void> _dropV18SettingsColumns(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE settings DROP COLUMN chore_reminders_enabled',
+  );
+  await seed.customStatement('ALTER TABLE settings DROP COLUMN sync_left_at');
+}
+
 const _settingsColumnsAddedAfterV2 = [
   'acting_member_id', // v3
   'locale', // v4
@@ -197,6 +209,8 @@ const _settingsColumnsAddedAfterV2 = [
   'evening_reminder_enabled', // v13
   'evening_reminder_minutes', // v13
   'error_reports_enabled', // v16
+  'chore_reminders_enabled', // v18
+  'sync_left_at', // v18
 ];
 
 /// The names of the columns [table] actually has on disk, straight from
@@ -429,6 +443,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -547,6 +562,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -640,6 +656,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -738,6 +755,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -909,6 +927,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1059,6 +1078,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1145,6 +1165,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1213,6 +1234,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1287,6 +1309,7 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1401,6 +1424,7 @@ void main() {
           );
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
@@ -1511,6 +1535,7 @@ void main() {
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await seed.customStatement('PRAGMA user_version = 13');
       await seed.close();
 
@@ -1561,6 +1586,7 @@ void main() {
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
       await seed.customStatement('PRAGMA user_version = 14');
       await seed.close();
@@ -1611,6 +1637,7 @@ void main() {
           );
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
       await seed.customStatement('PRAGMA user_version = 15');
       await seed.close();
@@ -1670,6 +1697,7 @@ void main() {
             ),
           );
       await _dropChoresFilterColumns(seed);
+      await _dropV18SettingsColumns(seed);
       await seed.customStatement('PRAGMA user_version = 16');
       await seed.close();
 
@@ -1688,6 +1716,55 @@ void main() {
       expect(row.lastTab, 'shopping');
       expect(row.choresMemberFilter, isNull);
       expect(row.choresCategoryFilter, isNull);
+    },
+  );
+
+  test(
+    'a 17 -> 18 upgrade adds settings.choreRemindersEnabled (true) and '
+    'settings.syncLeftAt (NULL) and leaves existing data alone',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v18_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v17 install: the current schema minus the two v18 columns, with
+      // `user_version` rolled back to 17 and a linked settings row in place.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+              syncHouseholdId: const Value('hh-1'),
+              errorReportsEnabled: const Value(false),
+            ),
+          );
+      await _dropV18SettingsColumns(seed);
+      await seed.customStatement('PRAGMA user_version = 17');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(
+        await _columnNames(upgraded, 'settings'),
+        containsAll(['chore_reminders_enabled', 'sync_left_at']),
+      );
+      final settings = await upgraded.select(upgraded.settings).getSingle();
+      expect(settings.choreRemindersEnabled, isTrue);
+      expect(settings.syncLeftAt, isNull);
+      expect(settings.actingMemberId, 'member-1');
+      expect(settings.syncHouseholdId, 'hh-1');
+      expect(settings.errorReportsEnabled, isFalse);
     },
   );
 }

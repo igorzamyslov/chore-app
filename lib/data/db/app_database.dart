@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -169,6 +169,17 @@ class AppDatabase extends _$AppDatabase {
           // [createTable], and a second unconditional `addColumn` for the
           // same column would throw a duplicate-column error.
           await migrator.addColumn(settings, settings.errorReportsEnabled);
+        }
+        if (from < 18) {
+          // v17 -> v18 (plan `docs/plans/2026-10-06-persona-review-fixes.md`
+          // §1, W5): `settings.choreRemindersEnabled` (default `true`) and
+          // the nullable `settings.syncLeftAt` (spec
+          // `docs/specs/household-lifecycle.md` §2.2) -- no data rewrite.
+          // Lives here, inside the `else` branch, for exactly the reason
+          // spelled out for `membershipRevoked` above: a v1 -> v18 jump
+          // builds `settings` at full current width via [createTable].
+          await migrator.addColumn(settings, settings.choreRemindersEnabled);
+          await migrator.addColumn(settings, settings.syncLeftAt);
         }
       }
       if (from < 8) {

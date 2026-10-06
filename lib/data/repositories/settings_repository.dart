@@ -72,6 +72,7 @@ class SettingsRepository {
         eveningReminderEnabled: false,
         eveningReminderMinutes: 1200,
         errorReportsEnabled: true,
+        choreRemindersEnabled: true,
         createdAt: now,
         updatedAt: now,
       );
@@ -431,6 +432,24 @@ class SettingsRepository {
           .update(db.members)
           .write(const MembersCompanion(userId: Value(null)));
     });
+  }
+
+  /// Records ([at] non-null) or clears ([at] `null`) that this device left
+  /// the household's online copy while other members stayed (spec
+  /// `docs/specs/household-lifecycle.md` §2.2, amendment 2026-10-06). While
+  /// set, the Account section hides "Put my household online". Set by
+  /// `HouseholdExitService.leave` on a non-last leave; cleared by Reset app
+  /// data (which deletes the whole row anyway).
+  Future<void> setSyncLeftAt(DateTime? at) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        syncLeftAt: Value(at?.toUtc().toIso8601String()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
   }
 
   /// Records that this device's household membership was revoked
