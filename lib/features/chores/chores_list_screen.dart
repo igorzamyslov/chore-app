@@ -55,6 +55,12 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   String? _memberFilter;
   String? _categoryFilter;
 
+  // E1 (persona review 2026-10-06): whether the "default to my chores"
+  // decision has been made. True from the start when a filter was stored,
+  // and from the first manual filter change; otherwise settled by [build]
+  // once the device's identity resolves.
+  bool _defaultSettled = false;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +70,38 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     final stored = ref.read(uiStateProvider).valueOrNull;
     _memberFilter = stored?.choresMemberFilter;
     _categoryFilter = stored?.choresCategoryFilter;
+    _defaultSettled = _memberFilter != null || _categoryFilter != null;
+  }
+
+  /// E1: a signed-in member's list opens on THEIR chores (plus unassigned
+  /// ones) when nothing was stored. Settles the first time identity is
+  /// known: pinned with a resolved claim applies and stores the default;
+  /// an unlinked household has nobody to default to. A still-resolving
+  /// identity waits, so a late claim cannot override a manual pick (which
+  /// settles it too).
+  void _settleDefaultFilter() {
+    if (_defaultSettled) {
+      return;
+    }
+    switch (ref.watch(memberIdentityModeProvider)) {
+      case MemberIdentityMode.unknown:
+        return;
+      case MemberIdentityMode.switching:
+        _defaultSettled = true;
+      case MemberIdentityMode.pinned:
+        final claimed = ref.watch(claimedMemberProvider);
+        if (claimed == null) {
+          return;
+        }
+        _defaultSettled = true;
+        _memberFilter = claimed.id;
+        // Not inside build: a blind write, after this frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _persistFilters();
+          }
+        });
+    }
   }
 
   /// Writes the current filters to `ui_state`, blind and fire-and-forget.
@@ -83,6 +121,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _settleDefaultFilter();
     // Stale stored ids degrade to "All" at read time; nothing is written
     // back. While members/categories have no value yet the stored id is kept,
     // so there is no unfiltered flash before they load.
@@ -153,14 +192,20 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           MemberFilterButton(
             selected: memberFilter,
             onChanged: (value) {
-              setState(() => _memberFilter = value);
+              setState(() {
+                _memberFilter = value;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
           CategoryFilterButton(
             selected: categoryFilter,
             onChanged: (value) {
-              setState(() => _categoryFilter = value);
+              setState(() {
+                _categoryFilter = value;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
@@ -616,6 +661,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     setState(() {
       _memberFilter = null;
       _categoryFilter = null;
+      _defaultSettled = true;
     });
     _persistFilters();
   }
@@ -686,7 +732,12 @@ List<OccurrenceWithChore> _filterOccurrences(
   required String? categoryFilter,
 }) {
   return occurrences.where((occurrence) {
-    if (memberFilter != null && occurrence.assignedMember?.id != memberFilter) {
+    // E1: an unassigned occurrence is anyone's, so it passes every member
+    // filter -- the daily summary counts it for each member too.
+    final assignee = occurrence.assignedMember;
+    if (memberFilter != null &&
+        assignee != null &&
+        assignee.id != memberFilter) {
       return false;
     }
     if (categoryFilter != null && occurrence.category?.id != categoryFilter) {
@@ -711,7 +762,8 @@ List<ClosedOccurrenceWithChore> _filterClosedToday(
     if (memberFilter != null) {
       final displayedMemberId =
           row.occurrence.completedBy ?? row.assignedMember?.id;
-      if (displayedMemberId != memberFilter) {
+      // E1: no displayed member means unassigned: kept, like pending rows.
+      if (displayedMemberId != null && displayedMemberId != memberFilter) {
         return false;
       }
     }
@@ -783,7 +835,9 @@ class _Body extends StatelessWidget {
       if (categoryFilter != null && details.category?.id != categoryFilter) {
         return false;
       }
+      // E1: a chore nobody is assigned to is anyone's, so it stays.
       if (memberFilter != null &&
+          details.assigneeMemberIds.isNotEmpty &&
           !details.assigneeMemberIds.contains(memberFilter)) {
         return false;
       }

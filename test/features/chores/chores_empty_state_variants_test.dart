@@ -174,14 +174,19 @@ void main() {
         chores: ChoreRepository(database),
         clock: Clock.fixed(today),
       );
-      // Unassigned ("anyone" mode): never matches ANY specific member
-      // filter, so filtering to Anna hides it -- she has no occurrence of
-      // any kind (pending, paused, or done-today).
+      // Assigned to Me: filtering to Anna hides it -- she has no occurrence
+      // of any kind (pending, paused, or done-today), and nothing
+      // unassigned either (an unassigned chore stays under every member
+      // filter, E1).
+      final me = await (database.select(
+        database.members,
+      )..where((tbl) => tbl.name.equals('Me'))).getSingle();
       await service.createChore(
         householdId: householdId,
         title: 'My chore',
         startDate: PlainDate(2026, 7, 24),
-        assignmentMode: AssignmentMode.anyone,
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [me.id],
       );
       await tester.pumpAndSettle();
       expect(find.text('My chore'), findsOneWidget);

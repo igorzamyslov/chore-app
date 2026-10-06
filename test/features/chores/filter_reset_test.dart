@@ -99,7 +99,18 @@ void main() {
         chores: ChoreRepository(database),
         clock: Clock.fixed(DateTime(2026, 7, 24, 9)),
       );
-      // Unassigned chore: filtering by the bootstrap member hides it.
+      final anna = await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
+      // Anna's chore: filtering by the bootstrap member hides it. (The
+      // unassigned chore stays under any member filter, E1.)
+      await service.createChore(
+        householdId: householdId,
+        title: 'Annas chore',
+        startDate: PlainDate(2026, 7, 24),
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [anna.id],
+      );
       await service.createChore(
         householdId: householdId,
         title: 'Unassigned chore',
@@ -107,17 +118,18 @@ void main() {
         assignmentMode: AssignmentMode.anyone,
       );
       await tester.pumpAndSettle();
-      expect(find.text('Unassigned chore'), findsOneWidget);
+      expect(find.text('Annas chore'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
-      await tapMenuEntry(tester, 'Me');
-      expect(find.text('Unassigned chore'), findsNothing);
+      await tapMenuEntry(tester, 'Me (you)');
+      expect(find.text('Annas chore'), findsNothing);
+      expect(find.text('Unassigned chore'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
       await tapMenuEntry(tester, 'All members');
-      expect(find.text('Unassigned chore'), findsOneWidget);
+      expect(find.text('Annas chore'), findsOneWidget);
     },
   );
 

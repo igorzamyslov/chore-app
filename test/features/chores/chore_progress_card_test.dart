@@ -223,7 +223,7 @@ void main() {
       // for Me = 1, N = 0.
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
-      await tapMenuEntry(tester, 'Me');
+      await tapMenuEntry(tester, 'Me (you)');
 
       expect(find.text('Me pending'), findsOneWidget);
       expect(find.text('Anna pending'), findsNothing);

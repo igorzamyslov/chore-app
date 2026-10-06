@@ -61,6 +61,8 @@
 
   "choresFilterMemberTooltip": "Nach Mitglied filtern",
   "choresFilterMemberAll": "Alle Mitglieder",
+  "choresFilterYou": "{name} (du)",
+  "choresAssigneeAnyone": "Jemand",
   "choresFilterCategoryTooltip": "Nach Kategorie filtern",
   "choresFilterCategoryAll": "Alle Kategorien",
   "choresFilterClear": "Alles anzeigen",

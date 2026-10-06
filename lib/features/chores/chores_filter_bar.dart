@@ -26,6 +26,12 @@ class MemberFilterButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(membersProvider).value ?? const [];
+    // E1 (persona review 2026-10-06): mark the member this device acts as,
+    // so the person holding the phone can find their own name -- only where
+    // there is somebody else to tell them apart from.
+    final youId = members.length > 1
+        ? ref.watch(actingMemberProvider)?.id
+        : null;
     final l10n = AppLocalizations.of(context);
     return semantic(
       'chores.filter.member',
@@ -56,7 +62,9 @@ class MemberFilterButton extends ConsumerWidget {
               child: semantic(
                 'chores.filter.member.${member.id}',
                 child: _entryLabel(
-                  member.name,
+                  member.id == youId
+                      ? l10n.choresFilterYou(member.name)
+                      : member.name,
                   isSelected: selected == member.id,
                 ),
               ),

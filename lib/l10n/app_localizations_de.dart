@@ -226,6 +226,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresFilterMemberAll => 'Alle Mitglieder';
 
   @override
+  String choresFilterYou(String name) {
+    return '$name (du)';
+  }
+
+  @override
+  String get choresAssigneeAnyone => 'Jemand';
+
+  @override
   String get choresFilterCategoryTooltip => 'Nach Kategorie filtern';
 
   @override

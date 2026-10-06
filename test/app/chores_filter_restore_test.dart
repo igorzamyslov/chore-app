@@ -108,7 +108,8 @@ void main() {
     (tester, database) async {
       expect(find.text('Mine A'), findsOneWidget);
       expect(find.text('Mine B'), findsNothing);
-      expect(find.text('Free A'), findsNothing);
+      // E1: an unassigned chore in the category passes the member filter.
+      expect(find.text('Free A'), findsOneWidget);
     },
   );
 

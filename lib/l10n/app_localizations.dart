@@ -404,6 +404,18 @@ abstract class AppLocalizations {
   /// **'All members'**
   String get choresFilterMemberAll;
 
+  /// Member-filter menu entry for the member this device acts as (the claimed member when signed in, else the app-bar member), shown only in a household of more than one so the person holding the phone can find their own name. Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (you)'**
+  String choresFilterYou(String name);
+
+  /// Chip on a chore tile with no assignee, in the place where the assignee's avatar and name would be. The member filter keeps these tiles (anyone may do them, and the daily summary counts them for every member). Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone'**
+  String get choresAssigneeAnyone;
+
   /// Tooltip for the chores list's category-filter button.
   ///
   /// In en, this message translates to:
