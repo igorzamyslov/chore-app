@@ -39,7 +39,15 @@
 ///    NOT respond by switching to `NotificationScheduler.cancelAll()`, which
 ///    trades one wrong notification for up to 83 days of silence.*
 ///
-/// A third assumption the plan flagged IS now verified, from the installed
+/// 3. **That a failure in this isolate lands in the error log (H5).** `_run`
+///    attaches a `DatabaseErrorLogSink` for its own lifetime. `_run` opens the
+///    real `openConnection()` database, which `flutter test` cannot reach, so
+///    the manual check is: on a device, break step 3 (e.g. airplane-mode
+///    cannot do it -- temporarily throw in `rewriteDigestHorizon`), tap Done on
+///    a digest notification, reopen the app, and confirm an
+///    `app.notificationAction` row exists in `error_log`.
+///
+/// A further assumption the plan flagged IS now verified, from the installed
 /// package's own Android source rather than on a device — see the routing note
 /// at `FlutterLocalNotificationsAdapter.initialize`: a `showsUserInterface:
 /// false` action always reaches this callback, even with the app in the
@@ -56,6 +64,7 @@ import 'package:chore_app/application/digest_action_payload.dart';
 import 'package:chore_app/application/notification_action_processor.dart';
 import 'package:chore_app/application/notification_scheduler.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/domain/error_scrubber.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// The `IsolateNameServer` port name the main isolate registers at bootstrap
@@ -120,6 +129,14 @@ void handleNotificationAction(NotificationResponse response) {
 /// a completion that landed must stay landed even if the reschedule blows up.
 Future<void> _run(DigestActionPayload payload) async {
   final database = AppDatabase(openConnection());
+  // Persona review / technical review H5: this isolate has its own `AppLog`
+  // (statics are per-isolate) with NO sink, so every failure below used to
+  // reach `debugPrint` only and never the error log -- the very path that is
+  // verified by hand only. Attach the database sink BEFORE the try so the
+  // catch below is recorded durably; the tracking wrapper lets `finally`
+  // wait for those fire-and-forget writes before the connection closes.
+  final sink = _TrackingErrorLogSink(DatabaseErrorLogSink(database));
+  AppLog.attach(sink);
   try {
     await applyDoneAction(
       database: database,
@@ -149,8 +166,6 @@ Future<void> _run(DigestActionPayload payload) async {
       actingMemberId: payload.actingMemberId,
     );
   } on Object catch (e, s) {
-    // No `AppLog` sink exists in this background isolate, so this only
-    // reaches `debugPrint` -- recording it durably is out of scope here.
     AppLog.error('app.notificationAction', e, s);
     // `on Object`, not `on Exception`: an Error escaping here has nowhere to go
     // -- there is no UI in this isolate and no user waiting on a result -- and
@@ -169,6 +184,33 @@ Future<void> _run(DigestActionPayload payload) async {
     // SQLite's own WAL locking handles two connections to one file correctly;
     // what it does not forgive is a second connection left dangling across
     // isolate messages.
+    await sink.settle();
+    AppLog.detach();
     await database.close();
   }
+}
+
+/// Wraps the inner sink and remembers every write it was handed, so [_run]'s
+/// `finally` can let them finish before closing the database ([AppLog.error]
+/// is fire-and-forget and would otherwise race the close).
+class _TrackingErrorLogSink implements ErrorLogSink {
+  _TrackingErrorLogSink(this._inner);
+
+  final ErrorLogSink _inner;
+  final List<Future<void>> _pending = [];
+
+  @override
+  Future<void> record({
+    required String source,
+    required ScrubbedError error,
+  }) {
+    final write = _inner.record(source: source, error: error);
+    _pending.add(write);
+    return write;
+  }
+
+  /// Completes once every recorded write has finished, successfully or not.
+  Future<void> settle() => Future.wait(
+    _pending.map((write) => write.then<void>((_) {}, onError: (Object _) {})),
+  );
 }
