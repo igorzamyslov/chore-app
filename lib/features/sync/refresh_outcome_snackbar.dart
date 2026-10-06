@@ -5,6 +5,8 @@
 /// disagree about what a given [RefreshOutcome] means.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/sync_engine.dart';
@@ -54,12 +56,17 @@ Future<void> refreshAndReport(BuildContext context, WidgetRef ref) async {
     return;
   }
   final l10n = AppLocalizations.of(context);
-  showAppSnackbar(
+  showAppErrorSnackbar(
     context,
     message: switch (outcome) {
       RefreshOutcome.rejected => l10n.syncRefreshErrorRejected,
       RefreshOutcome.offline when revoked => l10n.syncRefreshErrorRevoked,
       RefreshOutcome.offline || RefreshOutcome.ok => l10n.syncRefreshError,
     },
+    // Retrying only helps when the failure was transient: a revocation or
+    // a server-rejected row will fail the same way again.
+    onRetry: outcome == RefreshOutcome.offline && !revoked
+        ? () => unawaited(refreshAndReport(context, ref))
+        : null,
   );
 }

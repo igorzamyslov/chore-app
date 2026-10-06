@@ -12,6 +12,8 @@
 /// ([NoopAuthGateway]).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
@@ -348,9 +350,10 @@ class _SignedInTile extends ConsumerWidget {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSignOut', e, s);
       if (context.mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSignOutError,
+          onRetry: () => unawaited(_signOut(context, ref)),
         );
       }
     }
@@ -506,7 +509,7 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSendMagicLink', e, s);
       if (mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSendError,
         );
@@ -732,7 +735,7 @@ class _LeaveRow extends ConsumerWidget {
       // only way to throw after it is a dead local database, which is
       // already a broken-app state rather than a failed leave.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.householdLeaveError);
+        showAppErrorSnackbar(context, message: l10n.householdLeaveError);
       }
       return;
     }
@@ -898,7 +901,7 @@ class _DeleteAccountRow extends ConsumerWidget {
       // way to throw after it is a dead local database, which is already a
       // broken-app state rather than a failed deletion.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.accountDeleteError);
+        showAppErrorSnackbar(context, message: l10n.accountDeleteError);
       }
       return;
     }

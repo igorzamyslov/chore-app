@@ -124,7 +124,7 @@ Future<void> confirmAndResetAppData(
     // expected failure, not a bug. `on Object catch` rather than a bare
     // `catch` also satisfies `avoid_catches_without_on_clauses`.
     if (context.mounted) {
-      showAppSnackbar(context, message: l10n.settingsResetError);
+      showAppErrorSnackbar(context, message: l10n.settingsResetError);
     }
     return;
   }

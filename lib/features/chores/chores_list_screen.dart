@@ -269,7 +269,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       if (!mounted) {
         return;
       }
-      showAppSnackbar(
+      showAppErrorSnackbar(
         context,
         message: AppLocalizations.of(context).choresSnackbarNoActingMember,
       );
