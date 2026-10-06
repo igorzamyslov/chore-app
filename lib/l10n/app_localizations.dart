@@ -1202,6 +1202,12 @@ abstract class AppLocalizations {
   /// **'Already on the list'**
   String get shoppingAddAlreadyOnList;
 
+  /// Snackbar shown after the quick-add field is submitted with a comma- or newline-separated list that added more than one NEW item (persona finding F7: a pasted "oat milk, sourdough" used to become one item). Only used for two or more; a single add stays silent. Duplicates in the list are skipped and not counted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items added'**
+  String shoppingAddedCount(int count);
+
   /// Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row.
   ///
   /// In en, this message translates to:

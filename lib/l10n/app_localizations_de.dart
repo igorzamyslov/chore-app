@@ -832,6 +832,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingAddAlreadyOnList => 'Schon auf der Liste';
 
   @override
+  String shoppingAddedCount(int count) {
+    return '$count Artikel hinzugefügt';
+  }
+
+  @override
   String get shoppingAddMovedBack => 'Zurück auf die Liste verschoben';
 
   @override

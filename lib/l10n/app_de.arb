@@ -213,7 +213,8 @@
   "shoppingAddHint": "Artikel hinzufügen…",
   "shoppingAddTooltip": "Artikel hinzufügen",
   "shoppingAddAlreadyOnList": "Schon auf der Liste",
-  "shoppingAddMovedBack": "Zurück auf die Liste verschoben",
+  "shoppingAddedCount": "{count} Artikel hinzugefügt",
+  "shoppingAddMovedBack":"Zurück auf die Liste verschoben",
 
   "settingsDigestSectionTitle": "Tägliche Zusammenfassung",
   "settingsDigestToggleTitle": "Tägliche Zusammenfassung",

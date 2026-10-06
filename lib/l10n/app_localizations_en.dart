@@ -827,6 +827,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingAddAlreadyOnList => 'Already on the list';
 
   @override
+  String shoppingAddedCount(int count) {
+    return '$count items added';
+  }
+
+  @override
   String get shoppingAddMovedBack => 'Moved back to the list';
 
   @override

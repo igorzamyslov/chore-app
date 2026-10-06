@@ -36,6 +36,85 @@ void main() {
   );
 
   testChoreApp(
+    'quick add: a comma / newline list becomes one item per entry, with an '
+    '"N items added" snackbar (F7)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openShoppingTab(tester);
+
+      final inputField = find.descendant(
+        of: find.bySemanticsIdentifier('shopping.add.input'),
+        matching: find.byType(TextField),
+      );
+
+      // A pasted newline must not be swallowed by the single-line field.
+      await tester.enterText(inputField, 'Oat milk, Sourdough\nEggs,, milk ');
+      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Oat milk'), findsOneWidget);
+      expect(find.text('Sourdough'), findsOneWidget);
+      expect(find.text('Eggs'), findsOneWidget);
+      expect(find.text('milk'), findsOneWidget);
+      // "milk" is a distinct name from "Oat milk": 4 added.
+      expect(find.text('4 items added'), findsOneWidget);
+      expect(tester.widget<TextField>(inputField).controller?.text, isEmpty);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'quick add: duplicates inside a list are handled per item',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openShoppingTab(tester);
+
+      final inputField = find.descendant(
+        of: find.bySemanticsIdentifier('shopping.add.input'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(inputField, 'Milk, Bread, MILK, Eggs');
+      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.text('MILK'), findsNothing);
+      expect(find.text('Bread'), findsOneWidget);
+      expect(find.text('Eggs'), findsOneWidget);
+      expect(find.text('3 items added'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'quick add: a list of one new item adds no count snackbar',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openShoppingTab(tester);
+
+      final inputField = find.descendant(
+        of: find.bySemanticsIdentifier('shopping.add.input'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(inputField, 'Milk,');
+      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Milk'), findsOneWidget);
+      expect(find.textContaining('items added'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
     'quick add: empty submit adds nothing',
     today: today,
     (tester, database) async {
