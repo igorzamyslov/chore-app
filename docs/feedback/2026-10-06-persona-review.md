@@ -283,3 +283,16 @@ Converging across reviewers:
 7. **A4 + H9, A6, A7, A8** (S + XS, XS, XS, S): the remaining desync modes.
 8. **H1, H2, H5** (3 × XS): CI/observability hygiene.
 9. Then write `sync-backend.md` §8.7 invariants before the next sync feature.
+
+## 12. Outcome (2026-10-07)
+
+Shipped in PR igorzamyslov/chore-app#61 as **v0.15.0+22**, following
+`docs/plans/2026-10-06-persona-review-fixes.md`. Everything in the §1 matrix
+landed except: D2 (OTP fallback and the rest of the sign-in row; needs a
+dashboard email-template edit), F2 (bottom quick-add; design call), the
+keep-screen-on half of F8, the viewer half of B8, the reminder-action half of
+E8 (slice 7; needs a phone), and E4 beyond a disclosure line (decision D1
+stands). Igor's decisions for this round: C2 (reassign + pause until) and A9
+(field-level merge for shopping) in; OTP and bottom quick-add out; prod
+migrations applied by Claude; version 0.15.0; per-member stats clamp (E7).
+The closed/opened bookkeeping lives in `docs/backlog.md` ("Closed 2026-10-06").
