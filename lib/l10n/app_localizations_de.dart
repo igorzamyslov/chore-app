@@ -809,6 +809,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingClearedUndo => 'Rückgängig';
 
   @override
+  String get shoppingCheckedSnackbar => 'Im Einkaufswagen';
+
+  @override
   String get shoppingAddHint => 'Artikel hinzufügen…';
 
   @override

@@ -1166,11 +1166,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{Cleared 1 item} other{Cleared {count} items}}'**
   String shoppingClearedSnackbar(int count);
 
-  /// Action label of the 'Clear checked' undo snackbar; restores exactly the items that tap cleared, via ShoppingRepository.restoreItems.
+  /// Action label of the shopping list's undo snackbars: after 'Clear checked' it restores exactly the items that tap cleared (ShoppingRepository.restoreItems); after ticking an item it unchecks it again; after 'Put all back' it re-checks exactly the items that tap returned.
   ///
   /// In en, this message translates to:
   /// **'Undo'**
   String get shoppingClearedUndo;
+
+  /// Snackbar shown right after ticking a shopping item (persona finding F3, docs/feedback/2026-10-06-personas/tom-shopping.md PP4): the row moves into the collapsed 'In the cart' section, and without this a stray tap made the item look as if it had vanished. Carries an Undo action that unchecks the item. Phrased as the place the item went, matching the section header.
+  ///
+  /// In en, this message translates to:
+  /// **'In the cart'**
+  String get shoppingCheckedSnackbar;
 
   /// Placeholder hint text of the shopping list's quick-add text field.
   ///

@@ -278,6 +278,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // once the write is confirmed, rather than in the tile's onTap, so it
     // fires exactly once per real check/uncheck.
     unawaited(HapticFeedback.selectionClick());
+    // F3 (persona review 2026-10-06, tom-shopping PP4): ticking moves the
+    // row into the collapsed cart, so offer an Undo right where the eye is.
+    // Only for a TICK: unticking is itself the undo. Latest-wins is fine
+    // (showAppSnackbar replaces whatever is showing), so ticking a second
+    // item simply moves the Undo to that one.
+    if (checked && mounted) {
+      final l10n = AppLocalizations.of(context);
+      showAppSnackbar(
+        context,
+        message: l10n.shoppingCheckedSnackbar,
+        action: SnackBarAction(
+          label: l10n.shoppingClearedUndo,
+          onPressed: () => unawaited(
+            ref.read(shoppingRepositoryProvider).setChecked(id, checked: false),
+          ),
+        ),
+      );
+    }
   }
 
   /// Clears every checked item, then shows an undo snackbar restoring
