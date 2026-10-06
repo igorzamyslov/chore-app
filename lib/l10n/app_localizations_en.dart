@@ -423,6 +423,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormEditTitle => 'Edit chore';
 
   @override
+  String get choreSavedSnackbar => 'Saved';
+
+  @override
+  String choreSavedNextDue(String date) {
+    return 'Saved — next due $date';
+  }
+
+  @override
+  String choreSavedReassigned(String name) {
+    return 'Saved — today\'s turn is now $name\'s';
+  }
+
+  @override
   String get choreFormNewTitle => 'New chore';
 
   @override

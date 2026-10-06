@@ -121,6 +121,9 @@
   "choresPausedResume": "Fortsetzen",
 
   "choreFormEditTitle": "Aufgabe bearbeiten",
+  "choreSavedSnackbar": "Gespeichert",
+  "choreSavedNextDue": "Gespeichert — als Nächstes fällig {date}",
+  "choreSavedReassigned": "Gespeichert — heute ist jetzt {name} dran",
   "choreFormNewTitle": "Neue Aufgabe",
   "choreFormTitleLabel": "Titel",
   "choreFormNotesLabel": "Notizen",

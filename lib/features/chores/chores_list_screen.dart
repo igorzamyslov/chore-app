@@ -8,6 +8,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -348,9 +349,21 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         }
         await _showCloseSnackbar(occurrence: occurrence, skipped: true);
       case ChoreMenuAction.edit:
-        await Navigator.of(context).push<void>(
+        final saved = await Navigator.of(context).push<ChoreUpdateResult>(
           MaterialPageRoute(
             builder: (_) => ChoreFormScreen(choreId: occurrence.chore.id),
+          ),
+        );
+        if (!mounted || saved == null) {
+          return;
+        }
+        showAppSnackbar(
+          context,
+          message: choreSavedMessage(
+            AppLocalizations.of(context),
+            Localizations.localeOf(context).toString(),
+            today: ref.read(todayProvider),
+            result: saved,
           ),
         );
       case ChoreMenuAction.pause:

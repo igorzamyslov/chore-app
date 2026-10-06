@@ -534,6 +534,27 @@ class ChoreRepository {
         .getSingleOrNull();
   }
 
+  /// Sets [occurrenceId]'s `assignedMemberId` to [memberId] (null =
+  /// unassigned), marking the row dirty so the change syncs.
+  ///
+  /// Only ever applied to a PENDING occurrence by its callers
+  /// (`ChoreService.updateChore`'s holder re-resolution and
+  /// `ChoreService.reassignOccurrence`); history is never rewritten.
+  Future<void> setOccurrenceAssignee(
+    String occurrenceId,
+    String? memberId,
+  ) async {
+    await (db.update(
+      db.choreOccurrences,
+    )..where((tbl) => tbl.id.equals(occurrenceId))).write(
+      ChoreOccurrencesCompanion(
+        assignedMemberId: Value(memberId),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
+    );
+  }
+
   /// Clears `assignedMemberId` on every PENDING occurrence currently
   /// assigned to [memberId], across every chore (member-deletion
   /// referential cleanup, spec `docs/feedback/2026-08-01-ux-audit.md` A1;

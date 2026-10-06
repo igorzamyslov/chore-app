@@ -698,6 +698,24 @@ abstract class AppLocalizations {
   /// **'Edit chore'**
   String get choreFormEditTitle;
 
+  /// Snackbar on the chores list after saving an edit that left the chore's open turn exactly where it was (persona review 2026-10-06 C6: saving used to be silent). One word, matching the 'Done'/'Skipped' snackbars.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get choreSavedSnackbar;
+
+  /// Snackbar on the chores list after saving an edit that changed the schedule and so regenerated the open turn (persona review C6): says where the chore went, since the tile may jump sections. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Oct 10'), same as the Done snackbar's.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — next due {date}'**
+  String choreSavedNextDue(String date);
+
+  /// Snackbar on the chores list after an assignment edit removed the person holding the open turn, so the app moved that turn (persona review C1, Maria: 'I took Anna off the bins and the list still says Anna'). Names who has it now so the change is visible, not silent.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — today\'s turn is now {name}\'s'**
+  String choreSavedReassigned(String name);
+
   /// Chore form app bar title when creating a new chore.
   ///
   /// In en, this message translates to:

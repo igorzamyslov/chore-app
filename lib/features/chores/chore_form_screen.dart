@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
@@ -19,6 +20,8 @@ import 'package:chore_app/features/chores/chore_form/repeat_section.dart'
 import 'package:chore_app/features/chores/chore_form/start_date_field.dart';
 import 'package:chore_app/features/chores/chore_form/title_notes_fields.dart';
 import 'package:chore_app/features/chores/chore_form_discard_dialog.dart';
+import 'package:chore_app/features/chores/chore_occurrence_tile.dart'
+    show futureDueText;
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show listEquals, setEquals;
@@ -643,8 +646,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         : null;
     final notes = _notesController.text.trim();
 
+    ChoreUpdateResult? result;
     if (_isEditing) {
-      await ref
+      result = await ref
           .read(choreServiceProvider)
           .updateChore(
             widget.choreId!,
@@ -680,6 +684,31 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     if (!mounted) {
       return;
     }
-    Navigator.of(context).pop();
+    // An edit pops WITH its result so the chores list (which owns the
+    // snackbar's ScaffoldMessenger) can confirm the save in words -- see
+    // [choreSavedMessage]. A create pops with nothing, as before.
+    Navigator.of(context).pop(result);
   }
+}
+
+/// The snackbar text confirming a saved chore edit (persona review
+/// 2026-10-06 C1/C6): who holds the open turn now if the edit moved it,
+/// else when it is next due if the schedule changed, else plain "Saved".
+String choreSavedMessage(
+  AppLocalizations l10n,
+  String localeName, {
+  required PlainDate today,
+  required ChoreUpdateResult result,
+}) {
+  final name = result.reassignedToName;
+  if (name != null) {
+    return l10n.choreSavedReassigned(name);
+  }
+  final nextDue = result.nextDue;
+  if (nextDue != null && !nextDue.isBefore(today)) {
+    return l10n.choreSavedNextDue(
+      futureDueText(l10n, localeName, today: today, dueDate: nextDue),
+    );
+  }
+  return l10n.choreSavedSnackbar;
 }
