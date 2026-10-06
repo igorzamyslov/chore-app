@@ -158,6 +158,7 @@ add in a table in this section when implementing.
 | `sync.pullSince` | `SupabaseSyncEngine._logFailure` (pull failures) |
 | `sync.refreshNow` | `SupabaseSyncEngine._logFailure` (pull-to-refresh failures) |
 | `sync.realtime` | `SupabaseSyncTransport.householdChanges` subscribe callback, context `status` |
+| `sync.rejected` | `SupabaseSyncEngine._quarantine` (added 2026-10-06, `sync-backend.md` §8.3 amendment): a row the server refused with a 22/23/42-class error, context `table` and `id`; recorded once per row per engine session |
 | `flutter.framework` | `FlutterError.onError` in `main.dart` |
 | `flutter.uncaught` | `PlatformDispatcher.instance.onError` in `main.dart` |
 | `ui.inviteFlow` | `invite_flow.dart` |

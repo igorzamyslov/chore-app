@@ -104,12 +104,46 @@ that future settles, so the spinner reflects real work.
 - Semantic ids `chores.refresh` and `shopping.refresh` *(new)* on the
   indicators, so E2E can drive them.
 
+**Amendment 2026-10-06 (plan W1.7, technical review #5).** The indicator
+calls `SyncEngine.refreshNow()`, which returns a `RefreshOutcome`
+(`sync-backend.md` §8.3 amendment). Mapping, shared by both lists and the
+Settings → Account tile through `refreshAndReport`
+(`lib/features/sync/refresh_outcome_snackbar.dart`): `ok` → silent;
+`offline` → `syncRefreshError` (or `syncRefreshErrorRevoked` when the pull
+just discovered revocation, read from `settings.membershipRevoked`);
+`rejected` → `syncRefreshErrorRejected` — "The household server rejected a
+change from this phone, so it hasn't gone through. Check for an app update;
+your other changes keep syncing." A rejected row is one no retry fixes, so
+"will sync later" would be a false promise there.
+
 ### 2.4 "Last synced" honesty
 
 Settings → Account gains a relative "Last synced <time>" line under the
 sync-state row, from the `syncLastPulledAt` cursor the engine already
 persists. This is the place a suspicious user can check whether sync is
 alive, and it costs one existing DB field.
+
+**Amendment 2026-10-06 (plan W1.7/W1.9, technical review #5, #7).**
+
+- **Pending-changes line.** While `syncPendingCountProvider` — dirty rows
+  across the seven synced tables plus pending hard-delete tombstones
+  (`SyncRepository.watchDirtyRowCount`), `0` while unlinked — is nonzero, a
+  second line follows "Last synced": `syncPendingChanges` ("1 change waiting
+  to send" / "{count} changes waiting to send"; semantic id
+  `settings.account.pendingChanges`). The count is briefly nonzero after
+  every edit, so the wording must not alarm; a count that stays put is what
+  tells a suspicious user sync is stuck.
+- **Tap to sync.** Once linked, the whole signed-in tile (semantic id
+  `settings.account.syncNow`) runs `refreshNow()` and shows the §2.3
+  outcome snackbar; success is silent and visible as the lines updating.
+  The place that shows whether sync is alive is also a place to make it
+  try.
+- **Device-clock stamp.** The line prefers `syncLastPullCompletedAtProvider`
+  (the device-clock moment this session's last pull completed) and falls
+  back to the `syncLastPulledAt` cursor only before the session's first
+  pull: the cursor is server time (and, since the §8.3 amendment, 30 s
+  behind it), so "10 minutes ago" computed from the device clock against it
+  was off by the clock skew.
 
 ### 2.5 Can't-reach-the-household indicator (D-5, `docs/backlog.md`)
 
@@ -201,6 +235,20 @@ Fixed by `docs/plans/2026-08-08-offline-indicator.md`:
   recovers. Fully independent — the indicator never reads engine internals
   or retry state, only the persisted cursor/link timestamps and the
   `syncDirty` flag every synced write already sets.
+
+**Amendment 2026-10-06 (plan W1.9, technical review #7).** The
+pull-staleness signal is measured on the DEVICE clock, not against the
+server-time cursor. `computeSyncHealth`'s `lastPulledAt` is
+`syncLastPullCompletedAtProvider` — set by the engine from `clock.now()`
+after every successful pull of this session — and the persisted
+`syncLastPulledAt` cursor is used only while that is `null`, i.e. before the
+first pull of the session (where the observing-since floor already bounds
+it). Before this, a phone whose clock ran five minutes ahead of the server
+showed the banner permanently while sync worked, and a phone behind by N
+minutes hid a real outage for N extra minutes. The cursor itself stays
+server time: it is a correctness input to the pull protocol, not a
+freshness display. The "inferred, never reported" rule above is unchanged —
+the stamp is a timestamp of a pull that completed, not an error state.
 
 ## 3. Non-goals
 

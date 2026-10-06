@@ -56,23 +56,55 @@ class FakeSyncTransport implements SyncTransport {
     return now;
   }
 
+  /// Every [pullTable] call, in order -- `(table, offset, limit)`. Lets a
+  /// test assert that a table bigger than one page was fetched in pages
+  /// (spec §8.3 amendment 2026-10-06, technical review #2).
+  final List<({String table, int offset, int limit})> pullTableCalls = [];
+
   @override
   Future<List<Map<String, Object?>>> pullTable(
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   }) async {
+    pullTableCalls.add((table: table, offset: offset, limit: limit));
     final scopeColumn = table == 'households' ? 'id' : 'household_id';
-    return [
-      for (final row in serverRows[table]!)
-        if (row[scopeColumn] == householdId &&
-            (since == null ||
-                DateTime.parse(
-                  row['updated_at']! as String,
-                ).isAfter(since)))
-          Map<String, Object?>.from(row),
-    ];
+    // Sorted into the same total order the real transport asks PostgREST
+    // for (`updated_at`, then the primary key), so pages are stable across
+    // calls -- the paging contract depends on that.
+    final matching =
+        [
+          for (final row in serverRows[table]!)
+            if (row[scopeColumn] == householdId &&
+                (since == null ||
+                    DateTime.parse(
+                      row['updated_at']! as String,
+                    ).isAfter(since)))
+              Map<String, Object?>.from(row),
+        ]..sort((a, b) {
+          final byUpdated = DateTime.parse(
+            a['updated_at']! as String,
+          ).compareTo(DateTime.parse(b['updated_at']! as String));
+          if (byUpdated != 0) {
+            return byUpdated;
+          }
+          return _keyOf(table, a).compareTo(_keyOf(table, b));
+        });
+    if (offset >= matching.length) {
+      return const [];
+    }
+    return matching.sublist(
+      offset,
+      offset + limit > matching.length ? matching.length : offset + limit,
+    );
   }
+
+  static String _keyOf(String table, Map<String, Object?> row) =>
+      table == 'chore_assignees'
+      ? '${row['chore_id']}/${row['member_id']}'
+      : row['id']! as String;
 
   @override
   Future<void> upsertRows(
@@ -138,6 +170,10 @@ class FakeSyncTransport implements SyncTransport {
     markDeletedCalls.add((table: table, match: match, deletedAt: deletedAt));
     // An UPDATE: matches zero rows harmlessly, and (like the real
     // `set_updated_at()` trigger) bumps `updated_at` on the rows it hits.
+    // EVERY entry of [match] filters, exactly like PostgREST's `.match()`:
+    // an occurrence tombstone's `status: 'pending'` therefore skips a
+    // server row that has since been completed (spec §8.6 amendment
+    // 2026-10-06), which is what the completion-race test relies on.
     final list = serverRows[table]!;
     for (var i = 0; i < list.length; i++) {
       final row = list[i];

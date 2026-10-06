@@ -24,6 +24,7 @@ import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/data/sync/row_mappers.dart';
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -39,6 +40,59 @@ const List<String> syncedTablesInFkOrder = [
   'chore_occurrences',
   'shopping_items',
 ];
+
+/// How many rows one server read asks for (spec §8.3 amendment
+/// 2026-10-06, technical review #2). PostgREST silently truncates EVERY
+/// response at its `max_rows` setting -- 1000 in `supabase/config.toml` and
+/// on the hosted project -- with no error and no marker, so a bare
+/// `select()` over a household's year of `chore_occurrences` returned the
+/// first thousand rows in heap order and dropped the rest, and the cursor
+/// then advanced past them forever. Every full-table read ([SyncTransport
+/// .pullTable] and `HouseholdGateway.downloadHousehold`) therefore asks for
+/// exactly this many rows at a time, ordered by `updated_at` then primary
+/// key, and keeps going until a page comes back shorter than this. Equal to
+/// `max_rows` on purpose: a larger value would be truncated to it anyway,
+/// and the short-page stop condition would then never fire.
+const int syncPageSize = 1000;
+
+/// How far BEHIND the fetched server `now()` the pull cursor is stored
+/// (spec §8.3 amendment 2026-10-06, technical review #3). Postgres' `now()`
+/// -- what `set_updated_at()` stamps -- is the TRANSACTION START time, not
+/// the commit time: a push whose transaction began before our
+/// `server_now()` read and committed after our table read gets an
+/// `updated_at` below a cursor equal to that `now()`, and no later
+/// incremental pull would ever see it. Storing the cursor this much earlier
+/// re-fetches everything stamped in the window on the next pull; the apply
+/// is idempotent (LWW + dirty check, every row arrives in its current server
+/// state), so a re-apply costs a few rows of bandwidth and loses nothing.
+/// 30 s is far longer than any PostgREST transaction this app issues.
+const Duration syncCursorOverlap = Duration(seconds: 30);
+
+/// The columns that, after `updated_at`, make a page order total for
+/// [table] -- its primary key. `chore_assignees` is keyed by
+/// `(chore_id, member_id)` and has no `id`.
+List<String> pageOrderKeyColumns(String table) =>
+    table == 'chore_assignees' ? const ['chore_id', 'member_id'] : const ['id'];
+
+/// What a USER-INITIATED sync ([SyncEngine.refreshNow]) found (spec
+/// `docs/specs/sync-freshness.md` §2.3, amended 2026-10-06; plan §2).
+enum RefreshOutcome {
+  /// Push and pull both completed.
+  ok,
+
+  /// Something failed in a way that will heal by itself -- no network, the
+  /// server unreachable, a revoked membership discovered by the pull. The
+  /// UI shows the existing "will sync later" copy (or the revoked copy,
+  /// which it tells apart via `settings.membershipRevoked`).
+  offline,
+
+  /// The server REFUSED at least one of this device's rows with a 22/23/42-
+  /// class Postgres error (bad data, constraint, permission) -- the one
+  /// kind of failure a retry never fixes. Those rows are quarantined (left
+  /// dirty, skipped, logged once as `sync.rejected`) while every other row
+  /// keeps syncing; the UI must say so instead of promising "later".
+  rejected,
+}
 
 /// App-facing sync engine seam (spec §8.2): [pushDirty] upserts every
 /// locally-dirty row; [pullSince] fetches and applies everything the server
@@ -70,10 +124,9 @@ abstract class SyncEngine {
   /// Disarms everything [start] armed (timers, subscriptions). Idempotent.
   void stop();
 
-  /// A USER-INITIATED sync (pull-to-refresh, spec
+  /// A USER-INITIATED sync (pull-to-refresh, the Settings sync tile; spec
   /// `docs/specs/sync-freshness.md` §2.3): pushes then pulls, and reports
-  /// whether it actually worked -- `true` on success, `false` if either half
-  /// failed.
+  /// what happened as a [RefreshOutcome] -- never throws.
   ///
   /// Deliberately separate from [pushDirty]/[pullSince], whose contract is
   /// to swallow every error into a silent retry-later (spec §8.3). That is
@@ -81,8 +134,10 @@ abstract class SyncEngine {
   /// incapable of ever reporting failure: it spun and stopped identically
   /// whether the sync worked or the phone was in airplane mode. Found by the
   /// 2026-08-07 persona walkthrough, against §2.3's own promise of a failure
-  /// snackbar.
-  Future<bool> refreshNow();
+  /// snackbar. The 2026-10-06 amendment split "failed" into
+  /// [RefreshOutcome.offline] and [RefreshOutcome.rejected], because "will
+  /// sync later" is a false promise for a row the server refuses.
+  Future<RefreshOutcome> refreshNow();
 
   /// Suspends the periodic safety-net poll while the app is backgrounded
   /// (spec `docs/specs/sync-freshness.md` §2.2) -- a backgrounded app must
@@ -118,7 +173,7 @@ class NoopSyncEngine implements SyncEngine {
   void stop() {}
 
   @override
-  Future<bool> refreshNow() async => true;
+  Future<RefreshOutcome> refreshNow() async => RefreshOutcome.ok;
 
   @override
   void pauseBackgroundWork() {}
@@ -141,13 +196,19 @@ abstract class SyncTransport {
   /// never the device clock).
   Future<DateTime> serverNow();
 
-  /// Rows of [table] belonging to [householdId] with `updated_at >`
-  /// [since], or every row if [since] is `null` (this device's first
-  /// pull). RLS (or the fake) scopes access to [householdId]'s own rows.
+  /// ONE PAGE of the rows of [table] belonging to [householdId] with
+  /// `updated_at >` [since], or of every row if [since] is `null` (this
+  /// device's first pull): rows `[offset, offset + limit)` of the matching
+  /// set ordered by `updated_at`, then primary key ([pageOrderKeyColumns]).
+  /// The engine keeps calling with a growing [offset] until a page comes
+  /// back shorter than [limit] (see [syncPageSize]). RLS (or the fake)
+  /// scopes access to [householdId]'s own rows.
   Future<List<Map<String, Object?>>> pullTable(
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   });
 
   /// Upserts [rows] into [table] -- the ordinary push path for every synced
@@ -186,9 +247,12 @@ abstract class SyncTransport {
   Future<void> updateHousehold(String id, Map<String, Object?> columns);
 
   /// Sets `deleted_at` to [deletedAt] on the [table] row(s) matching
-  /// [match] (column to value: `{'id': ...}` for an occurrence,
-  /// `{'chore_id': ..., 'member_id': ...}` for an assignee) -- the push half
-  /// of a local HARD delete (spec `docs/specs/sync-backend.md` §8.6.3).
+  /// [match] (column to value: `{'id': ..., 'status': 'pending'}` for an
+  /// occurrence, `{'chore_id': ..., 'member_id': ...}` for an assignee) --
+  /// the push half of a local HARD delete (spec `docs/specs/sync-backend.md`
+  /// §8.6.3). Every entry of [match] is a filter: a tombstone whose row no
+  /// longer matches (an occurrence completed elsewhere since) must match
+  /// nothing.
   ///
   /// An UPDATE, never an upsert: a tombstone carries no full row. Matching
   /// zero rows (the row was never pushed) is success, not an error.
@@ -237,6 +301,9 @@ class SupabaseSyncEngine implements SyncEngine {
     required this.householdId,
     this.pushDebounce = const Duration(seconds: 2),
     this.pollInterval = const Duration(seconds: 60),
+    this.realtimeEchoWindow = const Duration(seconds: 1),
+    this.clock = const Clock(),
+    this.onPullCompleted,
   }) : _sync = SyncRepository(db);
 
   /// The local database this engine reads from and writes to.
@@ -266,7 +333,43 @@ class SupabaseSyncEngine implements SyncEngine {
   /// Tests pass a shorter value.
   final Duration pollInterval;
 
+  /// How long after our own successful push a realtime `householdChanges`
+  /// event is treated as the server echoing the rows we just wrote, and
+  /// dropped (technical review 2026-10-06 #17). The push's own follow-up
+  /// pull (spec §8.3c) already fetched those rows; the echo used to start a
+  /// SECOND pull of the same data, and with the start-time push racing the
+  /// `subscribed` tick, two interleaved pulls could move the cursor
+  /// backwards. A genuine other-device change inside this window is
+  /// caught by the next poll tick at the latest (`pollInterval`). Tests
+  /// pass a shorter value.
+  final Duration realtimeEchoWindow;
+
+  /// The DEVICE clock, used for the echo window, for tombstone stamps and
+  /// for [onPullCompleted]'s timestamp -- never for the pull cursor, which
+  /// is server time (spec §8.3). Injected so tests can pin it.
+  final Clock clock;
+
+  /// Called with `clock.now()` -- DEVICE time -- after every successful
+  /// pull, once the cursor is stored (spec `docs/specs/sync-freshness.md`
+  /// §2.5 amendment 2026-10-06, technical review #7). `syncEngineProvider`
+  /// feeds it into `syncLastPullCompletedAtProvider`, which the health
+  /// indicator and the "Last synced" line read instead of the persisted
+  /// cursor: the cursor is SERVER time, and comparing it with the device
+  /// clock made a phone whose clock was five minutes ahead show the
+  /// can't-reach-the-household banner forever while sync worked perfectly.
+  /// `null` (tests, or any caller that does not care) means never called.
+  final void Function(DateTime completedAt)? onPullCompleted;
+
   final SyncRepository _sync;
+
+  /// The pull currently running, if any (technical review 2026-10-06 #17):
+  /// [pullSince] and [refreshNow] join it instead of starting a second one,
+  /// so two pulls can never interleave and race each other's cursor write.
+  Future<bool>? _inFlightPull;
+
+  /// Until when realtime events are dropped as our own echo -- see
+  /// [realtimeEchoWindow].
+  DateTime? _ignoreRealtimeUntil;
 
   StreamSubscription<Set<TableUpdate>>? _writeSubscription;
   StreamSubscription<void>? _realtimeSubscription;
@@ -301,9 +404,15 @@ class SupabaseSyncEngine implements SyncEngine {
     // (re)subscribe (spec `docs/specs/sync-freshness.md` §2.1). Mapping
     // both to the same pull is what closes the gap a dropped-and-restored
     // socket used to leave open indefinitely.
-    _realtimeSubscription = transport
-        .householdChanges(householdId)
-        .listen((_) => unawaited(pullSince()));
+    _realtimeSubscription = transport.householdChanges(householdId).listen((
+      _,
+    ) {
+      final ignoreUntil = _ignoreRealtimeUntil;
+      if (ignoreUntil != null && clock.now().isBefore(ignoreUntil)) {
+        return;
+      }
+      unawaited(pullSince());
+    });
     // Push on start (recovers rows left dirty from a prior session that
     // never got pushed -- e.g. a cold start while linked), which itself
     // pulls afterward on success (spec §8.3a/c): this covers "pull on
@@ -366,11 +475,7 @@ class SupabaseSyncEngine implements SyncEngine {
   /// try/catch exists specifically so a push failure can never prevent
   /// the pull that follows it.
   Future<void> _pollTick() async {
-    try {
-      await _pushAll();
-    } on Object catch (error, stackTrace) {
-      _logFailure('pushDirty', error, stackTrace);
-    }
+    await _pushAll();
     await pullSince();
   }
 
@@ -394,48 +499,182 @@ class SupabaseSyncEngine implements SyncEngine {
     _pushTimer = Timer(pushDebounce, () => unawaited(pushDirty()));
   }
 
-  /// Every table's push, in FK order (spec §8.3) -- THROWS on failure.
-  /// [pushDirty] swallows that; [refreshNow] reports it.
-  Future<void> _pushAll() async {
-    await _pushHouseholds();
-    await _pushMembers();
-    await _pushCategories();
-    await _pushChores();
-    await _pushChoreAssignees();
-    await _pushChoreOccurrences();
-    await _pushShoppingItems();
-    await _pushTombstones();
+  /// Every table's push, in FK order (spec §8.3, amended 2026-10-06) --
+  /// NEVER throws. Each table is pushed in its own try/catch and the
+  /// sequence continues past a failure, so one bad table cannot stop the
+  /// ones after it (technical review 2026-10-06 #5: before this, one row
+  /// the server kept rejecting silently blocked every later table forever).
+  /// Within a table, a batch the server REJECTS (class 22/23/42) is retried
+  /// row by row and the offenders are quarantined -- see [_pushRows].
+  ///
+  /// The returned [_PushReport] says what happened: [pushDirty] skips its
+  /// follow-up pull on an ordinary failure (retry-later), [refreshNow]
+  /// turns it into a [RefreshOutcome]. The first ordinary failure is logged
+  /// once per tick as `sync.pushDirty` (spec
+  /// `docs/specs/client-error-reporting.md` §3.4); rejections are logged by
+  /// [_quarantine]. [_PushReport.pushedAny] is what opens the realtime echo
+  /// window ([realtimeEchoWindow]): a push with nothing to send produces no
+  /// server event to ignore.
+  Future<_PushReport> _pushAll() async {
+    final report = _PushReport();
+    for (final step in [
+      _pushHouseholds,
+      _pushMembers,
+      _pushCategories,
+      _pushChores,
+      _pushChoreAssignees,
+      _pushChoreOccurrences,
+      _pushShoppingItems,
+      _pushTombstones,
+    ]) {
+      try {
+        report.pushedAny |= await step(report);
+      } on Object catch (error, stackTrace) {
+        // Catches `Error` subclasses too, not just `Exception` -- spec
+        // §8.3's "every engine error is swallowed" is read literally here:
+        // an uncaught `Error` (e.g. from an unexpected server response
+        // shape) would otherwise propagate to the zone and could be killed
+        // silently, with no debug log at all.
+        if (!report.failed) {
+          _logFailure('pushDirty', error, stackTrace);
+        }
+        report.failed = true;
+      }
+    }
+    if (report.pushedAny) {
+      _ignoreRealtimeUntil = clock.now().add(realtimeEchoWindow);
+    }
+    return report;
+  }
+
+  /// Whether [error] is the server REFUSING the data (a `PostgrestException`
+  /// whose SQLSTATE class is 22 data exception, 23 integrity constraint
+  /// violation, or 42 syntax error / insufficient privilege) as opposed to
+  /// failing to answer. These are deterministic: the same row will be
+  /// refused again on every retry, which is what makes quarantining it
+  /// right and "will sync later" wrong.
+  static bool _isRejection(Object error) {
+    if (error is! supabase.PostgrestException) {
+      return false;
+    }
+    final code = error.code;
+    return code != null &&
+        (code.startsWith('22') ||
+            code.startsWith('23') ||
+            code.startsWith('42'));
+  }
+
+  /// Rows the server has rejected, as `table:id`, so each is recorded ONCE
+  /// per engine session rather than on every 60s tick (the row stays dirty
+  /// and is retried each time, so without this the log would fill with the
+  /// same rejection forever).
+  final Set<String> _reportedRejections = {};
+
+  /// Quarantines one rejected row: it stays dirty (nothing is cleared), is
+  /// skipped for this tick, and is recorded once as `sync.rejected` with
+  /// the table and id so the row can be found and fixed (technical review
+  /// 2026-10-06 #5).
+  void _quarantine(
+    _PushReport report,
+    String table,
+    String id,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    report.rejected = true;
+    if (_reportedRejections.add('$table:$id')) {
+      AppLog.error(
+        'sync.rejected',
+        error,
+        stackTrace,
+        context: {'table': table, 'id': id},
+      );
+    }
+  }
+
+  /// The shared push step for one table's dirty rows: [send] the whole
+  /// batch, then [clear] each row's flag. If the batch is REJECTED
+  /// ([_isRejection]), the server does not say which row offended, so the
+  /// rows are retried one at a time: each row that goes through is cleared,
+  /// each row still rejected is handed to [_quarantine]. Any other failure
+  /// (network, server down) propagates to [_pushAll]'s per-table catch.
+  /// Returns whether anything reached the server.
+  Future<bool> _pushRows<R>(
+    _PushReport report, {
+    required String table,
+    required List<R> rows,
+    required String Function(R row) idOf,
+    required Future<void> Function(List<R> rows) send,
+    required Future<void> Function(R row) clear,
+  }) async {
+    if (rows.isEmpty) {
+      return false;
+    }
+    try {
+      await send(rows);
+    } on Object catch (error, stackTrace) {
+      if (!_isRejection(error)) {
+        rethrow;
+      }
+      if (rows.length == 1) {
+        _quarantine(report, table, idOf(rows.single), error, stackTrace);
+        return false;
+      }
+      var sentAny = false;
+      for (final row in rows) {
+        try {
+          await send([row]);
+        } on Object catch (rowError, rowStackTrace) {
+          if (!_isRejection(rowError)) {
+            rethrow;
+          }
+          _quarantine(report, table, idOf(row), rowError, rowStackTrace);
+          continue;
+        }
+        sentAny = true;
+        await clear(row);
+      }
+      return sentAny;
+    }
+    for (final row in rows) {
+      await clear(row);
+    }
+    return true;
   }
 
   @override
-  Future<bool> refreshNow() async {
+  Future<RefreshOutcome> refreshNow() async {
+    final report = await _pushAll();
+    var pullFailed = false;
+    var revoked = false;
     try {
-      await _pushAll();
-      final revoked = await _pullSinceInner();
       // A pull that discovers revocation is not a success from the
       // caller's point of view: this is a deliberate pull-to-refresh, and
-      // "true" here would tell the user "yes, working" at the exact
-      // moment their device is being cut off from the household -- right
-      // before the refresh affordance itself disappears because it is
-      // gated on linked state.
-      return !revoked;
+      // "ok" here would tell the user "yes, working" at the exact moment
+      // their device is being cut off from the household -- right before
+      // the refresh affordance itself disappears because it is gated on
+      // linked state.
+      revoked = await _pull();
     } on Object catch (error, stackTrace) {
       _logFailure('refreshNow', error, stackTrace);
-      return false;
+      pullFailed = true;
     }
+    if (report.rejected) {
+      return RefreshOutcome.rejected;
+    }
+    if (report.failed || pullFailed || revoked) {
+      return RefreshOutcome.offline;
+    }
+    return RefreshOutcome.ok;
   }
 
   @override
   Future<void> pushDirty() async {
-    try {
-      await _pushAll();
-    } on Object catch (error, stackTrace) {
-      // Catches `Error` subclasses too, not just `Exception` -- spec
-      // §8.3's "every engine error is swallowed" is read literally here:
-      // an uncaught `Error` (e.g. from an unexpected server response
-      // shape) would otherwise propagate to the zone and could be killed
-      // silently, with no debug log at all.
-      _logFailure('pushDirty', error, stackTrace);
+    final report = await _pushAll();
+    if (report.failed) {
+      // Retry later (spec §8.3); the poll's own tick still pulls. A
+      // REJECTED row is not a reason to skip the pull: it is quarantined
+      // precisely so that everything else keeps flowing.
       return;
     }
     // Pull after every successful push (spec §8.3c).
@@ -445,11 +684,21 @@ class SupabaseSyncEngine implements SyncEngine {
   @override
   Future<void> pullSince() async {
     try {
-      await _pullSinceInner();
+      await _pull();
     } on Object catch (error, stackTrace) {
       _logFailure('pullSince', error, stackTrace);
     }
   }
+
+  /// Runs [_pullSinceInner], or joins the one already running (technical
+  /// review 2026-10-06 #17). `whenComplete` clears the slot before the
+  /// shared future completes, so a caller that starts a pull AFTER this
+  /// one finished gets a fresh pull, while every caller that arrived during
+  /// it shares this one's result -- including its error, which each
+  /// caller's own try/catch then handles.
+  Future<bool> _pull() => _inFlightPull ??= _pullSinceInner().whenComplete(
+    () => _inFlightPull = null,
+  );
 
   /// The pull itself -- THROWS on failure. [pullSince] swallows that;
   /// [refreshNow] reports it. Returns whether this pull discovered
@@ -480,45 +729,19 @@ class SupabaseSyncEngine implements SyncEngine {
         : DateTime.parse(current.syncLastPulledAt!);
     // Server now() FIRST (spec §8.3): a row touched between this call and
     // the per-table reads below ends up with `updated_at` AFTER this
-    // value, so the NEXT pull (cursor == this value) finds it again --
-    // a possible harmless re-apply, never a missed row.
+    // value, so the NEXT pull finds it again -- a possible harmless
+    // re-apply, never a missed row. (A row whose TRANSACTION began before
+    // this call but committed after a table read is stamped BEFORE this
+    // value; the cursor overlap below covers that case.)
     final serverNow = await transport.serverNow();
 
-    final householdRows = await transport.pullTable(
-      'households',
-      householdId: householdId,
-      since: since,
-    );
-    final memberRows = await transport.pullTable(
-      'members',
-      householdId: householdId,
-      since: since,
-    );
-    final categoryRows = await transport.pullTable(
-      'categories',
-      householdId: householdId,
-      since: since,
-    );
-    final choreRows = await transport.pullTable(
-      'chores',
-      householdId: householdId,
-      since: since,
-    );
-    final assigneeRows = await transport.pullTable(
-      'chore_assignees',
-      householdId: householdId,
-      since: since,
-    );
-    final occurrenceRows = await transport.pullTable(
-      'chore_occurrences',
-      householdId: householdId,
-      since: since,
-    );
-    final itemRows = await transport.pullTable(
-      'shopping_items',
-      householdId: householdId,
-      since: since,
-    );
+    final householdRows = await _pullAllPages('households', since);
+    final memberRows = await _pullAllPages('members', since);
+    final categoryRows = await _pullAllPages('categories', since);
+    final choreRows = await _pullAllPages('chores', since);
+    final assigneeRows = await _pullAllPages('chore_assignees', since);
+    final occurrenceRows = await _pullAllPages('chore_occurrences', since);
+    final itemRows = await _pullAllPages('shopping_items', since);
 
     // Apply in FK order, in ONE local transaction (spec §8.3).
     await db.transaction(() async {
@@ -534,17 +757,30 @@ class SupabaseSyncEngine implements SyncEngine {
       for (final row in choreRows) {
         await _sync.applyPulledChore(choreFromRow(row));
       }
+      // Assignees are applied PER CHORE as one LWW value (spec §8.3
+      // amendment 2026-10-06): live rows and tombstones (§8.6.5) for a
+      // chore are grouped and handed over together, so a dirty local chore
+      // keeps its whole list and a clean one takes the pulled list whole.
+      final liveByChore = <String, List<ChoreAssignee>>{};
+      final tombstonedByChore = <String, List<String>>{};
       for (final row in assigneeRows) {
-        // A tombstoned row is a local hard delete, not an apply (spec
-        // `docs/specs/sync-backend.md` §8.6.5).
+        final choreId = row['chore_id']! as String;
         if (row['deleted_at'] != null) {
-          await _sync.applyPulledAssigneeDeletion(
-            row['chore_id']! as String,
-            row['member_id']! as String,
-          );
+          tombstonedByChore
+              .putIfAbsent(choreId, () => [])
+              .add(row['member_id']! as String);
         } else {
-          await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
+          liveByChore
+              .putIfAbsent(choreId, () => [])
+              .add(choreAssigneeFromRow(row));
         }
+      }
+      for (final choreId in {...liveByChore.keys, ...tombstonedByChore.keys}) {
+        await _sync.applyPulledAssigneeSet(
+          choreId,
+          live: liveByChore[choreId] ?? const [],
+          tombstonedMemberIds: tombstonedByChore[choreId] ?? const [],
+        );
       }
       for (final row in occurrenceRows) {
         if (row['deleted_at'] != null) {
@@ -561,25 +797,61 @@ class SupabaseSyncEngine implements SyncEngine {
       // push.
       await _sync.repairGhostOccurrences(
         householdId,
-        DateTime.now().toUtc().toIso8601String(),
+        clock.now().toUtc().toIso8601String(),
       );
     });
 
-    // Cursor stored only after the transaction above commits (spec §8.3).
-    await settings.setSyncLastPulledAt(serverNow);
+    // Cursor stored only after the transaction above commits (spec §8.3),
+    // and BEHIND the server now() by [syncCursorOverlap] -- see its doc
+    // comment for why `now()` being transaction-start time makes an exact
+    // cursor leak rows.
+    await settings.setSyncLastPulledAt(serverNow.subtract(syncCursorOverlap));
+    onPullCompleted?.call(clock.now());
     return false;
+  }
+
+  /// Every matching row of [table], fetched [syncPageSize] at a time until
+  /// a short page (see [syncPageSize] for why). Throws like any other pull
+  /// step: a failure on any page fails the whole pull, so the cursor never
+  /// advances past rows that were not fetched.
+  Future<List<Map<String, Object?>>> _pullAllPages(
+    String table,
+    DateTime? since,
+  ) async {
+    final rows = <Map<String, Object?>>[];
+    var offset = 0;
+    while (true) {
+      final page = await transport.pullTable(
+        table,
+        householdId: householdId,
+        since: since,
+        offset: offset,
+        limit: syncPageSize,
+      );
+      rows.addAll(page);
+      if (page.length < syncPageSize) {
+        return rows;
+      }
+      offset += syncPageSize;
+    }
   }
 
   /// Households-only push (spec §8.3's grants note applied to `households`
   /// too -- see [SyncTransport.updateHousehold]'s doc comment): a plain
   /// UPDATE per dirty row, never an upsert.
-  Future<void> _pushHouseholds() async {
-    final dirty = await _sync.dirtyHouseholds();
-    for (final household in dirty) {
-      await transport.updateHousehold(household.id, householdRow(household));
-      await _sync.clearHouseholdDirty(household.id, household.updatedAt);
-    }
-  }
+  Future<bool> _pushHouseholds(_PushReport report) async => _pushRows(
+    report,
+    table: 'households',
+    rows: await _sync.dirtyHouseholds(),
+    idOf: (household) => household.id,
+    send: (rows) async {
+      for (final household in rows) {
+        await transport.updateHousehold(household.id, householdRow(household));
+      }
+    },
+    clear: (household) =>
+        _sync.clearHouseholdDirty(household.id, household.updatedAt),
+  );
 
   /// Members-only push (spec §8.3): insert-with-ignore for every dirty row
   /// (covers brand-new members), THEN a granted-columns-only update for
@@ -590,122 +862,130 @@ class SupabaseSyncEngine implements SyncEngine {
   /// granted columns (name, color, role, deleted_at), so a local soft
   /// delete (`MemberService.deleteMember`) propagates as a tombstone
   /// exactly like every other field change.
-  Future<void> _pushMembers() async {
-    final dirty = await _sync.dirtyMembers();
-    if (dirty.isEmpty) {
-      return;
-    }
-    await transport.insertMembersIgnoringConflicts([
-      for (final member in dirty) memberRow(member),
-    ]);
-    for (final member in dirty) {
-      await transport.updateMemberGrantedColumns(member.id, {
-        'name': member.name,
-        'color': member.color,
-        'role': member.role.name,
-        'deleted_at': member.deletedAt,
-      });
-      await _sync.clearMemberDirty(member.id, member.updatedAt);
-    }
-  }
+  Future<bool> _pushMembers(_PushReport report) async => _pushRows(
+    report,
+    table: 'members',
+    rows: await _sync.dirtyMembers(),
+    idOf: (member) => member.id,
+    send: (rows) async {
+      await transport.insertMembersIgnoringConflicts([
+        for (final member in rows) memberRow(member),
+      ]);
+      for (final member in rows) {
+        await transport.updateMemberGrantedColumns(member.id, {
+          'name': member.name,
+          'color': member.color,
+          'role': member.role.name,
+          'deleted_at': member.deletedAt,
+        });
+      }
+    },
+    clear: (member) => _sync.clearMemberDirty(member.id, member.updatedAt),
+  );
 
-  Future<void> _pushCategories() async {
-    final dirty = await _sync.dirtyCategories();
-    if (dirty.isEmpty) {
-      return;
-    }
-    await transport.upsertRows('categories', [
-      for (final category in dirty) categoryRow(category),
-    ]);
-    for (final category in dirty) {
-      await _sync.clearCategoryDirty(category.id, category.updatedAt);
-    }
-  }
+  Future<bool> _pushCategories(_PushReport report) async => _pushRows(
+    report,
+    table: 'categories',
+    rows: await _sync.dirtyCategories(),
+    idOf: (category) => category.id,
+    send: (rows) => transport.upsertRows('categories', [
+      for (final category in rows) categoryRow(category),
+    ]),
+    clear: (category) =>
+        _sync.clearCategoryDirty(category.id, category.updatedAt),
+  );
 
-  Future<void> _pushChores() async {
-    final dirty = await _sync.dirtyChores();
-    if (dirty.isEmpty) {
-      return;
-    }
-    await transport.upsertRows('chores', [
-      for (final chore in dirty) choreRow(chore),
-    ]);
-    for (final chore in dirty) {
-      await _sync.clearChoreDirty(chore.id, chore.updatedAt);
-    }
-  }
+  Future<bool> _pushChores(_PushReport report) async => _pushRows(
+    report,
+    table: 'chores',
+    rows: await _sync.dirtyChores(),
+    idOf: (chore) => chore.id,
+    send: (rows) => transport.upsertRows('chores', [
+      for (final chore in rows) choreRow(chore),
+    ]),
+    clear: (chore) => _sync.clearChoreDirty(chore.id, chore.updatedAt),
+  );
 
   /// `chore_assignees` denormalizes `household_id` (spec §2: "the client
   /// fills it on push") -- neither local row carries it directly (see
   /// `ChoreAssignees` in `lib/data/db/tables.dart`), so it's looked up via
   /// each dirty row's own chore.
-  Future<void> _pushChoreAssignees() async {
+  Future<bool> _pushChoreAssignees(_PushReport report) async {
     final dirty = await _sync.dirtyChoreAssignees();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
-    final choreIds = {for (final assignee in dirty) assignee.choreId};
-    final chores = await (db.select(
-      db.chores,
-    )..where((tbl) => tbl.id.isIn(choreIds))).get();
-    final choreHouseholdIds = {
-      for (final chore in chores) chore.id: chore.householdId,
-    };
-    await transport.upsertRows(
-      'chore_assignees',
-      [
-        for (final assignee in dirty)
-          choreAssigneeRow(assignee, choreHouseholdIds),
-      ],
-      onConflict: 'chore_id,member_id',
-    );
-    for (final assignee in dirty) {
-      await _sync.clearChoreAssigneeDirty(
+    final choreHouseholdIds = await _householdIdsOfChores({
+      for (final assignee in dirty) assignee.choreId,
+    });
+    return _pushRows(
+      report,
+      table: 'chore_assignees',
+      rows: dirty,
+      idOf: (assignee) => '${assignee.choreId}/${assignee.memberId}',
+      send: (rows) => transport.upsertRows(
+        'chore_assignees',
+        [
+          for (final assignee in rows)
+            choreAssigneeRow(assignee, choreHouseholdIds),
+        ],
+        onConflict: 'chore_id,member_id',
+      ),
+      clear: (assignee) => _sync.clearChoreAssigneeDirty(
         assignee.choreId,
         assignee.memberId,
         assignee.position,
-      );
-    }
+      ),
+    );
+  }
+
+  /// `chore_id -> household_id` for [choreIds], the denormalized column
+  /// `chore_assignees`/`chore_occurrences` carry on the server.
+  Future<Map<String, String>> _householdIdsOfChores(
+    Set<String> choreIds,
+  ) async {
+    final chores = await (db.select(
+      db.chores,
+    )..where((tbl) => tbl.id.isIn(choreIds))).get();
+    return {for (final chore in chores) chore.id: chore.householdId};
   }
 
   /// `chore_occurrences` denormalizes `household_id` the same way
   /// `chore_assignees` does; see [_pushChoreAssignees].
-  Future<void> _pushChoreOccurrences() async {
+  Future<bool> _pushChoreOccurrences(_PushReport report) async {
     final dirty = await _sync.dirtyChoreOccurrences();
     if (dirty.isEmpty) {
-      return;
+      return false;
     }
-    final choreIds = {for (final occurrence in dirty) occurrence.choreId};
-    final chores = await (db.select(
-      db.chores,
-    )..where((tbl) => tbl.id.isIn(choreIds))).get();
-    final choreHouseholdIds = {
-      for (final chore in chores) chore.id: chore.householdId,
-    };
-    await transport.upsertRows('chore_occurrences', [
-      for (final occurrence in dirty)
-        choreOccurrenceRow(occurrence, choreHouseholdIds),
-    ]);
-    for (final occurrence in dirty) {
-      await _sync.clearChoreOccurrenceDirty(
+    final choreHouseholdIds = await _householdIdsOfChores({
+      for (final occurrence in dirty) occurrence.choreId,
+    });
+    return _pushRows(
+      report,
+      table: 'chore_occurrences',
+      rows: dirty,
+      idOf: (occurrence) => occurrence.id,
+      send: (rows) => transport.upsertRows('chore_occurrences', [
+        for (final occurrence in rows)
+          choreOccurrenceRow(occurrence, choreHouseholdIds),
+      ]),
+      clear: (occurrence) => _sync.clearChoreOccurrenceDirty(
         occurrence.id,
         occurrence.updatedAt,
-      );
-    }
+      ),
+    );
   }
 
-  Future<void> _pushShoppingItems() async {
-    final dirty = await _sync.dirtyShoppingItems();
-    if (dirty.isEmpty) {
-      return;
-    }
-    await transport.upsertRows('shopping_items', [
-      for (final item in dirty) shoppingItemRow(item),
-    ]);
-    for (final item in dirty) {
-      await _sync.clearShoppingItemDirty(item.id, item.updatedAt);
-    }
-  }
+  Future<bool> _pushShoppingItems(_PushReport report) async => _pushRows(
+    report,
+    table: 'shopping_items',
+    rows: await _sync.dirtyShoppingItems(),
+    idOf: (item) => item.id,
+    send: (rows) => transport.upsertRows('shopping_items', [
+      for (final item in rows) shoppingItemRow(item),
+    ]),
+    clear: (item) => _sync.clearShoppingItemDirty(item.id, item.updatedAt),
+  );
 
   /// Pushes the hard-delete outbox (spec `docs/specs/sync-backend.md`
   /// §8.6.3), oldest first. An assignee that was removed and then re-added
@@ -713,24 +993,54 @@ class SupabaseSyncEngine implements SyncEngine {
   /// (the re-added row's own push already sends `deleted_at: null`).
   /// Otherwise [SyncTransport.markDeleted], then delete exactly that
   /// tombstone. Throws like every other push step.
-  Future<void> _pushTombstones() async {
-    for (final tombstone in await _sync.pendingTombstones()) {
+  ///
+  /// An occurrence tombstone matches on `status = 'pending'` as well as
+  /// `id` (spec §8.6 amendment 2026-10-06, technical review #1): every
+  /// local site that hard-deletes an occurrence only ever deletes PENDING
+  /// rows, so the tombstone's meaning is "the pending row is gone" -- and
+  /// it must not land on a row another device has since completed, which
+  /// would erase that completion from the server and from every device.
+  ///
+  /// A tombstone the server REJECTS (class 22/23/42) is quarantined like a
+  /// rejected row ([_quarantine], keyed by its outbox id): it stays in the
+  /// outbox and the next one is tried, so one bad tombstone cannot block
+  /// the rest of the outbox forever.
+  Future<bool> _pushTombstones(_PushReport report) async {
+    final tombstones = await _sync.pendingTombstones();
+    var sentAny = false;
+    for (final tombstone in tombstones) {
       final memberId = tombstone.memberId;
       final isAssignee = tombstone.entity == 'chore_assignees';
       final readded = isAssignee
           ? await _sync.assigneeExists(tombstone.rowId, memberId!)
           : await _sync.occurrenceExists(tombstone.rowId);
       if (!readded) {
-        await transport.markDeleted(
-          tombstone.entity,
-          isAssignee
-              ? {'chore_id': tombstone.rowId, 'member_id': memberId}
-              : {'id': tombstone.rowId},
-          tombstone.deletedAt,
-        );
+        try {
+          await transport.markDeleted(
+            tombstone.entity,
+            isAssignee
+                ? {'chore_id': tombstone.rowId, 'member_id': memberId}
+                : {'id': tombstone.rowId, 'status': 'pending'},
+            tombstone.deletedAt,
+          );
+        } on Object catch (error, stackTrace) {
+          if (!_isRejection(error)) {
+            rethrow;
+          }
+          _quarantine(
+            report,
+            'sync_tombstones',
+            '${tombstone.id}',
+            error,
+            stackTrace,
+          );
+          continue;
+        }
+        sentAny = true;
       }
       await _sync.deleteTombstone(tombstone.id);
     }
+    return sentAny;
   }
 
   /// Failure posture (spec §8.3): every engine error is swallowed into a
@@ -744,6 +1054,21 @@ class SupabaseSyncEngine implements SyncEngine {
   void _logFailure(String where, Object error, StackTrace stackTrace) {
     AppLog.error('sync.$where', error, stackTrace);
   }
+}
+
+/// What one [SupabaseSyncEngine._pushAll] run found, table by table.
+class _PushReport {
+  /// Whether anything at all reached the server (opens the realtime echo
+  /// window).
+  bool pushedAny = false;
+
+  /// Whether at least one row was REJECTED by the server (class 22/23/42)
+  /// and quarantined -- [RefreshOutcome.rejected].
+  bool rejected = false;
+
+  /// Whether at least one table failed for any other reason (network,
+  /// server down) -- retry-later, [RefreshOutcome.offline].
+  bool failed = false;
 }
 
 /// The production [SyncTransport]: a thin wrapper over
@@ -769,6 +1094,8 @@ class SupabaseSyncTransport implements SyncTransport {
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   }) async {
     // `households` is scoped by its own `id`; every other synced table
     // carries (or, for chore_assignees/chore_occurrences, denormalizes)
@@ -778,7 +1105,14 @@ class SupabaseSyncTransport implements SyncTransport {
     if (since != null) {
       query = query.gt('updated_at', since.toUtc().toIso8601String());
     }
-    final rows = await query;
+    // A total order is what makes `range` pages disjoint and complete
+    // (see [syncPageSize]): `updated_at` alone has ties (one bulk upsert
+    // stamps every row with the same `now()`), so the primary key follows.
+    var ordered = query.order('updated_at', ascending: true);
+    for (final column in pageOrderKeyColumns(table)) {
+      ordered = ordered.order(column, ascending: true);
+    }
+    final rows = await ordered.range(offset, offset + limit - 1);
     return [for (final row in rows) Map<String, Object?>.from(row)];
   }
 

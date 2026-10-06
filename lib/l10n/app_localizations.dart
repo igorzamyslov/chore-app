@@ -1958,6 +1958,18 @@ abstract class AppLocalizations {
   /// **'This phone was removed from the household, so nothing will sync. Nothing is lost — see Settings → Household to reconnect.'**
   String get syncRefreshErrorRevoked;
 
+  /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED sync (pull-to-refresh, or the Settings -> Account sync tile) finds that the server REFUSED at least one of this phone's rows with a 22/23/42-class Postgres error (SyncEngine.refreshNow() returned RefreshOutcome.rejected; spec docs/specs/sync-backend.md 8.3 amendment 2026-10-06). A retry never fixes such a row, so syncRefreshError's 'will sync later' would be a false promise; this names the honest state (that one change did not go through), the most likely remedy (an outdated app sending a shape the server no longer accepts), and reassures that everything else still syncs because the rejected row is quarantined rather than blocking the rest.
+  ///
+  /// In en, this message translates to:
+  /// **'The household server rejected a change from this phone, so it hasn\'t gone through. Check for an app update; your other changes keep syncing.'**
+  String get syncRefreshErrorRejected;
+
+  /// Settings -> Account: second line under 'Last synced', shown only while this device has unsent changes (dirty synced rows plus pending hard-delete tombstones, SyncRepository.watchDirtyRowCount; spec docs/specs/sync-freshness.md 2.4 amendment 2026-10-06). 'Waiting to send' rather than 'failed': in the normal case the count is nonzero for a couple of seconds after every edit, so the wording must not alarm; a count that stays put is what tells a suspicious user that sync is stuck. The whole tile is tappable to sync now.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 change waiting to send} other{{count} changes waiting to send}}'**
+  String syncPendingChanges(int count);
+
   /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
   ///
   /// In en, this message translates to:

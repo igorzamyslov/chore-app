@@ -510,12 +510,27 @@ class ChoreRepository {
   }
 
   /// Returns the pending occurrence of [choreId], or `null` if none.
+  ///
+  /// Tolerant of the invariant being briefly broken (technical review
+  /// 2026-10-06 #6): if two pending rows exist -- a ghost a pull has not
+  /// repaired yet, a join-import copy -- this returns the one with the
+  /// latest `dueDate` (then the latest `updatedAt`) rather than throwing
+  /// `Too many elements` out of bootstrap's catch-up. The repair itself is
+  /// `SyncRepository.repairGhostOccurrences`, which
+  /// `ChoreService.catchUpOverdue` runs first; this is only the read side
+  /// staying up while that happens.
   Future<ChoreOccurrence?> pendingOccurrenceOf(String choreId) {
-    return (db.select(db.choreOccurrences)..where(
-          (tbl) =>
-              tbl.choreId.equals(choreId) &
-              tbl.status.equalsValue(OccurrenceStatus.pending),
-        ))
+    return (db.select(db.choreOccurrences)
+          ..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.status.equalsValue(OccurrenceStatus.pending),
+          )
+          ..orderBy([
+            (tbl) => OrderingTerm.desc(tbl.dueDate),
+            (tbl) => OrderingTerm.desc(tbl.updatedAt),
+          ])
+          ..limit(1))
         .getSingleOrNull();
   }
 
@@ -783,11 +798,19 @@ class ChoreRepository {
     }
   }
 
+  /// The chore's assignee ids in rotation order. `memberId` breaks a
+  /// `position` tie so the order is deterministic on every device even if
+  /// two rows ever share a position (technical review 2026-10-06 #8 --
+  /// the pull now applies the list as one value, so this is defence in
+  /// depth, not the fix).
   Future<List<String>> _currentAssigneeIds(String choreId) async {
     final rows =
         await (db.select(db.choreAssignees)
               ..where((tbl) => tbl.choreId.equals(choreId))
-              ..orderBy([(tbl) => OrderingTerm(expression: tbl.position)]))
+              ..orderBy([
+                (tbl) => OrderingTerm(expression: tbl.position),
+                (tbl) => OrderingTerm(expression: tbl.memberId),
+              ]))
             .get();
     return [for (final row in rows) row.memberId];
   }
