@@ -418,6 +418,70 @@ void main() {
   );
 
   testChoreApp(
+    'linked household: each member row says who is you, who joined on their '
+    'own phone, and who has no phone yet (persona review D4)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u1')));
+      final anna = await claimedMember(database, name: 'Anna', userId: 'u2');
+      final kid = await HouseholdRepository(database).addMember(
+        await currentHouseholdId(database),
+        name: 'Kid',
+        color: 0xFF6D9F71,
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+
+      Finder statusOf(String memberId) => find.descendant(
+        of: find.bySemanticsIdentifier('members.row.$memberId.status'),
+        matching: find.byType(Text),
+      );
+      expect(tester.widget<Text>(statusOf(me.id)).data, 'You');
+      expect(
+        tester.widget<Text>(statusOf(anna.id)).data,
+        'Uses Famdo on their own phone',
+      );
+      expect(
+        tester.widget<Text>(statusOf(kid.id)).data,
+        'No phone yet — you can mark their chores',
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'local household: member rows carry no status line (persona review D4)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('members.row.${me.id}.status'),
+        findsNothing,
+      );
+      expect(find.text('You'), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
     'member delete action (spec A1) is hidden, not disabled, for the '
     "household's last remaining member -- T1.7: a visible explanation "
     'names the actual reason in its place',
@@ -792,7 +856,15 @@ void main() {
       // The claimed body, not the unclaimed one: the effect on the removed
       // person's own phone is the one consequence the person tapping Delete
       // cannot see from here.
-      expect(find.textContaining('their own phone'), findsOneWidget);
+      // Scoped to the dialog: the member row behind it now carries its own
+      // "Uses Famdo on their own phone" status line (persona review D4).
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('their own phone'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.bySemanticsIdentifier('members.edit.delete.confirm'),

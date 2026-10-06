@@ -242,6 +242,9 @@
   "settingsMembersInviteShare": "Teilen",
   "settingsMembersInviteShareText": "Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code {code} ein.",
   "settingsMembersInviteError": "Die Einladung konnte nicht erstellt werden. Versuch es noch mal.",
+  "memberStatusYou": "Du",
+  "memberStatusLinked": "Nutzt Famdo auf dem eigenen Handy",
+  "memberStatusUnclaimed": "Noch kein Handy — du kannst ihre Aufgaben abhaken",
 
   "manageMembersTitle": "Mitglieder",
   "manageMembersErrorMessage": "Deine Mitglieder konnten nicht geladen werden.",

@@ -912,6 +912,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t create an invite. Please try again.';
 
   @override
+  String get memberStatusYou => 'You';
+
+  @override
+  String get memberStatusLinked => 'Uses Famdo on their own phone';
+
+  @override
+  String get memberStatusUnclaimed =>
+      'No phone yet — you can mark their chores';
+
+  @override
   String get manageMembersTitle => 'Members';
 
   @override

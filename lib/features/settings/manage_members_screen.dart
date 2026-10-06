@@ -31,6 +31,7 @@ class ManageMembersScreen extends ConsumerWidget {
     final membersAsync = ref.watch(membersProvider);
     final linked =
         ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
+    final myUserId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageMembersTitle)),
@@ -49,6 +50,9 @@ class ManageMembersScreen extends ConsumerWidget {
             final member = members[linked ? afterHeader - 1 : afterHeader];
             return _MemberRow(
               member: member,
+              status: linked
+                  ? _statusLine(l10n, member: member, myUserId: myUserId)
+                  : null,
               onTap: () => showMemberEditSheet(context, member: member),
             );
           },
@@ -66,6 +70,25 @@ class ManageMembersScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The linked-household status line under a member row (persona review D4):
+/// who is "you", who has joined on their own phone, who has no phone yet.
+/// Only meaningful once the household is online -- a local household has no
+/// accounts at all, so the caller passes no status there.
+String _statusLine(
+  AppLocalizations l10n, {
+  required Member member,
+  required String? myUserId,
+}) {
+  final userId = member.userId;
+  if (userId == null) {
+    return l10n.memberStatusUnclaimed;
+  }
+  if (userId == myUserId) {
+    return l10n.memberStatusYou;
+  }
+  return l10n.memberStatusLinked;
 }
 
 /// The editable household-name row (spec
@@ -124,16 +147,23 @@ class _InviteRow extends ConsumerWidget {
   }
 }
 
-/// One member row: avatar + name, tappable to open the edit sheet.
+/// One member row: avatar + name (+ the linked-household [status] line,
+/// semantic id `members.row.<memberId>.status`), tappable to open the edit
+/// sheet.
 ///
 /// Row semantic id is `members.row.<memberId>`, not `members.row.<name>` —
 /// names aren't unique (duplicates are allowed by design, spec §3) — so
 /// E2E flows select rows by their visible name text instead, matching the
 /// manage-categories screen's convention.
 class _MemberRow extends StatelessWidget {
-  const _MemberRow({required this.member, required this.onTap});
+  const _MemberRow({
+    required this.member,
+    required this.status,
+    required this.onTap,
+  });
 
   final Member member;
+  final String? status;
   final VoidCallback onTap;
 
   @override
@@ -144,6 +174,12 @@ class _MemberRow extends StatelessWidget {
         // 42px, the design canvas's members-row avatar (G-4).
         leading: MemberAvatar(member: member, radius: 21),
         title: Text(member.name),
+        subtitle: status == null
+            ? null
+            : semantic(
+                'members.row.${member.id}.status',
+                child: Text(status!),
+              ),
         onTap: onTap,
       ),
     );

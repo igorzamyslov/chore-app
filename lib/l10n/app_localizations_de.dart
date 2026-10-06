@@ -917,6 +917,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Einladung konnte nicht erstellt werden. Versuch es noch mal.';
 
   @override
+  String get memberStatusYou => 'Du';
+
+  @override
+  String get memberStatusLinked => 'Nutzt Famdo auf dem eigenen Handy';
+
+  @override
+  String get memberStatusUnclaimed =>
+      'Noch kein Handy — du kannst ihre Aufgaben abhaken';
+
+  @override
   String get manageMembersTitle => 'Mitglieder';
 
   @override

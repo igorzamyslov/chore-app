@@ -123,6 +123,17 @@ superseded; see that spec for the current behavior.
   that spec for the current delete affordance (visibility guards,
   referential cleanup) and `lib/application/member_service.dart`.
 
+> **Amendment 2026-10-06 (persona review D4) — status line per row.** While
+> the household is linked (`settings.syncHouseholdId != null`), each member
+> row gains a subtitle (`members.row.<memberId>.status`) derived from
+> `members.userId`: claimed by the signed-in account → "You"; claimed by
+> anyone else → "Uses Famdo on their own phone"; unclaimed → "No phone yet —
+> you can mark their chores". A local household shows no subtitle (no
+> accounts exist there). Soft-deleted members are not listed at all, so
+> there is no "moved out" line: a member who leaves is soft-deleted
+> server-side (`household-lifecycle.md` §2.2 amendment 2026-10-06) and drops
+> out of this list and of every rotation.
+
 ## 4. Who the app acts as
 
 Two modes, decided by `memberIdentityModeProvider` (`lib/app/providers.dart`)

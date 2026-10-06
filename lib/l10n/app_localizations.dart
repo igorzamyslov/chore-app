@@ -1346,6 +1346,24 @@ abstract class AppLocalizations {
   /// **'Couldn\'t create an invite. Please try again.'**
   String get settingsMembersInviteError;
 
+  /// Members screen row subtitle (linked households only) for the profile claimed by the signed-in account on this phone (persona review D4: rows used to be avatar + name only).
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get memberStatusYou;
+
+  /// Members screen row subtitle (linked households only) for a profile some other account has claimed — that person joined and marks their own chores.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses Famdo on their own phone'**
+  String get memberStatusLinked;
+
+  /// Members screen row subtitle (linked households only) for a profile nobody has claimed: a joiner can still pick it, and meanwhile anyone can complete that person's chores.
+  ///
+  /// In en, this message translates to:
+  /// **'No phone yet — you can mark their chores'**
+  String get memberStatusUnclaimed;
+
   /// App bar title of the manage-members screen.
   ///
   /// In en, this message translates to:
