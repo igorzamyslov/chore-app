@@ -151,6 +151,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuEdit => 'Bearbeiten';
 
   @override
+  String get choresMenuDuplicate => 'Duplizieren';
+
+  @override
   String get choresMenuPause => 'Pausieren';
 
   @override

@@ -24,6 +24,10 @@ enum ChoreMenuAction {
   /// Open the chore in the edit form.
   edit,
 
+  /// Open the form in create mode, prefilled from this chore (persona
+  /// review 2026-10-06 C9). Pending variant only.
+  duplicate,
+
   /// Pause the chore (removing its pending occurrence).
   pause,
 
@@ -41,7 +45,7 @@ enum ChoreMenuAction {
 /// Two variants:
 ///
 /// - a pending occurrence (the default): optionally mark-done-for and
-///   reassign, then skip/edit/pause/delete;
+///   reassign, then skip/edit/duplicate/pause/delete;
 /// - [paused] (persona review 2026-10-06 C4): resume/edit/delete only — a
 ///   paused chore has no open turn to skip, mark done or pause again, but
 ///   it can still be changed or removed without resuming it first.
@@ -125,6 +129,13 @@ Future<ChoreMenuAction?> showChoreActionSheet(
               icon: Icons.edit_outlined,
               label: l10n.choresMenuEdit,
             ),
+            if (!paused)
+              row(
+                ChoreMenuAction.duplicate,
+                id: 'chores.menu.duplicate',
+                icon: Icons.copy_outlined,
+                label: l10n.choresMenuDuplicate,
+              ),
             if (!paused)
               row(
                 ChoreMenuAction.pause,

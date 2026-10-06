@@ -37,6 +37,7 @@
   "choresMarkDoneForTitle": "Wer hat das gemacht?",
   "choresMenuSkip": "Überspringen",
   "choresMenuEdit": "Bearbeiten",
+  "choresMenuDuplicate": "Duplizieren",
   "choresMenuPause": "Pausieren",
 
   "choresDeleteDialogTitle": "Aufgabe löschen?",

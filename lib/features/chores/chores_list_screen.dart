@@ -373,6 +373,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         await _showCloseSnackbar(occurrence: occurrence, skipped: true);
       case ChoreMenuAction.edit:
         await _edit(occurrence.chore.id);
+      case ChoreMenuAction.duplicate:
+        // C9 (persona review 2026-10-06): the create form, prefilled.
+        // Saving creates a second chore; like any create, it pops silently.
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) =>
+                ChoreFormScreen(duplicateOfChoreId: occurrence.chore.id),
+          ),
+        );
       case ChoreMenuAction.pause:
         await _pause(occurrence);
       case ChoreMenuAction.resume:
@@ -404,6 +413,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       case ChoreMenuAction.markDoneFor:
       case ChoreMenuAction.reassign:
       case ChoreMenuAction.skip:
+      case ChoreMenuAction.duplicate:
       case ChoreMenuAction.pause:
         // Not offered on the paused sheet: there is no open turn.
         break;

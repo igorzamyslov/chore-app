@@ -28,7 +28,8 @@ import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Creates a new chore, or edits an existing one when [choreId] is given.
+/// Creates a new chore, or edits an existing one when [choreId] is given,
+/// or creates a copy of one when [duplicateOfChoreId] is given.
 ///
 /// Saving an edit routes through `ChoreService.updateChore` rather than
 /// `ChoreRepository.updateChore` directly: per
@@ -37,11 +38,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// `unpauseChore`), so that rule needs to live at the service layer.
 class ChoreFormScreen extends ConsumerStatefulWidget {
   /// Creates the form. Omit [choreId] to create a new chore; pass an
-  /// existing chore's id to edit it.
-  const ChoreFormScreen({this.choreId, super.key});
+  /// existing chore's id to edit it. Pass [duplicateOfChoreId] (and no
+  /// [choreId]) to create a new chore prefilled from that one.
+  const ChoreFormScreen({this.choreId, this.duplicateOfChoreId, super.key})
+    : assert(
+        choreId == null || duplicateOfChoreId == null,
+        'Edit or duplicate, not both',
+      );
 
   /// The chore being edited, or `null` when creating a new one.
   final String? choreId;
+
+  /// The chore to copy (persona review 2026-10-06 C9, "Duplicate"): the
+  /// form opens in CREATE mode prefilled with every field of that chore,
+  /// title included, and saving creates a second chore. The one field that
+  /// may move is a start date in the past -- see `_floorDuplicateStartDate`.
+  final String? duplicateOfChoreId;
 
   @override
   ConsumerState<ChoreFormScreen> createState() => _ChoreFormScreenState();
@@ -183,10 +195,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     // `canPop` is only as fresh as the widget's last build.
     _titleController.addListener(_onDirtyTrackedFieldChanged);
     _notesController.addListener(_onDirtyTrackedFieldChanged);
-    final choreId = widget.choreId;
-    if (choreId != null) {
+    final sourceId = widget.choreId ?? widget.duplicateOfChoreId;
+    if (sourceId != null) {
       _loading = true;
-      unawaited(_loadExisting(choreId));
+      unawaited(_loadExisting(sourceId));
     } else {
       _captureInitialSnapshot();
     }
@@ -252,6 +264,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         _monthlyOrdinal = recurrence.monthlyOrdinal ?? _monthlyOrdinal;
         _monthlyWeekday = recurrence.monthlyWeekday ?? _monthlyWeekday;
         _intervalController.text = recurrence.interval.toString();
+      }
+      if (widget.duplicateOfChoreId != null) {
+        _floorDuplicateStartDate();
       }
       _loading = false;
     });
@@ -453,6 +468,27 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
       case AssignmentError.needsTwoMembers:
         return l10n.choreFormAssignmentNeedsTwoError;
     }
+  }
+
+  /// C9 (persona review 2026-10-06): a copy keeps every field, except that
+  /// a start date already in the past moves to today -- otherwise the copy
+  /// would be born overdue (its first slot computed from a months-old
+  /// anchor). A monthly day-of-month rule then re-aligns the date onto its
+  /// day, forwards, keeping the OPD-1 start-date mirror intact (see
+  /// [_onMonthlyDayOfMonthChanged]). Weekly and nth-weekday rules carry
+  /// their pattern explicitly, so moving the anchor does not change them.
+  void _floorDuplicateStartDate() {
+    final today = ref.read(todayProvider);
+    if (!_startDate.isBefore(today)) {
+      return;
+    }
+    _startDate =
+        _repeatEnabled &&
+            _unit == RecurrenceUnit.month &&
+            _anchor == RecurrenceAnchor.schedule &&
+            _monthlyMode == MonthlyMode.dayOfMonth
+        ? alignStartDateToMonthlyDay(today, _monthlyDayOfMonth)
+        : today;
   }
 
   /// Fills every directly-editable pattern field from [_startDate].

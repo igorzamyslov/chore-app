@@ -290,6 +290,12 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get choresMenuEdit;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C9, Maria: 'I'm typing six chores from scratch'): opens the new-chore form prefilled with every field of this chore, title included; saving creates a second chore.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get choresMenuDuplicate;
+
   /// Chore occurrence action-sheet entry: pause the chore.
   ///
   /// In en, this message translates to:

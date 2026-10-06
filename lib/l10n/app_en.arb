@@ -170,6 +170,10 @@
   "@choresMenuEdit": {
     "description": "Chore occurrence action-sheet entry: open the chore in the edit form."
   },
+  "choresMenuDuplicate": "Duplicate",
+  "@choresMenuDuplicate": {
+    "description": "Chore occurrence action-sheet entry (persona review 2026-10-06 C9, Maria: 'I'm typing six chores from scratch'): opens the new-chore form prefilled with every field of this chore, title included; saving creates a second chore."
+  },
   "choresMenuPause": "Pause",
   "@choresMenuPause": {
     "description": "Chore occurrence action-sheet entry: pause the chore."

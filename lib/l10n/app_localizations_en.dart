@@ -150,6 +150,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuEdit => 'Edit';
 
   @override
+  String get choresMenuDuplicate => 'Duplicate';
+
+  @override
   String get choresMenuPause => 'Pause';
 
   @override
