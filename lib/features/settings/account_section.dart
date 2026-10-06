@@ -27,6 +27,7 @@ import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/features/settings/last_synced_line.dart';
 import 'package:chore_app/features/settings/membership_revoked_notice.dart';
+import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -139,8 +140,15 @@ class _ComingSoonTile extends StatelessWidget {
 
 /// The signed-in row: account email (plus, once linked, a subtitle naming
 /// the household -- spec §7.3 last paragraph -- and a relative "Last synced"
-/// line, spec `docs/specs/sync-freshness.md` §2.4), with a 'Sign out' action
-/// that opens a confirmation dialog first.
+/// line with a pending-changes count, spec `docs/specs/sync-freshness.md`
+/// §2.4), with a 'Sign out' action that opens a confirmation dialog first.
+///
+/// Once linked the whole tile is tappable and runs a user-initiated sync
+/// (§2.4 amendment 2026-10-06, semantic id `settings.account.syncNow`):
+/// this is the one place that SHOWS whether sync is alive, so it should
+/// also be a place to make it try -- a "3 changes waiting to send" line
+/// with no way to act on it would be the same dead end as a banner without
+/// recourse. The outcome snackbar is the shared `refreshAndReport`.
 class _SignedInTile extends ConsumerWidget {
   const _SignedInTile({required this.user, this.householdName});
 
@@ -156,31 +164,37 @@ class _SignedInTile extends ConsumerWidget {
     final householdName = this.householdName;
     return semantic(
       'settings.account.signedIn',
-      child: ListTile(
-        leading: const Icon(Icons.account_circle_outlined),
-        title: Text(user.email),
-        subtitle: householdName == null
-            ? null
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.settingsAccountLinkedSubtitle(householdName)),
-                  // §2.4's relative last-sync line, read from the
-                  // `syncLastPulledAt` cursor the engine persists on every
-                  // successful pull. Mounted only here, on the linked
-                  // branch, since the cursor is meaningless while unlinked;
-                  // it renders nothing until there is a cursor, and keeps
-                  // its own text fresh while the screen stays open
-                  // (backlog A-2b).
-                  const LastSyncedLine(),
-                ],
-              ),
-        trailing: semantic(
-          'settings.account.signOut',
-          child: TextButton(
-            onPressed: () => _confirmAndSignOut(context, ref),
-            child: Text(l10n.settingsAccountSignOut),
+      child: semantic(
+        'settings.account.syncNow',
+        child: ListTile(
+          onTap: householdName == null
+              ? null
+              : () => refreshAndReport(context, ref),
+          leading: const Icon(Icons.account_circle_outlined),
+          title: Text(user.email),
+          subtitle: householdName == null
+              ? null
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l10n.settingsAccountLinkedSubtitle(householdName)),
+                    // §2.4's relative last-sync line, read from the
+                    // `syncLastPulledAt` cursor the engine persists on every
+                    // successful pull. Mounted only here, on the linked
+                    // branch, since the cursor is meaningless while unlinked;
+                    // it renders nothing until there is a cursor, and keeps
+                    // its own text fresh while the screen stays open
+                    // (backlog A-2b).
+                    const LastSyncedLine(),
+                  ],
+                ),
+          trailing: semantic(
+            'settings.account.signOut',
+            child: TextButton(
+              onPressed: () => _confirmAndSignOut(context, ref),
+              child: Text(l10n.settingsAccountSignOut),
+            ),
           ),
         ),
       ),

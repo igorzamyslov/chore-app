@@ -83,33 +83,58 @@ class _LastSyncedLineState extends ConsumerState<LastSyncedLine> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final lastPulledAtRaw = ref
         .watch(settingsProvider)
         .valueOrNull
         ?.syncLastPulledAt;
+    // Spec §2.4 amendment 2026-10-06: how many changes are still waiting
+    // to be sent. `0` while unlinked or still loading, so the line is
+    // simply absent then.
+    final pending = ref.watch(syncPendingCountProvider).valueOrNull ?? 0;
+
+    final lines = <Widget>[];
     if (lastPulledAtRaw == null) {
       _stopTicking();
       // Deliberately semantics-free: while there is no cursor there must be
       // no `settings.account.lastSynced` node for E2E or widget tests to
       // find, exactly as the omitted widget it replaced had none.
+    } else {
+      final lastPulledAt = DateTime.parse(lastPulledAtRaw);
+      final now = ref.watch(clockProvider).now();
+      _tickAt(
+        _nextChange(now: now, lastPulledAt: lastPulledAt),
+        now: now,
+      );
+      lines.add(
+        semantic(
+          'settings.account.lastSynced',
+          child: Text(
+            _lastSyncedText(
+              l10n,
+              Localizations.localeOf(context).toString(),
+              now: now,
+              lastPulledAt: lastPulledAt,
+            ),
+          ),
+        ),
+      );
+    }
+    if (pending > 0) {
+      lines.add(
+        semantic(
+          'settings.account.pendingChanges',
+          child: Text(l10n.syncPendingChanges(pending)),
+        ),
+      );
+    }
+    if (lines.isEmpty) {
       return const SizedBox.shrink();
     }
-    final lastPulledAt = DateTime.parse(lastPulledAtRaw);
-    final now = ref.watch(clockProvider).now();
-    _tickAt(
-      _nextChange(now: now, lastPulledAt: lastPulledAt),
-      now: now,
-    );
-    return semantic(
-      'settings.account.lastSynced',
-      child: Text(
-        _lastSyncedText(
-          AppLocalizations.of(context),
-          Localizations.localeOf(context).toString(),
-          now: now,
-          lastPulledAt: lastPulledAt,
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: lines,
     );
   }
 

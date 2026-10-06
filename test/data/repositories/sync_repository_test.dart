@@ -89,4 +89,65 @@ void main() {
       },
     );
   });
+
+  // Spec `docs/specs/sync-freshness.md` §2.4 amendment 2026-10-06: the
+  // "N changes waiting to send" line's source.
+  group('watchDirtyRowCount', () {
+    test(
+      'counts dirty rows across every synced table PLUS pending tombstones, '
+      'and re-emits as they come and go',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        final households = HouseholdRepository(db);
+        final categories = CategoryRepository(db);
+        final repo = SyncRepository(db);
+        final household = await households.createLocalHousehold('Me');
+
+        final seen = <int>[];
+        final subscription = repo.watchDirtyRowCount().listen(seen.add);
+        await pumpEventQueue();
+        // createLocalHousehold: the household row and its admin member.
+        expect(seen.last, 2);
+
+        for (final table in <TableInfo<Table, dynamic>>[
+          db.households,
+          db.members,
+        ]) {
+          await db.customUpdate(
+            'UPDATE ${table.actualTableName} SET sync_dirty = 0',
+            updates: {table},
+          );
+        }
+        await pumpEventQueue();
+        expect(seen.last, 0);
+
+        await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'Produce',
+          icon: 'a',
+          color: 1,
+        );
+        await pumpEventQueue();
+        expect(seen.last, 1);
+
+        // A hard-delete tombstone is an unsent change too (spec
+        // sync-backend.md §8.6): it has no dirty row of its own.
+        await db
+            .into(db.syncTombstones)
+            .insert(
+              SyncTombstonesCompanion.insert(
+                entity: 'chore_occurrences',
+                rowId: 'gone',
+                deletedAt: '2026-01-01T00:00:00.000Z',
+              ),
+            );
+        await pumpEventQueue();
+        expect(seen.last, 2);
+
+        await subscription.cancel();
+        await db.close();
+      },
+    );
+  });
 }

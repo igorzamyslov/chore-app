@@ -61,6 +61,46 @@ class SyncRepository {
         .map((row) => row.read<int>('any_dirty') == 1);
   }
 
+  /// Watches HOW MANY changes this device still owes the server: every
+  /// `syncDirty` row across the seven synced tables plus every pending
+  /// hard-delete tombstone (spec `docs/specs/sync-backend.md` §8.6 -- a
+  /// deleted row has no dirty row of its own, the outbox entry IS the
+  /// unsent change). Backs `syncPendingCountProvider`
+  /// (`lib/app/providers.dart`) and the "N changes waiting to send" line in
+  /// Settings -> Account (spec `docs/specs/sync-freshness.md` §2.4
+  /// amendment 2026-10-06). Re-emits on a write to any of those eight
+  /// tables.
+  ///
+  /// Kept separate from [watchAnyDirty]: that one is an `EXISTS` the health
+  /// check only needs collapsed to a boolean, and SQLite short-circuits it;
+  /// this one has to count.
+  Stream<int> watchDirtyRowCount() {
+    return db
+        .customSelect(
+          'SELECT '
+          '(SELECT COUNT(*) FROM households WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM members WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM categories WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chores WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chore_assignees WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chore_occurrences WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM shopping_items WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM sync_tombstones) AS pending',
+          readsFrom: {
+            db.households,
+            db.members,
+            db.categories,
+            db.chores,
+            db.choreAssignees,
+            db.choreOccurrences,
+            db.shoppingItems,
+            db.syncTombstones,
+          },
+        )
+        .watchSingle()
+        .map((row) => row.read<int>('pending'));
+  }
+
   // ---------------------------------------------------------------------
   // Dirty select (push, step 1) -- ordered by `id` purely for deterministic
   // test output; push order across ROWS of the same table has no FK

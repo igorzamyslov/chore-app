@@ -591,6 +591,34 @@ final dirtySinceProvider = StreamProvider<DateTime?>((ref) {
   return dirtySinceStream(SyncRepository(db).watchAnyDirty(), clock.now);
 });
 
+/// How many changes this device still owes the server -- dirty synced rows
+/// plus pending hard-delete tombstones ([SyncRepository.watchDirtyRowCount])
+/// -- for the "N changes waiting to send" line in Settings -> Account (spec
+/// `docs/specs/sync-freshness.md` §2.4 amendment 2026-10-06; plan §2).
+/// Always `0` while this device is not linked: an unlinked household owes
+/// nobody anything, and the flags it accumulates are only meaningful once
+/// it links (spec `sync-backend.md` §8.1).
+///
+/// Gated on the linked state alone (not on [syncEngineProvider]'s
+/// linked-AND-signed-in identity, and not on Supabase being configured):
+/// a signed-out linked device still has those changes waiting, and saying
+/// so is the honest state the Account section's paused-sync notice already
+/// describes. Scoped `select` on `syncHouseholdId`, for the same reason
+/// [syncEngineProvider] documents at length.
+final syncPendingCountProvider = StreamProvider<int>((ref) {
+  final linked =
+      ref.watch(
+        settingsProvider.select(
+          (settings) => settings.valueOrNull?.syncHouseholdId,
+        ),
+      ) !=
+      null;
+  if (!linked) {
+    return Stream.value(0);
+  }
+  return SyncRepository(ref.watch(appDatabaseProvider)).watchDirtyRowCount();
+});
+
 /// The D-5 indicator's source of truth (spec
 /// `docs/specs/sync-freshness.md` §2.5): [SyncHealthStatus.healthy]
 /// whenever the device isn't linked+signed-in at all -- the same gate
