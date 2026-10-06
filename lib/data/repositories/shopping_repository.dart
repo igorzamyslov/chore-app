@@ -730,6 +730,39 @@ GROUP BY k
     );
   }
 
+  /// Hard-deletes soft-deleted shopping rows whose `deleted_at` is strictly
+  /// older than [before], in every household, and returns how many went.
+  ///
+  /// Retention for the suggestions history (technical review 2026-10-06
+  /// #14): every checked-off item is soft-deleted after 24h and kept
+  /// forever, and `suggestions` loads that whole history into memory.
+  /// Only rows that are NOT `syncDirty` are touched -- a dirty tombstone
+  /// has not reached the server yet and must still be pushed -- so no
+  /// delete record is needed: the server already holds the soft-delete.
+  /// Called from `bootstrapProvider` with a one-year cutoff.
+  ///
+  /// `deleted_at` is parsed rather than compared as a string, because
+  /// device-written (`...Z`) and server-written (`...+00:00`) timestamps do
+  /// not sort consistently as text.
+  Future<int> compactHistory({required DateTime before}) async {
+    final rows =
+        await (db.select(db.shoppingItems)..where(
+              (tbl) => tbl.deletedAt.isNotNull() & tbl.syncDirty.equals(false),
+            ))
+            .get();
+    final staleIds = [
+      for (final row in rows)
+        if (DateTime.tryParse(row.deletedAt!)?.isBefore(before) ?? false)
+          row.id,
+    ];
+    if (staleIds.isEmpty) {
+      return 0;
+    }
+    return (db.delete(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.isIn(staleIds))).go();
+  }
+
   // ---------------------------------------------------------------------
   // Device-local UI memory (never synced), kept in `ui_state`.
   //
