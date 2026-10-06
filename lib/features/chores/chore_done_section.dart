@@ -37,6 +37,7 @@ class ChoreDoneSection extends StatelessWidget {
     required this.today,
     required this.reopenableOccurrenceIds,
     required this.onReopen,
+    this.syncLinked = false,
     super.key,
   });
 
@@ -53,6 +54,10 @@ class ChoreDoneSection extends StatelessWidget {
 
   /// Called with the tapped row's occurrence when its Reopen action fires.
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
+
+  /// Whether the household is linked: a row that is still `syncDirty` then
+  /// shows the "waiting to send" clock (persona review 2026-10-06 E10).
+  final bool syncLinked;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +87,7 @@ class ChoreDoneSection extends StatelessWidget {
             _DoneRow(
               occurrence: occurrences[i],
               today: today,
+              waitingToSend: syncLinked && occurrences[i].occurrence.syncDirty,
               showReopen: reopenableOccurrenceIds.contains(
                 occurrences[i].occurrence.id,
               ),
@@ -141,12 +147,16 @@ class _DoneRow extends StatelessWidget {
   const _DoneRow({
     required this.occurrence,
     required this.today,
+    required this.waitingToSend,
     required this.showReopen,
     required this.onReopen,
   });
 
   final ClosedOccurrenceWithChore occurrence;
   final PlainDate today;
+
+  /// Whether to show the "waiting to send" clock (E10).
+  final bool waitingToSend;
 
   /// Whether this row is its chore's latest closed-today occurrence — see
   /// [ChoreDoneSection]'s LIFO doc comment.
@@ -170,6 +180,32 @@ class _DoneRow extends StatelessWidget {
         isDone &&
         closedOn != null &&
         closedOn.isBefore(occurrence.occurrence.dueDate);
+
+    final reopen = showReopen
+        ? semantic(
+            'chores.done.${occurrence.occurrence.id}.reopen',
+            child: TextButton(
+              onPressed: onReopen,
+              child: Text(l10n.choresDoneReopen),
+            ),
+          )
+        : null;
+    final clock = waitingToSend
+        ? Tooltip(
+            message: l10n.syncPendingItemTooltip,
+            child: Icon(
+              Icons.schedule,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        : null;
+    final trailing = clock != null && reopen != null
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [clock, const SizedBox(width: 8), reopen],
+          )
+        : clock ?? reopen;
 
     return ListTile(
       title: Text(
@@ -228,15 +264,7 @@ class _DoneRow extends StatelessWidget {
       ),
       // LIFO amendment: plain absence (no placeholder) on every row except
       // the chore's latest closed-today one — see the class doc comment.
-      trailing: showReopen
-          ? semantic(
-              'chores.done.${occurrence.occurrence.id}.reopen',
-              child: TextButton(
-                onPressed: onReopen,
-                child: Text(l10n.choresDoneReopen),
-              ),
-            )
-          : null,
+      trailing: trailing,
     );
   }
 }

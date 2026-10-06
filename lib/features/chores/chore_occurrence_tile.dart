@@ -76,6 +76,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
     required this.section,
     required this.onComplete,
     required this.onOpenMenu,
+    this.waitingToSend = false,
     super.key,
   });
 
@@ -98,6 +99,13 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// Called when the tile body or the trailing menu button is tapped, or
   /// the tile is long-pressed.
   final VoidCallback onOpenMenu;
+
+  /// Whether to show the small "waiting to send" clock before the menu
+  /// button (persona review 2026-10-06 E10): the caller passes `true` only
+  /// while the household is linked AND this occurrence is `syncDirty`, so
+  /// a change made on a weak connection does not look identical to one the
+  /// rest of the household already has.
+  final bool waitingToSend;
 
   @override
   Widget build(BuildContext context) {
@@ -168,6 +176,15 @@ class ChoreOccurrenceTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (waitingToSend)
+                Tooltip(
+                  message: l10n.syncPendingItemTooltip,
+                  child: Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               semantic(
                 'chores.occurrence.${chore.id}.menu',
                 child: IconButton(

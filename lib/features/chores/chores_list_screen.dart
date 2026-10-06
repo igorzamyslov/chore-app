@@ -242,6 +242,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                   closedRecently: closedRecently ?? const [],
                   paused: paused ?? const [],
                   hasActiveChores: hasActiveChores,
+                  syncLinked: syncLinked,
                   today: today,
                   memberFilter: memberFilter,
                   categoryFilter: categoryFilter,
@@ -810,6 +811,7 @@ class _Body extends StatelessWidget {
     required this.closedRecently,
     required this.paused,
     required this.hasActiveChores,
+    required this.syncLinked,
     required this.today,
     required this.memberFilter,
     required this.categoryFilter,
@@ -830,6 +832,10 @@ class _Body extends StatelessWidget {
   /// signal that distinguishes the "fresh install" empty state from "all
   /// done" (spec `docs/specs/polish-round-1.md` A1).
   final bool hasActiveChores;
+
+  /// Whether the household is linked: a still-`syncDirty` row then shows
+  /// the "waiting to send" clock (persona review 2026-10-06 E10).
+  final bool syncLinked;
   final PlainDate today;
   final String? memberFilter;
   final String? categoryFilter;
@@ -942,6 +948,7 @@ class _Body extends StatelessWidget {
                   occurrence: occurrence,
                   today: today,
                   section: section,
+                  waitingToSend: syncLinked && occurrence.occurrence.syncDirty,
                   onComplete: () => onComplete(occurrence),
                   onOpenMenu: () => onOpenMenu(occurrence),
                 ),
@@ -956,6 +963,7 @@ class _Body extends StatelessWidget {
           ChoreDoneSection(
             occurrences: filteredClosed,
             today: today,
+            syncLinked: syncLinked,
             // Computed from the UNFILTERED closedRecently (see that
             // function's doc comment on why filters mustn't affect it).
             reopenableOccurrenceIds: latestClosedTodayOccurrenceIds(
