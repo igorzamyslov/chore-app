@@ -1126,6 +1126,32 @@
   "@settingsMembersInviteHint": {
     "description": "Hint line in the invite sheet: pre-created profiles are what joiners claim, so adding people first avoids duplicate 'I'm new here' profiles (persona review D3, Maria)."
   },
+  "settingsMembersInviteValidUntil": "Valid until {date}",
+  "@settingsMembersInviteValidUntil": {
+    "description": "Invite sheet line shown instead of the 'replaces any earlier code' body when the sheet re-shows the household's still-active code (persona review D5: each Invite tap used to silently revoke the code already shared). {date} is DateFormat.yMMMd in the app locale.",
+    "placeholders": {
+      "date": {
+        "type": "String",
+        "example": "Oct 13, 2026"
+      }
+    }
+  },
+  "settingsMembersInviteNewCode": "New code",
+  "@settingsMembersInviteNewCode": {
+    "description": "Text button in the invite sheet (id settings.members.invite.newCode), shown while re-displaying the active code. Asks for confirmation before revoking it and creating a fresh one."
+  },
+  "settingsMembersInviteReplaceTitle": "Replace the shared code?",
+  "@settingsMembersInviteReplaceTitle": {
+    "description": "Title of the confirm dialog behind the invite sheet's 'New code' button: replacing revokes the code people may already have received."
+  },
+  "settingsMembersInviteReplaceBody": "Anyone still joining with the old code will need this new one.",
+  "@settingsMembersInviteReplaceBody": {
+    "description": "Body of the replace-invite-code confirm dialog: names the one consequence (the old code stops working)."
+  },
+  "settingsMembersInviteReplaceConfirm": "Replace",
+  "@settingsMembersInviteReplaceConfirm": {
+    "description": "Confirm button of the replace-invite-code dialog (id settings.members.invite.replace.confirm); Cancel is commonCancel (id settings.members.invite.replace.cancel)."
+  },
   "settingsMembersInviteShare": "Share",
   "@settingsMembersInviteShare": {
     "description": "Label of the invite-code sheet's share button (share_plus)."
@@ -1702,6 +1728,10 @@
   "joinHouseholdCodeUnknownError": "Couldn't check that code. Check your connection and try again.",
   "@joinHouseholdCodeUnknownError": {
     "description": "Inline error shown on the code-entry step when listClaimableMembers fails for a reason OTHER than the server rejecting the code (e.g. no network, a timeout) -- distinguished from joinHouseholdCodeError (T1.6) because the server never got to evaluate the code itself, so blaming the code would be misleading."
+  },
+  "joinCodeErrorServer": "Couldn't check the code right now — try again in a moment.",
+  "@joinCodeErrorServer": {
+    "description": "Inline error on the join code step when the server answered with an error that is NOT an invalid/expired-code rejection (persona review D5: every server error used to read as 'typo'). Blames neither the code nor the connection."
   },
   "joinHouseholdContinue": "Continue",
   "@joinHouseholdContinue": {

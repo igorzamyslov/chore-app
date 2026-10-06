@@ -315,6 +315,22 @@ A3 -- one live code per household, so creating a new one is how you
 revoke the old one) → `createInvite` → bottom sheet with the code in
 large type + a share button (share_plus).
 
+> **Amendment 2026-10-06 (persona review D5) — invite code lifecycle.**
+> `runInviteFlow` first asks `HouseholdGateway.activeInvite(householdId)`
+> (a plain select on `household_invites`: `revoked_at is null and
+> expires_at > now`, newest first). If a code is active, the sheet re-shows
+> THAT code with "Valid until {date}" (`DateFormat.yMMMd`, id
+> `settings.members.invite.validUntil`) and a "New code" text button
+> (`settings.members.invite.newCode`) — nothing is revoked by opening the
+> sheet. "New code" confirms ("Replace the shared code?" / "Anyone still
+> joining with the old code will need this new one.", ids
+> `settings.members.invite.replace.confirm` / `.cancel`) and only then runs
+> the revoke-then-create pair above. With no active code the flow creates
+> one directly, as before. On the join side, `joinCodeErrorMessage` keeps
+> the "typo" copy only for a `PostgrestException` whose message contains
+> `invalid` or `expired`; any other `PostgrestException` reads "Couldn't
+> check the code right now — try again in a moment."
+
 ### 7.4 P2c — join ("Join an existing household")
 
 From the join row: enter code (`settings.account.join.code` field) →

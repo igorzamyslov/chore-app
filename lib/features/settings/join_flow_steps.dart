@@ -47,10 +47,23 @@ int autoJoinColor(List<ClaimableMember> claimableMembers) {
 /// code at all. A [PostgrestException] means it did (and rejected it) --
 /// every other exception (no connectivity, a timeout, ...) means it didn't,
 /// so blaming the code itself would be misleading.
+///
+/// Amended 2026-10-06 (persona review D5): not every [PostgrestException]
+/// is a rejected code -- a server-side outage, a missing function or a
+/// permission error also arrive as one. Only a message naming the rejection
+/// (`invalid` / `expired`, as `_valid_invite` and `peek_invite` raise it)
+/// earns the "check for typos" copy; any other server error gets
+/// [AppLocalizations.joinCodeErrorServer], which blames neither the code
+/// nor the connection.
 String joinCodeErrorMessage(AppLocalizations l10n, Object error) {
-  return error is PostgrestException
-      ? l10n.joinHouseholdCodeError
-      : l10n.joinHouseholdCodeUnknownError;
+  if (error is! PostgrestException) {
+    return l10n.joinHouseholdCodeUnknownError;
+  }
+  final message = error.message.toLowerCase();
+  if (message.contains('invalid') || message.contains('expired')) {
+    return l10n.joinHouseholdCodeError;
+  }
+  return l10n.joinCodeErrorServer;
 }
 
 /// [MemberAvatar] takes a full [Member]; the chooser step only has a

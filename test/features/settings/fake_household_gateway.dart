@@ -79,6 +79,18 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// Every [createInvite] call's household id, in call order.
   final List<String> createInviteCalls = [];
 
+  /// What [activeInvite] returns unless [activeInviteError] is set;
+  /// `null` (the default) means "no active code", i.e. the create-directly
+  /// path.
+  ActiveInvite? activeInviteResult;
+
+  /// Set to make the next [activeInvite] call throw this instead of
+  /// succeeding.
+  Exception? activeInviteError;
+
+  /// Every [activeInvite] call's household id, in call order.
+  final List<String> activeInviteCalls = [];
+
   /// Every [revokeActiveInvites] call's household id, in call order.
   final List<String> revokeActiveInvitesCalls = [];
 
@@ -216,6 +228,16 @@ class FakeHouseholdGateway implements HouseholdGateway {
       throw error;
     }
     return inviteCode;
+  }
+
+  @override
+  Future<ActiveInvite?> activeInvite(String householdId) async {
+    activeInviteCalls.add(householdId);
+    final error = activeInviteError;
+    if (error != null) {
+      throw error;
+    }
+    return activeInviteResult;
   }
 
   @override

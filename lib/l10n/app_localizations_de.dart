@@ -905,6 +905,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'Leg vorher alle unter Mitglieder an — beim Beitreten wählen sie ihren eigenen Namen.';
 
   @override
+  String settingsMembersInviteValidUntil(String date) {
+    return 'Gültig bis $date';
+  }
+
+  @override
+  String get settingsMembersInviteNewCode => 'Neuer Code';
+
+  @override
+  String get settingsMembersInviteReplaceTitle => 'Geteilten Code ersetzen?';
+
+  @override
+  String get settingsMembersInviteReplaceBody =>
+      'Wer noch mit dem alten Code beitritt, braucht dann den neuen.';
+
+  @override
+  String get settingsMembersInviteReplaceConfirm => 'Ersetzen';
+
+  @override
   String get settingsMembersInviteShare => 'Teilen';
 
   @override
@@ -1341,6 +1359,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get joinHouseholdCodeUnknownError =>
       'Der Code konnte nicht geprüft werden. Prüf deine Verbindung und versuch es noch mal.';
+
+  @override
+  String get joinCodeErrorServer =>
+      'Der Code konnte gerade nicht geprüft werden — versuch es gleich noch mal.';
 
   @override
   String get joinHouseholdContinue => 'Weiter';

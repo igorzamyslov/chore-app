@@ -900,6 +900,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add everyone under Members first — they\'ll pick their own name when they join.';
 
   @override
+  String settingsMembersInviteValidUntil(String date) {
+    return 'Valid until $date';
+  }
+
+  @override
+  String get settingsMembersInviteNewCode => 'New code';
+
+  @override
+  String get settingsMembersInviteReplaceTitle => 'Replace the shared code?';
+
+  @override
+  String get settingsMembersInviteReplaceBody =>
+      'Anyone still joining with the old code will need this new one.';
+
+  @override
+  String get settingsMembersInviteReplaceConfirm => 'Replace';
+
+  @override
   String get settingsMembersInviteShare => 'Share';
 
   @override
@@ -1332,6 +1350,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get joinHouseholdCodeUnknownError =>
       'Couldn\'t check that code. Check your connection and try again.';
+
+  @override
+  String get joinCodeErrorServer =>
+      'Couldn\'t check the code right now — try again in a moment.';
 
   @override
   String get joinHouseholdContinue => 'Continue';

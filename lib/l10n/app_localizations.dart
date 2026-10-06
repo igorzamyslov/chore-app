@@ -1328,6 +1328,36 @@ abstract class AppLocalizations {
   /// **'Add everyone under Members first — they\'ll pick their own name when they join.'**
   String get settingsMembersInviteHint;
 
+  /// Invite sheet line shown instead of the 'replaces any earlier code' body when the sheet re-shows the household's still-active code (persona review D5: each Invite tap used to silently revoke the code already shared). {date} is DateFormat.yMMMd in the app locale.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid until {date}'**
+  String settingsMembersInviteValidUntil(String date);
+
+  /// Text button in the invite sheet (id settings.members.invite.newCode), shown while re-displaying the active code. Asks for confirmation before revoking it and creating a fresh one.
+  ///
+  /// In en, this message translates to:
+  /// **'New code'**
+  String get settingsMembersInviteNewCode;
+
+  /// Title of the confirm dialog behind the invite sheet's 'New code' button: replacing revokes the code people may already have received.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the shared code?'**
+  String get settingsMembersInviteReplaceTitle;
+
+  /// Body of the replace-invite-code confirm dialog: names the one consequence (the old code stops working).
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone still joining with the old code will need this new one.'**
+  String get settingsMembersInviteReplaceBody;
+
+  /// Confirm button of the replace-invite-code dialog (id settings.members.invite.replace.confirm); Cancel is commonCancel (id settings.members.invite.replace.cancel).
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get settingsMembersInviteReplaceConfirm;
+
   /// Label of the invite-code sheet's share button (share_plus).
   ///
   /// In en, this message translates to:
@@ -1993,6 +2023,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t check that code. Check your connection and try again.'**
   String get joinHouseholdCodeUnknownError;
+
+  /// Inline error on the join code step when the server answered with an error that is NOT an invalid/expired-code rejection (persona review D5: every server error used to read as 'typo'). Blames neither the code nor the connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check the code right now — try again in a moment.'**
+  String get joinCodeErrorServer;
 
   /// Label of the join sheet's 'Continue' buttons (code entry and the new-member name step).
   ///

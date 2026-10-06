@@ -61,6 +61,32 @@ class ClaimableMember {
   String toString() => 'ClaimableMember($memberId, $name, $color)';
 }
 
+/// The household's currently shareable invite code (persona review D5): not
+/// revoked and not yet expired, as read by [HouseholdGateway.activeInvite].
+@immutable
+class ActiveInvite {
+  /// Creates an active-invite result.
+  const ActiveInvite({required this.code, required this.expiresAt});
+
+  /// The 8-character invite code.
+  final String code;
+
+  /// When the code stops working (server `expires_at`, UTC).
+  final DateTime expiresAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ActiveInvite &&
+      other.code == code &&
+      other.expiresAt == expiresAt;
+
+  @override
+  int get hashCode => Object.hash(code, expiresAt);
+
+  @override
+  String toString() => 'ActiveInvite($code, $expiresAt)';
+}
+
 /// The caller's own already-claimed member profile, as found by
 /// `HouseholdGateway.findMyMembership` (spec §7.6, P2d reconnect): a
 /// returning device (phone reset, new phone) whose signed-in account is
@@ -172,6 +198,13 @@ abstract class HouseholdGateway {
   /// RPC `create_invite`: creates an 8-character invite code for
   /// [householdId] (member-only).
   Future<String> createInvite(String householdId);
+
+  /// PostgREST select of `household_invites` (SELECT is granted to members):
+  /// the newest invite for [householdId] that is neither revoked nor
+  /// expired, or `null` when there is none. Lets the invite flow re-show the
+  /// code already shared instead of silently revoking it on every tap
+  /// (persona review D5).
+  Future<ActiveInvite?> activeInvite(String householdId);
 
   /// PostgREST update of `household_invites`: stamps `revoked_at` (a
   /// client-authored ISO timestamp -- acceptable for an audit column like
@@ -307,6 +340,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
 
   @override
   Future<void> revokeActiveInvites(String householdId) => _unreachable();
+
+  @override
+  Future<ActiveInvite?> activeInvite(String householdId) => _unreachable();
 
   @override
   Future<List<ClaimableMember>> listClaimableMembers(String code) =>
@@ -461,6 +497,29 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
       params: {'p_household_id': householdId},
     );
     return result as String;
+  }
+
+  @override
+  Future<ActiveInvite?> activeInvite(String householdId) async {
+    final rows = await _client
+        .from('household_invites')
+        .select('code, expires_at')
+        .eq('household_id', householdId)
+        .isFilter('revoked_at', null)
+        // Device clock, not server clock: a few minutes of skew only moves
+        // the moment a nearly-expired code stops being re-offered, and the
+        // server re-validates expiry on every redemption anyway.
+        .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) {
+      return null;
+    }
+    final row = rows.first;
+    return ActiveInvite(
+      code: row['code'] as String,
+      expiresAt: DateTime.parse(row['expires_at'] as String).toUtc(),
+    );
   }
 
   @override

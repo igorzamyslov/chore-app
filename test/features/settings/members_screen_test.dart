@@ -2,6 +2,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -349,6 +350,73 @@ void main() {
       expect(inviteGateway.createInviteCalls, [householdId]);
       expect(inviteGateway.revokeActiveInvitesCalls, [householdId]);
       expect(inviteGateway.inviteCallOrder, ['revoke', 'create']);
+
+      handle.dispose();
+    },
+  );
+
+  final activeInviteGateway = FakeHouseholdGateway(inviteCode: 'NEWCODE2')
+    ..activeInviteResult = ActiveInvite(
+      code: 'OLDCODE1',
+      expiresAt: DateTime.utc(2026, 7, 31, 12),
+    );
+  testChoreApp(
+    'an active invite is re-shown with its expiry, not silently revoked; '
+    '"New code" confirms first and only then revokes and creates '
+    '(persona review D5)',
+    today: today,
+    overrides: [
+      householdGatewayProvider.overrideWithValue(activeInviteGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.members.invite'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OLDCODE1'), findsOneWidget);
+      expect(find.text('Valid until Jul 31, 2026'), findsOneWidget);
+      expect(activeInviteGateway.activeInviteCalls, [householdId]);
+      expect(activeInviteGateway.inviteCallOrder, isEmpty);
+
+      // Cancel keeps the shared code alive.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Replace the shared code?'), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.replace.cancel'),
+      );
+      await tester.pumpAndSettle();
+      expect(activeInviteGateway.inviteCallOrder, isEmpty);
+      expect(find.text('OLDCODE1'), findsOneWidget);
+
+      // Replace revokes, then creates, and shows the new code.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.replace.confirm'),
+      );
+      await tester.pumpAndSettle();
+      expect(activeInviteGateway.inviteCallOrder, ['revoke', 'create']);
+      expect(find.text('NEWCODE2'), findsOneWidget);
+      expect(find.text('OLDCODE1'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.validUntil'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+        findsNothing,
+      );
 
       handle.dispose();
     },
