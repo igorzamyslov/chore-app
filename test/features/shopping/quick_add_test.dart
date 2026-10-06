@@ -115,6 +115,37 @@ void main() {
   );
 
   testChoreApp(
+    'quick add: a typed count becomes the quantity note (F6)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openShoppingTab(tester);
+
+      final inputField = find.descendant(
+        of: find.bySemanticsIdentifier('shopping.add.input'),
+        matching: find.byType(TextField),
+      );
+
+      await tester.enterText(inputField, '2x Milch, Eier x12, Brot');
+      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+      await tester.pumpAndSettle();
+
+      final rows = await database.select(database.shoppingItems).get();
+      final byName = {for (final row in rows) row.name: row.quantityNote};
+      expect(byName, {'Milch': '2', 'Eier': '12', 'Brot': null});
+
+      // Duplicates are judged on the name alone: "3 milch" is Milch.
+      await tester.enterText(inputField, '3 milch');
+      await tester.tap(find.bySemanticsIdentifier('shopping.add.submit'));
+      await tester.pumpAndSettle();
+      expect(find.text('Already on the list'), findsOneWidget);
+      expect(await database.select(database.shoppingItems).get(), hasLength(3));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
     'quick add: empty submit adds nothing',
     today: today,
     (tester, database) async {

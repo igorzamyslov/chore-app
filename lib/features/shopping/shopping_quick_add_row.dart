@@ -250,8 +250,13 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
       return;
     }
     final outcomes = <_AddOutcome>[];
-    for (final name in names) {
-      final outcome = await _addOrRestore(name);
+    for (final entry in names) {
+      // F6: "2x Milch" / "Milch x2" -> name "Milch", note "2".
+      final parsed = parseQuantity(entry);
+      final outcome = await _addOrRestore(
+        parsed.name,
+        quantityNote: parsed.quantityNote,
+      );
       if (!mounted) {
         return;
       }
@@ -300,6 +305,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   /// nothing itself; the caller announces the outcome(s).
   Future<_AddOutcome> _addOrRestore(
     String name, {
+    String? quantityNote,
     String? categoryId,
     bool isSuggestionTap = false,
   }) async {
@@ -334,6 +340,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     await repository.addItem(
       householdId,
       name: name,
+      quantityNote: quantityNote,
       categoryId: resolvedCategoryId,
       addedBy: ref.read(actingMemberProvider)?.id,
     );
