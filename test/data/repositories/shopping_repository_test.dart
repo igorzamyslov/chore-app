@@ -309,6 +309,76 @@ void main() {
     });
   });
 
+  group('device UI memory in ui_state (F9, F11)', () {
+    test(
+      'collapsed categories round-trip and are wiped with ui_state',
+      () async {
+        expect(await repo.collapsedCategoryKeys(), isEmpty);
+
+        await repo.setCategoryCollapsed('cat-a', collapsed: true);
+        await repo.setCategoryCollapsed('cat-b', collapsed: true);
+        await repo.setCategoryCollapsed(
+          uncategorizedCollapseKey,
+          collapsed: true,
+        );
+        expect(await repo.collapsedCategoryKeys(), {
+          'cat-a',
+          'cat-b',
+          uncategorizedCollapseKey,
+        });
+
+        await repo.setCategoryCollapsed('cat-a', collapsed: false);
+        expect(await repo.collapsedCategoryKeys(), {
+          'cat-b',
+          uncategorizedCollapseKey,
+        });
+
+        // Extra keys never disturb the single 'device' row the shell reads.
+        expect(
+          await (db.select(
+            db.uiState,
+          )..where((tbl) => tbl.id.equals('device'))).getSingleOrNull(),
+          isNull,
+        );
+
+        await db.delete(db.uiState).go();
+        expect(await repo.collapsedCategoryKeys(), isEmpty);
+      },
+    );
+
+    test('forgotten suggestions are stored normalised, once each', () async {
+      expect(await repo.forgottenSuggestionNames(), isEmpty);
+
+      await repo.forgetSuggestion('  MÜSLI ');
+      await repo.forgetSuggestion('musli');
+      await repo.forgetSuggestion('Milk');
+
+      expect(await repo.forgottenSuggestionNames(), {'musli', 'milk'});
+    });
+
+    test('a forgotten name no longer appears in suggestions', () async {
+      await repo.addItem(householdId, name: 'Typo mlik');
+      await repo.addItem(householdId, name: 'Milk');
+      await repo.addItem(householdId, name: 'Milk');
+      final typo = await repo.findActiveByNormalizedName(
+        householdId,
+        'typo mlik',
+      );
+      await repo.deleteItem(typo!.item.id);
+
+      await repo.forgetSuggestion('typo mlik');
+
+      expect(
+        [for (final s in await repo.suggestions(householdId, 'ty')) s.name],
+        isEmpty,
+      );
+      expect(
+        [for (final s in await repo.suggestions(householdId, 'mi')) s.name],
+        ['Milk'],
+      );
+    });
+  });
+
   group('normalizeShoppingItemName', () {
     test('trims, lowercases, and collapses inner whitespace', () {
       expect(normalizeShoppingItemName('  Milk  '), 'milk');

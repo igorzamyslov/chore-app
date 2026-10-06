@@ -1,6 +1,8 @@
 /// Manages the household's shared shopping list.
 library;
 
+import 'dart:convert';
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
@@ -119,6 +121,13 @@ String normalizeShoppingItemName(String name) {
       .replaceAll(RegExp(r'\s+'), ' ');
 }
 
+/// The collapse key of the uncategorized run (its header has no category
+/// id).
+const uncategorizedCollapseKey = 'uncategorized';
+
+const _collapsedKeyPrefix = 'shopping.collapsed.';
+const _forgottenSuggestionsKey = 'shopping.forgottenSuggestions';
+
 /// Repository for the household's shared shopping list.
 class ShoppingRepository {
   /// Creates a repository backed by [db].
@@ -230,9 +239,11 @@ class ShoppingRepository {
     }
 
     final rows = await _historyRows(householdId);
-    final excludedNormalizedNames = prefix.isEmpty
-        ? _namesToExcludeFromFocusSuggestions(rows)
-        : const <String>{};
+    final forgotten = await forgottenSuggestionNames();
+    final excludedNormalizedNames = {
+      ...forgotten,
+      if (prefix.isEmpty) ..._namesToExcludeFromFocusSuggestions(rows),
+    };
 
     final groups = <String, List<_HistoryRow>>{};
     for (final row in rows) {
@@ -625,6 +636,90 @@ class ShoppingRepository {
         syncDirty: syncDirtyOnWrite,
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------
+  // Device-local UI memory (never synced), kept in `ui_state`.
+  //
+  // `ui_state` has fixed columns and a single `'device'` row for the shell
+  // (`UiStateRepository`). The shopping tab's two small memories -- which
+  // aisles are collapsed (F9) and which suggestions were forgotten (F11) --
+  // are stored as ADDITIONAL rows of the same table, keyed by a namespaced
+  // `id` (`shopping.collapsed.<categoryId>`, `shopping.forgottenSuggestions`)
+  // with the value in the nullable text column `last_tab`. That is a
+  // deliberate reuse of an existing column rather than a schema change
+  // (schema versions are owned per workstream, plan §1); `readUiState`
+  // only ever looks up the `'device'` row, so these never disturb it, and
+  // `resetAppData` wipes the whole table. A future migration can give the
+  // value its own column without touching callers: they only use the
+  // methods below.
+
+  Future<String?> _readUiValue(String key) async {
+    final row = await (db.select(
+      db.uiState,
+    )..where((tbl) => tbl.id.equals(key))).getSingleOrNull();
+    return row?.lastTab;
+  }
+
+  Future<void> _writeUiValue(String key, String? value) async {
+    if (value == null) {
+      await (db.delete(db.uiState)..where((tbl) => tbl.id.equals(key))).go();
+      return;
+    }
+    await db
+        .into(db.uiState)
+        .insertOnConflictUpdate(
+          UiStateCompanion(id: Value(key), lastTab: Value(value)),
+        );
+  }
+
+  /// The keys of every collapsed category run: a category id, or
+  /// [uncategorizedCollapseKey] (F9).
+  Future<Set<String>> collapsedCategoryKeys() async {
+    final rows = await (db.select(
+      db.uiState,
+    )..where((tbl) => tbl.id.like('$_collapsedKeyPrefix%'))).get();
+    return {
+      for (final row in rows)
+        if (row.lastTab == '1') row.id.substring(_collapsedKeyPrefix.length),
+    };
+  }
+
+  /// Remembers (or forgets) that the category run [key] is collapsed
+  /// (stored as `shopping.collapsed.<key>`).
+  Future<void> setCategoryCollapsed(String key, {required bool collapsed}) =>
+      _writeUiValue('$_collapsedKeyPrefix$key', collapsed ? '1' : null);
+
+  /// The normalized names the user chose to forget as suggestions (F11),
+  /// stored as a JSON list under `shopping.forgottenSuggestions`.
+  Future<Set<String>> forgottenSuggestionNames() async {
+    final raw = await _readUiValue(_forgottenSuggestionsKey);
+    if (raw == null) {
+      return const {};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return {
+          for (final name in decoded)
+            if (name is String) name,
+        };
+      }
+    } on FormatException {
+      // A corrupt value is the same as none: suggestions just reappear.
+    }
+    return const {};
+  }
+
+  /// Stops [name] (compared normalized) from ever being suggested again.
+  /// Existing items are untouched; only the suggestion chips and type-ahead
+  /// hide it.
+  Future<void> forgetSuggestion(String name) async {
+    final names = {
+      ...await forgottenSuggestionNames(),
+      normalizeShoppingItemName(name),
+    };
+    await _writeUiValue(_forgottenSuggestionsKey, jsonEncode(names.toList()));
   }
 
   String _isoNow() => nowUtc().toIso8601String();

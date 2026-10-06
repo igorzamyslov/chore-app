@@ -91,6 +91,42 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   final Map<String, Timer> _heldMoves = {};
   final Map<String, bool> _heldBuckets = {};
 
+  /// The collapsed aisles (category ids, or [uncategorizedCollapseKey]),
+  /// seeded from `ui_state` in [initState] (persona finding F9). Empty until
+  /// that read lands, i.e. everything starts expanded for a frame at most.
+  /// Writes are blind and fire-and-forget, like the Chores filters: the
+  /// screen owns the value after the first read.
+  Set<String> _collapsed = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCollapsed());
+  }
+
+  Future<void> _loadCollapsed() async {
+    final stored = await ref
+        .read(shoppingRepositoryProvider)
+        .collapsedCategoryKeys();
+    if (mounted && stored.isNotEmpty) {
+      setState(() => _collapsed = {..._collapsed, ...stored});
+    }
+  }
+
+  void _toggleCategory(String key) {
+    final collapse = !_collapsed.contains(key);
+    setState(
+      () => _collapsed = collapse
+          ? {..._collapsed, key}
+          : ({..._collapsed}..remove(key)),
+    );
+    unawaited(
+      ref
+          .read(shoppingRepositoryProvider)
+          .setCategoryCollapsed(key, collapsed: collapse),
+    );
+  }
+
   @override
   void dispose() {
     // Cancelled, not flushed: there is nothing to flush. Also what keeps
@@ -223,6 +259,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   final body = _Body(
                     items: items,
                     membersById: membersById,
+                    collapsedCategories: _collapsed,
+                    onToggleCategory: _toggleCategory,
                     syncLinked: syncLinked,
                     actingMemberId: actingMemberId,
                     heldBuckets: _heldBuckets,
@@ -389,6 +427,8 @@ class _Body extends StatelessWidget {
   const _Body({
     required this.items,
     required this.membersById,
+    required this.collapsedCategories,
+    required this.onToggleCategory,
     required this.syncLinked,
     required this.actingMemberId,
     required this.heldBuckets,
@@ -401,6 +441,10 @@ class _Body extends StatelessWidget {
   });
 
   final List<ShoppingItemWithCategory> items;
+
+  /// The collapsed aisles' keys (F9) and the callback that toggles one.
+  final Set<String> collapsedCategories;
+  final ValueChanged<String> onToggleCategory;
 
   /// Every household member by id, to resolve a row's `addedBy`.
   final Map<String, Member> membersById;
@@ -496,9 +540,19 @@ class _Body extends StatelessWidget {
         group.add(unchecked[index]);
         index++;
       }
-      children
-        ..add(ShoppingCategoryHeader(category: group.first.category))
-        ..add(_aisleCard(group));
+      final key = categoryId ?? uncategorizedCollapseKey;
+      final collapsed = collapsedCategories.contains(key);
+      children.add(
+        ShoppingCategoryHeader(
+          category: group.first.category,
+          collapsed: collapsed,
+          itemCount: group.length,
+          onToggle: () => onToggleCategory(key),
+        ),
+      );
+      if (!collapsed) {
+        children.add(_aisleCard(group));
+      }
     }
     return children;
   }
