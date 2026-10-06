@@ -1,5 +1,7 @@
 import 'package:chore_app/app/app.dart';
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/features/settings/about_section.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -217,4 +219,62 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'About links the privacy notes and the source code; the sync-server row '
+    'is absent in a build without a sync server (persona review D11)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      // Tall enough that the whole About group is laid out at once.
+      tester.view.physicalSize = const Size(800, 4000);
+      await openSettingsTab(tester);
+
+      await tester.tap(find.bySemanticsIdentifier('settings.about.privacy'));
+      await tester.pumpAndSettle();
+      expect(
+        fakeUrlLauncher.lastLaunchedUrl,
+        'https://github.com/igorzamyslov/chore-app/blob/main/PRIVACY.md',
+      );
+      expect(
+        fakeUrlLauncher.lastOptions?.mode,
+        PreferredLaunchMode.externalApplication,
+      );
+
+      await tester.tap(find.bySemanticsIdentifier('settings.about.source'));
+      await tester.pumpAndSettle();
+      expect(
+        fakeUrlLauncher.lastLaunchedUrl,
+        'https://github.com/igorzamyslov/chore-app',
+      );
+
+      // This test binary runs with SUPABASE_URL= (no sync server).
+      expect(
+        find.bySemanticsIdentifier('settings.about.syncServer'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testWidgets('the sync-server row shows only the host of the configured URL', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: AboutSyncServerTile(
+            serverUrl: 'https://abcdefgh.supabase.co',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sync server'), findsOneWidget);
+    expect(find.text('abcdefgh.supabase.co'), findsOneWidget);
+  });
 }

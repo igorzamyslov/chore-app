@@ -1099,6 +1099,10 @@
   "@settingsExportEntry": {
     "description": "Settings screen list entry (spec docs/specs/polish-round-1.md B1), between the digest section and About. Tapping it shares a JSON backup via the OS share sheet, covering the tables named in exportedTableNames (lib/application/data_export.dart) -- deliberately not every table in the schema: device-scoped, transient tables such as reminder_snoozes are excluded. The user-facing copy is this two-word label alone and claims no completeness."
   },
+  "settingsExportSubtitle": "JSON file with your members, chores, history and shopping list. The app can't import it yet.",
+  "@settingsExportSubtitle": {
+    "description": "Sub-line of the Export row (id settings.export): the format, what is in it, and the honest limit that there is no import yet (persona review D12)."
+  },
   "settingsExportError": "Couldn't export your data. Please try again.",
   "@settingsExportError": {
     "description": "Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1)."
@@ -2018,6 +2022,18 @@
   "settingsAboutLicensesEntry": "Open source licenses",
   "@settingsAboutLicensesEntry": {
     "description": "About section row that opens Flutter's built-in showLicensePage."
+  },
+  "settingsAboutPrivacy": "Privacy notes",
+  "@settingsAboutPrivacy": {
+    "description": "About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where)."
+  },
+  "settingsAboutSource": "Source code",
+  "@settingsAboutSource": {
+    "description": "About row (id settings.about.source) opening the project's source repository in the browser (persona review D11)."
+  },
+  "settingsAboutSyncServer": "Sync server",
+  "@settingsAboutSyncServer": {
+    "description": "Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server."
   },
   "settingsErrorReportsTitle": "Send error reports",
   "@settingsErrorReportsTitle": {

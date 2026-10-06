@@ -884,6 +884,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsExportEntry => 'Daten exportieren';
 
   @override
+  String get settingsExportSubtitle =>
+      'JSON-Datei mit Mitgliedern, Aufgaben, Verlauf und Einkaufsliste. Die App kann sie noch nicht importieren.';
+
+  @override
   String get settingsExportError =>
       'Deine Daten konnten nicht exportiert werden. Versuch es noch mal.';
 
@@ -1568,6 +1572,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAboutLicensesEntry => 'Open-Source-Lizenzen';
+
+  @override
+  String get settingsAboutPrivacy => 'Hinweise zum Datenschutz';
+
+  @override
+  String get settingsAboutSource => 'Quellcode';
+
+  @override
+  String get settingsAboutSyncServer => 'Sync-Server';
 
   @override
   String get settingsErrorReportsTitle => 'Fehlerberichte senden';

@@ -879,6 +879,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExportEntry => 'Export data';
 
   @override
+  String get settingsExportSubtitle =>
+      'JSON file with your members, chores, history and shopping list. The app can\'t import it yet.';
+
+  @override
   String get settingsExportError =>
       'Couldn\'t export your data. Please try again.';
 
@@ -1559,6 +1563,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAboutLicensesEntry => 'Open source licenses';
+
+  @override
+  String get settingsAboutPrivacy => 'Privacy notes';
+
+  @override
+  String get settingsAboutSource => 'Source code';
+
+  @override
+  String get settingsAboutSyncServer => 'Sync server';
 
   @override
   String get settingsErrorReportsTitle => 'Send error reports';

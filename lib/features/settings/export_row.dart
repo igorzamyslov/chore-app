@@ -41,6 +41,7 @@ class ExportDataTile extends ConsumerWidget {
       child: SettingsRow(
         icon: Icons.ios_share_outlined,
         label: l10n.settingsExportEntry,
+        sublabel: l10n.settingsExportSubtitle,
         onTap: () => _export(context, ref),
       ),
     );

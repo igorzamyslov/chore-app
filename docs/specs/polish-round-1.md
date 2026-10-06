@@ -88,6 +88,14 @@ of the chores list, and flows keep passing untouched.
   generic error string. No import in this round (import belongs to the
   sync/adoption work, G4).
 
+> **Amendment 2026-10-06 (persona review D12).** `settings` is no longer
+> exported: it is this device's configuration, not household data, and it
+> carried sync identifiers and `pending_join_code` into a file people share.
+> The `tables` key set is now households, members, categories, chores,
+> chore_assignees, chore_occurrences, shopping_items. The row gains the
+> sub-line "JSON file with your members, chores, history and shopping list.
+> The app can't import it yet." (import stays backlog G-3).
+
 ### B2. Reset app data (G9)
 - Bottom of Settings, visually separated, destructive-styled row
   `settings.reset` ("Reset app data").

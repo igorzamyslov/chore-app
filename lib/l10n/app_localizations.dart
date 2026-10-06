@@ -1292,6 +1292,12 @@ abstract class AppLocalizations {
   /// **'Export data'**
   String get settingsExportEntry;
 
+  /// Sub-line of the Export row (id settings.export): the format, what is in it, and the honest limit that there is no import yet (persona review D12).
+  ///
+  /// In en, this message translates to:
+  /// **'JSON file with your members, chores, history and shopping list. The app can\'t import it yet.'**
+  String get settingsExportSubtitle;
+
   /// Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1).
   ///
   /// In en, this message translates to:
@@ -2329,6 +2335,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
+
+  /// About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy notes'**
+  String get settingsAboutPrivacy;
+
+  /// About row (id settings.about.source) opening the project's source repository in the browser (persona review D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get settingsAboutSource;
+
+  /// Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync server'**
+  String get settingsAboutSyncServer;
 
   /// Title of the About section's switch row that controls whether technical error details are uploaded to the sync server.
   ///

@@ -51,6 +51,18 @@ void main() {
       );
 
       await openSettingsTab(tester);
+      // Persona review D12: the row says what the file is, and that there
+      // is no import yet.
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.export'),
+          matching: find.text(
+            'JSON file with your members, chores, history and shopping '
+            "list. The app can't import it yet.",
+          ),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.bySemanticsIdentifier('settings.export'));
       await tester.pumpAndSettle();
 

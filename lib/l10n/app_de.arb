@@ -231,6 +231,7 @@
   "settingsQuietHoursEmptyWindowHint": "Anfang und Ende sind gleich — keine Ruhezeit",
 
   "settingsExportEntry": "Daten exportieren",
+  "settingsExportSubtitle": "JSON-Datei mit Mitgliedern, Aufgaben, Verlauf und Einkaufsliste. Die App kann sie noch nicht importieren.",
   "settingsExportError": "Deine Daten konnten nicht exportiert werden. Versuch es noch mal.",
 
   "settingsHouseholdSectionTitle": "Haushalt",
@@ -417,6 +418,9 @@
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
   "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
+  "settingsAboutPrivacy": "Hinweise zum Datenschutz",
+  "settingsAboutSource": "Quellcode",
+  "settingsAboutSyncServer": "Sync-Server",
   "settingsErrorReportsTitle": "Fehlerberichte senden",
   "settingsErrorReportsSubtitle": "Sendet technische Fehlerdetails (keine Aufgaben- oder Mitgliederdaten) an den Sync-Server, damit Fehler behoben werden können. Nur wenn du angemeldet bist.",
   "settingsAboutDonateTitle": "Unterstütze die App",
