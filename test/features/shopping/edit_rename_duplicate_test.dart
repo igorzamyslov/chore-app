@@ -19,7 +19,7 @@ void main() {
   );
 
   testChoreApp(
-    'renaming an item to another active item\'s name shows an inline '
+    "renaming an item to another active item's name shows an inline "
     '"Already on the list" error and does not save (F7)',
     today: today,
     (tester, database) async {
@@ -54,7 +54,7 @@ void main() {
   );
 
   testChoreApp(
-    'changing only the casing of an item\'s own name is not a duplicate',
+    "changing only the casing of an item's own name is not a duplicate",
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
