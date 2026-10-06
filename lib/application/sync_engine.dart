@@ -537,17 +537,30 @@ class SupabaseSyncEngine implements SyncEngine {
       for (final row in choreRows) {
         await _sync.applyPulledChore(choreFromRow(row));
       }
+      // Assignees are applied PER CHORE as one LWW value (spec §8.3
+      // amendment 2026-10-06): live rows and tombstones (§8.6.5) for a
+      // chore are grouped and handed over together, so a dirty local chore
+      // keeps its whole list and a clean one takes the pulled list whole.
+      final liveByChore = <String, List<ChoreAssignee>>{};
+      final tombstonedByChore = <String, List<String>>{};
       for (final row in assigneeRows) {
-        // A tombstoned row is a local hard delete, not an apply (spec
-        // `docs/specs/sync-backend.md` §8.6.5).
+        final choreId = row['chore_id']! as String;
         if (row['deleted_at'] != null) {
-          await _sync.applyPulledAssigneeDeletion(
-            row['chore_id']! as String,
-            row['member_id']! as String,
-          );
+          tombstonedByChore
+              .putIfAbsent(choreId, () => [])
+              .add(row['member_id']! as String);
         } else {
-          await _sync.applyPulledChoreAssignee(choreAssigneeFromRow(row));
+          liveByChore
+              .putIfAbsent(choreId, () => [])
+              .add(choreAssigneeFromRow(row));
         }
+      }
+      for (final choreId in {...liveByChore.keys, ...tombstonedByChore.keys}) {
+        await _sync.applyPulledAssigneeSet(
+          choreId,
+          live: liveByChore[choreId] ?? const [],
+          tombstonedMemberIds: tombstonedByChore[choreId] ?? const [],
+        );
       }
       for (final row in occurrenceRows) {
         if (row['deleted_at'] != null) {

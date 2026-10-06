@@ -950,6 +950,151 @@ void main() {
     );
   });
 
+  // Technical review 2026-10-06 #8 / spec `docs/specs/sync-backend.md` §8.3
+  // amendment 2026-10-06: a chore's assignee list is ONE value for LWW
+  // purposes, not a set of independently merged rows.
+  group('SupabaseSyncEngine assignee set LWW', () {
+    late AppDatabase db;
+    late HouseholdRepository households;
+    late ChoreRepository chores;
+    late Household household;
+    late FakeSyncTransport transport;
+    late SupabaseSyncEngine engine;
+    late String owner;
+    late Member b;
+    late Member c;
+
+    setUp(() async {
+      db = AppDatabase(NativeDatabase.memory());
+      households = HouseholdRepository(db);
+      chores = ChoreRepository(db);
+      household = await households.createLocalHousehold('Me');
+      owner = (await db.select(db.members).getSingle()).id;
+      b = await households.addMember(household.id, name: 'B', color: 1);
+      c = await households.addMember(household.id, name: 'C', color: 2);
+      transport = FakeSyncTransport();
+      engine = SupabaseSyncEngine(
+        db: db,
+        transport: transport,
+        settings: SettingsRepository(db),
+        householdId: household.id,
+      );
+    });
+
+    tearDown(() async {
+      engine.stop();
+      await db.close();
+    });
+
+    Future<Chore> rotationChore(List<String> memberIds) => chores.createChore(
+      householdId: household.id,
+      title: 'T',
+      startDate: PlainDate(2026, 1, 1),
+      assignmentMode: AssignmentMode.rotation,
+      assigneeMemberIds: memberIds,
+    );
+
+    Future<List<ChoreAssignee>> localSet(String choreId) =>
+        (db.select(db.choreAssignees)
+              ..where((tbl) => tbl.choreId.equals(choreId))
+              ..orderBy([(tbl) => OrderingTerm(expression: tbl.position)]))
+            .get();
+
+    /// Rewrites the fake server's assignee rows for [choreId] to
+    /// [memberIds] in order, as another device's `updateChore` push would,
+    /// tombstoning every member no longer in the list.
+    void serverSetAssignees(String choreId, List<String> memberIds) {
+      transport.now = DateTime.utc(2026, 2);
+      final stamp = transport.now.toIso8601String();
+      final rows = transport.serverRows['chore_assignees']!;
+      for (final row in rows) {
+        if (row['chore_id'] == choreId &&
+            !memberIds.contains(row['member_id'])) {
+          row['deleted_at'] = stamp;
+          row['updated_at'] = stamp;
+        }
+      }
+      for (var i = 0; i < memberIds.length; i++) {
+        final existing = rows.indexWhere(
+          (row) =>
+              row['chore_id'] == choreId && row['member_id'] == memberIds[i],
+        );
+        final row = {
+          'chore_id': choreId,
+          'member_id': memberIds[i],
+          'household_id': household.id,
+          'position': i,
+          'deleted_at': null,
+          'updated_at': stamp,
+        };
+        if (existing == -1) {
+          rows.add(row);
+        } else {
+          rows[existing] = row;
+        }
+      }
+    }
+
+    test(
+      'a dirty local chore keeps its whole assignee set: pulled rows AND '
+      'tombstones for that chore are skipped',
+      () async {
+        final chore = await rotationChore([owner, b.id, c.id]);
+        await engine.pushDirty();
+        // Local edit, not yet pushed: drop c.
+        await chores.updateChore(chore.id, assigneeMemberIds: [owner, b.id]);
+        // The other device, concurrently: drop b instead and reorder.
+        serverSetAssignees(chore.id, [c.id, owner]);
+
+        await engine.pullSince();
+
+        final set = await localSet(chore.id);
+        expect(set.map((row) => row.memberId), [owner, b.id]);
+        expect(set.every((row) => row.syncDirty), isTrue);
+      },
+    );
+
+    test(
+      'a clean local chore takes the pulled set exactly, positions 0..n-1, '
+      'with no union and no duplicate positions',
+      () async {
+        final chore = await rotationChore([owner, b.id]);
+        await engine.pushDirty();
+        serverSetAssignees(chore.id, [c.id, owner]);
+
+        await engine.pullSince();
+
+        final set = await localSet(chore.id);
+        expect(set.map((row) => row.memberId), [c.id, owner]);
+        expect(set.map((row) => row.position), [0, 1]);
+        expect(set.every((row) => !row.syncDirty), isTrue);
+      },
+    );
+
+    test(
+      "tombstones alone (a pull landing between the other device's row "
+      'push and its tombstone push) delete only those members, never the '
+      'whole set',
+      () async {
+        final chore = await rotationChore([owner, b.id, c.id]);
+        await engine.pushDirty();
+        transport.now = DateTime.utc(2026, 2);
+        final bRow = transport.serverRows['chore_assignees']!.singleWhere(
+          (row) => row['chore_id'] == chore.id && row['member_id'] == b.id,
+        );
+        bRow['deleted_at'] = transport.now.toIso8601String();
+        bRow['updated_at'] = transport.now.toIso8601String();
+
+        await engine.pullSince();
+
+        expect(
+          (await localSet(chore.id)).map((row) => row.memberId),
+          [owner, c.id],
+        );
+      },
+    );
+  });
+
   group('SupabaseSyncEngine hard-delete tombstones (spec §8.6)', () {
     late AppDatabase db;
     late HouseholdRepository households;

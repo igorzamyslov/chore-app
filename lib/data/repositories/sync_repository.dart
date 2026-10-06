@@ -245,19 +245,58 @@ class SyncRepository {
     write: () => db.into(db.chores).insertOnConflictUpdate(pulled),
   );
 
-  /// Applies a pulled `chore_assignees` row (keyed by `choreId` +
-  /// `memberId`), unless the local row is dirty.
-  Future<void> applyPulledChoreAssignee(ChoreAssignee pulled) => _applyPulled(
-    existing:
-        (db.select(db.choreAssignees)..where(
-              (tbl) =>
-                  tbl.choreId.equals(pulled.choreId) &
-                  tbl.memberId.equals(pulled.memberId),
-            ))
-            .getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.choreAssignees).insertOnConflictUpdate(pulled),
-  );
+  /// Applies everything a pull fetched for ONE chore's `chore_assignees`
+  /// (spec §8.3 amendment 2026-10-06, technical review #8): the assignee
+  /// list is a single LWW value, not a set of independently merged rows.
+  ///
+  /// - If the local chore row is dirty, or any of its local assignee rows
+  ///   is (an edit whose push has not completed), nothing is applied: local
+  ///   dirty wins for the WHOLE list, and the next push settles it. Merging
+  ///   row-by-row here is what produced a union of both devices' edits with
+  ///   duplicate `position`s and a rotation order that differed per device.
+  /// - Otherwise, if [live] is non-empty, the local set is replaced by it
+  ///   (delete then insert, positions exactly as pulled). Every local edit
+  ///   rewrites the full list (`ChoreRepository.updateChore`), so a pull
+  ///   that sees any live row of a chore sees that chore's complete list.
+  /// - Otherwise only [tombstonedMemberIds] are deleted: a pull can land
+  ///   between the other device's live-row push and its tombstone push,
+  ///   and treating "tombstones only" as "the new set is empty" would wipe
+  ///   the chore's assignees.
+  Future<void> applyPulledAssigneeSet(
+    String choreId, {
+    required List<ChoreAssignee> live,
+    required List<String> tombstonedMemberIds,
+  }) async {
+    final chore = await (db.select(
+      db.chores,
+    )..where((tbl) => tbl.id.equals(choreId))).getSingleOrNull();
+    if (chore != null && chore.syncDirty) {
+      return;
+    }
+    final current = await (db.select(
+      db.choreAssignees,
+    )..where((tbl) => tbl.choreId.equals(choreId))).get();
+    if (current.any((row) => row.syncDirty)) {
+      return;
+    }
+    if (live.isNotEmpty) {
+      await (db.delete(
+        db.choreAssignees,
+      )..where((tbl) => tbl.choreId.equals(choreId))).go();
+      for (final row in live) {
+        await db.into(db.choreAssignees).insert(row);
+      }
+      return;
+    }
+    if (tombstonedMemberIds.isNotEmpty) {
+      await (db.delete(db.choreAssignees)..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.memberId.isIn(tombstonedMemberIds),
+          ))
+          .go();
+    }
+  }
 
   /// Applies a pulled `chore_occurrences` row, unless the local row is
   /// dirty.
@@ -347,18 +386,6 @@ class SyncRepository {
                 tbl.id.equals(id) &
                 tbl.syncDirty.equals(false) &
                 tbl.status.equalsValue(OccurrenceStatus.pending),
-          ))
-          .go();
-
-  /// Applies a pulled tombstone for the `chore_assignees` row keyed
-  /// [choreId] + [memberId]; same dirty rule as
-  /// [applyPulledOccurrenceDeletion].
-  Future<void> applyPulledAssigneeDeletion(String choreId, String memberId) =>
-      (db.delete(db.choreAssignees)..where(
-            (tbl) =>
-                tbl.choreId.equals(choreId) &
-                tbl.memberId.equals(memberId) &
-                tbl.syncDirty.equals(false),
           ))
           .go();
 

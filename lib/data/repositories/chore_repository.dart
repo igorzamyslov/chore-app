@@ -724,11 +724,19 @@ class ChoreRepository {
     }
   }
 
+  /// The chore's assignee ids in rotation order. `memberId` breaks a
+  /// `position` tie so the order is deterministic on every device even if
+  /// two rows ever share a position (technical review 2026-10-06 #8 --
+  /// the pull now applies the list as one value, so this is defence in
+  /// depth, not the fix).
   Future<List<String>> _currentAssigneeIds(String choreId) async {
     final rows =
         await (db.select(db.choreAssignees)
               ..where((tbl) => tbl.choreId.equals(choreId))
-              ..orderBy([(tbl) => OrderingTerm(expression: tbl.position)]))
+              ..orderBy([
+                (tbl) => OrderingTerm(expression: tbl.position),
+                (tbl) => OrderingTerm(expression: tbl.memberId),
+              ]))
             .get();
     return [for (final row in rows) row.memberId];
   }
