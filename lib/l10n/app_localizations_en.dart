@@ -896,6 +896,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Share this code — it replaces any earlier code and expires in 7 days.';
 
   @override
+  String get settingsMembersInviteHint =>
+      'Add everyone under Members first — they\'ll pick their own name when they join.';
+
+  @override
   String get settingsMembersInviteShare => 'Share';
 
   @override
@@ -1323,7 +1327,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get joinHouseholdContinue => 'Continue';
 
   @override
-  String get joinHouseholdChooserTitle => 'Which profile is yours?';
+  String joinHouseholdChooserTitle(String household) {
+    return 'Which one is you in $household?';
+  }
 
   @override
   String joinHouseholdChooserAreYou(String name) {
@@ -1332,6 +1338,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdChooserNewMember => 'I\'m new here';
+
+  @override
+  String joinClaimConfirmTitle(String household, String name) {
+    return 'Join $household as $name?';
+  }
+
+  @override
+  String joinClaimConfirmBody(String name) {
+    return 'You\'ll see and mark the chores assigned to $name. Pick another name if this isn\'t you.';
+  }
+
+  @override
+  String get joinClaimConfirmJoin => 'Join';
 
   @override
   String get joinHouseholdNewMemberTitle => 'What\'s your name?';

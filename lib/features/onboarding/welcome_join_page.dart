@@ -62,6 +62,11 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
   bool _busy = false;
   String? _inlineError;
   String _code = '';
+
+  /// The joined household's display name (`peek_invite`), known once the
+  /// server has accepted the code -- shown as the AppBar title and in the
+  /// chooser (persona review D3).
+  String? _householdName;
   List<ClaimableMember> _claimableMembers = const [];
   JoinChoice? _choice;
 
@@ -124,8 +129,16 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final signedIn = ref.watch(currentAuthUserProvider).valueOrNull != null;
+    final householdName = _householdName;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.welcomeJoinTitle)),
+      appBar: AppBar(
+        title: Text(
+          signedIn && householdName != null
+              ? householdName
+              : l10n.welcomeJoinTitle,
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -154,6 +167,7 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       switch (subStep) {
         case _SubStep.chooser:
           return JoinChooserStep(
+            householdName: _householdName ?? '',
             claimableMembers: _claimableMembers,
             onClaim: (member) => _runJoin(ClaimMemberChoice(member.memberId)),
             onNewMember: () =>
@@ -306,9 +320,9 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       _inlineError = null;
     });
     try {
-      final members = await ref
-          .read(householdGatewayProvider)
-          .listClaimableMembers(code);
+      final gateway = ref.read(householdGatewayProvider);
+      final members = await gateway.listClaimableMembers(code);
+      final householdName = await gateway.peekInviteHouseholdName(code);
       if (!mounted) {
         return;
       }
@@ -325,6 +339,7 @@ class _WelcomeJoinPageState extends ConsumerState<WelcomeJoinPage> {
       }
       setState(() {
         _code = code;
+        _householdName = householdName;
         _claimableMembers = members;
         _subStep = _SubStep.chooser;
         _busy = false;

@@ -115,6 +115,18 @@ Deltas vs local:
     not generalise. The app then drops back to local-only mode; local data
     on the user's own device is untouched unless they tick the
     `household-lifecycle.md` §3.3 opt-in (D-L3).
+- **Amendment 2026-10-06 (persona review D3; migration
+  `20261006120000_join_funnel.sql`) — `peek_invite(p_code text) returns
+  text`.** SECURITY DEFINER, `set search_path = public`, EXECUTE revoked
+  from `public`/`anon`, granted to `authenticated` only. Returns the
+  household `name` for a code that is active (not revoked), unexpired and
+  whose household is not cascaded — validation delegated to
+  `_valid_invite`; every rejection raises the single message
+  `'invalid code'`. Reveals nothing `list_claimable_members` does not
+  already give the same code holder. Client: `HouseholdGateway.peekInviteHouseholdName`,
+  called right after `list_claimable_members` succeeds; the join chooser
+  and its new claim confirm ("Join {household} as {name}?", §7.4
+  amendment) show the name. pgTAP: `supabase/tests/006_join_funnel_test.sql`.
 - **Tests: pgTAP** in `supabase/tests/` — the isolation matrix (member of
   A cannot read/write anything of B, for every table and every verb),
   invite lifecycle (expiry, revocation, double-claim rejection), RPC
@@ -328,6 +340,20 @@ name prompt, auto color). Then, per §4, strictly in this order:
    replace is one local transaction; the post-replace UI must re-resolve
    the bootstrap household (provider invalidation), since the household
    id changes.
+
+> **Amendment 2026-10-06 (persona review D3) — name the household, confirm
+> the claim.** Once the code is accepted, the client also calls
+> `peekInviteHouseholdName` (§2 amendment). The chooser heading becomes
+> "Which one is you in {household}?" and, on the welcome join subpage, the
+> AppBar title becomes the household name. Tapping a profile no longer
+> claims it: a dialog "Join {household} as {name}?" / "You'll see and mark
+> the chores assigned to {name}. Pick another name if this isn't you."
+> (ids `join.claim.cancel` / `join.claim.confirm`) comes first, and only
+> Join proceeds (to the import offer in the Settings sheet; to the join
+> itself on the welcome subpage). The invite sheet carries the hint "Add
+> everyone under Members first — they'll pick their own name when they
+> join." so joiners claim a pre-created profile instead of duplicating it
+> via "I'm new here".
 
 ### 7.5 Testing
 

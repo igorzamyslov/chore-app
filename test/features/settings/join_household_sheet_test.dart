@@ -155,10 +155,13 @@ void main() {
 
       expect(find.text('Are you Anna?'), findsOneWidget);
       expect(find.text('Are you Bob?'), findsOneWidget);
+      expect(find.text('Which one is you in The Testers?'), findsOneWidget);
 
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('join.claim.confirm'));
       await tester.pumpAndSettle();
 
       expect(
@@ -391,6 +394,8 @@ void main() {
         find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('join.claim.confirm'));
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.join.import.accept'),
@@ -593,6 +598,8 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('join.claim.confirm'));
       await tester.pumpAndSettle();
 
       await tester.tap(

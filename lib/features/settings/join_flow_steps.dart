@@ -141,24 +141,68 @@ class JoinCodeStep extends StatelessWidget {
 
 /// The claim/"I'm new here" chooser step (ids
 /// `settings.account.join.claim.<memberId>`/`settings.account.join.newMember`).
+///
+/// Tapping a profile does NOT claim it: a confirm dialog first names the
+/// household and the profile ("Join {household} as {name}?", ids
+/// `join.claim.confirm` / `join.claim.cancel`) and only its Join button calls
+/// [onClaim] (persona review D3: a one-tap claim with no household name let a
+/// joiner take over the wrong person's chores).
 class JoinChooserStep extends StatelessWidget {
   /// Creates the chooser step.
   const JoinChooserStep({
+    required this.householdName,
     required this.claimableMembers,
     required this.onClaim,
     required this.onNewMember,
     super.key,
   });
 
+  /// The display name of the household the code joins (`peek_invite`).
+  final String householdName;
+
   /// The unclaimed member profiles `listClaimableMembers` returned.
   final List<ClaimableMember> claimableMembers;
 
-  /// Called with the tapped member when the caller claims an existing
-  /// profile.
+  /// Called with the tapped member once the caller has confirmed the claim.
   final ValueChanged<ClaimableMember> onClaim;
 
   /// Called when the caller picks "I'm new here" instead.
   final VoidCallback onNewMember;
+
+  Future<void> _confirmClaim(
+    BuildContext context,
+    ClaimableMember member,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: Text(l10n.joinClaimConfirmTitle(householdName, member.name)),
+          content: Text(l10n.joinClaimConfirmBody(member.name)),
+          actions: [
+            semantic(
+              'join.claim.cancel',
+              child: TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.commonCancel),
+              ),
+            ),
+            semantic(
+              'join.claim.confirm',
+              child: FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(l10n.joinClaimConfirmJoin),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed ?? false) {
+      onClaim(member);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +213,7 @@ class JoinChooserStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n.joinHouseholdChooserTitle,
+          l10n.joinHouseholdChooserTitle(householdName),
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
@@ -180,7 +224,7 @@ class JoinChooserStep extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               leading: MemberAvatar(member: memberForAvatar(member)),
               title: Text(l10n.joinHouseholdChooserAreYou(member.name)),
-              onTap: () => onClaim(member),
+              onTap: () => _confirmClaim(context, member),
             ),
           ),
         semantic(

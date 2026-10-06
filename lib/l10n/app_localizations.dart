@@ -1322,6 +1322,12 @@ abstract class AppLocalizations {
   /// **'Share this code — it replaces any earlier code and expires in 7 days.'**
   String get settingsMembersInviteSheetBody;
 
+  /// Hint line in the invite sheet: pre-created profiles are what joiners claim, so adding people first avoids duplicate 'I'm new here' profiles (persona review D3, Maria).
+  ///
+  /// In en, this message translates to:
+  /// **'Add everyone under Members first — they\'ll pick their own name when they join.'**
+  String get settingsMembersInviteHint;
+
   /// Label of the invite-code sheet's share button (share_plus).
   ///
   /// In en, this message translates to:
@@ -1976,11 +1982,11 @@ abstract class AppLocalizations {
   /// **'Continue'**
   String get joinHouseholdContinue;
 
-  /// Title of the join sheet's chooser step, listing unclaimed member profiles plus 'I'm new here'.
+  /// Title of the join chooser step (welcome join subpage and Settings join sheet), listing unclaimed member profiles plus 'I'm new here'. Names the household the code belongs to (from the peek_invite RPC) so the joiner can tell they are in the right place before claiming anyone (persona review D3).
   ///
   /// In en, this message translates to:
-  /// **'Which profile is yours?'**
-  String get joinHouseholdChooserTitle;
+  /// **'Which one is you in {household}?'**
+  String joinHouseholdChooserTitle(String household);
 
   /// Label of one claimable-member row in the chooser step, naming the unclaimed profile.
   ///
@@ -1993,6 +1999,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I\'m new here'**
   String get joinHouseholdChooserNewMember;
+
+  /// Title of the confirm dialog shown after tapping a claimable profile in the join chooser (persona review D3: claiming used to happen on one tap, with no household name). Names both the household and the profile being claimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {household} as {name}?'**
+  String joinClaimConfirmTitle(String household, String name);
+
+  /// Body of the join claim confirm dialog: says what claiming a profile means in practice (you take over that person's chores) and offers the way back.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll see and mark the chores assigned to {name}. Pick another name if this isn\'t you.'**
+  String joinClaimConfirmBody(String name);
+
+  /// Confirm button of the join claim confirm dialog (id join.claim.confirm). Only this button claims the profile; Cancel (commonCancel, id join.claim.cancel) returns to the chooser.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get joinClaimConfirmJoin;
 
   /// Title of the join sheet's new-member name step (after picking 'I'm new here').
   ///

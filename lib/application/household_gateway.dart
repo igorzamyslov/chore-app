@@ -186,6 +186,14 @@ abstract class HouseholdGateway {
   /// household offers for the P2c "Are you Anna?" claiming step.
   Future<List<ClaimableMember>> listClaimableMembers(String code);
 
+  /// RPC `peek_invite` (migration `20261006120000_join_funnel.sql`): the
+  /// display name of the household [code] would join, so the claim step can
+  /// say WHICH household before anyone commits (persona review D3). Throws
+  /// (a `PostgrestException` whose message contains `invalid`) for an
+  /// unknown, revoked or expired code -- the same rejection
+  /// [listClaimableMembers] gives.
+  Future<String> peekInviteHouseholdName(String code);
+
   /// RPC `claim_member`: links the caller's `user_id` to the unclaimed
   /// [memberId] profile redeemed via [code]; returns the household id.
   Future<String> claimMember(String code, String memberId);
@@ -303,6 +311,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
   @override
   Future<List<ClaimableMember>> listClaimableMembers(String code) =>
       _unreachable();
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) => _unreachable();
 
   @override
   Future<String> claimMember(String code, String memberId) => _unreachable();
@@ -475,6 +486,15 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
           color: (row['member_color'] as num).toInt(),
         ),
     ];
+  }
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) async {
+    final result = await _client.rpc<dynamic>(
+      'peek_invite',
+      params: {'p_code': code},
+    );
+    return result as String;
   }
 
   @override

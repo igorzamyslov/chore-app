@@ -44,6 +44,16 @@ class _InviteCodeSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(l10n.settingsMembersInviteSheetBody),
+          const SizedBox(height: 8),
+          semantic(
+            'settings.members.invite.hint',
+            child: Text(
+              l10n.settingsMembersInviteHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
           Center(
             child: semantic(

@@ -109,6 +109,17 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// succeeding.
   Exception? listClaimableMembersError;
 
+  /// The household name [peekInviteHouseholdName] returns unless
+  /// [peekInviteError] is set.
+  String peekHouseholdName = 'The Testers';
+
+  /// Set to make the next [peekInviteHouseholdName] call throw this instead
+  /// of succeeding.
+  Exception? peekInviteError;
+
+  /// Every [peekInviteHouseholdName] call's code, in call order.
+  final List<String> peekInviteCalls = [];
+
   /// The household id [claimMember] returns unless [claimMemberError] is
   /// set.
   String claimResultHouseholdId = 'household-1';
@@ -225,6 +236,16 @@ class FakeHouseholdGateway implements HouseholdGateway {
       throw error;
     }
     return claimableMembers;
+  }
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) async {
+    peekInviteCalls.add(code);
+    final error = peekInviteError;
+    if (error != null) {
+      throw error;
+    }
+    return peekHouseholdName;
   }
 
   @override

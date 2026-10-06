@@ -125,9 +125,35 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Are you Anna?'), findsOneWidget);
+      // The code is accepted: the household's name (peek_invite) is now the
+      // AppBar title and part of the chooser heading (persona review D3).
+      expect(claimGateway.peekInviteCalls, ['ABC12345']);
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('The Testers'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Which one is you in The Testers?'), findsOneWidget);
+
+      // Tapping a profile only asks; Cancel claims nothing.
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
       );
+      await tester.pumpAndSettle();
+      expect(find.text('Join The Testers as Anna?'), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('join.claim.cancel'));
+      await tester.pumpAndSettle();
+      expect(claimGateway.claimMemberCalls, isEmpty);
+      expect(find.text('Are you Anna?'), findsOneWidget);
+
+      // Join is what claims.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('join.claim.confirm'));
       await tester.pumpAndSettle();
 
       // No import-offer step at all -- straight to the shell.
@@ -419,6 +445,8 @@ void main() {
       await tester.tap(
         find.bySemanticsIdentifier('settings.account.join.claim.m-anna'),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('join.claim.confirm'));
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('shell.tab.chores'), findsOneWidget);

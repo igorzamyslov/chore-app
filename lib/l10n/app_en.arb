@@ -1122,6 +1122,10 @@
   "@settingsMembersInviteSheetBody": {
     "description": "One-line explanatory copy in the invite-code sheet, stating the code's expiry (spec docs/specs/sync-backend.md §1: invites default to a 7-day expiry) AND that creating it revoked any previously active code (spec docs/feedback/2026-08-01-ux-audit.md A3: one live code per household)."
   },
+  "settingsMembersInviteHint": "Add everyone under Members first — they'll pick their own name when they join.",
+  "@settingsMembersInviteHint": {
+    "description": "Hint line in the invite sheet: pre-created profiles are what joiners claim, so adding people first avoids duplicate 'I'm new here' profiles (persona review D3, Maria)."
+  },
   "settingsMembersInviteShare": "Share",
   "@settingsMembersInviteShare": {
     "description": "Label of the invite-code sheet's share button (share_plus)."
@@ -1691,9 +1695,15 @@
   "@joinHouseholdContinue": {
     "description": "Label of the join sheet's 'Continue' buttons (code entry and the new-member name step)."
   },
-  "joinHouseholdChooserTitle": "Which profile is yours?",
+  "joinHouseholdChooserTitle": "Which one is you in {household}?",
   "@joinHouseholdChooserTitle": {
-    "description": "Title of the join sheet's chooser step, listing unclaimed member profiles plus 'I'm new here'."
+    "description": "Title of the join chooser step (welcome join subpage and Settings join sheet), listing unclaimed member profiles plus 'I'm new here'. Names the household the code belongs to (from the peek_invite RPC) so the joiner can tell they are in the right place before claiming anyone (persona review D3).",
+    "placeholders": {
+      "household": {
+        "type": "String",
+        "example": "The Millers"
+      }
+    }
   },
   "joinHouseholdChooserAreYou": "Are you {name}?",
   "@joinHouseholdChooserAreYou": {
@@ -1708,6 +1718,34 @@
   "joinHouseholdChooserNewMember": "I'm new here",
   "@joinHouseholdChooserNewMember": {
     "description": "Label of the chooser step's 'join as a new member' option, below the claimable-member rows."
+  },
+  "joinClaimConfirmTitle": "Join {household} as {name}?",
+  "@joinClaimConfirmTitle": {
+    "description": "Title of the confirm dialog shown after tapping a claimable profile in the join chooser (persona review D3: claiming used to happen on one tap, with no household name). Names both the household and the profile being claimed.",
+    "placeholders": {
+      "household": {
+        "type": "String",
+        "example": "The Millers"
+      },
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "joinClaimConfirmBody": "You'll see and mark the chores assigned to {name}. Pick another name if this isn't you.",
+  "@joinClaimConfirmBody": {
+    "description": "Body of the join claim confirm dialog: says what claiming a profile means in practice (you take over that person's chores) and offers the way back.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Anna"
+      }
+    }
+  },
+  "joinClaimConfirmJoin": "Join",
+  "@joinClaimConfirmJoin": {
+    "description": "Confirm button of the join claim confirm dialog (id join.claim.confirm). Only this button claims the profile; Cancel (commonCancel, id join.claim.cancel) returns to the chooser."
   },
   "joinHouseholdNewMemberTitle": "What's your name?",
   "@joinHouseholdNewMemberTitle": {
