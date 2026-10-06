@@ -9,12 +9,14 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/sync_engine.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
+import 'package:chore_app/features/shopping/shopping_status_line.dart';
 import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
@@ -141,10 +143,29 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // comment and syncEngineProvider's own doc comment
     // (lib/app/providers.dart) for why.
     final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
+    // F1: rows added by a member other than the one acting show that
+    // member's avatar. Resolved once here, not per row.
+    final membersById = {
+      for (final member
+          in ref.watch(membersProvider).valueOrNull ?? const <Member>[])
+        member.id: member,
+    };
+    final actingMemberId = ref.watch(actingMemberProvider)?.id;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context).shoppingTabLabel),
+        // F1/F10: the title with a one-line status subtitle (remaining
+        // count, sync freshness). The extra height keeps the two lines
+        // clear of each other at the default text scale.
+        toolbarHeight: 64,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(AppLocalizations.of(context).shoppingTabLabel),
+            const ShoppingStatusLine(),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -201,6 +222,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
                   final body = _Body(
                     items: items,
+                    membersById: membersById,
+                    actingMemberId: actingMemberId,
                     heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
@@ -364,6 +387,8 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) =>
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
+    required this.membersById,
+    required this.actingMemberId,
     required this.heldBuckets,
     required this.cartExpanded,
     required this.onCartExpansionChanged,
@@ -374,6 +399,12 @@ class _Body extends StatelessWidget {
   });
 
   final List<ShoppingItemWithCategory> items;
+
+  /// Every household member by id, to resolve a row's `addedBy`.
+  final Map<String, Member> membersById;
+
+  /// The acting (or claimed) member's id; their own additions get no avatar.
+  final String? actingMemberId;
 
   /// Item ids whose row is held in a section that no longer matches their
   /// database state, valued by the section they are drawn in (`true` = the
@@ -482,10 +513,21 @@ class _Body extends StatelessWidget {
     );
   }
 
+  /// The adder to show an avatar for, or `null` (see
+  /// [ShoppingItemTile.addedBy]).
+  Member? _addedByOther(ShoppingItemWithCategory item) {
+    final addedById = item.item.addedBy;
+    if (addedById == null || addedById == actingMemberId) {
+      return null;
+    }
+    return membersById[addedById];
+  }
+
   Widget _tileFor(ShoppingItemWithCategory item) {
     return ShoppingItemTile(
       key: ValueKey(item.item.id),
       item: item,
+      addedBy: _addedByOther(item),
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onLongPress: () => onLongPressItem(item),

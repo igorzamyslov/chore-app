@@ -2,7 +2,9 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:flutter/material.dart';
 
 /// A row for one active [ShoppingItemWithCategory].
@@ -42,6 +44,7 @@ class ShoppingItemTile extends StatelessWidget {
     required this.item,
     required this.onCheckedChanged,
     required this.onLongPress,
+    this.addedBy,
     super.key,
   });
 
@@ -60,6 +63,14 @@ class ShoppingItemTile extends StatelessWidget {
   /// edit sheet (`shopping_edit_sheet.dart`), where rename, quantity,
   /// category and Delete live.
   final VoidCallback onLongPress;
+
+  /// The member who added this item, when it was NOT the acting member --
+  /// shown as a 16 dp avatar after the name, tooltip = their name (persona
+  /// finding F1: Tom could not tell which items had just arrived from his
+  /// partner). `null` for the viewer's own items, for items with no known
+  /// adder, and for an adder who is no longer a member: the list stays quiet
+  /// unless there is someone else to attribute.
+  final Member? addedBy;
 
   @override
   Widget build(BuildContext context) {
@@ -97,14 +108,31 @@ class ShoppingItemTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          shoppingItem.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            decoration: checked
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: checked ? mutedColor : null,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                shoppingItem.name,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  decoration: checked
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: checked ? mutedColor : null,
+                                ),
+                              ),
+                            ),
+                            if (addedBy != null) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: addedBy!.name,
+                                child: MemberAvatar(
+                                  member: addedBy!,
+                                  radius: 8,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         if (quantityNote != null && quantityNote.isNotEmpty)
                           Text(
