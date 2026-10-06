@@ -87,7 +87,8 @@ Chores list's member and category filter buttons
 ### 5.1 Behavior
 
 - The chosen member filter and category filter survive a cold start. Each is
-  independent; "All" is stored as `NULL`.
+  independent; "All" is stored as `NULL` (member: see the 2026-10-07
+  amendment below for the explicit-All sentinel).
 - **Recorded** on every change: picking an entry in either menu, and the
   filtered-empty state's "Show everything" (clears both). Written blind,
   like the tab.
@@ -111,9 +112,20 @@ Chores list's member and category filter buttons
 > decision once — as soon as `memberIdentityModeProvider` is known and, when
 > pinned, the claim resolves — and records it like any other change, so it
 > persists. Any manual pick or "Show everything" settles it too (nothing
-> applied afterwards can override a choice made earlier). Consequence, by
-> design: an explicit "All members" is stored as `NULL` and therefore opens as
-> "mine" again on the next cold start, which is the point of the default.
+> applied afterwards can override a choice made earlier). See the second
+> amendment below for how an explicit "All members" is told apart from "never
+> chosen".
+
+> **Amendment 2026-10-07 (persona review E1 follow-up).** An explicit "All
+> members" (the member menu's first entry, or "Show everything") is now stored
+> in `chores_member_filter` as the sentinel string `all`
+> (`UiStateRepository.allMembersFilter`; member ids are UUIDs, so it cannot
+> collide). `NULL` keeps its meaning "never chosen". Cold start therefore reads
+> three states: `NULL` (and no category) → default to the claimed member when
+> pinned; `all` → unfiltered, no default re-applied; a member id → that member
+> (stale ids still degrade to "All" at read time). The sentinel is written only
+> by an explicit choice; a category-only change in a household that never
+> picked a member keeps the member column `NULL`. No schema change.
 
 ### 5.2 Storage
 

@@ -12,6 +12,7 @@ import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/ui_state_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
 import 'package:chore_app/features/chores/active_chores_presence.dart';
@@ -61,6 +62,12 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   // once the device's identity resolves.
   bool _defaultSettled = false;
 
+  // E1 follow-up: the user explicitly chose "All members" (or "Show
+  // everything"). Stored as [UiStateRepository.allMembersFilter] so the next
+  // cold start can tell it from "never chosen" and does not re-apply the
+  // claimed-member default.
+  bool _allMembersChosen = false;
+
   @override
   void initState() {
     super.initState();
@@ -68,9 +75,11 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // this one-shot read, so the first frame is already filtered. A missing
     // or errored read means no filters.
     final stored = ref.read(uiStateProvider).valueOrNull;
-    _memberFilter = stored?.choresMemberFilter;
+    final storedMember = stored?.choresMemberFilter;
+    _allMembersChosen = storedMember == UiStateRepository.allMembersFilter;
+    _memberFilter = _allMembersChosen ? null : storedMember;
     _categoryFilter = stored?.choresCategoryFilter;
-    _defaultSettled = _memberFilter != null || _categoryFilter != null;
+    _defaultSettled = storedMember != null || _categoryFilter != null;
   }
 
   /// E1: a signed-in member's list opens on THEIR chores (plus unassigned
@@ -110,7 +119,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       ref
           .read(uiStateRepositoryProvider)
           .setChoresFilters(
-            memberId: _memberFilter,
+            memberId:
+                _memberFilter ??
+                (_allMembersChosen ? UiStateRepository.allMembersFilter : null),
             categoryId: _categoryFilter,
           )
           .catchError((Object error, StackTrace stackTrace) {
@@ -203,6 +214,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
             onChanged: (value) {
               setState(() {
                 _memberFilter = value;
+                _allMembersChosen = value == null;
                 _defaultSettled = true;
               });
               _persistFilters();
@@ -693,6 +705,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   void _clearFilters() {
     setState(() {
       _memberFilter = null;
+      _allMembersChosen = true;
       _categoryFilter = null;
       _defaultSettled = true;
     });
