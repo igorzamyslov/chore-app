@@ -146,6 +146,41 @@ the whole bug report.
   (`chores.delete.confirm` / `.cancel`).
 - Pause/unpause reflects immediately (paused chores vanish from list —
   they have no pending occurrence).
+
+> **Amendment 2026-10-06 (persona review C3, C4, C5, C2, C9, E4; plan
+> `docs/plans/2026-10-06-persona-review-fixes.md` W3).**
+>
+> - **Tap opens the sheet (C3).** Tapping the tile body opens the same
+>   action sheet as `.menu` and long-press (both kept); the complete ring
+>   keeps its own tap.
+> - **Sheet rows (pending).** Mark done for… (when > 1 member), Reassign
+>   this turn… (`chores.menu.reassign`, when > 1 member; picker
+>   `chores.reassign.sheet` / `.row.<id>`, current holder not listed;
+>   snackbar "Reassigned to {name}" with Undo), Skip, Edit, Duplicate
+>   (`chores.menu.duplicate`: create form prefilled with every field, a
+>   past start date moved to today), Pause, Delete.
+> - **Pause asks how long (C2).** `chores.pause.sheet` with "Until I resume
+>   it" (`chores.pause.indefinite`) / "Until a date…"
+>   (`chores.pause.untilDate`, date picker, earliest tomorrow). A dated
+>   pause shows "Paused until {date}" on the paused row and in the
+>   snackbar.
+> - **Paused rows are actionable (C4).** Tap or long-press on a paused row
+>   (`chores.paused.<choreId>`) opens the sheet with Resume
+>   (`chores.menu.resume`), Edit and Delete only; the trailing Resume
+>   button stays.
+> - **Mark done for… in local households (C5).** Offered whenever the
+>   household has more than one member (the linked-and-signed-in gate is
+>   dropped); the person holding the phone (claimed member, else the
+>   acting member) is not listed. In a household of more than one, the
+>   Done snackbar names the credited member: "Done — credited to {name}"
+>   / "Done — credited to {name}, next due {date}" (leading "Done" kept
+>   for substring checks). The acting-member sheet gains the line "Credit
+>   and your daily summary follow this person."
+> - **Delete discloses (E4).** With more than one member the delete dialog
+>   body adds "Everyone in the household will see this."
+> - **Save confirms (C1/C6).** Saving an edit shows "Saved" / "Saved —
+>   next due {date}" / "Saved — today's turn is now {name}'s" (see
+>   `occurrence-lifecycle.md` updateChore amendment).
 - Empty state (no pending occurrences at all): centered friendly message +
   `semantic('chores.empty')` + the add FAB remains.
 - FAB `chores.add` → form screen.

@@ -160,6 +160,18 @@ the word "missed". Requirements:
 ### pauseChore(String choreId)
 `setPaused(true)` + delete pending occurrences. History untouched.
 
+> **Amendment 2026-10-06 (persona review C2, schema v19) — pause until.**
+> `pauseChore(choreId, {PlainDate? until})` also stores `chores.paused_until`
+> (plain date, synced; `NULL` = until resumed by hand). `unpauseChore`
+> always clears it. `catchUpOverdue` — which runs at bootstrap, on resume
+> and on local day change — first (after ghost repair, before the overdue
+> loop) unpauses every paused chore whose `paused_until <= today` via
+> `unpauseChore`, so the regenerated occurrence follows the usual
+> two-floors rule (never before today, never on a closed slot; a resume day
+> missed while the app was closed resumes at today). These auto-resumes
+> are not counted in `catchUpOverdue`'s return value: the catch-up banner
+> explains rolled-forward overdue turns, not this.
+
 ### unpauseChore(String choreId)
 `setPaused(false)` + insert a fresh pending occurrence — except for a
 one-off whose only occurrence is already closed, which gets none (see
@@ -221,8 +233,57 @@ An edit that changes NEITHER `recurrence` nor `startDate` leaves the
 pending occurrence — and its assignee — completely untouched, no matter
 what else changed (title, notes, category, assignment mode/assignees).
 
+> **Amendment 2026-10-06 (persona review C1/C6, plan
+> `docs/plans/2026-10-06-persona-review-fixes.md` W3) — holder
+> re-resolution.** The paragraph above is narrowed: when an edit changes
+> neither `recurrence` nor `startDate`, the pending occurrence's row and
+> due date are still untouched, BUT if the edit leaves its holder invalid
+> for the chore's new assignment, that one turn's `assigned_member_id` is
+> re-resolved in place (same row, marked dirty):
+>
+> - `fixed`: invalid if the holder is not the fixed member (e.g. Anna →
+>   Ben, or Anyone → Fixed with an unassigned turn);
+> - `rotation`: invalid if the holder is null or no longer in the order;
+>   the new holder is `nextRotationAssignee(order,
+>   latestClosed?.assignedMemberId, skipMemberId: <latestClosed.completedBy
+>   if done>)` — the same `_regeneratedAssignee` rule as unpause, i.e.
+>   whose turn it would be given history;
+> - `anyone`: always valid — the turn keeps whoever had it.
+>
+> A still-valid holder is never moved, so a pure rotation reorder still
+> leaves today's turn where it is (the reorder plan's point 2 stands; its
+> point 3, "a removed holder keeps the turn", is superseded).
+> `ChoreRepository.detachMemberFromChores` (member removal) calls the
+> repository directly and is unaffected.
+>
+> `updateChore` now returns `ChoreUpdateResult {PlainDate? nextDue,
+> String? reassignedToName}`: `nextDue` when the schedule changed and an
+> occurrence was regenerated, `reassignedToName` when the step above moved
+> the turn. The form pops with it and the chores list confirms the save:
+> "Saved — today's turn is now {name}'s" / "Saved — next due {date}" /
+> "Saved".
+
 Throws `StateError` if the chore doesn't exist or is soft-deleted (same
 guard as `pauseChore`/`unpauseChore`).
+
+### reassignOccurrence(String occurrenceId, String? memberId)
+
+> **Added 2026-10-06 (persona review C2, Maria: "Anna's ill, I just want
+> Ben to take her turn this week").** Writes `assigned_member_id =
+> memberId` on that one PENDING occurrence and marks it dirty; the chore's
+> own assignment is untouched. `memberId == null` is accepted only so the
+> Undo of reassigning an unassigned `anyone` turn can restore it. Throws
+> `StateError` if the occurrence doesn't exist or isn't pending.
+>
+> **What the next turn is after a reassign.** Nothing special-cases it:
+> `completeOccurrence` advances from the closed occurrence's
+> `assigned_member_id`, which is now the REASSIGNED holder, so the next
+> turn is the member after the reassigned holder in rotation order
+> (order A → B → C, A's turn reassigned to B, B does it → next is C). The
+> cover rule still applies to whoever completes it: reassigned to B but
+> done by C → after B would be C, who covered, so it is A. A skip keeps
+> the reassigned holder (skip sticks). A holder outside the rotation falls
+> back to the first member, as always.
 
 ### reopenOccurrence(String occurrenceId)
 The undo path for `completeOccurrence`/`skipOccurrence` (spec
