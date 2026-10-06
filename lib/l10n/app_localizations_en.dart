@@ -1417,7 +1417,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get householdLeaveConfirmBodyLastMember =>
-      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get householdLeaveConfirmAction => 'Leave';
@@ -1438,7 +1438,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountDeleteConfirmBodyLastMember =>
-      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get accountDeleteConfirmAction => 'Delete account';

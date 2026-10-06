@@ -1426,7 +1426,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get householdLeaveConfirmBodyLastMember =>
-      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die gemeinsame Kopie ist sofort für alle verborgen und wird nach 30 Tagen endgültig vom Server gelöscht, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
 
   @override
   String get householdLeaveConfirmAction => 'Verlassen';
@@ -1447,7 +1447,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get accountDeleteConfirmBodyLastMember =>
-      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die gemeinsame Kopie ist sofort für alle verborgen und wird nach 30 Tagen endgültig vom Server gelöscht, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
 
   @override
   String get accountDeleteConfirmAction => 'Konto löschen';

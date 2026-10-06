@@ -1809,9 +1809,9 @@
   "@householdLeaveConfirmBody": {
     "description": "Body of the leave-household confirm when other claimed members remain (spec §3.4)."
   },
-  "householdLeaveConfirmBodyLastMember": "You're the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
+  "householdLeaveConfirmBodyLastMember": "You're the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
   "@householdLeaveConfirmBodyLastMember": {
-    "description": "Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked."
+    "description": "Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked. Persona review B2: the server soft-deletes the household at once (hidden from everyone) and a nightly job hard-deletes it after 30 days (supabase/migrations/20261006140000_privacy_and_grants.sql), and the copy says exactly that instead of 'removed'."
   },
   "householdLeaveConfirmAction": "Leave",
   "@householdLeaveConfirmAction": {
@@ -1833,9 +1833,9 @@
   "@accountDeleteConfirmBody": {
     "description": "Body of the delete-account exit sheet when claimed members remain in the household(s). The export pointer deliberately lives on the FINAL dialog instead (D-L6/D-L7), where it is the last thing read before the point of no return."
   },
-  "accountDeleteConfirmBodyLastMember": "Your account and your email address are deleted from the server. This can't be undone. You're the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
+  "accountDeleteConfirmBodyLastMember": "Your account and your email address are deleted from the server. This can't be undone. You're the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.",
   "@accountDeleteConfirmBodyLastMember": {
-    "description": "Body of the delete-account confirm when the caller is the last claimed member, so \u00a72.4's cascade will fire -- the same plain warning D-L5 requires for leaving."
+    "description": "Body of the delete-account confirm when the caller is the last claimed member, so \u00a72.4's cascade will fire -- the same plain warning D-L5 requires for leaving. Persona review B2: states the 30-day soft-delete-then-purge window, same as householdLeaveConfirmBodyLastMember."
   },
   "accountDeleteConfirmAction": "Delete account",
   "@accountDeleteConfirmAction": {

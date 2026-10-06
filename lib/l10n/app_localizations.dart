@@ -2084,10 +2084,10 @@ abstract class AppLocalizations {
   /// **'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.'**
   String get householdLeaveConfirmBody;
 
-  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked.
+  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked. Persona review B2: the server soft-deletes the household at once (hidden from everyone) and a nightly job hard-deletes it after 30 days (supabase/migrations/20261006140000_privacy_and_grants.sql), and the copy says exactly that instead of 'removed'.
   ///
   /// In en, this message translates to:
-  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get householdLeaveConfirmBodyLastMember;
 
   /// Confirm button of the leave-household sheet.
@@ -2120,10 +2120,10 @@ abstract class AppLocalizations {
   /// **'Your account and your email address are deleted from the server. This can\'t be undone. Your profile stays with each household you\'re part of, so the others keep their history — you\'re just no longer linked to it.'**
   String get accountDeleteConfirmBody;
 
-  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving.
+  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving. Persona review B2: states the 30-day soft-delete-then-purge window, same as householdLeaveConfirmBodyLastMember.
   ///
   /// In en, this message translates to:
-  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get accountDeleteConfirmBodyLastMember;
 
   /// Confirm button of the delete-account sheet. Confirming here opens the final confirmation (D-L6); it does not start the deletion.
