@@ -518,25 +518,25 @@ abstract class AppLocalizations {
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
 
-  /// Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences due today, overdue, or already completed today. The whole card is hidden when m is 0.
+  /// Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences that are due today, overdue (skipping is always available, so overdue is part of today's load), or already completed today. The whole card is hidden when m is 0.
   ///
   /// In en, this message translates to:
   /// **'{n} of {m} done today'**
   String choresProgressTitle(int n, int m);
 
-  /// Day-progress card's bodySmall sub-line shown when at least one of today's counted occurrences is still open: how many remain.
+  /// Day-progress card's bodySmall sub-line shown when at least one of the counted occurrences (due today or overdue) is still open: how many remain, overdue included.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
   String choresProgressRemainingToday(int count);
 
-  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today, overdue or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
   /// **'That\'s everything for today.'**
   String get choresProgressAllDoneToday;
 
-  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.
+  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many of the still-to-go occurrences are overdue; appended after ' · '. The overdue pile IS part of the N-of-M count (2026-10-07, superseding persona review E5). Shown only when count is above 0.
   ///
   /// In en, this message translates to:
   /// **'{count} to catch up'**

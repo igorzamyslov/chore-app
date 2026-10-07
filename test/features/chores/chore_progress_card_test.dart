@@ -11,12 +11,12 @@ import '../../test_utils/pump_app.dart';
 
 /// Widget coverage for the day-progress card's counting rule (spec
 /// `docs/specs/theme-v2.md` §4.1 item 1): `M` = still-pending occurrences
-/// due TODAY, plus occurrences completed (done, never skipped) today; `N` =
-/// occurrences completed today. The overdue pile is NOT part of `M`: it is
-/// reported separately as "N to catch up" on the sub-line (persona review
-/// 2026-10-06 E5, amending the original due-or-overdue rule). The card is
-/// hidden entirely when `M == 0` AND nothing is overdue; with only an
-/// overdue pile its headline is the catch-up line and it has no ring.
+/// due TODAY, plus still-pending OVERDUE ones, plus occurrences completed
+/// (done, never skipped) today; `N` = occurrences completed today. Overdue
+/// is part of `M` (Amendment 2026-10-07, superseding persona review
+/// 2026-10-06 E5: skipping is always available, so an overdue chore is part
+/// of today's load) and is repeated on the sub-line as " · N to catch up".
+/// The card is hidden entirely when `M == 0`.
 ///
 /// **Changed 2026-08-07** (triage T1.1/D3): `M`/`N` are now computed from
 /// the SAME member/category-filtered collections the sections below render
@@ -52,9 +52,9 @@ void main() {
   );
 
   testChoreApp(
-    'M counts pending-due-today plus completed-today; overdue is reported '
-    'as "to catch up" instead, and a future-due pending occurrence and a '
-    'skipped-today occurrence are both excluded',
+    'M counts pending-due-today plus overdue plus completed-today, with the '
+    'overdue share repeated as "to catch up"; a future-due pending '
+    'occurrence and a skipped-today occurrence are both excluded',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -81,7 +81,7 @@ void main() {
         startDate: todayPlain,
         assignmentMode: AssignmentMode.anyone,
       );
-      // Stays pending, overdue -- NOT part of M (E5), counted as catch-up.
+      // Stays pending, overdue -- counts toward M AND shows as catch-up.
       await service.createChore(
         householdId: householdId,
         title: 'Overdue, still pending',
@@ -117,12 +117,12 @@ void main() {
       await service.skipOccurrence(skippedPending!.id);
       await tester.pumpAndSettle();
 
-      // M = 1 still-pending due today + 1 completed-today = 2; N = 1.
-      // The overdue chore sits beside it as "1 to catch up".
+      // M = 1 pending due today + 1 overdue + 1 completed-today = 3; N = 1;
+      // 2 still to go, 1 of them overdue.
       expect(find.bySemanticsIdentifier('chores.progress'), findsOneWidget);
-      expect(find.text('1 of 2 done today'), findsOneWidget);
-      expect(find.text('1 still to go'), findsOneWidget);
-      expect(find.text('1 to catch up'), findsOneWidget);
+      expect(find.text('1 of 3 done today'), findsOneWidget);
+      expect(find.text('2 still to go · 1 to catch up'), findsOneWidget);
+      expect(find.text('33%'), findsOneWidget);
 
       handle.dispose();
     },
@@ -166,8 +166,9 @@ void main() {
   );
 
   testChoreApp(
-    'E5: only an overdue pile and nothing due today still shows the card, '
-    'headlined by the catch-up line with no ring; the tiles show too',
+    'only an overdue pile and nothing due today: the overdue chore is '
+    "today's load -- \"0 of 1 done today\", a 0% ring, and the catch-up "
+    'segment on the sub-line (Amendment 2026-10-07)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -185,12 +186,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('chores.progress'), findsOneWidget);
-      expect(find.text('1 to catch up'), findsOneWidget);
-      // No "N of M" headline, no sub-line and no ring when nothing is due
-      // today.
-      expect(find.textContaining('done today'), findsNothing);
-      expect(find.textContaining('still to go'), findsNothing);
-      expect(find.text('0%'), findsNothing);
+      expect(find.text('0 of 1 done today'), findsOneWidget);
+      expect(find.text('1 still to go · 1 to catch up'), findsOneWidget);
+      expect(find.text('0%'), findsOneWidget);
       expect(find.text('Long overdue'), findsOneWidget);
 
       handle.dispose();
@@ -198,8 +196,8 @@ void main() {
   );
 
   testChoreApp(
-    'E5: everything due today done, with two overdue: the "everything" line '
-    'and the catch-up count share the sub-line, and the ring stays at 100%',
+    'everything due today done, with two overdue: they are still to go, so '
+    'the headline is 1 of 3 and the ring is a third (Amendment 2026-10-07)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -230,10 +228,10 @@ void main() {
       await service.completeOccurrence(pending!.id, completedBy: me.id);
       await tester.pumpAndSettle();
 
-      expect(find.text('1 of 1 done today'), findsOneWidget);
-      expect(find.text("That's everything for today."), findsOneWidget);
-      expect(find.text('2 to catch up'), findsOneWidget);
-      expect(find.text('100%'), findsOneWidget);
+      expect(find.text('1 of 3 done today'), findsOneWidget);
+      expect(find.text('2 still to go · 2 to catch up'), findsOneWidget);
+      expect(find.text("That's everything for today."), findsNothing);
+      expect(find.text('33%'), findsOneWidget);
 
       handle.dispose();
     },
