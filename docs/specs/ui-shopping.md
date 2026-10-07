@@ -85,10 +85,11 @@ synced"). The relative phrase and its self-refreshing timer are shared with
 that line (`lib/features/settings/relative_time.dart`). An unlinked household
 sees only the remaining count.
 
-**Who added it (F1).** A row added by a member other than the acting/claimed
-member shows that member's `MemberAvatar` (16 dp) after the name, tooltip = the
-member's name. Own rows, rows with no `addedBy`, and rows whose adder is no
-longer a member show nothing.
+**Who added it (F1) — superseded by Amendment 2026-10-07 (below).** The per-row
+`MemberAvatar` after the name is gone: Igor, first use of 0.15.0, found the
+icon felt off and does not want the feature. The "synced …" app-bar line above
+stays. `ShoppingItemTile.addedBy` and its tooltip are removed; `addedBy` is
+still written on insert (and synced), so the data is kept.
 
 **Waiting to send (E10).** While linked, a row whose `syncDirty` is true shows
 a 14 dp `Icons.schedule` at its trailing edge, tooltip `syncPendingItemTooltip`
@@ -178,6 +179,16 @@ Tests added (`test/features/shopping/` unless noted): `check_snackbar_test`,
 `test/data/repositories/shopping_repository_test.dart` (folding, `checkItems`,
 ui_state memory, grouped history); `test/application/sync_engine_test.dart`
 (A9).
+
+## Amendment 2026-10-07 — first-use feedback on 0.15.0
+
+**Who added it (F1) is removed.** The small member avatar after an item's name
+(added 2026-10-06) is gone, along with its tooltip. Reason (Igor, first use):
+the icon feels off and the feature is not wanted. Kept: the app-bar status
+line ("7 left · synced 2 min ago"), the E10 "waiting to send" glyph, and the
+`addedBy` column — still written on insert and synced, so the data survives
+should the idea return. Where the 2026-10-06 block describes a per-row mark,
+this block wins.
 
 ## Placement
 
