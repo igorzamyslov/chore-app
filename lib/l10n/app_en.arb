@@ -2345,19 +2345,23 @@
   },
   "settingsAboutLicensesEntry": "Open source licenses",
   "@settingsAboutLicensesEntry": {
-    "description": "About section row that opens Flutter's built-in showLicensePage."
+    "description": "Technical-details sheet tile (id settings.about.licenses) that opens Flutter's built-in showLicensePage."
+  },
+  "settingsAboutTechnicalTitle": "Technical details",
+  "@settingsAboutTechnicalTitle": {
+    "description": "About row (id settings.about.technical) that opens a bottom sheet with Privacy notes, Source code, Open source licenses and the sync server host; also that sheet's title (2026-10-07 amendment: one row instead of four)."
   },
   "settingsAboutPrivacy": "Privacy notes",
   "@settingsAboutPrivacy": {
-    "description": "About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where)."
+    "description": "Technical-details sheet tile (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where)."
   },
   "settingsAboutSource": "Source code",
   "@settingsAboutSource": {
-    "description": "About row (id settings.about.source) opening the project's source repository in the browser (persona review D11)."
+    "description": "Technical-details sheet tile (id settings.about.source) opening the project's source repository in the browser (persona review D11)."
   },
   "settingsAboutSyncServer": "Sync server",
   "@settingsAboutSyncServer": {
-    "description": "Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server."
+    "description": "Non-tappable two-line tile in the technical-details sheet (id settings.about.syncServer): this label on the first line, the host name as selectable text on the second -- the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server."
   },
   "settingsErrorReportsTitle": "Send error reports",
   "@settingsErrorReportsTitle": {

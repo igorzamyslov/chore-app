@@ -2666,25 +2666,31 @@ abstract class AppLocalizations {
   /// **'Version {version} ({buildNumber})'**
   String settingsAboutVersionLabel(String version, String buildNumber);
 
-  /// About section row that opens Flutter's built-in showLicensePage.
+  /// Technical-details sheet tile (id settings.about.licenses) that opens Flutter's built-in showLicensePage.
   ///
   /// In en, this message translates to:
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
 
-  /// About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
+  /// About row (id settings.about.technical) that opens a bottom sheet with Privacy notes, Source code, Open source licenses and the sync server host; also that sheet's title (2026-10-07 amendment: one row instead of four).
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get settingsAboutTechnicalTitle;
+
+  /// Technical-details sheet tile (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
   ///
   /// In en, this message translates to:
   /// **'Privacy notes'**
   String get settingsAboutPrivacy;
 
-  /// About row (id settings.about.source) opening the project's source repository in the browser (persona review D11).
+  /// Technical-details sheet tile (id settings.about.source) opening the project's source repository in the browser (persona review D11).
   ///
   /// In en, this message translates to:
   /// **'Source code'**
   String get settingsAboutSource;
 
-  /// Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
+  /// Non-tappable two-line tile in the technical-details sheet (id settings.about.syncServer): this label on the first line, the host name as selectable text on the second -- the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
   ///
   /// In en, this message translates to:
   /// **'Sync server'**

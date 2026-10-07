@@ -1820,6 +1820,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open-Source-Lizenzen';
 
   @override
+  String get settingsAboutTechnicalTitle => 'Technische Details';
+
+  @override
   String get settingsAboutPrivacy => 'Hinweise zum Datenschutz';
 
   @override

@@ -3,7 +3,6 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
-import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/account_section.dart';
@@ -275,10 +274,7 @@ class SettingsScreen extends ConsumerWidget {
             children: const [
               AboutVersionTile(),
               AboutErrorReportsTile(),
-              AboutLicensesTile(),
-              AboutPrivacyTile(),
-              AboutSourceTile(),
-              if (supabaseConfigured) AboutSyncServerTile(),
+              AboutTechnicalTile(),
               AboutDonateTile(),
             ],
           ),

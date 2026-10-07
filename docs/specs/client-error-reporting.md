@@ -386,7 +386,9 @@ deferred to the first migration that goes through the MCP
 
 ## 6. Settings switch
 
-Settings → About, a switch row above the licenses row, using the existing
+Settings → About, a switch row directly under the version row (it was
+above the licenses row until Amendment 2026-10-07 of `theme-v2.md` §4.2 moved
+the licenses into Technical details), using the existing
 `SettingsRow(onSwitchChanged: …)` pattern, semantic id
 `settings-error-reports-switch`. Bound to `Settings.errorReportsEnabled`
 via a `SettingsRepository.setErrorReportsEnabled(bool)`. Shown always (also

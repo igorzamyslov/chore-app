@@ -474,6 +474,7 @@
   "settingsAboutSectionTitle": "Über die App",
   "settingsAboutVersionLabel": "Version {version} ({buildNumber})",
   "settingsAboutLicensesEntry": "Open-Source-Lizenzen",
+  "settingsAboutTechnicalTitle": "Technische Details",
   "settingsAboutPrivacy": "Hinweise zum Datenschutz",
   "settingsAboutSource": "Quellcode",
   "settingsAboutSyncServer": "Sync-Server",
