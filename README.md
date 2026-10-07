@@ -8,6 +8,12 @@ sees the same lists.
 Free and open source (MIT). No ads, no tracking, no account unless you choose
 to sync.
 
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="Chores: today's progress card, then chores grouped by Today and This week with the assigned person, category and due date" width="300">
+  &nbsp;&nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" alt="Shopping list: items grouped by aisle (Produce, Dairy, Bakery, Drinks, Household) with a quick-add field and a remaining-count header" width="300">
+</p>
+
 ## What it does
 
 **Chores**
