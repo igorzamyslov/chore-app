@@ -1111,10 +1111,9 @@ void main() {
   );
 
   testChoreApp(
-    'signed-in+linked (spec docs/feedback/2026-08-07-field-feedback.md '
-    'A1.2): the Disconnect row is reachable below Invite; confirming it '
-    'clears the local linked state and flips the section back to the '
-    'signed-in+unlinked adopt/join rows, without signing the user out',
+    'signed-in+linked (Amendment 2026-10-07): Leave and Delete my account '
+    'are offered, but NOT Disconnect -- it lives only in the signed-out '
+    '(A1.1/A1.2) state, where Leave is not possible',
     today: today,
     overrides: [
       authGatewayProvider.overrideWithValue(
@@ -1133,40 +1132,21 @@ void main() {
       await openSettingsTab(tester);
 
       expect(
-        find.bySemanticsIdentifier('settings.account.disconnect'),
-        findsOneWidget,
-      );
-
-      await tester.tap(
-        find.bySemanticsIdentifier('settings.account.disconnect'),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.bySemanticsIdentifier('settings.account.disconnect.confirm'),
-      );
-      await tester.pumpAndSettle();
-
-      // Still signed in -- only the LINKED state was cleared.
-      expect(
         find.bySemanticsIdentifier('settings.account.signedIn'),
         findsOneWidget,
       );
-      expect(find.text('me@example.com'), findsOneWidget);
       expect(
-        find.bySemanticsIdentifier('settings.account.adopt'),
+        find.bySemanticsIdentifier('settings.account.leave'),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsIdentifier('settings.account.join'),
+        find.bySemanticsIdentifier('settings.account.deleteAccount'),
         findsOneWidget,
       );
       expect(
         find.bySemanticsIdentifier('settings.account.disconnect'),
         findsNothing,
       );
-
-      final settings = await database.select(database.settings).getSingle();
-      expect(settings.syncHouseholdId, isNull);
 
       handle.dispose();
     },

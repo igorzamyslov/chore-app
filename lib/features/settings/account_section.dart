@@ -6,7 +6,8 @@
 /// (once linked) a subtitle naming the household plus the B3 'Invite a
 /// member' row (spec `docs/feedback/2026-08-01-ux-audit.md` B3) and the F9
 /// 'Leave the household' row (spec
-/// `docs/specs/household-lifecycle.md` §3.3); plus, LAST in both signed-in
+/// `docs/specs/household-lifecycle.md` §3.3; no Disconnect row while signed
+/// in, Amendment 2026-10-07); plus, LAST in both signed-in
 /// states, the F11 'Delete my account' row (§2.2, D-L4/D-L6); and a
 /// static 'coming soon' row when Supabase isn't configured
 /// ([NoopAuthGateway]).
@@ -117,10 +118,11 @@ class AccountSectionBody extends ConsumerWidget {
       children: [
         _SignedInTile(user: user, householdName: householdName),
         _InviteRow(householdId: householdId),
-        // Leave reads before Disconnect: it is the more consequential of the
-        // two, and Disconnect stays the quieter, purely local one.
+        // Amendment 2026-10-07: no Disconnect row while signed in. Next to
+        // Leave it was a second exit with no visible difference; Disconnect
+        // lives only in [_SignedOutLinkedSection], where Leave is not
+        // possible.
         _LeaveRow(householdId: householdId, householdName: householdName),
-        const _DisconnectRow(),
         const _DeleteAccountRow(),
       ],
     );
@@ -572,11 +574,11 @@ class _SignedOutLinkedSection extends ConsumerWidget {
 
 /// The A1.2 disconnect action (spec
 /// `docs/feedback/2026-08-07-field-feedback.md`): the local exit the app
-/// never had for a linked household. Reachable from BOTH
-/// [_SignedOutLinkedSection] (A1.1) and the normal signed-in linked state
-/// (`AccountSectionBody`, below [_InviteRow]) -- shown as a plain, secondary
-/// [ListTile] (never a [FilledButton]) so it never competes with either
-/// state's primary action.
+/// never had for a linked household. Reachable ONLY from
+/// [_SignedOutLinkedSection] (A1.1) -- since Amendment 2026-10-07 the signed-in
+/// linked state shows Leave and Delete my account only. Shown as a plain,
+/// secondary [ListTile] (never a [FilledButton]) so it never competes with the
+/// section's primary action.
 ///
 /// Guarded behind a confirm dialog stating exactly what this does (and does
 /// NOT do): the household stays on this device untouched, other members
@@ -641,8 +643,8 @@ class _DisconnectRow extends ConsumerWidget {
 /// `docs/specs/household-lifecycle.md` §3.3, F9), shown only while signed in
 /// AND linked -- the `leave_household` RPC needs both.
 ///
-/// Deliberately adjacent to, and deliberately NOT the same as,
-/// [_DisconnectRow]: Disconnect is purely local, keeps this account's
+/// Deliberately NOT the same as [_DisconnectRow] (signed-out only since
+/// Amendment 2026-10-07): Disconnect is purely local, keeps this account's
 /// `user_id` on the server and preserves the §7.6 reconnect path, while
 /// Leave severs the membership server-side. The two bodies of copy must keep
 /// saying which is which.
@@ -758,22 +760,18 @@ class _LeaveRow extends ConsumerWidget {
 /// Under D-B2 (open-source distribution only) this is GDPR-driven rather
 /// than store-mandated: still genuinely required, not a launch gate.
 ///
-/// LAST in both signed-in branches, below [_DisconnectRow]. That is not the
-/// same rule slice 5 used to put [_LeaveRow] above [_DisconnectRow], and it
-/// does not contradict it either. That rule was about which of two rows is
-/// the PRIMARY action: Leave is the real thing you came for, Disconnect the
-/// quieter purely-local footnote that must not compete with it. Delete
-/// account is nobody's primary action -- it is an exit hatch you go looking
-/// for -- so it follows the convention the rest of Settings already uses for
-/// those: destructive last. `SettingsGroup`'s Data group is
-/// `[ExportDataTile(), ResetDataTile()]`, in that order, for the same
-/// reason.
+/// LAST in both signed-in branches, below [_LeaveRow] (unlinked: below the
+/// join row). Delete account is nobody's primary action -- it is an exit
+/// hatch you go looking for -- so it follows the convention the rest of
+/// Settings already uses for those: destructive last. `SettingsGroup`'s
+/// Data group is `[ExportDataTile(), ResetDataTile()]`, in that order, for
+/// the same reason.
 ///
 /// Drawn in `error`, the same treatment `ResetDataTile` gets -- the only
 /// other irreversible-feeling row in Settings. It reaches that colour
 /// differently, and deliberately: `ResetDataTile` uses
 /// `SettingsRow(destructive: true)`, while every row in THIS section
-/// ([_InviteRow], [_LeaveRow], [_DisconnectRow], [_ReconnectRow],
+/// ([_InviteRow], [_LeaveRow], [_ReconnectRow],
 /// [_AdoptRow], [_JoinRow]) is a plain [ListTile]. Matching the section
 /// beats matching the one row elsewhere: a lone `SettingsRow` among six
 /// `ListTile`s would read as a rendering bug.
