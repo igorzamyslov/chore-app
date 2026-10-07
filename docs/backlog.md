@@ -44,9 +44,9 @@ shipped except the "Opened" items below; rows that shipped only in part say so.*
   role model stays decision D1).
 - **Joining and members:** D1, D3–D13.
 - **Daily use for a member:** E1 (incl. an explicit "All members" now sticking
-  across restarts), E2, E3, E5 (incl. the overdue-only card), E6, E7, E8 (digest
+  across restarts), E2, E3, E5 (the overdue split was REVERTED in 0.15.1, #62: overdue chores count into the total again, by Igor's decision), E6, E7, E8 (digest
   names; reminder actions are opened below), E9, E10.
-- **Shopping:** A9, F1, F3, F4, F6, F7, F8 (text size; keep-screen-on opened
+- **Shopping:** A9, F1 (the per-row added-by mark was REMOVED again in 0.15.1, #62; the "N left · synced" line stays), F3, F4, F6, F7, F8 (text size; keep-screen-on opened
   below), F9, F10, F11, F12, F13, F14.
 - **Accessibility:** G1 (tile and ring labels, settings headers, "Tab N of 3"),
   G2 (bottom-bar text-scale clamp, two-line notes).
@@ -55,7 +55,10 @@ shipped except the "Opened" items below; rows that shipped only in part say so.*
   (parametrised migration test for every version 1..18 to the current schema),
   H6 (query half in W2, local retention: year-old synced shopping tombstones
   are compacted at bootstrap), H7 (`watchActiveChores` is one joined query and
-  re-emits on assignee-only changes).
+  re-emits on assignee-only changes); default-privilege leftovers (TRUNCATE/
+  REFERENCES/TRIGGER for anon/authenticated on every table) revoked in
+  `20261007120000_revoke_default_privileges.sql` + pgTAP 008 (found verifying
+  the prod apply, 2026-10-07).
 
 ### Opened 2026-10-06 (deferred from that review)
 

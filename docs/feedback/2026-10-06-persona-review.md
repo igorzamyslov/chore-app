@@ -296,3 +296,12 @@ stands). Igor's decisions for this round: C2 (reassign + pause until) and A9
 (field-level merge for shopping) in; OTP and bottom quick-add out; prod
 migrations applied by Claude; version 0.15.0; per-member stats clamp (E7).
 The closed/opened bookkeeping lives in `docs/backlog.md` ("Closed 2026-10-06").
+
+**0.15.1 (2026-10-07, PR igorzamyslov/chore-app#62).** Igor's first-use
+feedback reversed three choices within a day: the per-row added-by mark (F1)
+was removed, the progress card counts overdue chores into its total again
+(E5 split reverted), and Disconnect is shown only in the signed-out state
+(D9: one exit per state). About's reference rows moved behind one "Technical
+details" row. The lesson is recorded in memory as Igor's product taste: default
+to the quieter option, one entry point for reference material, no parallel
+actions where a state-dependent one will do.
