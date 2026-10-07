@@ -108,7 +108,8 @@ void main() {
     (tester, database) async {
       expect(find.text('Mine A'), findsOneWidget);
       expect(find.text('Mine B'), findsNothing);
-      expect(find.text('Free A'), findsNothing);
+      // E1: an unassigned chore in the category passes the member filter.
+      expect(find.text('Free A'), findsOneWidget);
     },
   );
 
@@ -135,7 +136,7 @@ void main() {
   );
 
   testChoreApp(
-    'picking a filter persists it, and Show everything persists nulls',
+    'picking a filter persists it, and All members stores the sentinel',
     today: today,
     seed: (database) async {
       await seedChores(database);
@@ -189,7 +190,7 @@ void main() {
       expect(row?.choresMemberFilter, member.id);
       expect(row?.choresCategoryFilter, isNull);
 
-      // "All members" -> both null.
+      // "All members" -> explicit sentinel for the member, category null.
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -200,13 +201,30 @@ void main() {
       );
       await tester.pumpAndSettle();
       row = await storedRow(tester, database);
-      expect(row?.choresMemberFilter, isNull);
+      expect(row?.choresMemberFilter, UiStateRepository.allMembersFilter);
       expect(row?.choresCategoryFilter, isNull);
     },
   );
 
   testChoreApp(
-    'Show everything on the filtered-empty state persists nulls',
+    'a stored explicit "All members" opens unfiltered',
+    today: today,
+    seed: (database) async {
+      await seedChores(database);
+      await seedFilters(
+        database,
+        memberId: UiStateRepository.allMembersFilter,
+      );
+    },
+    (tester, database) async {
+      expect(find.text('Mine A'), findsOneWidget);
+      expect(find.text('Mine B'), findsOneWidget);
+      expect(find.text('Free A'), findsOneWidget);
+    },
+  );
+
+  testChoreApp(
+    'Show everything on the filtered-empty state stores an explicit All',
     today: today,
     seed: (database) async {
       final ids = await seedChores(database);
@@ -239,7 +257,7 @@ void main() {
       expect(find.text('Mine A'), findsOneWidget);
       expect(find.text('Free A'), findsOneWidget);
       final row = await storedRow(tester, database);
-      expect(row?.choresMemberFilter, isNull);
+      expect(row?.choresMemberFilter, UiStateRepository.allMembersFilter);
       expect(row?.choresCategoryFilter, isNull);
 
       handle.dispose();

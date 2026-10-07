@@ -180,6 +180,26 @@ Future<void> _dropChoresFilterColumns(AppDatabase seed) async {
   );
 }
 
+/// Drops the two schema v18 `settings` columns (`chore_reminders_enabled`,
+/// `sync_left_at`; plan `docs/plans/2026-10-06-persona-review-fixes.md` §1)
+/// on [seed] -- the same collateral-drop pattern as
+/// `_dropErrorReportsEnabledColumn`. Needed by every seed that rewinds to
+/// 2..17 while KEEPING `settings`.
+Future<void> _dropV18SettingsColumns(AppDatabase seed) async {
+  await seed.customStatement(
+    'ALTER TABLE settings DROP COLUMN chore_reminders_enabled',
+  );
+  await seed.customStatement('ALTER TABLE settings DROP COLUMN sync_left_at');
+}
+
+/// Drops the schema v19 `chores.paused_until` column (plan
+/// `docs/plans/2026-10-06-persona-review-fixes.md` §1, W3) on [seed]. Needed
+/// by EVERY seed that rewinds to 1..18: `chores` has existed since
+/// schemaVersion 1, so no seed ever drops the whole table.
+Future<void> _dropChorePausedUntilColumn(AppDatabase seed) async {
+  await seed.customStatement('ALTER TABLE chores DROP COLUMN paused_until');
+}
+
 const _settingsColumnsAddedAfterV2 = [
   'acting_member_id', // v3
   'locale', // v4
@@ -197,6 +217,8 @@ const _settingsColumnsAddedAfterV2 = [
   'evening_reminder_enabled', // v13
   'evening_reminder_minutes', // v13
   'error_reports_enabled', // v16
+  'chore_reminders_enabled', // v18
+  'sync_left_at', // v18
 ];
 
 /// The names of the columns [table] actually has on disk, straight from
@@ -227,6 +249,310 @@ const _settingsColumnsAddedAfterV2 = [
 Future<Set<String>> _columnNames(AppDatabase db, String table) async {
   final rows = await db.customSelect("PRAGMA table_info('$table')").get();
   return rows.map((row) => row.read<String>('name')).toSet();
+}
+
+/// The full current column set of every table (schemaVersion 19), as
+/// `PRAGMA table_info` names them. Literal on purpose: adding a column
+/// means editing this map, which is the moment to also write its migration
+/// and check the upgrade paths below.
+const _currentColumns = <String, Set<String>>{
+  'categories': {
+    'sync_dirty',
+    'id',
+    'household_id',
+    'kind',
+    'name',
+    'icon',
+    'color',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  },
+  'chore_assignees': {'sync_dirty', 'chore_id', 'member_id', 'position'},
+  'chore_occurrences': {
+    'sync_dirty',
+    'id',
+    'chore_id',
+    'due_date',
+    'status',
+    'assigned_member_id',
+    'completed_by',
+    'closed_on',
+    'created_at',
+    'updated_at',
+  },
+  'chores': {
+    'sync_dirty',
+    'id',
+    'household_id',
+    'title',
+    'notes',
+    'category_id',
+    'recurrence',
+    'start_date',
+    'assignment_mode',
+    'paused_at',
+    'paused_until',
+    'reminder_minutes',
+    'created_by',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  },
+  'client_errors': {
+    'id',
+    'source',
+    'error_type',
+    'message',
+    'stack',
+    'context',
+    'count',
+    'first_seen_at',
+    'last_seen_at',
+    'app_version',
+    'platform',
+    'household_id',
+    'uploaded_at',
+  },
+  'households': {'sync_dirty', 'id', 'name', 'created_at', 'updated_at'},
+  'members': {
+    'sync_dirty',
+    'id',
+    'household_id',
+    'name',
+    'color',
+    'role',
+    'user_id',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  },
+  'reminder_snoozes': {
+    'occurrence_id',
+    'snoozed_until',
+    'created_at',
+    'updated_at',
+  },
+  'settings': {
+    'id',
+    'digest_enabled',
+    'digest_minutes',
+    'acting_member_id',
+    'locale',
+    'onboarding_name_prompt_shown_at',
+    'digest_preprompt_shown_at',
+    'sync_household_id',
+    'sync_linked_at',
+    'theme_mode',
+    'sync_last_pulled_at',
+    'membership_revoked',
+    'pending_join_code',
+    'quiet_hours_enabled',
+    'quiet_start_minutes',
+    'quiet_end_minutes',
+    'evening_reminder_enabled',
+    'evening_reminder_minutes',
+    'error_reports_enabled',
+    'chore_reminders_enabled',
+    'sync_left_at',
+    'created_at',
+    'updated_at',
+  },
+  'shopping_items': {
+    'sync_dirty',
+    'id',
+    'household_id',
+    'name',
+    'quantity_note',
+    'category_id',
+    'added_by',
+    'checked_at',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  },
+  'sync_tombstones': {'id', 'entity', 'row_id', 'member_id', 'deleted_at'},
+  'ui_state': {
+    'id',
+    'last_tab',
+    'chores_member_filter',
+    'chores_category_filter',
+  },
+};
+
+/// The explicit indexes of the current schema (autoindexes excluded).
+const _currentIndexes = {
+  'chore_occurrences_chore_status_idx',
+  'chore_occurrences_status_closed_on_idx',
+  'chore_occurrences_status_due_date_idx',
+};
+
+/// `(type, notnull, default)` for every column of [table], by name.
+Future<Map<String, List<Object?>>> _columnDefinitions(
+  AppDatabase db,
+  String table,
+) async {
+  final rows = await db.customSelect("PRAGMA table_info('$table')").get();
+  return {
+    for (final row in rows)
+      row.read<String>('name'): [
+        row.read<String>('type'),
+        row.read<int>('notnull'),
+        row.readNullable<String>('dflt_value'),
+      ],
+  };
+}
+
+/// One row in each synced table (plus `settings`), so every upgrade path has
+/// data to carry.
+Future<void> _insertOneRowPerSyncedTable(AppDatabase seed) async {
+  await seed
+      .into(seed.households)
+      .insert(
+        HouseholdsCompanion.insert(
+          id: 'h1',
+          name: 'H',
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await seed
+      .into(seed.members)
+      .insert(
+        MembersCompanion.insert(
+          id: 'm1',
+          householdId: 'h1',
+          name: 'Anna',
+          color: 0xFF112233,
+          role: MemberRole.member,
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await seed
+      .into(seed.chores)
+      .insert(
+        ChoresCompanion.insert(
+          id: 'ch1',
+          householdId: 'h1',
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await seed
+      .into(seed.choreOccurrences)
+      .insert(
+        ChoreOccurrencesCompanion.insert(
+          id: 'o1',
+          choreId: 'ch1',
+          dueDate: PlainDate(2026, 1, 1),
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await seed
+      .into(seed.shoppingItems)
+      .insert(
+        ShoppingItemsCompanion.insert(
+          id: 's1',
+          householdId: 'h1',
+          name: 'Milk',
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+  await seed
+      .into(seed.settings)
+      .insert(
+        SettingsCompanion.insert(
+          id: 'device',
+          createdAt: 't0',
+          updatedAt: 't0',
+        ),
+      );
+}
+
+/// Turns [seed] (open at the current schema) into a version-[from] install by
+/// undoing, newest first, everything a migration after [from] added -- the
+/// collateral-drop helpers above, plus the per-column drops the older
+/// hand-written tests spell out inline. `settings` columns are only dropped
+/// for `from >= 2` (below that the whole table is dropped, as v1 had none),
+/// and the `ui_state` filter columns only for `from >= 14` (below that the
+/// whole table is dropped).
+Future<void> _rewindTo(AppDatabase seed, int from) async {
+  Future<void> dropSettingsColumn(String column) =>
+      seed.customStatement('ALTER TABLE settings DROP COLUMN $column');
+
+  if (from < 19) {
+    await _dropChorePausedUntilColumn(seed);
+  }
+  if (from < 18 && from >= 2) {
+    await _dropV18SettingsColumns(seed);
+  }
+  if (from < 17 && from >= 14) {
+    await _dropChoresFilterColumns(seed);
+  }
+  if (from < 16) {
+    await _dropClientErrorsTable(seed);
+    if (from >= 2) {
+      await _dropErrorReportsEnabledColumn(seed);
+    }
+  }
+  if (from < 15) {
+    await _dropSyncTombstonesTable(seed);
+  }
+  if (from < 14) {
+    await _dropUiStateTable(seed);
+  }
+  if (from < 13) {
+    if (from >= 2) {
+      await _dropN2SettingsColumns(seed);
+    }
+    await _dropChoreReminderMinutesColumn(seed);
+    await _dropReminderSnoozesTable(seed);
+  }
+  if (from < 12 && from >= 2) {
+    await _dropPendingJoinCodeColumn(seed);
+  }
+  if (from < 11) {
+    await _dropStatusClosedOnIndex(seed);
+  }
+  if (from < 10 && from >= 2) {
+    await _dropMembershipRevokedColumn(seed);
+  }
+  if (from < 9) {
+    await _dropMemberDeletedAtColumn(seed);
+  }
+  if (from < 8) {
+    await _dropSyncDirtyColumns(seed);
+    if (from >= 2) {
+      await dropSettingsColumn('sync_last_pulled_at');
+    }
+  }
+  if (from < 7 && from >= 2) {
+    await dropSettingsColumn('theme_mode');
+  }
+  if (from < 6 && from >= 2) {
+    await dropSettingsColumn('sync_household_id');
+    await dropSettingsColumn('sync_linked_at');
+  }
+  if (from < 5 && from >= 2) {
+    await dropSettingsColumn('onboarding_name_prompt_shown_at');
+    await dropSettingsColumn('digest_preprompt_shown_at');
+  }
+  if (from < 4 && from >= 2) {
+    await dropSettingsColumn('locale');
+  }
+  if (from < 3 && from >= 2) {
+    await dropSettingsColumn('acting_member_id');
+  }
+  if (from < 2) {
+    await seed.customStatement('DROP TABLE settings');
+  }
 }
 
 void main() {
@@ -266,6 +592,7 @@ void main() {
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 1');
       await seed.close();
 
@@ -429,11 +756,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 3');
       await seed.close();
 
@@ -547,11 +876,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 2');
       await seed.close();
 
@@ -640,11 +971,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 5');
       await seed.close();
 
@@ -738,11 +1071,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 6');
       await seed.close();
 
@@ -909,11 +1244,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 7');
       await seed.close();
 
@@ -1059,11 +1396,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 8');
       await seed.close();
 
@@ -1145,11 +1484,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 9');
       await seed.close();
 
@@ -1213,11 +1554,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 10');
       await seed.close();
 
@@ -1287,11 +1630,13 @@ void main() {
       await _dropPendingJoinCodeColumn(seed);
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 11');
       await seed.close();
 
@@ -1401,11 +1746,13 @@ void main() {
           );
       await _dropN2SettingsColumns(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoreReminderMinutesColumn(seed);
       await _dropReminderSnoozesTable(seed);
       await _dropUiStateTable(seed);
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 12');
       await seed.close();
 
@@ -1511,6 +1858,8 @@ void main() {
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 13');
       await seed.close();
 
@@ -1561,7 +1910,9 @@ void main() {
       await _dropSyncTombstonesTable(seed);
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 14');
       await seed.close();
 
@@ -1611,7 +1962,9 @@ void main() {
           );
       await _dropClientErrorsTable(seed);
       await _dropErrorReportsEnabledColumn(seed);
+      await _dropV18SettingsColumns(seed);
       await _dropChoresFilterColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 15');
       await seed.close();
 
@@ -1670,6 +2023,8 @@ void main() {
             ),
           );
       await _dropChoresFilterColumns(seed);
+      await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
       await seed.customStatement('PRAGMA user_version = 16');
       await seed.close();
 
@@ -1690,4 +2045,233 @@ void main() {
       expect(row.choresCategoryFilter, isNull);
     },
   );
+
+  test(
+    'a 17 -> 18 upgrade adds settings.choreRemindersEnabled (true) and '
+    'settings.syncLeftAt (NULL) and leaves existing data alone',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v18_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v17 install: the current schema minus the two v18 columns, with
+      // `user_version` rolled back to 17 and a linked settings row in place.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.settings)
+          .insert(
+            SettingsCompanion.insert(
+              id: 'device',
+              createdAt: 't0',
+              updatedAt: 't0',
+              actingMemberId: const Value('member-1'),
+              syncHouseholdId: const Value('hh-1'),
+              errorReportsEnabled: const Value(false),
+            ),
+          );
+      await _dropV18SettingsColumns(seed);
+      await _dropChorePausedUntilColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 17');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(
+        await _columnNames(upgraded, 'settings'),
+        containsAll(['chore_reminders_enabled', 'sync_left_at']),
+      );
+      final settings = await upgraded.select(upgraded.settings).getSingle();
+      expect(settings.choreRemindersEnabled, isTrue);
+      expect(settings.syncLeftAt, isNull);
+      expect(settings.actingMemberId, 'member-1');
+      expect(settings.syncHouseholdId, 'hh-1');
+      expect(settings.errorReportsEnabled, isFalse);
+    },
+  );
+
+  test(
+    'an 18 -> 19 upgrade adds chores.pausedUntil (NULL) and leaves a paused '
+    'chore paused',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'chore_app_migration_v19_test',
+      );
+      addTearDown(() async {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/test.sqlite');
+
+      // A v18 install: the current schema minus the v19 column, with
+      // `user_version` rolled back to 18 and a paused chore in place.
+      final seed = AppDatabase(NativeDatabase(file));
+      await seed
+          .into(seed.households)
+          .insert(
+            HouseholdsCompanion.insert(
+              id: 'hh-1',
+              name: 'H',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await seed
+          .into(seed.chores)
+          .insert(
+            ChoresCompanion.insert(
+              id: 'chore-1',
+              householdId: 'hh-1',
+              title: 'Bed sheets',
+              startDate: PlainDate(2026, 10, 1),
+              assignmentMode: AssignmentMode.anyone,
+              pausedAt: const Value('2026-10-05T08:00:00.000Z'),
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await _dropChorePausedUntilColumn(seed);
+      await seed.customStatement('PRAGMA user_version = 18');
+      await seed.close();
+
+      final upgraded = AppDatabase(NativeDatabase(file));
+      addTearDown(upgraded.close);
+
+      expect(await _columnNames(upgraded, 'chores'), contains('paused_until'));
+      final chore = await upgraded.select(upgraded.chores).getSingle();
+      expect(chore.pausedUntil, isNull);
+      expect(chore.pausedAt, '2026-10-05T08:00:00.000Z');
+      expect(chore.title, 'Bed sheets');
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // H3 (technical review 2026-10-06 #11): every upgrade path N -> current.
+  //
+  // The hand-written tests above each cover one rung or a few; none of them
+  // proves that EVERY version a user may still be on (1..18) ends at the
+  // exact current shape. This group does, parametrised over N: it builds a
+  // version-N install by opening the current schema, writing one row per
+  // synced table, then undoing every change a migration after N made (see
+  // `_rewindTo`) and rolling `user_version` back; opens it with the real
+  // `AppDatabase`; and asserts the full current column set of every table,
+  // the column definitions against a fresh `onCreate` database, the
+  // indexes, and that the rows written before the upgrade survived it.
+  // ---------------------------------------------------------------------
+  group('every N -> current upgrade path', () {
+    // The `fresh` database below deliberately coexists with the file one.
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+
+    for (var from = 1; from < 19; from++) {
+      test(
+        'schemaVersion $from -> 19 ends at the full current schema, keeping '
+        'the existing rows',
+        () async {
+          final dir = await Directory.systemTemp.createTemp(
+            'chore_app_migration_all_${from}_test',
+          );
+          addTearDown(() async {
+            if (dir.existsSync()) {
+              dir.deleteSync(recursive: true);
+            }
+          });
+          final file = File('${dir.path}/test.sqlite');
+
+          final seed = AppDatabase(NativeDatabase(file));
+          await _insertOneRowPerSyncedTable(seed);
+          await _rewindTo(seed, from);
+          await seed.customStatement('PRAGMA user_version = $from');
+          await seed.close();
+
+          final upgraded = AppDatabase(NativeDatabase(file));
+          addTearDown(upgraded.close);
+
+          // The full current column set of every table (a literal, so a new
+          // column forces whoever adds it to update this test too).
+          for (final entry in _currentColumns.entries) {
+            expect(
+              await _columnNames(upgraded, entry.key),
+              entry.value,
+              reason: 'table ${entry.key}, upgraded from v$from',
+            );
+          }
+          final tables = await upgraded
+              .customSelect(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name NOT LIKE 'sqlite_%'",
+              )
+              .get();
+          expect(
+            tables.map((row) => row.read<String>('name')).toSet(),
+            _currentColumns.keys.toSet(),
+            reason: 'table set, upgraded from v$from',
+          );
+          final indexes = await upgraded
+              .customSelect(
+                "SELECT name FROM sqlite_master WHERE type = 'index' "
+                "AND name NOT LIKE 'sqlite_%'",
+              )
+              .get();
+          expect(
+            indexes.map((row) => row.read<String>('name')).toSet(),
+            _currentIndexes,
+            reason: 'index set, upgraded from v$from',
+          );
+
+          // Column definitions (type, NOT NULL, default) match a database
+          // created fresh at the current version, so an `addColumn` that
+          // drifted from `tables.dart` is caught too.
+          final fresh = AppDatabase(NativeDatabase.memory());
+          addTearDown(fresh.close);
+          for (final table in _currentColumns.keys) {
+            expect(
+              await _columnDefinitions(upgraded, table),
+              await _columnDefinitions(fresh, table),
+              reason: 'column definitions of $table, upgraded from v$from',
+            );
+          }
+
+          // Pre-existing data survived.
+          expect(
+            (await upgraded.select(upgraded.households).getSingle()).name,
+            'H',
+          );
+          expect(
+            (await upgraded.select(upgraded.members).getSingle()).name,
+            'Anna',
+          );
+          final chore = await upgraded.select(upgraded.chores).getSingle();
+          expect(chore.title, 'Dishes');
+          expect(chore.pausedUntil, isNull);
+          expect(chore.reminderMinutes, isNull);
+          expect(
+            (await upgraded.select(upgraded.choreOccurrences).getSingle()).id,
+            'o1',
+          );
+          expect(
+            (await upgraded.select(upgraded.shoppingItems).getSingle()).name,
+            'Milk',
+          );
+          if (from >= 2) {
+            // `settings` is rebuilt (empty) by a v1 upgrade; from v2 on the
+            // existing row must survive untouched.
+            final settings = await upgraded
+                .select(upgraded.settings)
+                .getSingle();
+            expect(settings.id, 'device');
+            expect(settings.digestMinutes, 480);
+            expect(settings.choreRemindersEnabled, isTrue);
+            expect(settings.syncLeftAt, isNull);
+          }
+        },
+      );
+    }
+  });
 }

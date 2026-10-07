@@ -98,6 +98,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String digestMoreCount(int count) {
+    return ' und $count weitere';
+  }
+
+  @override
   String get notificationActionDone => 'Erledigt';
 
   @override
@@ -111,6 +116,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get commonRetry => 'Erneut versuchen';
+
+  @override
+  String get commonShare => 'Teilen …';
 
   @override
   String get choresTabLabel => 'Aufgaben';
@@ -131,6 +139,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Für jemand anderen erledigen …';
 
   @override
+  String get choresMenuReassign => 'Diese Runde übergeben …';
+
+  @override
+  String get choresReassignTitle => 'Wer übernimmt diese Runde?';
+
+  @override
+  String choresReassignedSnackbar(String name) {
+    return 'An $name übergeben';
+  }
+
+  @override
   String get choresMarkDoneForTitle => 'Wer hat das gemacht?';
 
   @override
@@ -140,7 +159,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresMenuEdit => 'Bearbeiten';
 
   @override
+  String get choresMenuDuplicate => 'Duplizieren';
+
+  @override
   String get choresMenuPause => 'Pausieren';
+
+  @override
+  String get choresDeleteDialogShared => 'Alle im Haushalt sehen das.';
 
   @override
   String get choresDeleteDialogTitle => 'Aufgabe löschen?';
@@ -209,6 +234,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresFilterMemberAll => 'Alle Mitglieder';
 
   @override
+  String choresFilterYou(String name) {
+    return '$name (du)';
+  }
+
+  @override
+  String get choresAssigneeAnyone => 'Jemand';
+
+  @override
   String get choresFilterCategoryTooltip => 'Nach Kategorie filtern';
 
   @override
@@ -224,6 +257,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get actingMemberSheetTitle => 'Wer ist gerade dran?';
 
   @override
+  String get choresActingMemberHint =>
+      'Gutschrift und deine Tagesübersicht richten sich nach dieser Person.';
+
+  @override
   String actingMemberSignedInAs(String name) {
     return 'Du bist als $name angemeldet';
   }
@@ -232,7 +269,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get actingManageMembers => 'Mitglieder verwalten';
 
   @override
-  String get choresEmptyState => 'Keine Aufgaben offen — gut gemacht!';
+  String get choresEmptyState => 'Für heute ist nichts mehr offen.';
 
   @override
   String get choresEmptyDoneHeadline => 'Für heute alles erledigt';
@@ -270,7 +307,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get choresProgressAllDoneToday => 'Alles erledigt — gut gemacht!';
+  String get choresProgressAllDoneToday => 'Das war alles für heute.';
+
+  @override
+  String choresProgressCatchUp(int count) {
+    return '$count nachzuholen';
+  }
 
   @override
   String get choresProgressFilterActive =>
@@ -298,11 +340,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Einrichten deines Haushalts ist etwas schiefgelaufen. Versuch es noch mal.';
 
   @override
+  String get householdDefaultName => 'Mein Haushalt';
+
+  @override
   String get welcomeJoinTitle => 'Dem Haushalt meiner Familie beitreten';
 
   @override
   String get welcomeJoinSubtitle =>
-      'Melde dich an und nutze einen Einladungscode vom Gerät eines Familienmitglieds.';
+      'Hast du einen Einladungscode? Melde dich an und gib ihn hier ein.';
 
   @override
   String get welcomeJoinReconnectSubtitle =>
@@ -332,17 +377,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get digestPrepromptDismissAction => 'Nicht jetzt';
 
   @override
-  String catchUpBannerMessage(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          'Wir haben $count überfällige Aufgaben auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.',
-      one:
-          'Wir haben 1 überfällige Aufgabe auf ihre neueste Fälligkeit verschoben, damit sich nichts aufstaut.',
-    );
-    return '$_temp0';
-  }
+  String get catchUpBannerMessage =>
+      'Deine wiederkehrenden Aufgaben sind zu ihrem neuesten Fälligkeitstermin gesprungen — du hast nichts zusätzlich verpasst.';
 
   @override
   String get catchUpBannerDismissTooltip => 'Schließen';
@@ -356,8 +392,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String choresSnackbarDoneBy(String name) {
-    return 'Erledigt — $name gutgeschrieben';
+  String choresDoneCredited(String name) {
+    return 'Erledigt — gutgeschrieben für $name';
+  }
+
+  @override
+  String choresDoneCreditedNextDue(String name, String date) {
+    return 'Erledigt — gutgeschrieben für $name, als Nächstes fällig $date';
   }
 
   @override
@@ -379,15 +420,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Gerät weiß noch nicht, wer du bist. Melde dich erneut an oder öffne die App neu.';
 
   @override
-  String choresDoneHeader(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Heute erledigt ($count)',
-      one: 'Heute erledigt (1)',
-    );
-    return '$_temp0';
+  String choresDoneRecently(int count) {
+    return 'Kürzlich erledigt ($count)';
   }
+
+  @override
+  String get choresDoneDayToday => 'Heute';
+
+  @override
+  String get choresDoneDayYesterday => 'Gestern';
 
   @override
   String get choresDoneStatusDone => 'Erledigt';
@@ -396,12 +437,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresDoneStatusSkipped => 'Übersprungen';
 
   @override
+  String get choresDoneEarly => 'Vorzeitig erledigt';
+
+  @override
   String choresDoneClosedByLabel(String name) {
     return 'von $name';
   }
 
   @override
   String get choresDoneReopen => 'Wieder öffnen';
+
+  @override
+  String get choresReopenedSnackbar => 'Wieder geöffnet';
+
+  @override
+  String choresReopenOthersTitle(String name) {
+    return 'Erledigung von $name zurücknehmen?';
+  }
+
+  @override
+  String get choresReopenOthersBody => 'Das entfernt sie aus seinem Verlauf.';
+
+  @override
+  String get choresReopenOthersConfirm => 'Zurücknehmen';
 
   @override
   String choresPausedHeader(int count) {
@@ -418,10 +476,37 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choresPausedBadge => 'Pausiert';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Pausiert bis $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Aufgabe pausieren';
+
+  @override
+  String get choresPauseUntilResumed => 'Bis ich sie fortsetze';
+
+  @override
+  String get choresPauseUntilDate => 'Bis zu einem Datum …';
+
+  @override
   String get choresPausedResume => 'Fortsetzen';
 
   @override
   String get choreFormEditTitle => 'Aufgabe bearbeiten';
+
+  @override
+  String get choreSavedSnackbar => 'Gespeichert';
+
+  @override
+  String choreSavedNextDue(String date) {
+    return 'Gespeichert — als Nächstes fällig $date';
+  }
+
+  @override
+  String choreSavedReassigned(String name) {
+    return 'Gespeichert — heute ist jetzt $name dran';
+  }
 
   @override
   String get choreFormNewTitle => 'Neue Aufgabe';
@@ -718,6 +803,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormAssignmentAnyone => 'Beliebig';
 
   @override
+  String get choreFormAssignmentHelpFixed => 'Immer dieselbe Person.';
+
+  @override
+  String get choreFormAssignmentHelpRotation =>
+      'Reihum in dieser Reihenfolge, beginnend bei 1.';
+
+  @override
+  String get choreFormAssignmentHelpAnyone => 'Wer zuerst dazu kommt.';
+
+  @override
   String choreFormAssigneeOrderLabel(int order, String name) {
     return '$order. $name';
   }
@@ -740,14 +835,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get choreFormStartDateLabel => 'Startdatum';
 
   @override
-  String get choreFormReminderToggle => 'An diese Aufgabe erinnern';
+  String get choreFormReminderToggle => 'Erinnere, wer dran ist';
 
   @override
   String get choreFormReminderTime => 'Erinnerungszeit';
 
   @override
   String get choreFormReminderHint =>
-      'Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf';
+      'Klingelt um diese Zeit auf ihrem Handy. Die Tagesübersicht lässt diese Aufgabe an dem Tag aus.';
 
   @override
   String get shoppingEmptyState => 'Die Einkaufsliste ist leer';
@@ -786,7 +881,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get shoppingClearButton => 'Erledigte leeren';
+  String get shoppingClearButton => 'Einkaufswagen leeren';
 
   @override
   String get shoppingUncheckAll => 'Alles zurücklegen';
@@ -806,6 +901,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shoppingClearedUndo => 'Rückgängig';
 
   @override
+  String shoppingPutBackSnackbar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Artikel zurückgelegt',
+      one: '1 Artikel zurückgelegt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shoppingCheckedSnackbar => 'Im Einkaufswagen';
+
+  @override
   String get shoppingAddHint => 'Artikel hinzufügen…';
 
   @override
@@ -813,6 +922,63 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shoppingAddAlreadyOnList => 'Schon auf der Liste';
+
+  @override
+  String shoppingRemainingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Noch $count',
+      zero: 'Nichts mehr offen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingSyncedAgo(String relative) {
+    return 'synchronisiert $relative';
+  }
+
+  @override
+  String get relativeTimeJustNow => 'gerade eben';
+
+  @override
+  String relativeTimeMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'vor $count Min.',
+      one: 'vor 1 Min.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'vor $count Stunden',
+      one: 'vor 1 Stunde',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeOn(String date) {
+    return 'am $date';
+  }
+
+  @override
+  String get syncPendingItemTooltip => 'Wartet aufs Senden';
+
+  @override
+  String get shoppingSuggestionForget => 'Vorschlag vergessen';
+
+  @override
+  String shoppingAddedCount(int count) {
+    return '$count Artikel hinzugefügt';
+  }
 
   @override
   String get shoppingAddMovedBack => 'Zurück auf die Liste verschoben';
@@ -858,6 +1024,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur wenn heute noch etwas offen ist';
 
   @override
+  String get settingsChoreRemindersTitle => 'Aufgaben-Erinnerungen';
+
+  @override
   String get settingsEveningTime => 'Abends um';
 
   @override
@@ -881,6 +1050,43 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsExportEntry => 'Daten exportieren';
 
   @override
+  String settingsArchivesRow(int count) {
+    return 'Gesicherte Kopien früherer Haushalte ($count)';
+  }
+
+  @override
+  String get settingsArchivesTitle => 'Gesicherte Kopien';
+
+  @override
+  String get settingsArchivesIntro =>
+      'Jede Kopie ist eine JSON-Datei mit allem, was dieses Gerät vor dem Beitritt oder der Wiederverbindung mit einem Haushalt gespeichert hatte. Die App kann sie nicht selbst öffnen — teile eine Kopie, um sie woanders aufzubewahren, oder lösche die, die du nicht mehr brauchst.';
+
+  @override
+  String settingsArchivesItemTitle(String when) {
+    return 'Gesichert am $when';
+  }
+
+  @override
+  String get settingsArchivesDeleteConfirmTitle =>
+      'Diese gesicherte Kopie löschen?';
+
+  @override
+  String get settingsArchivesDeleteConfirmBody =>
+      'Die Kopie wird von diesem Gerät gelöscht und lässt sich nicht wiederherstellen.';
+
+  @override
+  String get settingsArchivesShareError =>
+      'Diese gesicherte Kopie konnte nicht geteilt werden. Bitte versuche es erneut.';
+
+  @override
+  String get settingsArchivesDeleteError =>
+      'Diese gesicherte Kopie konnte nicht gelöscht werden. Bitte versuche es erneut.';
+
+  @override
+  String get settingsExportSubtitle =>
+      'JSON-Datei mit Mitgliedern, Aufgaben, Verlauf und Einkaufsliste. Die App kann sie noch nicht importieren.';
+
+  @override
   String get settingsExportError =>
       'Deine Daten konnten nicht exportiert werden. Versuch es noch mal.';
 
@@ -888,10 +1094,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsHouseholdSectionTitle => 'Haushalt';
 
   @override
+  String get settingsHouseholdNameRow => 'Name des Haushalts';
+
+  @override
   String get settingsMembersEntry => 'Mitglieder';
 
   @override
   String get settingsMembersInviteEntry => 'Einladen';
+
+  @override
+  String get settingsMembersInviteLocalTitle => 'Einladen';
+
+  @override
+  String get settingsMembersInviteLocalSubtitle =>
+      'Melde dich zuerst an, um deine Familie einzuladen';
 
   @override
   String get settingsMembersInviteSheetTitle => 'Haushaltsmitglied einladen';
@@ -901,16 +1117,48 @@ class AppLocalizationsDe extends AppLocalizations {
       'Teile diesen Code — er ersetzt jeden früheren Code und ist 7 Tage gültig.';
 
   @override
+  String get settingsMembersInviteHint =>
+      'Leg vorher alle unter Mitglieder an — beim Beitreten wählen sie ihren eigenen Namen.';
+
+  @override
+  String settingsMembersInviteValidUntil(String date) {
+    return 'Gültig bis $date';
+  }
+
+  @override
+  String get settingsMembersInviteNewCode => 'Neuer Code';
+
+  @override
+  String get settingsMembersInviteReplaceTitle => 'Geteilten Code ersetzen?';
+
+  @override
+  String get settingsMembersInviteReplaceBody =>
+      'Wer noch mit dem alten Code beitritt, braucht dann den neuen.';
+
+  @override
+  String get settingsMembersInviteReplaceConfirm => 'Ersetzen';
+
+  @override
   String get settingsMembersInviteShare => 'Teilen';
 
   @override
   String settingsMembersInviteShareText(String code) {
-    return 'Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code $code ein.';
+    return 'Tritt meinem Haushalt auf Famdo bei — gib beim Anmelden den Code $code ein. Die App gibt\'s hier: https://github.com/igorzamyslov/chore-app/releases/latest';
   }
 
   @override
   String get settingsMembersInviteError =>
       'Die Einladung konnte nicht erstellt werden. Versuch es noch mal.';
+
+  @override
+  String get memberStatusYou => 'Du';
+
+  @override
+  String get memberStatusLinked => 'Nutzt Famdo auf dem eigenen Handy';
+
+  @override
+  String get memberStatusUnclaimed =>
+      'Noch kein Handy — du kannst ihre Aufgaben abhaken';
 
   @override
   String get manageMembersTitle => 'Mitglieder';
@@ -949,7 +1197,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get memberEditDeleteBlockedSelf =>
-      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Konto.';
+      'Das ist dein eigenes Profil. Wenn du selbst den Haushalt verlassen willst, nutze „Haushalt verlassen“ unter Einstellungen → Haushalt.';
 
   @override
   String get memberEditDeleteBlockedOffline =>
@@ -1019,6 +1267,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get categoryEditColorLabel => 'Farbe';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Aufgaben verwendet',
+      one: 'Von 1 Aufgabe verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Von $count Artikeln verwendet',
+      one: 'Von 1 Artikel verwendet',
+      zero: 'Noch nicht verwendet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Verschieben nach';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Ohne Kategorie';
+
+  @override
   String get categoryDeleteDialogTitle => 'Kategorie löschen?';
 
   @override
@@ -1032,9 +1310,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Aufgaben verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Aufgabe verwendet sie.',
     );
     return '$_temp0';
   }
@@ -1050,9 +1327,8 @@ class AppLocalizationsDe extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie noch und sind danach ohne Kategorie.',
-      one:
-          'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie noch und ist danach ohne Kategorie.',
+          'Damit löschst du \'$categoryName\'. $count Artikel verwenden sie.',
+      one: 'Damit löschst du \'$categoryName\'. 1 Artikel verwendet sie.',
     );
     return '$_temp0';
   }
@@ -1092,7 +1368,31 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät.';
+      'Beim Anmelden werden deine E-Mail-Adresse und die Daten deines Haushalts — Aufgaben, Einkaufsliste, Mitglieder — auf dem Sync-Server gespeichert, damit deine Geräte auf dem gleichen Stand bleiben. Ohne Konto bleibt alles auf diesem Gerät. Technische Fehlerberichte werden ebenfalls gesendet — unter Über die App kannst du sie abschalten.';
+
+  @override
+  String get settingsAccountHowItWorks => 'So funktionieren Konten';
+
+  @override
+  String get settingsAccountHowItWorksAccountTitle => 'Konto';
+
+  @override
+  String get settingsAccountHowItWorksAccountBody =>
+      'Deine E-Mail-Anmeldung beim Sync-Server. Du brauchst es nur, um einen Haushalt zu teilen oder mehrere Handys auf dem gleichen Stand zu halten.';
+
+  @override
+  String get settingsAccountHowItWorksMemberTitle => 'Mitglied';
+
+  @override
+  String get settingsAccountHowItWorksMemberBody =>
+      'Eine Person im Haushalt. Ein Mitglied kann ein eigenes Konto und Handy haben oder auch nicht — jeder kann seine Aufgaben abhaken.';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdTitle => 'Haushalt';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdBody =>
+      'Die gemeinsamen Aufgaben und die Einkaufsliste. Er liegt auf deinem Handy und, sobald du ihn online stellst, auch auf dem Sync-Server.';
 
   @override
   String get settingsAccountEmailLabel => 'E-Mail-Adresse';
@@ -1115,12 +1415,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String settingsAccountPausedNotice(String householdName) {
-    return 'Dieses Gerät ist weiterhin mit $householdName verbunden, aber die Synchronisierung ist pausiert. Änderungen, die du jetzt vornimmst, werden gesendet, sobald du dich wieder anmeldest.';
+    return 'Dieses Handy ist weiterhin mit $householdName verbunden, aber die Synchronisierung ist pausiert. Änderungen, die du jetzt vornimmst, werden gesendet, sobald du dich wieder anmeldest. Ändert jemand anderes inzwischen dasselbe, ersetzt deine Version seine, sobald du dich wieder anmeldest.';
   }
 
   @override
   String get settingsAccountDisconnect =>
       'Verbindung zum Online-Haushalt trennen';
+
+  @override
+  String get settingsAccountDisconnectSubtitle =>
+      'Stoppt die Synchronisierung nur auf diesem Handy — für alle anderen bleibt der Haushalt online.';
 
   @override
   String get settingsAccountDisconnectConfirmTitle =>
@@ -1137,6 +1441,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAccountLeave => 'Haushalt verlassen';
 
   @override
+  String get settingsAccountLeaveSubtitle =>
+      'Entfernt dich aus dem Haushalt. Deine Aufgaben und dein Verlauf bleiben dort.';
+
+  @override
   String householdLeaveConfirmTitle(String householdName) {
     return '$householdName verlassen?';
   }
@@ -1147,7 +1455,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get householdLeaveConfirmBodyLastMember =>
-      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+      'Du bist die letzte Person hier mit einem Konto. Wenn du gehst, verschwindet der Online-Haushalt mit dir: Die gemeinsame Kopie ist sofort für alle verborgen und wird nach 30 Tagen endgültig vom Server gelöscht, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
 
   @override
   String get householdLeaveConfirmAction => 'Verlassen';
@@ -1168,7 +1476,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get accountDeleteConfirmBodyLastMember =>
-      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die geteilte Kopie und ihr Verlauf werden vom Server entfernt, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
+      'Dein Konto und deine E-Mail-Adresse werden vom Server gelöscht. Das lässt sich nicht rückgängig machen. Du bist die letzte Person hier mit einem Konto, deshalb verschwindet der Online-Haushalt mit: Die gemeinsame Kopie ist sofort für alle verborgen und wird nach 30 Tagen endgültig vom Server gelöscht, und Einladungscodes funktionieren nicht mehr. Auf diesem Gerät ändert sich nichts, außer du setzt unten das Häkchen.';
 
   @override
   String get accountDeleteConfirmAction => 'Konto löschen';
@@ -1203,7 +1511,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet.';
+      'Die Synchronisierung pausiert, bis du dich wieder anmeldest. Dein Haushalt bleibt auf diesem Gerät, und Änderungen, die du in der Zwischenzeit vornimmst, werden gespeichert und beim nächsten Anmelden gesendet. Ändert jemand anderes inzwischen dasselbe, ersetzt deine Version seine, sobald du dich wieder anmeldest.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Abmelden';
@@ -1214,11 +1522,26 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncRefreshErrorRevoked =>
-      'Dieses Gerät wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Konto neu.';
+      'Dieses Handy wurde aus dem Haushalt entfernt, deshalb synchronisiert nichts mehr. Nichts ist verloren — verbinde dich unter Einstellungen → Haushalt neu.';
+
+  @override
+  String get syncRefreshErrorRejected =>
+      'Der Haushalts-Server hat eine Änderung von diesem Handy abgelehnt, sie ist also nicht angekommen. Prüfe, ob es ein App-Update gibt; deine anderen Änderungen werden weiter synchronisiert.';
+
+  @override
+  String syncPendingChanges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen warten aufs Senden',
+      one: '1 Änderung wartet aufs Senden',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get syncHealthBannerMessage =>
-      'Dieses Gerät hat den Rest des Haushalts schon eine Weile nicht erreicht. Deine Änderungen sind gespeichert – zieh die Liste nach unten, um es erneut zu versuchen.';
+      'Gerade keine Verbindung zum Haushalt. Deine Änderungen sind gespeichert — zieh die Liste nach unten, um es erneut zu versuchen.';
 
   @override
   String get settingsAccountSignOutError =>
@@ -1235,14 +1558,30 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Ersetzt deine lokalen Daten — sie werden in einer Sicherungsdatei auf diesem Gerät gespeichert.';
+      'Ersetzt deine lokalen Daten — sie bleiben als gesicherte Kopie in der App erhalten (Einstellungen → Daten).';
 
   @override
   String get settingsAccountAdoptTitle => 'Meinen Haushalt online stellen';
 
   @override
   String get settingsAccountAdoptIntro =>
-      'Macht deinen Haushalt auf deinen anderen Geräten verfügbar.';
+      'Stell ihn online, damit deine Familie per Einladungscode beitreten kann. Hält auch deine anderen Handys auf dem gleichen Stand.';
+
+  @override
+  String settingsAccountAdoptConfirmTitle(String household) {
+    return '\'$household\' online stellen?';
+  }
+
+  @override
+  String get settingsAccountAdoptConfirmBody =>
+      'Das lädt deine Mitglieder, Aufgaben, den Erledigt-Verlauf, Notizen und die Einkaufsliste auf den Sync-Server hoch, unter deinem Konto. Rückgängig machst du es mit Konto löschen oder Haushalt verlassen.';
+
+  @override
+  String get settingsAccountAdoptConfirmAction => 'Online stellen';
+
+  @override
+  String get settingsAccountLeftNotice =>
+      'Du hast die Online-Kopie dieses Haushalts verlassen. Was auf diesem Handy ist, bleibt deins; um es wieder zu teilen, kannst du später einen neuen Haushalt daraus machen.';
 
   @override
   String get settingsAccountAdoptRetry => 'Erneut versuchen';
@@ -1306,9 +1645,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nutze einen Einladungscode von einem anderen Gerät — das ersetzt deine lokalen Daten.';
 
   @override
-  String settingsAccountJoinSuccessSnackbar(String fileName) {
-    return 'Deine alten Daten wurden in $fileName gespeichert.';
-  }
+  String get settingsAccountJoinSuccessSnackbar =>
+      'Deine bisherigen Daten wurden in der App gesichert';
 
   @override
   String get joinHouseholdCodeTitle => 'Gib deinen Einladungscode ein';
@@ -1329,10 +1667,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Code konnte nicht geprüft werden. Prüf deine Verbindung und versuch es noch mal.';
 
   @override
+  String get joinCodeErrorServer =>
+      'Der Code konnte gerade nicht geprüft werden — versuch es gleich noch mal.';
+
+  @override
   String get joinHouseholdContinue => 'Weiter';
 
   @override
-  String get joinHouseholdChooserTitle => 'Welches Profil gehört dir?';
+  String joinHouseholdChooserTitle(String household) {
+    return 'Wer bist du in $household?';
+  }
 
   @override
   String joinHouseholdChooserAreYou(String name) {
@@ -1341,6 +1685,19 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get joinHouseholdChooserNewMember => 'Ich bin neu hier';
+
+  @override
+  String joinClaimConfirmTitle(String household, String name) {
+    return '$household als $name beitreten?';
+  }
+
+  @override
+  String joinClaimConfirmBody(String name) {
+    return 'Du siehst und erledigst die Aufgaben, die $name zugeteilt sind. Wähle einen anderen Namen, wenn das nicht du bist.';
+  }
+
+  @override
+  String get joinClaimConfirmJoin => 'Beitreten';
 
   @override
   String get joinHouseholdNewMemberTitle => 'Wie heißt du?';
@@ -1353,7 +1710,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt wird in einer Sicherungsdatei auf diesem Gerät gespeichert.';
+      'Deine offenen Aufgaben und nicht abgehakten Einkaufsartikel können als neue Einträge mitkommen — ohne ihren Verlauf. Alles andere wird ersetzt: dein bisheriger Haushalt bleibt als gesicherte Kopie in der App erhalten (Einstellungen → Daten).';
 
   @override
   String get joinHouseholdImportAccept => 'Mitnehmen';
@@ -1381,6 +1738,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String statsWindowSinceStart(String date) {
     return 'Seit deinem Start am $date';
+  }
+
+  @override
+  String statsSince(String date) {
+    return 'seit $date';
   }
 
   @override
@@ -1458,6 +1820,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open-Source-Lizenzen';
 
   @override
+  String get settingsAboutPrivacy => 'Hinweise zum Datenschutz';
+
+  @override
+  String get settingsAboutSource => 'Quellcode';
+
+  @override
+  String get settingsAboutSyncServer => 'Sync-Server';
+
+  @override
   String get settingsErrorReportsTitle => 'Fehlerberichte senden';
 
   @override
@@ -1490,11 +1861,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung – das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
+      'Exportiere vorher deine Daten, wenn du eine Kopie behalten willst. Damit löschst du deinen Haushalt, alle Mitglieder, Aufgaben und die Einkaufsliste endgültig. Es gibt keine Cloud-Sicherung — das lässt sich nicht rückgängig machen. Falls du angemeldet bist, wirst du dabei auch auf diesem Gerät abgemeldet.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>
-      'Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät.';
+      'Exportiere vorher deine Daten, wenn du eine Kopie behalten willst. Dein Haushalt bleibt online — dieses Gerät trennt sich nur davon. Du kannst dich einfach wieder anmelden, um die Verbindung wiederherzustellen. Das löscht trotzdem endgültig die Mitglieder, Aufgaben und die Einkaufsliste auf diesem Gerät. Dein Konto und deine E-Mail bleiben auf dem Server — Konto löschen entfernt sie.';
 
   @override
   String get settingsResetConfirm1Action => 'Weiter';
@@ -1523,6 +1894,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get exitConfirmCancel => 'Abbrechen';
+
+  @override
+  String get householdExitNameLabel => 'Dein Name im Verlauf des Haushalts';
 
   @override
   String get membershipRevokedTitle =>

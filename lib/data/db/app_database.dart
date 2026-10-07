@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -170,6 +170,17 @@ class AppDatabase extends _$AppDatabase {
           // same column would throw a duplicate-column error.
           await migrator.addColumn(settings, settings.errorReportsEnabled);
         }
+        if (from < 18) {
+          // v17 -> v18 (plan `docs/plans/2026-10-06-persona-review-fixes.md`
+          // §1, W5): `settings.choreRemindersEnabled` (default `true`) and
+          // the nullable `settings.syncLeftAt` (spec
+          // `docs/specs/household-lifecycle.md` §2.2) -- no data rewrite.
+          // Lives here, inside the `else` branch, for exactly the reason
+          // spelled out for `membershipRevoked` above: a v1 -> v18 jump
+          // builds `settings` at full current width via [createTable].
+          await migrator.addColumn(settings, settings.choreRemindersEnabled);
+          await migrator.addColumn(settings, settings.syncLeftAt);
+        }
       }
       if (from < 8) {
         // v7 -> v8 (spec `docs/specs/sync-backend.md` §8.1): every synced
@@ -278,6 +289,15 @@ class AppDatabase extends _$AppDatabase {
         // would throw a duplicate-column error.
         await migrator.addColumn(uiState, uiState.choresMemberFilter);
         await migrator.addColumn(uiState, uiState.choresCategoryFilter);
+      }
+      if (from < 19) {
+        // v18 -> v19 (plan `docs/plans/2026-10-06-persona-review-fixes.md`
+        // §1, W3): the nullable `chores.pausedUntil` plain date ("pause
+        // until"), defaulting to `NULL` ("until I resume it") -- no data
+        // rewrite. Flat and UNCONDITIONAL: `chores` has existed since
+        // schemaVersion 1, so `createTable` never covers this column on any
+        // path. Same shape as the `chores.reminderMinutes` (v13) backfill.
+        await migrator.addColumn(chores, chores.pausedUntil);
       }
     },
     beforeOpen: (details) async {

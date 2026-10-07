@@ -4,6 +4,7 @@ import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -600,6 +601,49 @@ void main() {
           (await repo.pendingOccurrenceOf(choreB.id))!.dueDate,
           PlainDate(2026, 1, 3),
         );
+      },
+    );
+
+    test(
+      'two pending occurrences of one chore (a ghost an older client or a '
+      'join copy left behind) do not break catch-up: it repairs first, '
+      'completes, and exactly one pending row survives (technical review '
+      '2026-10-06 #6)',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Daily',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        // The ghost: a second pending row, as a concurrent catch-up on
+        // another device would have inserted.
+        await repo.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 2),
+        );
+        // Before the fix, `pendingOccurrenceOf` was `getSingleOrNull()` and
+        // threw here, which killed bootstrap's catch-up.
+        expect(await repo.pendingOccurrenceOf(chore.id), isNotNull);
+
+        final count = await serviceOn(
+          PlainDate(2026, 1, 4),
+        ).catchUpOverdue(householdId);
+        expect(count, 1);
+
+        final pendingRows =
+            await (db.select(db.choreOccurrences)..where(
+                  (tbl) =>
+                      tbl.choreId.equals(chore.id) &
+                      tbl.status.equalsValue(OccurrenceStatus.pending),
+                ))
+                .get();
+        expect(pendingRows, hasLength(1));
+        expect(pendingRows.single.dueDate, PlainDate(2026, 1, 4));
+        // The repair recorded a tombstone for the row it removed, so the
+        // other device converges too (spec sync-backend.md §8.6.6).
+        expect(await db.select(db.syncTombstones).get(), hasLength(1));
       },
     );
   });
@@ -1367,5 +1411,246 @@ void main() {
         expect(details.assigneeMemberIds, [m1, m2]);
       },
     );
+  });
+
+  // Persona review 2026-10-06 C2 (Maria P2-I): "Anna's ill. I just want Ben
+  // to take her turn this week."
+  group('reassignOccurrence', () {
+    test(
+      'moves the open turn to the picked member and marks it dirty',
+      () async {
+        final anna = await _insertMember(db, 'anna', householdId);
+        final ben = await _insertMember(db, 'ben', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bins',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.fixed,
+          recurrence: Recurrence.everyNDays(7),
+          assigneeMemberIds: [anna],
+        );
+        final before = await repo.pendingOccurrenceOf(chore.id);
+        await (db.update(db.choreOccurrences)
+              ..where((tbl) => tbl.id.equals(before!.id)))
+            .write(const ChoreOccurrencesCompanion(syncDirty: Value(false)));
+
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).reassignOccurrence(before!.id, ben);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, before.id);
+        expect(pending.dueDate, before.dueDate);
+        expect(pending.assignedMemberId, ben);
+        expect(pending.syncDirty, isTrue);
+        // The chore's own assignment is untouched: this is one turn.
+        final details = await repo.getChore(chore.id);
+        expect(details!.assigneeMemberIds, [anna]);
+      },
+    );
+
+    test(
+      'in a rotation the next turn goes to the member after the REASSIGNED '
+      'holder',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        final aTurn = await repo.pendingOccurrenceOf(chore.id);
+        expect(aTurn!.assignedMemberId, a);
+
+        // A is away: hand A's turn to B. B completes it.
+        await service.reassignOccurrence(aTurn.id, b);
+        await service.completeOccurrence(aTurn.id, completedBy: b);
+
+        // After B (the reassigned holder) comes C.
+        final next = await repo.pendingOccurrenceOf(chore.id);
+        expect(next!.assignedMemberId, c);
+      },
+    );
+
+    test(
+      'the cover rule still applies: completed by someone other than the '
+      'reassigned holder, that person is not handed the next turn',
+      () async {
+        final a = await _insertMember(db, 'a', householdId);
+        final b = await _insertMember(db, 'b', householdId);
+        final c = await _insertMember(db, 'c', householdId);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+        final chore = await service.createChore(
+          householdId: householdId,
+          title: 'Dishes',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.rotation,
+          recurrence: Recurrence.everyNDays(1),
+          assigneeMemberIds: [a, b, c],
+        );
+        final aTurn = await repo.pendingOccurrenceOf(chore.id);
+
+        // Reassigned to B, but C does it: after B would be C, who covered,
+        // so the turn passes to A.
+        await service.reassignOccurrence(aTurn!.id, b);
+        await service.completeOccurrence(aTurn.id, completedBy: c);
+
+        final next = await repo.pendingOccurrenceOf(chore.id);
+        expect(next!.assignedMemberId, a);
+      },
+    );
+
+    test(
+      'reassigning back to null (undo of an anyone turn) is allowed',
+      () async {
+        final ben = await _insertMember(db, 'ben', householdId);
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Hoover',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        final service = serviceOn(PlainDate(2026, 1, 1));
+
+        await service.reassignOccurrence(pending!.id, ben);
+        expect(
+          (await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId,
+          ben,
+        );
+        await service.reassignOccurrence(pending.id, null);
+        expect(
+          (await repo.pendingOccurrenceOf(chore.id))!.assignedMemberId,
+          isNull,
+        );
+      },
+    );
+
+    test('throws for an occurrence that is not pending', () async {
+      final ben = await _insertMember(db, 'ben', householdId);
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'One-off',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final pending = await repo.pendingOccurrenceOf(chore.id);
+      final service = serviceOn(PlainDate(2026, 1, 1));
+      await service.completeOccurrence(pending!.id, completedBy: ben);
+
+      await expectLater(
+        service.reassignOccurrence(pending.id, ben),
+        throwsStateError,
+      );
+      await expectLater(
+        service.reassignOccurrence('missing', ben),
+        throwsStateError,
+      );
+    });
+  });
+
+  // Persona review 2026-10-06 C2 ("Pause until"; plan W3, schema v19).
+  group('pause until a date', () {
+    test('pauseChore(until:) stores the day; unpauseChore clears it', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bed sheets',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(7),
+      );
+
+      await serviceOn(
+        PlainDate(2026, 1, 1),
+      ).pauseChore(chore.id, until: PlainDate(2026, 1, 10));
+      var details = await repo.getChore(chore.id);
+      expect(details!.chore.pausedAt, isNotNull);
+      expect(details.chore.pausedUntil, PlainDate(2026, 1, 10));
+      expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+
+      await serviceOn(PlainDate(2026, 1, 2)).unpauseChore(chore.id);
+      details = await repo.getChore(chore.id);
+      expect(details!.chore.pausedAt, isNull);
+      expect(details.chore.pausedUntil, isNull);
+    });
+
+    test(
+      'catchUpOverdue leaves it paused before the day, and resumes it on '
+      'the day (the day-change trigger)',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bed sheets',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).pauseChore(chore.id, until: PlainDate(2026, 1, 5));
+
+        // The day before: still paused, nothing pending.
+        expect(
+          await serviceOn(PlainDate(2026, 1, 4)).catchUpOverdue(householdId),
+          0,
+        );
+        expect((await repo.getChore(chore.id))!.chore.pausedAt, isNotNull);
+        expect(await repo.pendingOccurrenceOf(chore.id), isNull);
+
+        // The day itself: resumed, due today, and not counted as catch-up.
+        expect(
+          await serviceOn(PlainDate(2026, 1, 5)).catchUpOverdue(householdId),
+          0,
+        );
+        final details = await repo.getChore(chore.id);
+        expect(details!.chore.pausedAt, isNull);
+        expect(details.chore.pausedUntil, isNull);
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 5));
+      },
+    );
+
+    test(
+      'a resume day already in the past (the app was not opened) resumes it '
+      'at today, never behind it',
+      () async {
+        final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+          householdId: householdId,
+          title: 'Bed sheets',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+          recurrence: Recurrence.everyNDays(1),
+        );
+        await serviceOn(
+          PlainDate(2026, 1, 1),
+        ).pauseChore(chore.id, until: PlainDate(2026, 1, 5));
+
+        await serviceOn(PlainDate(2026, 1, 9)).catchUpOverdue(householdId);
+
+        final pending = await repo.pendingOccurrenceOf(chore.id);
+        expect(pending!.dueDate, PlainDate(2026, 1, 9));
+      },
+    );
+
+    test('a chore paused with no date is never resumed by catch-up', () async {
+      final chore = await serviceOn(PlainDate(2026, 1, 1)).createChore(
+        householdId: householdId,
+        title: 'Bed sheets',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.everyNDays(1),
+      );
+      await serviceOn(PlainDate(2026, 1, 1)).pauseChore(chore.id);
+
+      await serviceOn(PlainDate(2027, 1, 1)).catchUpOverdue(householdId);
+
+      expect((await repo.getChore(chore.id))!.chore.pausedAt, isNotNull);
+    });
   });
 }

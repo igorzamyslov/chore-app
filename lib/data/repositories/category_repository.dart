@@ -1,6 +1,8 @@
 /// Manages chore/shopping categories, including v1's seeded defaults.
 library;
 
+import 'dart:ui' show Locale;
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/db/sync_dirty.dart';
 import 'package:drift/drift.dart';
@@ -66,6 +68,30 @@ class CategoryRepository {
     0xFF4C6B45, // moss
   ];
 
+  /// German names for [_choreSeeds], index for index (persona review D10:
+  /// German households saw English headers, synced to every member as-is).
+  static const List<String> _choreSeedNamesDe = [
+    'Putzen',
+    'Küche',
+    'Wäsche',
+    'Garten',
+    'Haustiere',
+    'Instandhaltung',
+    'Besorgungen',
+  ];
+
+  /// German names for [_shoppingSeeds], index for index.
+  static const List<String> _shoppingSeedNamesDe = [
+    'Obst & Gemüse',
+    'Milchprodukte',
+    'Fleisch & Fisch',
+    'Backwaren',
+    'Tiefkühl',
+    'Getränke',
+    'Haushalt',
+    'Sonstiges',
+  ];
+
   static const List<_CategorySeed> _choreSeeds = [
     (name: 'Cleaning', icon: 'cleaning_services'),
     (name: 'Kitchen', icon: 'skillet'),
@@ -102,9 +128,41 @@ class CategoryRepository {
   ///
   /// Idempotent per kind: re-running this only fills in whichever kind is
   /// still empty.
-  Future<void> seedDefaults(String householdId) async {
-    await _seedKind(householdId, CategoryKind.chore, _choreSeeds);
-    await _seedKind(householdId, CategoryKind.shopping, _shoppingSeeds);
+  ///
+  /// Names follow [locale] (persona review D10): German for `de`, English
+  /// for every other language. The seeds are ordinary synced rows written
+  /// once, so the creating phone's language is what the household keeps --
+  /// a later language switch does not rename them (users rename freely).
+  Future<void> seedDefaults(
+    String householdId, {
+    required Locale locale,
+  }) async {
+    final german = locale.languageCode == 'de';
+    await _seedKind(
+      householdId,
+      CategoryKind.chore,
+      german ? _localised(_choreSeeds, _choreSeedNamesDe) : _choreSeeds,
+    );
+    await _seedKind(
+      householdId,
+      CategoryKind.shopping,
+      german
+          ? _localised(_shoppingSeeds, _shoppingSeedNamesDe)
+          : _shoppingSeeds,
+    );
+  }
+
+  /// [seeds] with each name replaced by [names] at the same index; icons and
+  /// order unchanged.
+  static List<_CategorySeed> _localised(
+    List<_CategorySeed> seeds,
+    List<String> names,
+  ) {
+    assert(seeds.length == names.length, 'one localised name per seed');
+    return [
+      for (var i = 0; i < seeds.length; i++)
+        (name: names[i], icon: seeds[i].icon),
+    ];
   }
 
   /// Watches active categories of [kind] in [householdId], ordered by
@@ -196,10 +254,14 @@ class CategoryRepository {
     );
   }
 
-  /// Soft-deletes a category and, in the same transaction, clears
-  /// `categoryId` on every active chore and shopping item that referenced
-  /// it.
-  Future<void> softDeleteCategory(String id) async {
+  /// Soft-deletes a category and, in the same transaction, moves every
+  /// active chore and shopping item that referenced it to
+  /// [moveToCategoryId] — `null` (the default) clears their `categoryId`,
+  /// i.e. they become uncategorized. Passing another category of the same
+  /// kind merges this one into it (persona review 2026-10-06 C10, "Move
+  /// them to"). The plan calls this `deleteCategory(id, {moveToCategoryId})`;
+  /// the existing name is kept so the sync callers stay untouched.
+  Future<void> softDeleteCategory(String id, {String? moveToCategoryId}) async {
     final now = _isoNow();
     await db.transaction(() async {
       await (db.update(
@@ -216,7 +278,7 @@ class CategoryRepository {
           ))
           .write(
             ChoresCompanion(
-              categoryId: const Value(null),
+              categoryId: Value(moveToCategoryId),
               updatedAt: Value(now),
               syncDirty: syncDirtyOnWrite,
             ),
@@ -226,7 +288,7 @@ class CategoryRepository {
           ))
           .write(
             ShoppingItemsCompanion(
-              categoryId: const Value(null),
+              categoryId: Value(moveToCategoryId),
               updatedAt: Value(now),
               syncDirty: syncDirtyOnWrite,
             ),
@@ -257,6 +319,46 @@ class CategoryRepository {
                 ))
                 .get();
         return rows.length;
+    }
+  }
+
+  /// Watches how many active chores or shopping items — whichever [kind]
+  /// matches — reference each category of [householdId], keyed by category
+  /// id (a category nothing uses is simply absent). Same `WHERE` as
+  /// [countActiveReferences], so a row's count on the Categories screen
+  /// always equals what its delete dialog then states (persona review
+  /// 2026-10-06 C10).
+  Stream<Map<String, int>> watchActiveReferenceCounts(
+    String householdId,
+    CategoryKind kind,
+  ) {
+    Map<String, int> tally(Iterable<String?> categoryIds) {
+      final counts = <String, int>{};
+      for (final categoryId in categoryIds.nonNulls) {
+        counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+      }
+      return counts;
+    }
+
+    switch (kind) {
+      case CategoryKind.chore:
+        return (db.select(db.chores)..where(
+              (tbl) =>
+                  tbl.householdId.equals(householdId) &
+                  tbl.deletedAt.isNull() &
+                  tbl.categoryId.isNotNull(),
+            ))
+            .watch()
+            .map((rows) => tally(rows.map((row) => row.categoryId)));
+      case CategoryKind.shopping:
+        return (db.select(db.shoppingItems)..where(
+              (tbl) =>
+                  tbl.householdId.equals(householdId) &
+                  tbl.deletedAt.isNull() &
+                  tbl.categoryId.isNotNull(),
+            ))
+            .watch()
+            .map((rows) => tally(rows.map((row) => row.categoryId)));
     }
   }
 

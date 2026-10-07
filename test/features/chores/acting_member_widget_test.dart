@@ -55,6 +55,11 @@ void main() {
 
       expect(find.bySemanticsIdentifier('actingMember.sheet'), findsOneWidget);
       expect(find.text("Who's doing chores right now?"), findsOneWidget);
+      // Persona review 2026-10-06 C5: switching also moves the digest.
+      expect(
+        find.text('Credit and your daily summary follow this person.'),
+        findsOneWidget,
+      );
 
       final meRow = find.bySemanticsIdentifier(
         'actingMember.sheet.row.${me.id}',
@@ -118,7 +123,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();

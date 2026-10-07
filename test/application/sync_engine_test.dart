@@ -17,16 +17,20 @@ import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/error_scrubber.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../features/settings/fake_household_gateway.dart';
 import 'fake_sync_transport.dart';
 
-/// Collects the sources [AppLog] receives, in order.
+/// Collects the sources (and scrubbed contexts) [AppLog] receives, in
+/// order.
 class _RecordingSink implements ErrorLogSink {
   final List<String> sources = [];
+  final List<Map<String, String>?> contexts = [];
 
   @override
   Future<void> record({
@@ -34,6 +38,53 @@ class _RecordingSink implements ErrorLogSink {
     required ScrubbedError error,
   }) async {
     sources.add(source);
+    contexts.add(error.context);
+  }
+}
+
+/// A [FakeSyncTransport] whose server REJECTS any `categories` batch that
+/// contains a row named [badName] with a 23-class error, exactly as a
+/// Postgres FK/check violation would -- the whole batch fails, and only a
+/// row-by-row retry can tell which row is the offender (technical review
+/// 2026-10-06 #5).
+class _RejectsBadCategoryTransport extends FakeSyncTransport {
+  _RejectsBadCategoryTransport(this.badName);
+
+  final String badName;
+  int categoryUpserts = 0;
+
+  @override
+  Future<void> upsertRows(
+    String table,
+    List<Map<String, Object?>> rows, {
+    String? onConflict,
+  }) async {
+    if (table == 'categories') {
+      categoryUpserts++;
+      if (rows.any((row) => row['name'] == badName)) {
+        throw const PostgrestException(
+          message: 'violates check constraint',
+          code: '23514',
+        );
+      }
+    }
+    return super.upsertRows(table, rows, onConflict: onConflict);
+  }
+}
+
+/// A [FakeSyncTransport] whose `categories` push fails with an ordinary
+/// (non-rejection) error -- a dropped connection on exactly that request.
+class _CategoriesOfflineTransport extends FakeSyncTransport {
+  @override
+  Future<void> upsertRows(
+    String table,
+    List<Map<String, Object?>> rows, {
+    String? onConflict,
+  }) async {
+    if (table == 'categories') {
+      throw Exception('simulated connection drop');
+    }
+    return super.upsertRows(table, rows, onConflict: onConflict);
   }
 }
 
@@ -50,11 +101,44 @@ class _ThrowingPullTransport extends FakeSyncTransport {
     String table, {
     required String householdId,
     required DateTime? since,
+    required int offset,
+    required int limit,
   }) {
     if (table == failOnTable) {
       throw Exception('simulated network failure');
     }
-    return super.pullTable(table, householdId: householdId, since: since);
+    return super.pullTable(
+      table,
+      householdId: householdId,
+      since: since,
+      offset: offset,
+      limit: limit,
+    );
+  }
+}
+
+/// A [FakeSyncTransport] whose [pullTable] throws on every page but the
+/// first -- a network failure partway through a multi-page table fetch
+/// (spec §8.3 amendment 2026-10-06, technical review #2).
+class _SecondPageFailsTransport extends FakeSyncTransport {
+  @override
+  Future<List<Map<String, Object?>>> pullTable(
+    String table, {
+    required String householdId,
+    required DateTime? since,
+    required int offset,
+    required int limit,
+  }) {
+    if (offset > 0) {
+      throw Exception('simulated network failure on page 2');
+    }
+    return super.pullTable(
+      table,
+      householdId: householdId,
+      since: since,
+      offset: offset,
+      limit: limit,
+    );
   }
 }
 
@@ -154,6 +238,142 @@ void main() {
       expect(row.color, 2);
       expect(row.syncDirty, isFalse);
     });
+
+    group('shopping field-level merge (spec §8.8, finding A9)', () {
+      late ShoppingRepository shopping;
+      late String itemId;
+
+      Map<String, Object?> serverRow({
+        required String updatedAt,
+        String name = 'Milch',
+        String? checkedAt,
+        String? deletedAt,
+      }) => {
+        'id': itemId,
+        'household_id': household.id,
+        'name': name,
+        'quantity_note': null,
+        'category_id': null,
+        'added_by': null,
+        'checked_at': checkedAt,
+        'created_at': '2026-06-01T08:00:00.000Z',
+        'updated_at': updatedAt,
+        'deleted_at': deletedAt,
+      };
+
+      Future<ShoppingItem> localItem() => (db.select(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(itemId))).getSingle();
+
+      setUp(() async {
+        var tick = 0;
+        // Each local write lands one hour after the previous one.
+        shopping = ShoppingRepository(
+          db,
+          nowUtc: () => DateTime.utc(2026, 6, 1, 8 + tick++),
+        );
+        final item = await shopping.addItem(household.id, name: 'Milch');
+        itemId = item.id;
+        await (db.update(db.shoppingItems)
+              ..where((tbl) => tbl.id.equals(itemId)))
+            .write(const ShoppingItemsCompanion(syncDirty: Value(false)));
+      });
+
+      test('Tom clears Milch offline, his partner re-adds it online: the '
+          'item stays on the list after the pull', () async {
+        await shopping.setChecked(itemId, checked: true); // 09:00
+        await shopping.clearChecked(household.id); // 10:00, dirty
+        expect((await localItem()).deletedAt, isNotNull);
+
+        // The partner un-deleted it at 12:00 (newer than Tom's 10:00 edit).
+        transport.serverRows['shopping_items']!.add(
+          serverRow(updatedAt: '2026-06-01T12:00:00.000+00:00'),
+        );
+
+        await engine.pullSince();
+
+        final row = await localItem();
+        expect(row.deletedAt, isNull, reason: 'the newer un-delete wins');
+        expect(row.checkedAt, isNull);
+        expect(
+          row.syncDirty,
+          isTrue,
+          reason: 'still dirty: the local name/note/category must be pushed',
+        );
+      });
+
+      test('keeps the local name, note and category while taking the '
+          'pulled checkedAt/deletedAt', () async {
+        await shopping.updateItem(itemId, name: 'Milch 3,5 %'); // 09:00
+        transport.serverRows['shopping_items']!.add(
+          serverRow(
+            updatedAt: '2026-06-01T12:00:00.000+00:00',
+            name: 'Hafermilch',
+            checkedAt: '2026-06-01T11:59:00.000+00:00',
+          ),
+        );
+
+        await engine.pullSince();
+
+        final row = await localItem();
+        expect(row.name, 'Milch 3,5 %');
+        expect(row.checkedAt, '2026-06-01T11:59:00.000Z');
+        expect(row.syncDirty, isTrue);
+        expect(
+          row.updatedAt,
+          '2026-06-01T09:00:00.000Z',
+          reason:
+              'the local updatedAt is untouched so the guarded '
+              'dirty-clear after a push still matches',
+        );
+      });
+
+      test(
+        'a pulled row OLDER than the dirty local row changes nothing',
+        () async {
+          await shopping.deleteItem(itemId); // 09:00, dirty
+          transport.serverRows['shopping_items']!.add(
+            serverRow(updatedAt: '2026-06-01T08:30:00.000+00:00'),
+          );
+
+          await engine.pullSince();
+
+          final row = await localItem();
+          expect(row.deletedAt, isNotNull);
+          expect(row.syncDirty, isTrue);
+        },
+      );
+    });
+
+    test(
+      'pulled timestamps are normalised to the local format: a Postgres '
+      '"+00:00" stamp is stored as the same instant with a "Z" suffix '
+      '(technical review 2026-10-06 #4, so local and pulled stamps compare '
+      'lexically)',
+      () async {
+        transport.serverRows['categories']!.add({
+          'id': 'server-category',
+          'household_id': household.id,
+          'kind': 'chore',
+          'name': 'From server',
+          'icon': 'b',
+          'color': 2,
+          'sort_order': 0,
+          'created_at': '2026-05-01T10:00:00.123456+00:00',
+          'updated_at': '2026-06-01T10:00:00.5+00:00',
+          'deleted_at': '2026-06-02T10:00:00+02:00',
+        });
+
+        await engine.pullSince();
+
+        final row = await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals('server-category'))).getSingle();
+        expect(row.createdAt, '2026-05-01T10:00:00.123456Z');
+        expect(row.updatedAt, '2026-06-01T10:00:00.500Z');
+        expect(row.deletedAt, '2026-06-02T08:00:00.000Z');
+      },
+    );
 
     test(
       'pulled vs local-dirty: pull keeps the local row untouched',
@@ -281,8 +501,130 @@ void main() {
       },
     );
 
+    Map<String, Object?> serverCategory(int i, {required DateTime stamp}) => {
+      'id': 'cat-${i.toString().padLeft(5, '0')}',
+      'household_id': household.id,
+      'kind': 'chore',
+      'name': 'Category $i',
+      'icon': 'a',
+      'color': 1,
+      'sort_order': i,
+      'created_at': stamp.toIso8601String(),
+      'updated_at': stamp.toIso8601String(),
+      'deleted_at': null,
+    };
+
     test(
-      'cursor advances to the fetched server now() after a successful pull',
+      'a table larger than one page is pulled in pages and applied whole '
+      '(technical review 2026-10-06 #2: PostgREST caps every read at '
+      'max_rows = 1000, silently)',
+      () async {
+        final stamp = DateTime.utc(2026, 3);
+        for (var i = 0; i < syncPageSize + 1; i++) {
+          transport.serverRows['categories']!.add(
+            serverCategory(i, stamp: stamp),
+          );
+        }
+
+        await engine.pullSince();
+
+        final local = await db.select(db.categories).get();
+        expect(
+          local.where((row) => row.id.startsWith('cat-')).length,
+          syncPageSize + 1,
+        );
+        final categoryPages = transport.pullTableCalls
+            .where((call) => call.table == 'categories')
+            .map((call) => (call.offset, call.limit))
+            .toList();
+        expect(categoryPages, [
+          (0, syncPageSize),
+          (syncPageSize, syncPageSize),
+        ]);
+      },
+    );
+
+    test(
+      'a failure on a later page leaves the cursor unchanged and applies '
+      'nothing (the pull is all-or-nothing)',
+      () async {
+        final pagingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _SecondPageFailsTransport()
+            ..serverRows['categories']!.addAll([
+              for (var i = 0; i < syncPageSize + 1; i++)
+                serverCategory(i, stamp: DateTime.utc(2026, 3)),
+            ]),
+          settings: settings,
+          householdId: household.id,
+        );
+        addTearDown(pagingEngine.stop);
+
+        await pagingEngine.pullSince();
+
+        expect((await settings.ensureSettings()).syncLastPulledAt, isNull);
+        final local = await db.select(db.categories).get();
+        expect(local.where((row) => row.id.startsWith('cat-')), isEmpty);
+      },
+    );
+
+    test(
+      'onPullCompleted receives the DEVICE clock after a successful pull, '
+      'and nothing after a failed one (technical review 2026-10-06 #7)',
+      () async {
+        final deviceNow = DateTime.utc(2026, 7, 1, 12);
+        final completions = <DateTime>[];
+        final stampedEngine = SupabaseSyncEngine(
+          db: db,
+          transport: transport,
+          settings: settings,
+          householdId: household.id,
+          clock: Clock.fixed(deviceNow),
+          onPullCompleted: completions.add,
+        );
+        addTearDown(stampedEngine.stop);
+        // The server clock disagrees with the device by ten minutes; the
+        // cursor records the server, the callback the device.
+        transport.now = deviceNow.subtract(const Duration(minutes: 10));
+
+        await stampedEngine.pullSince();
+        expect(completions, [deviceNow]);
+        expect(
+          (await settings.ensureSettings()).syncLastPulledAt,
+          transport.now.subtract(syncCursorOverlap).toIso8601String(),
+        );
+
+        final failingEngine = SupabaseSyncEngine(
+          db: db,
+          transport: _ThrowingPullTransport('chores'),
+          settings: settings,
+          householdId: household.id,
+          clock: Clock.fixed(deviceNow),
+          onPullCompleted: completions.add,
+        );
+        addTearDown(failingEngine.stop);
+        await failingEngine.pullSince();
+        expect(completions, hasLength(1));
+      },
+    );
+
+    test(
+      'two concurrent pullSince() calls share one pull: the transport is '
+      'hit once (technical review 2026-10-06 #17, single in-flight pull)',
+      () async {
+        await Future.wait([engine.pullSince(), engine.pullSince()]);
+
+        expect(transport.serverNowCalls, 1);
+
+        // And a pull started AFTER the first completed is a real new pull.
+        await engine.pullSince();
+        expect(transport.serverNowCalls, 2);
+      },
+    );
+
+    test(
+      'cursor advances to the fetched server now() MINUS the overlap after '
+      'a successful pull (spec §8.3 amendment 2026-10-06)',
       () async {
         transport.now = DateTime.utc(2026, 5, 1, 12);
 
@@ -291,8 +633,49 @@ void main() {
         final settingsRow = await SettingsRepository(db).ensureSettings();
         expect(
           settingsRow.syncLastPulledAt,
-          DateTime.utc(2026, 5, 1, 12).toIso8601String(),
+          DateTime.utc(
+            2026,
+            5,
+            1,
+            12,
+          ).subtract(syncCursorOverlap).toIso8601String(),
         );
+      },
+    );
+
+    test(
+      'a row committed with an updated_at just BEFORE the server now() a '
+      'pull read (a transaction that started before it and committed after '
+      'the table read) is still fetched by the next pull (technical review '
+      '2026-10-06 #3)',
+      () async {
+        transport.now = DateTime.utc(2026, 5, 1, 12);
+        await engine.pullSince();
+
+        // Postgres' now() is the TRANSACTION START time: a push whose
+        // transaction began 10 s before our server_now() read but committed
+        // after our categories read carries this stamp.
+        final stamp = transport.now.subtract(const Duration(seconds: 10));
+        transport.serverRows['categories']!.add({
+          'id': 'late-commit',
+          'household_id': household.id,
+          'kind': 'chore',
+          'name': 'Committed late',
+          'icon': 'a',
+          'color': 1,
+          'sort_order': 0,
+          'created_at': stamp.toIso8601String(),
+          'updated_at': stamp.toIso8601String(),
+          'deleted_at': null,
+        });
+        transport.now = transport.now.add(const Duration(minutes: 1));
+
+        await engine.pullSince();
+
+        final row = await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals('late-commit'))).getSingleOrNull();
+        expect(row, isNotNull);
       },
     );
 
@@ -427,7 +810,7 @@ void main() {
 
         final result = await engine.refreshNow();
 
-        expect(result, isFalse);
+        expect(result, RefreshOutcome.offline);
         final row = await settings.ensureSettings();
         expect(row.syncHouseholdId, isNull);
         expect(row.membershipRevoked, isTrue);
@@ -435,7 +818,7 @@ void main() {
     );
 
     test(
-      'refreshNow still reports true for an ordinary successful refresh '
+      'refreshNow still reports ok for an ordinary successful refresh '
       '(membership present)',
       () async {
         await settings.setSyncLinked(
@@ -446,7 +829,7 @@ void main() {
 
         final result = await engine.refreshNow();
 
-        expect(result, isTrue);
+        expect(result, RefreshOutcome.ok);
       },
     );
   });
@@ -454,6 +837,7 @@ void main() {
   group('SupabaseSyncEngine push mechanics', () {
     late AppDatabase db;
     late HouseholdRepository households;
+    late CategoryRepository categories;
     late Household household;
     late FakeSyncTransport transport;
     late SupabaseSyncEngine engine;
@@ -461,6 +845,7 @@ void main() {
     setUp(() async {
       db = AppDatabase(NativeDatabase.memory());
       households = HouseholdRepository(db);
+      categories = CategoryRepository(db);
       household = await households.createLocalHousehold('Me');
       transport = FakeSyncTransport();
       engine = SupabaseSyncEngine(
@@ -557,6 +942,20 @@ void main() {
     );
 
     test(
+      'households push sends ONLY the name column: the server grants a '
+      'column-scoped UPDATE (name) and an ungranted column in the SET list '
+      'fails the whole statement with 42501 (H4)',
+      () async {
+        await engine.pushDirty();
+
+        expect(transport.householdUpdateCalls, hasLength(1));
+        final call = transport.householdUpdateCalls.single;
+        expect(call.id, household.id);
+        expect(call.columns, {'name': household.name});
+      },
+    );
+
+    test(
       "chore_assignees push denormalizes household_id off the assignee's "
       'chore',
       () async {
@@ -580,6 +979,108 @@ void main() {
         expect(assigneeRow['household_id'], household.id);
         expect(assigneeRow['chore_id'], chore.id);
         expect(assigneeRow['member_id'], member.id);
+      },
+    );
+
+    test(
+      'a server-rejected row is quarantined: the rest of its table and '
+      'every later table still push, the row stays dirty, and the '
+      'rejection is logged ONCE as sync.rejected (technical review '
+      '2026-10-06 #5)',
+      () async {
+        final sink = _RecordingSink();
+        AppLog.attach(sink);
+        addTearDown(AppLog.detach);
+        final rejecting = _RejectsBadCategoryTransport('Bad');
+        final quarantineEngine = SupabaseSyncEngine(
+          db: db,
+          transport: rejecting,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+        );
+        addTearDown(quarantineEngine.stop);
+        final good = await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'Good',
+          icon: 'a',
+          color: 1,
+        );
+        final bad = await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'Bad',
+          icon: 'a',
+          color: 1,
+        );
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        await quarantineEngine.pushDirty();
+
+        final serverCategories = rejecting.serverRows['categories']!;
+        expect(serverCategories.map((row) => row['id']), [good.id]);
+        expect(
+          rejecting.serverRows['shopping_items'],
+          hasLength(1),
+          reason: 'a later table must not be blocked by the rejected one',
+        );
+        Future<bool> dirtyOf(String id) async => (await (db.select(
+          db.categories,
+        )..where((tbl) => tbl.id.equals(id))).getSingle()).syncDirty;
+        expect(await dirtyOf(good.id), isFalse);
+        expect(await dirtyOf(bad.id), isTrue);
+        expect(
+          sink.sources.where((source) => source == 'sync.rejected'),
+          hasLength(1),
+        );
+        expect(
+          sink.contexts[sink.sources.indexOf('sync.rejected')],
+          {'table': 'categories', 'id': bad.id},
+        );
+        expect(
+          rejecting.categoryUpserts,
+          3,
+          reason: 'the batch, then one retry per row',
+        );
+
+        // The next tick retries (the row is still dirty) but does not log
+        // the same rejection again.
+        await quarantineEngine.pushDirty();
+        expect(await dirtyOf(bad.id), isTrue);
+        expect(
+          sink.sources.where((source) => source == 'sync.rejected'),
+          hasLength(1),
+        );
+      },
+    );
+
+    test(
+      'an ordinary failure on one table does not stop the later tables, '
+      'and pushDirty still skips its follow-up pull (retry-later)',
+      () async {
+        final offline = _CategoriesOfflineTransport();
+        final partialEngine = SupabaseSyncEngine(
+          db: db,
+          transport: offline,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+        );
+        addTearDown(partialEngine.stop);
+        await categories.createCategory(
+          household.id,
+          kind: CategoryKind.chore,
+          name: 'C',
+          icon: 'a',
+          color: 1,
+        );
+        await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+        await partialEngine.pushDirty();
+
+        expect(offline.serverRows['categories'], isEmpty);
+        expect(offline.serverRows['shopping_items'], hasLength(1));
+        expect(offline.serverNowCalls, 0);
+        expect(await partialEngine.refreshNow(), RefreshOutcome.offline);
       },
     );
 
@@ -710,6 +1211,72 @@ void main() {
           db.categories,
         )..where((tbl) => tbl.id.equals('server-category'))).getSingleOrNull();
         expect(row, isNotNull);
+      },
+    );
+
+    test(
+      'a pull that re-fetches UNCHANGED rows (inside the cursor overlap) is '
+      'a no-op locally: it fires no table update, so the write listener '
+      'does not turn it into another push and pull',
+      () async {
+        engine.start();
+        // start()'s push + pull, then the debounced push the pulled rows
+        // used to trigger; wait all of that out.
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        final pushesBefore = transport.pushedTables.length;
+        final pullsBefore = transport.serverNowCalls;
+
+        // The fake server's clock has not moved, so every row it holds is
+        // inside the overlap window and comes back again, unchanged.
+        await engine.pullSince();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+
+        expect(transport.serverNowCalls, pullsBefore + 1);
+        expect(
+          transport.pushedTables.length,
+          pushesBefore,
+          reason:
+              "rewriting identical rows would fire drift's table-update "
+              'stream and schedule a debounced push, whose own pull would '
+              're-fetch the same rows -- a loop for as long as they stay '
+              'inside the window',
+        );
+      },
+    );
+
+    test(
+      'a realtime event arriving right after our own push is ignored as an '
+      'echo; one arriving after the window still pulls (technical review '
+      '2026-10-06 #17)',
+      () async {
+        final echoEngine = SupabaseSyncEngine(
+          db: db,
+          transport: transport,
+          settings: SettingsRepository(db),
+          householdId: household.id,
+          realtimeEchoWindow: const Duration(milliseconds: 150),
+        );
+        addTearDown(echoEngine.stop);
+
+        // start() pushes the household rows createLocalHousehold left
+        // dirty, then pulls once -- that push opens the echo window.
+        echoEngine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(transport.pushedTables, isNotEmpty);
+        final pullsAfterStart = transport.serverNowCalls;
+
+        transport.emitChange();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(
+          transport.serverNowCalls,
+          pullsAfterStart,
+          reason: 'the server event for rows we just wrote is our own echo',
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        transport.emitChange();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        expect(transport.serverNowCalls, pullsAfterStart + 1);
       },
     );
   });
@@ -920,6 +1487,151 @@ void main() {
     );
   });
 
+  // Technical review 2026-10-06 #8 / spec `docs/specs/sync-backend.md` §8.3
+  // amendment 2026-10-06: a chore's assignee list is ONE value for LWW
+  // purposes, not a set of independently merged rows.
+  group('SupabaseSyncEngine assignee set LWW', () {
+    late AppDatabase db;
+    late HouseholdRepository households;
+    late ChoreRepository chores;
+    late Household household;
+    late FakeSyncTransport transport;
+    late SupabaseSyncEngine engine;
+    late String owner;
+    late Member b;
+    late Member c;
+
+    setUp(() async {
+      db = AppDatabase(NativeDatabase.memory());
+      households = HouseholdRepository(db);
+      chores = ChoreRepository(db);
+      household = await households.createLocalHousehold('Me');
+      owner = (await db.select(db.members).getSingle()).id;
+      b = await households.addMember(household.id, name: 'B', color: 1);
+      c = await households.addMember(household.id, name: 'C', color: 2);
+      transport = FakeSyncTransport();
+      engine = SupabaseSyncEngine(
+        db: db,
+        transport: transport,
+        settings: SettingsRepository(db),
+        householdId: household.id,
+      );
+    });
+
+    tearDown(() async {
+      engine.stop();
+      await db.close();
+    });
+
+    Future<Chore> rotationChore(List<String> memberIds) => chores.createChore(
+      householdId: household.id,
+      title: 'T',
+      startDate: PlainDate(2026, 1, 1),
+      assignmentMode: AssignmentMode.rotation,
+      assigneeMemberIds: memberIds,
+    );
+
+    Future<List<ChoreAssignee>> localSet(String choreId) =>
+        (db.select(db.choreAssignees)
+              ..where((tbl) => tbl.choreId.equals(choreId))
+              ..orderBy([(tbl) => OrderingTerm(expression: tbl.position)]))
+            .get();
+
+    /// Rewrites the fake server's assignee rows for [choreId] to
+    /// [memberIds] in order, as another device's `updateChore` push would,
+    /// tombstoning every member no longer in the list.
+    void serverSetAssignees(String choreId, List<String> memberIds) {
+      transport.now = DateTime.utc(2026, 2);
+      final stamp = transport.now.toIso8601String();
+      final rows = transport.serverRows['chore_assignees']!;
+      for (final row in rows) {
+        if (row['chore_id'] == choreId &&
+            !memberIds.contains(row['member_id'])) {
+          row['deleted_at'] = stamp;
+          row['updated_at'] = stamp;
+        }
+      }
+      for (var i = 0; i < memberIds.length; i++) {
+        final existing = rows.indexWhere(
+          (row) =>
+              row['chore_id'] == choreId && row['member_id'] == memberIds[i],
+        );
+        final row = {
+          'chore_id': choreId,
+          'member_id': memberIds[i],
+          'household_id': household.id,
+          'position': i,
+          'deleted_at': null,
+          'updated_at': stamp,
+        };
+        if (existing == -1) {
+          rows.add(row);
+        } else {
+          rows[existing] = row;
+        }
+      }
+    }
+
+    test(
+      'a dirty local chore keeps its whole assignee set: pulled rows AND '
+      'tombstones for that chore are skipped',
+      () async {
+        final chore = await rotationChore([owner, b.id, c.id]);
+        await engine.pushDirty();
+        // Local edit, not yet pushed: drop c.
+        await chores.updateChore(chore.id, assigneeMemberIds: [owner, b.id]);
+        // The other device, concurrently: drop b instead and reorder.
+        serverSetAssignees(chore.id, [c.id, owner]);
+
+        await engine.pullSince();
+
+        final set = await localSet(chore.id);
+        expect(set.map((row) => row.memberId), [owner, b.id]);
+        expect(set.every((row) => row.syncDirty), isTrue);
+      },
+    );
+
+    test(
+      'a clean local chore takes the pulled set exactly, positions 0..n-1, '
+      'with no union and no duplicate positions',
+      () async {
+        final chore = await rotationChore([owner, b.id]);
+        await engine.pushDirty();
+        serverSetAssignees(chore.id, [c.id, owner]);
+
+        await engine.pullSince();
+
+        final set = await localSet(chore.id);
+        expect(set.map((row) => row.memberId), [c.id, owner]);
+        expect(set.map((row) => row.position), [0, 1]);
+        expect(set.every((row) => !row.syncDirty), isTrue);
+      },
+    );
+
+    test(
+      "tombstones alone (a pull landing between the other device's row "
+      'push and its tombstone push) delete only those members, never the '
+      'whole set',
+      () async {
+        final chore = await rotationChore([owner, b.id, c.id]);
+        await engine.pushDirty();
+        transport.now = DateTime.utc(2026, 2);
+        final bRow = transport.serverRows['chore_assignees']!.singleWhere(
+          (row) => row['chore_id'] == chore.id && row['member_id'] == b.id,
+        );
+        bRow['deleted_at'] = transport.now.toIso8601String();
+        bRow['updated_at'] = transport.now.toIso8601String();
+
+        await engine.pullSince();
+
+        expect(
+          (await localSet(chore.id)).map((row) => row.memberId),
+          [owner, c.id],
+        );
+      },
+    );
+  });
+
   group('SupabaseSyncEngine hard-delete tombstones (spec §8.6)', () {
     late AppDatabase db;
     late HouseholdRepository households;
@@ -1003,7 +1715,10 @@ void main() {
       expect(transport.markDeletedCalls, hasLength(1));
       final call = transport.markDeletedCalls.single;
       expect(call.table, 'chore_occurrences');
-      expect(call.match, {'id': occurrence.id});
+      // The status match is load-bearing (technical review 2026-10-06 #1):
+      // an occurrence tombstone means "the PENDING row is gone", so it
+      // must never land on a row another device has since completed.
+      expect(call.match, {'id': occurrence.id, 'status': 'pending'});
       final serverRow = transport.serverRows['chore_occurrences']!.single;
       expect(serverRow['deleted_at'], call.deletedAt);
       expect(serverRow['updated_at'], DateTime.utc(2026, 3).toIso8601String());
@@ -1136,6 +1851,108 @@ void main() {
       expect(await chores.getOccurrence(occurrence.id), isNotNull);
     });
 
+    test(
+      'pull of a tombstone for a locally DONE occurrence leaves it alone '
+      '(technical review 2026-10-06 #1: a tombstone only kills the pending '
+      'row)',
+      () async {
+        final chore = await fixedChore();
+        final occurrence = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await engine.pushDirty();
+        await chores.closeOccurrence(
+          occurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: PlainDate(2026, 1, 5),
+          completedBy: owner,
+        );
+        await engine.pushDirty();
+        // The row is clean (just pushed) AND done; a tombstone now arrives
+        // for its id from a device that deleted it while it was pending.
+        serverTouched(
+          transport.serverRows['chore_occurrences']!.single,
+          deletedAt: '2026-02-01T00:00:00.000Z',
+        );
+
+        await engine.pullSince();
+
+        final kept = await chores.getOccurrence(occurrence.id);
+        expect(kept, isNotNull);
+        expect(kept!.status, OccurrenceStatus.done);
+      },
+    );
+
+    test(
+      'the completion race from the 2026-10-06 review (#1): A completes O '
+      'and pushes, B tombstones O and pushes, A pulls -- A keeps O as done '
+      'and B gets the completion back',
+      () async {
+        // Device A is the group's fixture; device B is a second database
+        // sharing the same fake server.
+        final dbB = AppDatabase(NativeDatabase.memory());
+        addTearDown(dbB.close);
+        final choresB = ChoreRepository(dbB);
+        final engineB = SupabaseSyncEngine(
+          db: dbB,
+          transport: transport,
+          settings: SettingsRepository(dbB),
+          householdId: household.id,
+        );
+        addTearDown(engineB.stop);
+
+        final chore = await fixedChore();
+        final occurrence = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 5),
+        );
+        await engine.pushDirty();
+        await engineB.pullSince();
+        expect(await choresB.getOccurrence(occurrence.id), isNotNull);
+
+        // A completes O (and gets the next occurrence), pushes first.
+        transport.now = DateTime.utc(2026, 1, 6);
+        await chores.closeOccurrence(
+          occurrence.id,
+          status: OccurrenceStatus.done,
+          closedOn: PlainDate(2026, 1, 5),
+          completedBy: owner,
+        );
+        await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 12),
+        );
+        await engine.pushDirty();
+
+        // B, not having pulled yet, deletes the chore: a local hard delete
+        // of its (still pending, on B) occurrence O plus a tombstone.
+        transport.now = DateTime.utc(2026, 1, 7);
+        await choresB.softDeleteChore(chore.id);
+        await engineB.pushDirty();
+
+        final serverO = transport.serverRows['chore_occurrences']!.singleWhere(
+          (row) => row['id'] == occurrence.id,
+        );
+        expect(
+          serverO['deleted_at'],
+          isNull,
+          reason: 'the tombstone matched on status = pending; O is done',
+        );
+
+        transport.now = DateTime.utc(2026, 1, 8);
+        await engine.pullSince();
+        final onA = await chores.getOccurrence(occurrence.id);
+        expect(onA, isNotNull);
+        expect(onA!.status, OccurrenceStatus.done);
+
+        await engineB.pullSince();
+        final onB = await choresB.getOccurrence(occurrence.id);
+        expect(onB, isNotNull, reason: 'B pulls the completion back');
+        expect(onB!.status, OccurrenceStatus.done);
+      },
+    );
+
     test('pull of a tombstoned assignee deletes it locally', () async {
       final b = await households.addMember(household.id, name: 'B', color: 1);
       final chore = await chores.createChore(
@@ -1161,58 +1978,61 @@ void main() {
       expect(left.map((row) => row.memberId), [owner]);
     });
 
-    test('ghost repair keeps the latest-updated pending occurrence and '
-        'tombstones the rest', () async {
-      final chore = await fixedChore();
-      final ghost = await chores.insertOccurrence(
-        choreId: chore.id,
-        dueDate: PlainDate(2026, 3, 1),
-      );
-      final survivor = await chores.insertOccurrence(
-        choreId: chore.id,
-        dueDate: PlainDate(2026, 1, 1),
-      );
-      Future<void> stamp(String id, String updatedAt) =>
-          (db.update(db.choreOccurrences)..where((tbl) => tbl.id.equals(id)))
-              .write(ChoreOccurrencesCompanion(updatedAt: Value(updatedAt)));
-      await stamp(ghost.id, '2026-01-01T00:00:00.000Z');
-      await stamp(survivor.id, '2026-01-02T00:00:00.000Z');
-
-      await engine.pullSince();
-
-      final pending = await chores.pendingOccurrenceOf(chore.id);
-      expect(pending!.id, survivor.id);
-      final rows = await outbox();
-      expect(rows, hasLength(1));
-      expect(rows.single.entity, 'chore_occurrences');
-      expect(rows.single.rowId, ghost.id);
-    });
-
     test(
-      'ghost repair breaks an updatedAt tie by the later due date',
+      'ghost repair keeps the latest-DUE pending occurrence regardless of '
+      'updatedAt (technical review 2026-10-06 #4: the survivor key uses '
+      'only fields both devices see identically, spec §8.7)',
       () async {
         final chore = await fixedChore();
-        final early = await chores.insertOccurrence(
-          choreId: chore.id,
-          dueDate: PlainDate(2026, 1, 1),
-        );
-        final later = await chores.insertOccurrence(
+        final survivor = await chores.insertOccurrence(
           choreId: chore.id,
           dueDate: PlainDate(2026, 3, 1),
         );
-        await db
-            .update(db.choreOccurrences)
-            .write(
-              const ChoreOccurrencesCompanion(
-                updatedAt: Value('2026-01-01T00:00:00.000Z'),
-              ),
-            );
+        final ghost = await chores.insertOccurrence(
+          choreId: chore.id,
+          dueDate: PlainDate(2026, 1, 1),
+        );
+        Future<void> stamp(String id, String updatedAt) =>
+            (db.update(db.choreOccurrences)..where((tbl) => tbl.id.equals(id)))
+                .write(ChoreOccurrencesCompanion(updatedAt: Value(updatedAt)));
+        // The earlier-due row was written LATER: under the old
+        // updatedAt-first key it would have won, and a second device whose
+        // clock disagrees would have picked the other one -- two devices
+        // tombstoning each other's survivor until no pending row is left.
+        await stamp(survivor.id, '2026-01-01T00:00:00.000Z');
+        await stamp(ghost.id, '2026-01-02T00:00:00.000Z');
 
         await engine.pullSince();
 
-        expect((await chores.pendingOccurrenceOf(chore.id))!.id, later.id);
-        expect((await outbox()).single.rowId, early.id);
+        final pending = await chores.pendingOccurrenceOf(chore.id);
+        expect(pending!.id, survivor.id);
+        final rows = await outbox();
+        expect(rows, hasLength(1));
+        expect(rows.single.entity, 'chore_occurrences');
+        expect(rows.single.rowId, ghost.id);
       },
     );
+
+    test('ghost repair breaks a dueDate tie by the greater id', () async {
+      final chore = await fixedChore();
+      final a = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 1),
+      );
+      final b = await chores.insertOccurrence(
+        choreId: chore.id,
+        dueDate: PlainDate(2026, 1, 1),
+      );
+      final expectedSurvivor = a.id.compareTo(b.id) > 0 ? a : b;
+      final expectedGhost = identical(expectedSurvivor, a) ? b : a;
+
+      await engine.pullSince();
+
+      expect(
+        (await chores.pendingOccurrenceOf(chore.id))!.id,
+        expectedSurvivor.id,
+      );
+      expect((await outbox()).single.rowId, expectedGhost.id);
+    });
   });
 }

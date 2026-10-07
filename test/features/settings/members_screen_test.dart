@@ -2,6 +2,7 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/theme.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/chore_service.dart';
+import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
@@ -13,10 +14,12 @@ import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
 
 import '../../test_utils/pump_app.dart';
 import 'fake_auth_gateway.dart';
 import 'fake_household_gateway.dart';
+import 'fake_share_platform.dart';
 import 'settings_test_utils.dart';
 
 /// Widget-level tests for the manage-members screen (spec
@@ -30,6 +33,10 @@ import 'settings_test_utils.dart';
 /// per A3), household rename (A2), and member deletion (A1).
 void main() {
   final today = DateTime(2026, 7, 24, 9);
+  // One fake for the whole file -- see FakeSharePlatform's doc comment.
+  final fakeShare = FakeSharePlatform();
+  SharePlatform.instance = fakeShare;
+  setUp(fakeShare.reset);
 
   Future<Member> soleBootstrapMember(AppDatabase database) async {
     final householdId = await currentHouseholdId(database);
@@ -316,6 +323,33 @@ void main() {
     },
   );
 
+  testChoreApp(
+    'local household with sign-in available: a disabled Invite row names '
+    'the missing step instead of hiding inviting (persona review D6)',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite'),
+        findsNothing,
+      );
+      final row = tester.widget<ListTile>(
+        find.descendant(
+          of: find.bySemanticsIdentifier('settings.members.inviteLocal'),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(row.enabled, isFalse);
+      expect(row.onTap, isNull);
+      expect(find.text('Sign in first to invite your family'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
   final inviteGateway = FakeHouseholdGateway();
   testChoreApp(
     'invite row visible once linked; tap revokes any previous invite THEN '
@@ -349,6 +383,121 @@ void main() {
       expect(inviteGateway.createInviteCalls, [householdId]);
       expect(inviteGateway.revokeActiveInvitesCalls, [householdId]);
       expect(inviteGateway.inviteCallOrder, ['revoke', 'create']);
+
+      handle.dispose();
+    },
+  );
+
+  final activeInviteGateway = FakeHouseholdGateway(inviteCode: 'NEWCODE2')
+    ..activeInviteResult = ActiveInvite(
+      code: 'OLDCODE1',
+      expiresAt: DateTime.utc(2026, 7, 31, 12),
+    );
+  testChoreApp(
+    'an active invite is re-shown with its expiry, not silently revoked; '
+    '"New code" confirms first and only then revokes and creates '
+    '(persona review D5)',
+    today: today,
+    overrides: [
+      householdGatewayProvider.overrideWithValue(activeInviteGateway),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await SettingsRepository(
+        database,
+      ).setSyncLinked(householdId: householdId, linkedAt: DateTime.utc(2026));
+
+      await openManageMembers(tester);
+      await tester.tap(find.bySemanticsIdentifier('settings.members.invite'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OLDCODE1'), findsOneWidget);
+      expect(find.text('Valid until Jul 31, 2026'), findsOneWidget);
+
+      // The share text carries the install link (persona review D7).
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.share'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        fakeShare.lastParams?.text,
+        'Join my household on Famdo — enter the code OLDCODE1 when you sign '
+        'in. Get the app: '
+        'https://github.com/igorzamyslov/chore-app/releases/latest',
+      );
+      expect(activeInviteGateway.activeInviteCalls, [householdId]);
+      expect(activeInviteGateway.inviteCallOrder, isEmpty);
+
+      // Cancel keeps the shared code alive.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Replace the shared code?'), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.replace.cancel'),
+      );
+      await tester.pumpAndSettle();
+      expect(activeInviteGateway.inviteCallOrder, isEmpty);
+      expect(find.text('OLDCODE1'), findsOneWidget);
+
+      // Replace revokes, then creates, and shows the new code.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.members.invite.replace.confirm'),
+      );
+      await tester.pumpAndSettle();
+      expect(activeInviteGateway.inviteCallOrder, ['revoke', 'create']);
+      expect(find.text('NEWCODE2'), findsOneWidget);
+      expect(find.text('OLDCODE1'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.validUntil'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('settings.members.invite.newCode'),
+        findsNothing,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'Settings → Household starts with a "Household name" row showing the '
+    'name; tapping it opens the rename sheet (persona review D10)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+
+      final row = find.bySemanticsIdentifier('settings.household.name');
+      expect(row, findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.text('Household name')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text('My household')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(row).dy,
+        lessThan(
+          tester.getTopLeft(find.bySemanticsIdentifier('settings.members')).dy,
+        ),
+      );
+
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('members.household.rename.name'),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },
@@ -412,6 +561,70 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Synced with The Smiths'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'linked household: each member row says who is you, who joined on their '
+    'own phone, and who has no phone yet (persona review D4)',
+    today: today,
+    overrides: [
+      authGatewayProvider.overrideWithValue(
+        FakeAuthGateway(
+          currentUser: const AuthUser(id: 'u1', email: 'me@example.com'),
+        ),
+      ),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+      await (database.update(database.members)
+            ..where((tbl) => tbl.id.equals(me.id)))
+          .write(const MembersCompanion(userId: Value('u1')));
+      final anna = await claimedMember(database, name: 'Anna', userId: 'u2');
+      final kid = await HouseholdRepository(database).addMember(
+        await currentHouseholdId(database),
+        name: 'Kid',
+        color: 0xFF6D9F71,
+      );
+      await linkThisDevice(database);
+
+      await openManageMembers(tester);
+
+      Finder statusOf(String memberId) => find.descendant(
+        of: find.bySemanticsIdentifier('members.row.$memberId.status'),
+        matching: find.byType(Text),
+      );
+      expect(tester.widget<Text>(statusOf(me.id)).data, 'You');
+      expect(
+        tester.widget<Text>(statusOf(anna.id)).data,
+        'Uses Famdo on their own phone',
+      );
+      expect(
+        tester.widget<Text>(statusOf(kid.id)).data,
+        'No phone yet — you can mark their chores',
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'local household: member rows carry no status line (persona review D4)',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final me = await soleBootstrapMember(database);
+
+      await openManageMembers(tester);
+
+      expect(
+        find.bySemanticsIdentifier('members.row.${me.id}.status'),
+        findsNothing,
+      );
+      expect(find.text('You'), findsNothing);
 
       handle.dispose();
     },
@@ -792,7 +1005,15 @@ void main() {
       // The claimed body, not the unclaimed one: the effect on the removed
       // person's own phone is the one consequence the person tapping Delete
       // cannot see from here.
-      expect(find.textContaining('their own phone'), findsOneWidget);
+      // Scoped to the dialog: the member row behind it now carries its own
+      // "Uses Famdo on their own phone" status line (persona review D4).
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('their own phone'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.bySemanticsIdentifier('members.edit.delete.confirm'),

@@ -8,8 +8,14 @@ import 'package:flutter/material.dart';
 /// A multi-select row of Mon..Sun circular toggles (spec
 /// `docs/specs/theme-v2.md` §4.4 item 3): selected = `primary` fill +
 /// `onPrimary` ink; unselected = `surfaceContainerLow` fill +
-/// `outlineVariant` border. Each toggle is a ≥48dp tap target holding a
+/// `outlineVariant` border. Each toggle is a 48dp-tall tap target holding a
 /// visually-smaller 36dp circle.
+///
+/// Laid out as seven `Expanded` cells in one `Row` (persona review
+/// 2026-10-06 C8), not a `Wrap` of fixed 48dp boxes: 7 × 48 + 6 × 4 = 360dp
+/// did not fit the 328dp a 360dp phone leaves inside the form's gutters, so
+/// Sunday wrapped onto a line of its own. Labels are two letters
+/// ([weekdayTwoLetterName]); the full day name is the semantic label.
 ///
 /// Only shown when the chore's repeat unit is week. An empty selection is
 /// allowed — it means "derive the weekday from the start date".
@@ -31,18 +37,18 @@ class WeekdayChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localeName = Localizations.localeOf(context).toString();
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
+    return Row(
       children: [
         for (var weekday = 1; weekday <= 7; weekday++)
-          semantic(
-            'chore_form.repeat.weekday.$weekday',
-            child: _WeekdayToggle(
-              weekday: weekday,
-              localeName: localeName,
-              selected: selected.contains(weekday),
-              onTap: () => onToggle(weekday),
+          Expanded(
+            child: semantic(
+              'chore_form.repeat.weekday.$weekday',
+              child: _WeekdayToggle(
+                weekday: weekday,
+                localeName: localeName,
+                selected: selected.contains(weekday),
+                onTap: () => onToggle(weekday),
+              ),
             ),
           ),
       ],
@@ -86,7 +92,6 @@ class _WeekdayToggle extends StatelessWidget {
             onTap: onTap,
             customBorder: const CircleBorder(),
             child: SizedBox(
-              width: 48,
               height: 48,
               child: Center(
                 child: Container(
@@ -101,7 +106,7 @@ class _WeekdayToggle extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      weekdayNarrowName(weekday, localeName),
+                      weekdayTwoLetterName(weekday, localeName),
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: inkColor,
                       ),

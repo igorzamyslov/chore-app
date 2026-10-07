@@ -1,6 +1,7 @@
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:clock/clock.dart';
@@ -44,7 +45,7 @@ void main() {
       // Weekly, due exactly 7 days out from today: "In 7 days".
       expect(find.text('Done — next due In 7 days'), findsOneWidget);
       expect(find.text('Undo'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       // showAppSnackbar's presentation: 4s floating (see
       // lib/app/snackbars.dart), not the 5s fixed bar this used to be.
@@ -231,6 +232,57 @@ void main() {
       // Not merely non-overlapping but with the floating margin's
       // breathing room above it, not a coincidental touching edge.
       expect(snackBarRect.bottom, lessThan(tabBarRect.top));
+
+      handle.dispose();
+    },
+  );
+
+  // Persona review 2026-10-06 C5 (Maria P2-F): in a household of more than
+  // one, the ordinary Done snackbar says who got the credit -- the acting
+  // member can be switched, so "Done" alone hid whose name it went under.
+  testChoreApp(
+    'with more than one member, Done names the credited member',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await HouseholdRepository(
+        database,
+      ).addMember(householdId, name: 'Anna', color: 0xFF112233);
+      final service = ChoreService(
+        database: database,
+        chores: ChoreRepository(database),
+        clock: Clock.fixed(today),
+      );
+      final oneOff = await service.createChore(
+        householdId: householdId,
+        title: 'Call plumber',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+      );
+      final weekly = await service.createChore(
+        householdId: householdId,
+        title: 'Bins',
+        startDate: PlainDate(2026, 7, 22),
+        assignmentMode: AssignmentMode.anyone,
+        recurrence: Recurrence.weekly(),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${oneOff.id}.complete'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Done — credited to Me'), findsOneWidget);
+
+      await tester.tap(
+        find.bySemanticsIdentifier('chores.occurrence.${weekly.id}.complete'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Done — credited to Me, next due In 7 days'),
+        findsOneWidget,
+      );
 
       handle.dispose();
     },

@@ -298,7 +298,7 @@ void main() {
   group('F9 — leave the household (spec §2.2, D-L5)', () {
     test(
       'leaving with another claimed member present: the household survives '
-      "and the leaver's profile stays claimable",
+      "and the leaver's profile is unclaimed and soft-deleted",
       () async {
         final owner = await _createUser();
         final other = await _createUser();
@@ -308,6 +308,9 @@ void main() {
         final code = await gateway.createInvite(household.householdId);
 
         await _signInAs(other);
+        // peek_invite (20261006120000_join_funnel.sql): the joiner sees the
+        // household's name before committing to anything.
+        expect(await gateway.peekInviteHouseholdName(code), 'Smoke household');
         final joinedMemberId = const Uuid().v4();
         await gateway.joinAsNewMember(
           code: code,
@@ -316,17 +319,21 @@ void main() {
           memberColor: 0xFFFF9800,
         );
 
+        // Rename-on-exit runs BEFORE the RPC, while RLS still admits it.
+        await gateway.renameMember(joinedMemberId, 'Former member');
         await gateway.leaveHousehold(household.householdId);
 
         // The household is NOT cascaded: another claimed member remains.
         final hh = (await _householdRow(household.householdId))!;
         expect(hh['deleted_at'], isNull, reason: 'the household must survive');
 
-        // The leaver's profile stays, unclaimed, so it is claimable again.
+        // The leaver's profile is unclaimed AND soft-deleted (spec
+        // household-lifecycle.md §2.2, amendment 2026-10-06): the family
+        // stops seeing them in rotations; history keeps the name.
         final row = (await _memberRow(joinedMemberId))!;
         expect(row['user_id'], isNull);
-        expect(row['deleted_at'], isNull);
-        expect(row['name'], 'Leaver');
+        expect(row['deleted_at'], isNotNull);
+        expect(row['name'], 'Former member');
 
         // And the leaver no longer has a membership.
         expect(await gateway.findMyMembership(), isNull);

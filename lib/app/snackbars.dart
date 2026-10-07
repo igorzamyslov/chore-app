@@ -1,10 +1,15 @@
 /// Shared snackbar-presentation helper.
 library;
 
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Shows a snackbar with [message] (and optional [action]) via the nearest
-/// [ScaffoldMessenger].
+/// [ScaffoldMessenger], for [duration] (default 4 s).
+///
+/// Bulk actions (Clear checked, Put all back) pass a longer [duration] so
+/// the Undo stays reachable while the person looks up from the phone
+/// (persona finding F4).
 ///
 /// Latest-wins: [ScaffoldMessengerState.showSnackBar] normally QUEUES
 /// snackbars, so completing several chores (or quick-adding several
@@ -36,6 +41,7 @@ void showAppSnackbar(
   BuildContext context, {
   required String message,
   SnackBarAction? action,
+  Duration duration = const Duration(seconds: 4),
 }) {
   // Style (spec docs/specs/theme-v2.md §4.5): a leading check_circle glyph
   // in `inversePrimary` ahead of the message. Ground color, radius, and
@@ -54,15 +60,50 @@ void showAppSnackbar(
             Expanded(child: Text(message)),
           ],
         ),
-        // Matches SnackBar's own default — spelled out because it's a
-        // deliberate choice this helper documents, not an incidental one.
-        // ignore: avoid_redundant_argument_values
-        duration: const Duration(seconds: 4),
+        duration: duration,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         action: action,
         // See the doc comment above: without this, an action snackbar
         // never auto-dismisses.
+        persist: false,
+      ),
+    );
+}
+
+/// Shows an ERROR snackbar (persona review B7): the same latest-wins,
+/// floating, auto-dismissing presentation as [showAppSnackbar], but with an
+/// `error_outline` glyph in `colorScheme.error` instead of the success
+/// check, a longer 8 s duration (an error has to be read, not just
+/// noticed), and -- when the caller can offer one -- a localised "Retry"
+/// action that runs [onRetry].
+///
+/// `persist: false` for the same reason as in [showAppSnackbar]: the Retry
+/// action would otherwise make the bar sticky.
+void showAppErrorSnackbar(
+  BuildContext context, {
+  required String message,
+  VoidCallback? onRetry,
+}) {
+  final scheme = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context);
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: scheme.error, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        duration: const Duration(seconds: 8),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        action: onRetry == null
+            ? null
+            : SnackBarAction(label: l10n.commonRetry, onPressed: onRetry),
         persist: false,
       ),
     );

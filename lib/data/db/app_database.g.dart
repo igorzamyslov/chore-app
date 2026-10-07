@@ -1826,6 +1826,15 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<PlainDate?, String> pausedUntil =
+      GeneratedColumn<String>(
+        'paused_until',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<PlainDate?>($ChoresTable.$converterpausedUntil);
   static const VerificationMeta _reminderMinutesMeta = const VerificationMeta(
     'reminderMinutes',
   );
@@ -1896,6 +1905,7 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    pausedUntil,
     reminderMinutes,
     createdBy,
     createdAt,
@@ -2054,6 +2064,12 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
         DriftSqlType.string,
         data['${effectivePrefix}paused_at'],
       ),
+      pausedUntil: $ChoresTable.$converterpausedUntil.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}paused_until'],
+        ),
+      ),
       reminderMinutes: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}reminder_minutes'],
@@ -2088,6 +2104,8 @@ class $ChoresTable extends Chores with TableInfo<$ChoresTable, Chore> {
       const PlainDateConverter();
   static JsonTypeConverter2<AssignmentMode, String, String>
   $converterassignmentMode = const EnumNameConverter(AssignmentMode.values);
+  static TypeConverter<PlainDate?, String?> $converterpausedUntil =
+      const NullAwareTypeConverter.wrap(PlainDateConverter());
 }
 
 class Chore extends DataClass implements Insertable<Chore> {
@@ -2124,6 +2142,16 @@ class Chore extends DataClass implements Insertable<Chore> {
 
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   final String? pausedAt;
+
+  /// The local calendar day a paused chore resumes on by itself, or `NULL`
+  /// for "until I resume it" (and always `NULL` on an unpaused chore).
+  /// Plain date `yyyy-MM-dd`, not a timestamp: "until Monday" is a day in
+  /// the household's calendar. `ChoreService.catchUpOverdue` (bootstrap and
+  /// day change) unpauses every chore whose `pausedUntil <= today` (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` W3, persona review
+  /// C2). Household data, synced as `chores.paused_until`. Added in
+  /// schemaVersion 19.
+  final PlainDate? pausedUntil;
 
   /// The per-chore individual reminder's fire time, as minutes since local
   /// midnight, or `NULL` for "no individual reminder" (spec
@@ -2164,6 +2192,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     required this.startDate,
     required this.assignmentMode,
     this.pausedAt,
+    this.pausedUntil,
     this.reminderMinutes,
     this.createdBy,
     required this.createdAt,
@@ -2201,6 +2230,11 @@ class Chore extends DataClass implements Insertable<Chore> {
     if (!nullToAbsent || pausedAt != null) {
       map['paused_at'] = Variable<String>(pausedAt);
     }
+    if (!nullToAbsent || pausedUntil != null) {
+      map['paused_until'] = Variable<String>(
+        $ChoresTable.$converterpausedUntil.toSql(pausedUntil),
+      );
+    }
     if (!nullToAbsent || reminderMinutes != null) {
       map['reminder_minutes'] = Variable<int>(reminderMinutes);
     }
@@ -2235,6 +2269,9 @@ class Chore extends DataClass implements Insertable<Chore> {
       pausedAt: pausedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(pausedAt),
+      pausedUntil: pausedUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pausedUntil),
       reminderMinutes: reminderMinutes == null && nullToAbsent
           ? const Value.absent()
           : Value(reminderMinutes),
@@ -2267,6 +2304,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         serializer.fromJson<String>(json['assignmentMode']),
       ),
       pausedAt: serializer.fromJson<String?>(json['pausedAt']),
+      pausedUntil: serializer.fromJson<PlainDate?>(json['pausedUntil']),
       reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
       createdBy: serializer.fromJson<String?>(json['createdBy']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
@@ -2290,6 +2328,7 @@ class Chore extends DataClass implements Insertable<Chore> {
         $ChoresTable.$converterassignmentMode.toJson(assignmentMode),
       ),
       'pausedAt': serializer.toJson<String?>(pausedAt),
+      'pausedUntil': serializer.toJson<PlainDate?>(pausedUntil),
       'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
       'createdBy': serializer.toJson<String?>(createdBy),
       'createdAt': serializer.toJson<String>(createdAt),
@@ -2309,6 +2348,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     PlainDate? startDate,
     AssignmentMode? assignmentMode,
     Value<String?> pausedAt = const Value.absent(),
+    Value<PlainDate?> pausedUntil = const Value.absent(),
     Value<int?> reminderMinutes = const Value.absent(),
     Value<String?> createdBy = const Value.absent(),
     String? createdAt,
@@ -2325,6 +2365,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate: startDate ?? this.startDate,
     assignmentMode: assignmentMode ?? this.assignmentMode,
     pausedAt: pausedAt.present ? pausedAt.value : this.pausedAt,
+    pausedUntil: pausedUntil.present ? pausedUntil.value : this.pausedUntil,
     reminderMinutes: reminderMinutes.present
         ? reminderMinutes.value
         : this.reminderMinutes,
@@ -2353,6 +2394,9 @@ class Chore extends DataClass implements Insertable<Chore> {
           ? data.assignmentMode.value
           : this.assignmentMode,
       pausedAt: data.pausedAt.present ? data.pausedAt.value : this.pausedAt,
+      pausedUntil: data.pausedUntil.present
+          ? data.pausedUntil.value
+          : this.pausedUntil,
       reminderMinutes: data.reminderMinutes.present
           ? data.reminderMinutes.value
           : this.reminderMinutes,
@@ -2376,6 +2420,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('pausedUntil: $pausedUntil, ')
           ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
@@ -2397,6 +2442,7 @@ class Chore extends DataClass implements Insertable<Chore> {
     startDate,
     assignmentMode,
     pausedAt,
+    pausedUntil,
     reminderMinutes,
     createdBy,
     createdAt,
@@ -2417,6 +2463,7 @@ class Chore extends DataClass implements Insertable<Chore> {
           other.startDate == this.startDate &&
           other.assignmentMode == this.assignmentMode &&
           other.pausedAt == this.pausedAt &&
+          other.pausedUntil == this.pausedUntil &&
           other.reminderMinutes == this.reminderMinutes &&
           other.createdBy == this.createdBy &&
           other.createdAt == this.createdAt &&
@@ -2435,6 +2482,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
   final Value<PlainDate> startDate;
   final Value<AssignmentMode> assignmentMode;
   final Value<String?> pausedAt;
+  final Value<PlainDate?> pausedUntil;
   final Value<int?> reminderMinutes;
   final Value<String?> createdBy;
   final Value<String> createdAt;
@@ -2452,6 +2500,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     this.startDate = const Value.absent(),
     this.assignmentMode = const Value.absent(),
     this.pausedAt = const Value.absent(),
+    this.pausedUntil = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2470,6 +2519,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     required PlainDate startDate,
     required AssignmentMode assignmentMode,
     this.pausedAt = const Value.absent(),
+    this.pausedUntil = const Value.absent(),
     this.reminderMinutes = const Value.absent(),
     this.createdBy = const Value.absent(),
     required String createdAt,
@@ -2494,6 +2544,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Expression<String>? startDate,
     Expression<String>? assignmentMode,
     Expression<String>? pausedAt,
+    Expression<String>? pausedUntil,
     Expression<int>? reminderMinutes,
     Expression<String>? createdBy,
     Expression<String>? createdAt,
@@ -2512,6 +2563,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       if (startDate != null) 'start_date': startDate,
       if (assignmentMode != null) 'assignment_mode': assignmentMode,
       if (pausedAt != null) 'paused_at': pausedAt,
+      if (pausedUntil != null) 'paused_until': pausedUntil,
       if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'created_at': createdAt,
@@ -2532,6 +2584,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     Value<PlainDate>? startDate,
     Value<AssignmentMode>? assignmentMode,
     Value<String?>? pausedAt,
+    Value<PlainDate?>? pausedUntil,
     Value<int?>? reminderMinutes,
     Value<String?>? createdBy,
     Value<String>? createdAt,
@@ -2550,6 +2603,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
       startDate: startDate ?? this.startDate,
       assignmentMode: assignmentMode ?? this.assignmentMode,
       pausedAt: pausedAt ?? this.pausedAt,
+      pausedUntil: pausedUntil ?? this.pausedUntil,
       reminderMinutes: reminderMinutes ?? this.reminderMinutes,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
@@ -2598,6 +2652,11 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
     if (pausedAt.present) {
       map['paused_at'] = Variable<String>(pausedAt.value);
     }
+    if (pausedUntil.present) {
+      map['paused_until'] = Variable<String>(
+        $ChoresTable.$converterpausedUntil.toSql(pausedUntil.value),
+      );
+    }
     if (reminderMinutes.present) {
       map['reminder_minutes'] = Variable<int>(reminderMinutes.value);
     }
@@ -2632,6 +2691,7 @@ class ChoresCompanion extends UpdateCompanion<Chore> {
           ..write('startDate: $startDate, ')
           ..write('assignmentMode: $assignmentMode, ')
           ..write('pausedAt: $pausedAt, ')
+          ..write('pausedUntil: $pausedUntil, ')
           ..write('reminderMinutes: $reminderMinutes, ')
           ..write('createdBy: $createdBy, ')
           ..write('createdAt: $createdAt, ')
@@ -4580,6 +4640,32 @@ class $SettingsTable extends Settings
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _choreRemindersEnabledMeta =
+      const VerificationMeta('choreRemindersEnabled');
+  @override
+  late final GeneratedColumn<bool> choreRemindersEnabled =
+      GeneratedColumn<bool>(
+        'chore_reminders_enabled',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("chore_reminders_enabled" IN (0, 1))',
+        ),
+        defaultValue: const Constant(true),
+      );
+  static const VerificationMeta _syncLeftAtMeta = const VerificationMeta(
+    'syncLeftAt',
+  );
+  @override
+  late final GeneratedColumn<String> syncLeftAt = GeneratedColumn<String>(
+    'sync_left_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4623,6 +4709,8 @@ class $SettingsTable extends Settings
     eveningReminderEnabled,
     eveningReminderMinutes,
     errorReportsEnabled,
+    choreRemindersEnabled,
+    syncLeftAt,
     createdAt,
     updatedAt,
   ];
@@ -4799,6 +4887,24 @@ class $SettingsTable extends Settings
         ),
       );
     }
+    if (data.containsKey('chore_reminders_enabled')) {
+      context.handle(
+        _choreRemindersEnabledMeta,
+        choreRemindersEnabled.isAcceptableOrUnknown(
+          data['chore_reminders_enabled']!,
+          _choreRemindersEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sync_left_at')) {
+      context.handle(
+        _syncLeftAtMeta,
+        syncLeftAt.isAcceptableOrUnknown(
+          data['sync_left_at']!,
+          _syncLeftAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4900,6 +5006,14 @@ class $SettingsTable extends Settings
         DriftSqlType.bool,
         data['${effectivePrefix}error_reports_enabled'],
       )!,
+      choreRemindersEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}chore_reminders_enabled'],
+      )!,
+      syncLeftAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_left_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}created_at'],
@@ -5061,6 +5175,21 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
   /// `AppDatabase.migration`.
   final bool errorReportsEnabled;
 
+  /// Master switch for per-chore reminder notifications (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` §2, read by W4).
+  /// Default `true`, so upgrading to schemaVersion 18 changes the behaviour
+  /// of zero installs. Added in schemaVersion 18; see `AppDatabase.migration`.
+  final bool choreRemindersEnabled;
+
+  /// ISO-8601 UTC moment this device successfully LEFT the household's
+  /// online copy while other members stayed (spec
+  /// `docs/specs/household-lifecycle.md` §2.2, amendment 2026-10-06), or
+  /// `NULL`. While set, the Account section hides "Put my household online"
+  /// (the local copy is the leaver's own; re-sharing means a new household)
+  /// and shows a plain notice instead. Cleared by Reset app data. Added in
+  /// schemaVersion 18; see `AppDatabase.migration`.
+  final String? syncLeftAt;
+
   /// ISO-8601 UTC creation timestamp.
   final String createdAt;
 
@@ -5086,6 +5215,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     required this.eveningReminderEnabled,
     required this.eveningReminderMinutes,
     required this.errorReportsEnabled,
+    required this.choreRemindersEnabled,
+    this.syncLeftAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -5133,6 +5264,10 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     map['evening_reminder_enabled'] = Variable<bool>(eveningReminderEnabled);
     map['evening_reminder_minutes'] = Variable<int>(eveningReminderMinutes);
     map['error_reports_enabled'] = Variable<bool>(errorReportsEnabled);
+    map['chore_reminders_enabled'] = Variable<bool>(choreRemindersEnabled);
+    if (!nullToAbsent || syncLeftAt != null) {
+      map['sync_left_at'] = Variable<String>(syncLeftAt);
+    }
     map['created_at'] = Variable<String>(createdAt);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
@@ -5178,6 +5313,10 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       eveningReminderEnabled: Value(eveningReminderEnabled),
       eveningReminderMinutes: Value(eveningReminderMinutes),
       errorReportsEnabled: Value(errorReportsEnabled),
+      choreRemindersEnabled: Value(choreRemindersEnabled),
+      syncLeftAt: syncLeftAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncLeftAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -5218,6 +5357,10 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       errorReportsEnabled: serializer.fromJson<bool>(
         json['errorReportsEnabled'],
       ),
+      choreRemindersEnabled: serializer.fromJson<bool>(
+        json['choreRemindersEnabled'],
+      ),
+      syncLeftAt: serializer.fromJson<String?>(json['syncLeftAt']),
       createdAt: serializer.fromJson<String>(json['createdAt']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -5249,6 +5392,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       'eveningReminderEnabled': serializer.toJson<bool>(eveningReminderEnabled),
       'eveningReminderMinutes': serializer.toJson<int>(eveningReminderMinutes),
       'errorReportsEnabled': serializer.toJson<bool>(errorReportsEnabled),
+      'choreRemindersEnabled': serializer.toJson<bool>(choreRemindersEnabled),
+      'syncLeftAt': serializer.toJson<String?>(syncLeftAt),
       'createdAt': serializer.toJson<String>(createdAt),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -5274,6 +5419,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     bool? eveningReminderEnabled,
     int? eveningReminderMinutes,
     bool? errorReportsEnabled,
+    bool? choreRemindersEnabled,
+    Value<String?> syncLeftAt = const Value.absent(),
     String? createdAt,
     String? updatedAt,
   }) => DeviceSettings(
@@ -5310,6 +5457,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     eveningReminderMinutes:
         eveningReminderMinutes ?? this.eveningReminderMinutes,
     errorReportsEnabled: errorReportsEnabled ?? this.errorReportsEnabled,
+    choreRemindersEnabled: choreRemindersEnabled ?? this.choreRemindersEnabled,
+    syncLeftAt: syncLeftAt.present ? syncLeftAt.value : this.syncLeftAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -5366,6 +5515,12 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
       errorReportsEnabled: data.errorReportsEnabled.present
           ? data.errorReportsEnabled.value
           : this.errorReportsEnabled,
+      choreRemindersEnabled: data.choreRemindersEnabled.present
+          ? data.choreRemindersEnabled.value
+          : this.choreRemindersEnabled,
+      syncLeftAt: data.syncLeftAt.present
+          ? data.syncLeftAt.value
+          : this.syncLeftAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -5393,6 +5548,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
           ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
           ..write('errorReportsEnabled: $errorReportsEnabled, ')
+          ..write('choreRemindersEnabled: $choreRemindersEnabled, ')
+          ..write('syncLeftAt: $syncLeftAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -5420,6 +5577,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
     eveningReminderEnabled,
     eveningReminderMinutes,
     errorReportsEnabled,
+    choreRemindersEnabled,
+    syncLeftAt,
     createdAt,
     updatedAt,
   ]);
@@ -5447,6 +5606,8 @@ class DeviceSettings extends DataClass implements Insertable<DeviceSettings> {
           other.eveningReminderEnabled == this.eveningReminderEnabled &&
           other.eveningReminderMinutes == this.eveningReminderMinutes &&
           other.errorReportsEnabled == this.errorReportsEnabled &&
+          other.choreRemindersEnabled == this.choreRemindersEnabled &&
+          other.syncLeftAt == this.syncLeftAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -5471,6 +5632,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
   final Value<bool> eveningReminderEnabled;
   final Value<int> eveningReminderMinutes;
   final Value<bool> errorReportsEnabled;
+  final Value<bool> choreRemindersEnabled;
+  final Value<String?> syncLeftAt;
   final Value<String> createdAt;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -5494,6 +5657,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.eveningReminderEnabled = const Value.absent(),
     this.eveningReminderMinutes = const Value.absent(),
     this.errorReportsEnabled = const Value.absent(),
+    this.choreRemindersEnabled = const Value.absent(),
+    this.syncLeftAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5518,6 +5683,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     this.eveningReminderEnabled = const Value.absent(),
     this.eveningReminderMinutes = const Value.absent(),
     this.errorReportsEnabled = const Value.absent(),
+    this.choreRemindersEnabled = const Value.absent(),
+    this.syncLeftAt = const Value.absent(),
     required String createdAt,
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -5544,6 +5711,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Expression<bool>? eveningReminderEnabled,
     Expression<int>? eveningReminderMinutes,
     Expression<bool>? errorReportsEnabled,
+    Expression<bool>? choreRemindersEnabled,
+    Expression<String>? syncLeftAt,
     Expression<String>? createdAt,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -5573,6 +5742,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
         'evening_reminder_minutes': eveningReminderMinutes,
       if (errorReportsEnabled != null)
         'error_reports_enabled': errorReportsEnabled,
+      if (choreRemindersEnabled != null)
+        'chore_reminders_enabled': choreRemindersEnabled,
+      if (syncLeftAt != null) 'sync_left_at': syncLeftAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -5599,6 +5771,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     Value<bool>? eveningReminderEnabled,
     Value<int>? eveningReminderMinutes,
     Value<bool>? errorReportsEnabled,
+    Value<bool>? choreRemindersEnabled,
+    Value<String?>? syncLeftAt,
     Value<String>? createdAt,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -5627,6 +5801,9 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
       eveningReminderMinutes:
           eveningReminderMinutes ?? this.eveningReminderMinutes,
       errorReportsEnabled: errorReportsEnabled ?? this.errorReportsEnabled,
+      choreRemindersEnabled:
+          choreRemindersEnabled ?? this.choreRemindersEnabled,
+      syncLeftAt: syncLeftAt ?? this.syncLeftAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -5701,6 +5878,14 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
     if (errorReportsEnabled.present) {
       map['error_reports_enabled'] = Variable<bool>(errorReportsEnabled.value);
     }
+    if (choreRemindersEnabled.present) {
+      map['chore_reminders_enabled'] = Variable<bool>(
+        choreRemindersEnabled.value,
+      );
+    }
+    if (syncLeftAt.present) {
+      map['sync_left_at'] = Variable<String>(syncLeftAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<String>(createdAt.value);
     }
@@ -5735,6 +5920,8 @@ class SettingsCompanion extends UpdateCompanion<DeviceSettings> {
           ..write('eveningReminderEnabled: $eveningReminderEnabled, ')
           ..write('eveningReminderMinutes: $eveningReminderMinutes, ')
           ..write('errorReportsEnabled: $errorReportsEnabled, ')
+          ..write('choreRemindersEnabled: $choreRemindersEnabled, ')
+          ..write('syncLeftAt: $syncLeftAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -9598,6 +9785,7 @@ typedef $$ChoresTableCreateCompanionBuilder =
       required PlainDate startDate,
       required AssignmentMode assignmentMode,
       Value<String?> pausedAt,
+      Value<PlainDate?> pausedUntil,
       Value<int?> reminderMinutes,
       Value<String?> createdBy,
       required String createdAt,
@@ -9617,6 +9805,7 @@ typedef $$ChoresTableUpdateCompanionBuilder =
       Value<PlainDate> startDate,
       Value<AssignmentMode> assignmentMode,
       Value<String?> pausedAt,
+      Value<PlainDate?> pausedUntil,
       Value<int?> reminderMinutes,
       Value<String?> createdBy,
       Value<String> createdAt,
@@ -9769,6 +9958,12 @@ class $$ChoresTableFilterComposer
   ColumnFilters<String> get pausedAt => $composableBuilder(
     column: $table.pausedAt,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<PlainDate?, PlainDate, String>
+  get pausedUntil => $composableBuilder(
+    column: $table.pausedUntil,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<int> get reminderMinutes => $composableBuilder(
@@ -9960,6 +10155,11 @@ class $$ChoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pausedUntil => $composableBuilder(
+    column: $table.pausedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get reminderMinutes => $composableBuilder(
     column: $table.reminderMinutes,
     builder: (column) => ColumnOrderings(column),
@@ -10088,6 +10288,12 @@ class $$ChoresTableAnnotationComposer
 
   GeneratedColumn<String> get pausedAt =>
       $composableBuilder(column: $table.pausedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<PlainDate?, String> get pausedUntil =>
+      $composableBuilder(
+        column: $table.pausedUntil,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<int> get reminderMinutes => $composableBuilder(
     column: $table.reminderMinutes,
@@ -10267,6 +10473,7 @@ class $$ChoresTableTableManager
                 Value<PlainDate> startDate = const Value.absent(),
                 Value<AssignmentMode> assignmentMode = const Value.absent(),
                 Value<String?> pausedAt = const Value.absent(),
+                Value<PlainDate?> pausedUntil = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
@@ -10284,6 +10491,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                pausedUntil: pausedUntil,
                 reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,
@@ -10303,6 +10511,7 @@ class $$ChoresTableTableManager
                 required PlainDate startDate,
                 required AssignmentMode assignmentMode,
                 Value<String?> pausedAt = const Value.absent(),
+                Value<PlainDate?> pausedUntil = const Value.absent(),
                 Value<int?> reminderMinutes = const Value.absent(),
                 Value<String?> createdBy = const Value.absent(),
                 required String createdAt,
@@ -10320,6 +10529,7 @@ class $$ChoresTableTableManager
                 startDate: startDate,
                 assignmentMode: assignmentMode,
                 pausedAt: pausedAt,
+                pausedUntil: pausedUntil,
                 reminderMinutes: reminderMinutes,
                 createdBy: createdBy,
                 createdAt: createdAt,
@@ -12220,6 +12430,8 @@ typedef $$SettingsTableCreateCompanionBuilder =
       Value<bool> eveningReminderEnabled,
       Value<int> eveningReminderMinutes,
       Value<bool> errorReportsEnabled,
+      Value<bool> choreRemindersEnabled,
+      Value<String?> syncLeftAt,
       required String createdAt,
       required String updatedAt,
       Value<int> rowid,
@@ -12245,6 +12457,8 @@ typedef $$SettingsTableUpdateCompanionBuilder =
       Value<bool> eveningReminderEnabled,
       Value<int> eveningReminderMinutes,
       Value<bool> errorReportsEnabled,
+      Value<bool> choreRemindersEnabled,
+      Value<String?> syncLeftAt,
       Value<String> createdAt,
       Value<String> updatedAt,
       Value<int> rowid,
@@ -12351,6 +12565,16 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get errorReportsEnabled => $composableBuilder(
     column: $table.errorReportsEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get choreRemindersEnabled => $composableBuilder(
+    column: $table.choreRemindersEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncLeftAt => $composableBuilder(
+    column: $table.syncLeftAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12469,6 +12693,16 @@ class $$SettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get choreRemindersEnabled => $composableBuilder(
+    column: $table.choreRemindersEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncLeftAt => $composableBuilder(
+    column: $table.syncLeftAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12578,6 +12812,16 @@ class $$SettingsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get choreRemindersEnabled => $composableBuilder(
+    column: $table.choreRemindersEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get syncLeftAt => $composableBuilder(
+    column: $table.syncLeftAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -12636,6 +12880,8 @@ class $$SettingsTableTableManager
                 Value<bool> eveningReminderEnabled = const Value.absent(),
                 Value<int> eveningReminderMinutes = const Value.absent(),
                 Value<bool> errorReportsEnabled = const Value.absent(),
+                Value<bool> choreRemindersEnabled = const Value.absent(),
+                Value<String?> syncLeftAt = const Value.absent(),
                 Value<String> createdAt = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -12659,6 +12905,8 @@ class $$SettingsTableTableManager
                 eveningReminderEnabled: eveningReminderEnabled,
                 eveningReminderMinutes: eveningReminderMinutes,
                 errorReportsEnabled: errorReportsEnabled,
+                choreRemindersEnabled: choreRemindersEnabled,
+                syncLeftAt: syncLeftAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -12685,6 +12933,8 @@ class $$SettingsTableTableManager
                 Value<bool> eveningReminderEnabled = const Value.absent(),
                 Value<int> eveningReminderMinutes = const Value.absent(),
                 Value<bool> errorReportsEnabled = const Value.absent(),
+                Value<bool> choreRemindersEnabled = const Value.absent(),
+                Value<String?> syncLeftAt = const Value.absent(),
                 required String createdAt,
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -12708,6 +12958,8 @@ class $$SettingsTableTableManager
                 eveningReminderEnabled: eveningReminderEnabled,
                 eveningReminderMinutes: eveningReminderMinutes,
                 errorReportsEnabled: errorReportsEnabled,
+                choreRemindersEnabled: choreRemindersEnabled,
+                syncLeftAt: syncLeftAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

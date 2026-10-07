@@ -1,10 +1,13 @@
 /// The settings screen's 'About' section (spec `docs/next-session-plan.md`
-/// #5): app name/version, the licenses page entry, and a donate row that
-/// opens a sheet linking to the developer's Ko-fi/PayPal pages.
+/// #5): app name/version, the licenses page entry, links to the privacy
+/// notes and the source code, the sync server's host (persona review D11),
+/// and a donate row that opens a sheet linking to the developer's
+/// Ko-fi/PayPal pages.
 library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/features/settings/settings_group.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -88,6 +91,81 @@ class AboutLicensesTile extends ConsumerWidget {
           applicationName: l10n.appTitle,
           applicationVersion: version,
         ),
+      ),
+    );
+  }
+}
+
+/// The project's own public pages (persona review D11). Constants, not
+/// content -- the same reasoning as the donation links below.
+const _privacyUrl =
+    'https://github.com/igorzamyslov/chore-app/blob/main/PRIVACY.md';
+const _sourceUrl = 'https://github.com/igorzamyslov/chore-app';
+
+/// Row opening the privacy notes (`PRIVACY.md`) in the browser.
+class AboutPrivacyTile extends StatelessWidget {
+  /// Creates the privacy-notes row.
+  const AboutPrivacyTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return semantic(
+      'settings.about.privacy',
+      child: SettingsRow(
+        icon: Icons.privacy_tip_outlined,
+        label: AppLocalizations.of(context).settingsAboutPrivacy,
+        showChevron: true,
+        onTap: () => launchUrl(
+          Uri.parse(_privacyUrl),
+          mode: LaunchMode.externalApplication,
+        ),
+      ),
+    );
+  }
+}
+
+/// Row opening the source repository in the browser.
+class AboutSourceTile extends StatelessWidget {
+  /// Creates the source-code row.
+  const AboutSourceTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return semantic(
+      'settings.about.source',
+      child: SettingsRow(
+        icon: Icons.code,
+        label: AppLocalizations.of(context).settingsAboutSource,
+        showChevron: true,
+        onTap: () => launchUrl(
+          Uri.parse(_sourceUrl),
+          mode: LaunchMode.externalApplication,
+        ),
+      ),
+    );
+  }
+}
+
+/// Non-tappable row naming the sync server's host (persona review D11), so
+/// "the sync server" in the sign-in disclosure points somewhere concrete.
+/// The settings screen only mounts it when `supabaseConfigured`; [serverUrl]
+/// defaults to the configured URL and is a parameter only so a test can
+/// render it in a build without one.
+class AboutSyncServerTile extends StatelessWidget {
+  /// Creates the sync-server row.
+  const AboutSyncServerTile({this.serverUrl = supabaseUrl, super.key});
+
+  /// The configured Supabase URL; only its host is shown.
+  final String serverUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return semantic(
+      'settings.about.syncServer',
+      child: SettingsRow(
+        icon: Icons.dns_outlined,
+        label: AppLocalizations.of(context).settingsAboutSyncServer,
+        value: Uri.tryParse(serverUrl)?.host ?? serverUrl,
       ),
     );
   }

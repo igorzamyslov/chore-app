@@ -232,7 +232,7 @@ void main() {
       // one recompute now means digestHorizonSlots plugin calls, not one.
       await tester.pump(const Duration(milliseconds: 450));
       expect(plugin.scheduledCalls, hasLength(digestHorizonSlots));
-      expect(plugin.pending[digestNotificationIdBase]!.body, '1 chore today');
+      expect(plugin.pending[digestNotificationIdBase]!.title, '1 chore today');
 
       await _disposeAndClose(tester, container, database);
     },
@@ -298,7 +298,7 @@ void main() {
       hasLength(digestHorizonSlots),
       reason: 'the burst must collapse into a single reschedule call',
     );
-    expect(plugin.pending[digestNotificationIdBase]!.body, '2 chores today');
+    expect(plugin.pending[digestNotificationIdBase]!.title, '2 chores today');
 
     await _disposeAndClose(tester, container, database);
   });
@@ -448,7 +448,7 @@ void main() {
       // chores, so the trailing re-run used the LATEST counts.
       expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
-        plugin.pending.values.every((call) => call.body == '4 chores today'),
+        plugin.pending.values.every((call) => call.title == '4 chores today'),
         isTrue,
       );
 
@@ -578,7 +578,7 @@ void main() {
         reason: 'the digest must not go silent the day after it fires',
       );
       expect(
-        plugin.pending.values.every((call) => call.body == '1 chore today'),
+        plugin.pending.values.every((call) => call.title == '1 chore today'),
         isTrue,
       );
 
@@ -756,7 +756,7 @@ void main() {
           );
       await tester.pump(digestRescheduleDebounce);
 
-      expect(plugin.pending[digestNotificationIdBase]!.body, '1 chore today');
+      expect(plugin.pending[digestNotificationIdBase]!.title, '1 chore today');
       expect(
         plugin.pending.containsKey(digestNotificationIdBase + 3),
         isFalse,
@@ -789,7 +789,7 @@ void main() {
       // overwrite them with counts that were already out of date.
       expect(plugin.pending, hasLength(digestHorizonSlots));
       expect(
-        plugin.pending.values.every((call) => call.body == '2 chores today'),
+        plugin.pending.values.every((call) => call.title == '2 chores today'),
         isTrue,
         reason: 'no slot may be left over from the earlier, stale recompute',
       );
@@ -1044,7 +1044,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       final armed = plugin.pending[digestNotificationIdBase]!;
-      expect(armed.body, '1 Aufgabe heute');
+      expect(armed.title, '1 Aufgabe heute');
       expect(armed.channelName, 'Tägliche Zusammenfassung');
 
       await _disposeAndClose(tester, container, database);
@@ -1140,7 +1140,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       final slotZero = plugin.pending[digestNotificationIdBase]!;
-      expect(slotZero.body, '2 chores today');
+      expect(slotZero.title, '2 chores today');
       expect(slotZero.actionable, isFalse);
       expect(slotZero.payload, null);
 
@@ -1210,7 +1210,7 @@ void main() {
       await tester.pump(digestRescheduleDebounce);
 
       final slotZero = plugin.pending[digestNotificationIdBase]!;
-      expect(slotZero.body, '1 chore today');
+      expect(slotZero.title, '1 chore today');
       expect(slotZero.actionable, isTrue);
       expect(
         decodeDigestActionPayload(slotZero.payload)!.occurrenceId,
@@ -1224,7 +1224,7 @@ void main() {
       // so the slot counts two and cannot name one.
       final laterSlot =
           plugin.pending[digestNotificationIdBase + laterSlotIndex]!;
-      expect(laterSlot.body, '1 chore today · 1 overdue');
+      expect(laterSlot.title, '1 chore today · 1 overdue');
       expect(
         laterSlot.actionable,
         isFalse,

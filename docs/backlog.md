@@ -29,6 +29,47 @@ row's pending-timer premise was refuted against `flutter_test`'s source,
 Effort key: XS ≈ under an hour · S ≈ half a day · M ≈ 1–3 days ·
 L ≈ a week · XL ≈ multi-week.
 
+## Closed 2026-10-06 (persona review PR #61)
+
+*Shipped as v0.15.0+22; findings are the ids in
+`docs/feedback/2026-10-06-persona-review.md` §1 (plan:
+`docs/plans/2026-10-06-persona-review-fixes.md`). Everything in the matrix
+shipped except the "Opened" items below; rows that shipped only in part say so.*
+
+- **Sync integrity:** A1–A9, H9.
+- **Honesty, privacy, errors, server hygiene:** B1, B2, B3, B4, B5, B6, B7,
+  B8 (the disclosure and the inline switch; the viewer is opened below), B9,
+  H4, H5, H8.
+- **Chores for the organiser:** C1–C10; E4 as a disclosure line only (the
+  role model stays decision D1).
+- **Joining and members:** D1, D3–D13.
+- **Daily use for a member:** E1 (incl. an explicit "All members" now sticking
+  across restarts), E2, E3, E5 (incl. the overdue-only card), E6, E7, E8 (digest
+  names; reminder actions are opened below), E9, E10.
+- **Shopping:** A9, F1, F3, F4, F6, F7, F8 (text size; keep-screen-on opened
+  below), F9, F10, F11, F12, F13, F14.
+- **Accessibility:** G1 (tile and ring labels, settings headers, "Tab N of 3"),
+  G2 (bottom-bar text-scale clamp, two-line notes).
+- **Engineering hygiene:** H1 (`db.yml` scope now covers `sync_repository.dart`
+  and `tables.dart`), H2 (release tag must match `pubspec.yaml`), H3
+  (parametrised migration test for every version 1..18 to the current schema),
+  H6 (query half in W2, local retention: year-old synced shopping tombstones
+  are compacted at bootstrap), H7 (`watchActiveChores` is one joined query and
+  re-emits on assignee-only changes).
+
+### Opened 2026-10-06 (deferred from that review)
+
+| Item | Review id | Notes |
+| --- | --- | --- |
+| Reminder notification Done/Snooze actions (G-6 slice 7) | E8 | Needs a real phone to verify; stays G-6's remaining slice |
+| Sign-in: email OTP fallback (and the rest of D2: code before sign-in, expired-link handling, error wording) | D2 | Needs a dashboard email-template edit; the whole row stays open |
+| Bottom-anchored quick-add (or a setting) | F2 | Design call |
+| Keep-screen-on toggle on Shopping | F8 | Needs a new dependency (wakelock) |
+| In-app viewer for the pending error reports | B8 | The disclosure and switch shipped; a read-only list is the remainder |
+| Import of the JSON export | G-3 / F12 | Unchanged; still top of the restore story |
+| Several shopping lists | G-8 | Unchanged (XL); F9 collapse is the interim |
+| Role / permission model | E4 | Decision D1 stands; revisit only if older kids become a target |
+
 ## Decisions taken 2026-08-08 (Igor)
 
 - **D-B1 — Android backup: `allowBackup="false"`.** The app's answer to

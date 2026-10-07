@@ -230,7 +230,6 @@ void main() {
         'chore_assignees',
         'chore_occurrences',
         'shopping_items',
-        'settings',
       ]);
     });
 
@@ -373,23 +372,44 @@ void main() {
     });
 
     test(
-      'settings: booleans come back as the 0/1 SQLite actually stores, '
-      'shown-once flags are raw null',
+      'settings is NOT exported (persona review D12): it is device '
+      'configuration and carries sync ids and a pending invite code',
+      () async {
+        await (db.update(
+          db.settings,
+        )..where((tbl) => tbl.id.equals('device'))).write(
+          const SettingsCompanion(
+            syncHouseholdId: Value('server-household-id'),
+            pendingJoinCode: Value('PENDCODE'),
+          ),
+        );
+
+        final document = await buildExportDocument(
+          database: db,
+          clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
+        );
+        final tables = document['tables']! as Map<String, Object?>;
+
+        expect(tables.containsKey('settings'), isFalse);
+        final json = jsonEncode(document);
+        expect(json, isNot(contains('PENDCODE')));
+        expect(json, isNot(contains('pending_join_code')));
+      },
+    );
+
+    test(
+      'booleans come back as the 0/1 SQLite actually stores',
       () async {
         final document = await buildExportDocument(
           database: db,
           clock: Clock.fixed(DateTime.utc(2026, 7, 31)),
         );
         final tables = document['tables']! as Map<String, Object?>;
-        final settingsRows = (tables['settings']! as List<dynamic>)
+        final households = (tables['households']! as List<dynamic>)
             .cast<Map<String, dynamic>>();
 
-        expect(settingsRows, hasLength(1));
-        final settings = settingsRows.single;
-        expect(settings['digest_enabled'], 1);
-        expect(settings['digest_minutes'], 480);
-        expect(settings['onboarding_name_prompt_shown_at'], isNull);
-        expect(settings['digest_preprompt_shown_at'], isNull);
+        expect(households.single['sync_dirty'], isA<int>());
+        expect(households.single['sync_dirty'], anyOf(0, 1));
       },
     );
   });

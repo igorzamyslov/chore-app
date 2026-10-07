@@ -1,5 +1,8 @@
 /// `SyncEngine.refreshNow` (spec `docs/specs/sync-freshness.md` §2.3): a
-/// USER-INITIATED sync must report whether it actually worked.
+/// USER-INITIATED sync must report whether it actually worked -- and, since
+/// the 2026-10-06 amendment, HOW it failed (`RefreshOutcome`): `offline`
+/// for a failure that will heal on its own, `rejected` for a row the server
+/// refused with a 22/23/42-class error, which no retry will fix.
 ///
 /// Regression cover for a gap found by the 2026-08-07 persona walkthrough:
 /// pull-to-refresh was wired to `pushDirty()`, whose contract is to swallow
@@ -18,6 +21,7 @@ import 'package:chore_app/data/repositories/settings_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import 'fake_sync_transport.dart';
 
@@ -48,6 +52,25 @@ class _PushFailsTransport extends FakeSyncTransport {
   }) async => throw Exception('no connectivity');
 }
 
+/// A transport whose server REJECTS every `shopping_items` upsert with a
+/// foreign-key violation (class 23) — the error class a retry never fixes.
+class _RejectsShoppingTransport extends FakeSyncTransport {
+  @override
+  Future<void> upsertRows(
+    String table,
+    List<Map<String, Object?>> rows, {
+    String? onConflict,
+  }) async {
+    if (table == 'shopping_items') {
+      throw const PostgrestException(
+        message: 'insert or update violates foreign key constraint',
+        code: '23503',
+      );
+    }
+    return super.upsertRows(table, rows, onConflict: onConflict);
+  }
+}
+
 void main() {
   late AppDatabase db;
   late Household household;
@@ -68,22 +91,47 @@ void main() {
     householdId: household.id,
   );
 
-  test('refreshNow returns true when both halves succeed', () async {
-    expect(await engineWith(FakeSyncTransport()).refreshNow(), isTrue);
+  test('refreshNow reports ok when both halves succeed', () async {
+    expect(
+      await engineWith(FakeSyncTransport()).refreshNow(),
+      RefreshOutcome.ok,
+    );
   });
 
-  test('refreshNow returns FALSE when the pull half fails', () async {
-    expect(await engineWith(_OfflineTransport()).refreshNow(), isFalse);
+  test('refreshNow reports offline when the pull half fails', () async {
+    expect(
+      await engineWith(_OfflineTransport()).refreshNow(),
+      RefreshOutcome.offline,
+    );
   });
 
-  test('refreshNow returns FALSE when the push half fails', () async {
+  test('refreshNow reports offline when the push half fails', () async {
     // Seed a dirty row through the repository (a direct companion insert
     // does not go through the dirty-marking write path), so the push
     // actually has something to send and therefore something to fail on.
     await ShoppingRepository(db).addItem(household.id, name: 'Milk');
 
-    expect(await engineWith(_PushFailsTransport()).refreshNow(), isFalse);
+    expect(
+      await engineWith(_PushFailsTransport()).refreshNow(),
+      RefreshOutcome.offline,
+    );
   });
+
+  test(
+    'refreshNow reports rejected when the server refuses a row with a '
+    '22/23/42-class error (technical review 2026-10-06 #5) -- and that row '
+    'stays dirty for the user to see',
+    () async {
+      await ShoppingRepository(db).addItem(household.id, name: 'Milk');
+
+      expect(
+        await engineWith(_RejectsShoppingTransport()).refreshNow(),
+        RefreshOutcome.rejected,
+      );
+      final item = await db.select(db.shoppingItems).getSingle();
+      expect(item.syncDirty, isTrue);
+    },
+  );
 
   test(
     'pushDirty and pullSince still swallow failures (background contract, '
@@ -98,7 +146,7 @@ void main() {
     },
   );
 
-  test('NoopSyncEngine.refreshNow reports success', () async {
-    expect(await const NoopSyncEngine().refreshNow(), isTrue);
+  test('NoopSyncEngine.refreshNow reports ok', () async {
+    expect(await const NoopSyncEngine().refreshNow(), RefreshOutcome.ok);
   });
 }

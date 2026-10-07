@@ -149,6 +149,43 @@ authorization matrix.
   is UNIQUE per household, so an account may legitimately be in several),
   runs the §2.4 cascade for each, then deletes the `auth.users` row (D-L4).
 
+> **Amendment 2026-10-06 (persona review D8; migration
+> `20261006120000_join_funnel.sql`) — leaving really leaves.** The first
+> bullet above is superseded: `leave_household()` now unclaims AND
+> soft-deletes the caller's own member row (`deleted_at = now()`, stamped
+> before the orphan cascade, which is kept unchanged — the last claimed
+> member leaving still cascades the household, D-L5). A member who left
+> used to stay in every rotation with nobody told; now the family's devices
+> drop them from rotations at the next pull, while their history keeps the
+> name (soft-deleted members are still rendered in Chore history). **The
+> reclaim-via-invite path is gone**: joining again means "I'm new here" or
+> an unclaimed profile, like anyone else.
+>
+> Client side:
+> - `SyncRepository.applyPulledMember` detaches a member whose pulled row
+>   newly carries `deletedAt` (local row active and clean) via
+>   `ChoreRepository.detachMemberFromChores` — the assignment rewrite
+>   extracted unchanged from `MemberService.deleteMember` (rotation lists
+>   shrink, 1 left → fixed, 0 left → anyone; fixed → anyone; pending
+>   occurrences of that member unassigned; history untouched).
+> - **Rename-on-exit.** The Leave and Delete-account confirm sheets carry an
+>   optional field "Your name in the household's history"
+>   (`settings.account.leave.name` / `settings.account.deleteAccount.name`),
+>   prefilled with the caller's current profile name (only while linked). A
+>   changed, non-empty name is written BEFORE the exit RPC — on the server
+>   through `HouseholdGateway.renameMember` (a direct `members.name`
+>   update, since the exit unlinks this device before the engine could push
+>   a dirty row), then locally through `HouseholdRepository.renameMember`.
+>   `delete_account()` itself is unchanged: it keeps the profile and its
+>   name, which is exactly why the rename is offered there.
+> - **`settings.syncLeftAt`** (client schema v18) is stamped on a successful
+>   leave that was not the cascade case and did not wipe this phone. While
+>   set, the Account section hides "Put my household online" (re-adopting
+>   would collide with the copy still online for everyone else) and shows
+>   `settingsAccountLeftNotice` (`settings.account.leftNotice`) instead.
+>   Cleared by any later link (`SettingsRepository.setSyncLinked`) and by
+>   Reset app data.
+
 ### 2.3 remove_member can never orphan a household
 
 The caller is always a claimed member who stays behind, and self-removal
@@ -171,6 +208,30 @@ one, which by D-L3 keeps its data as a local-only household anyway.
 A scheduled sweep (pg_cron) is explicitly NOT specified: with the cascade
 inline in both orphaning paths, a sweep is a backstop for half-failed
 exits only. Revisit only with evidence of such failures.
+
+> **Amendment 2026-10-06 (persona review B2; migration
+> `20261006140000_privacy_and_grants.sql`) — the soft-deleted household is
+> purged after 30 days.** "Child rows are left alone" and "no sweep" are
+> superseded for the END of a household's life: hiding a household is not
+> deleting it, and PRIVACY.md could not honestly promise erasure while
+> every row of an orphaned household stayed on the server for ever. The
+> cascade above is unchanged (it still only stamps `households.deleted_at`;
+> everyone is locked out at once). A nightly pg_cron job
+> (`purge-orphaned-households`, `41 3 * * *`) now runs
+> `public.purge_orphaned_households()` — `SECURITY DEFINER`, pinned
+> `search_path`, executable by nobody but its owner — which hard-deletes,
+> for every household with `deleted_at < now() - interval '30 days'`, in FK
+> order: `chore_occurrences`, `chore_assignees`, `chores`, `shopping_items`,
+> `categories`, `household_invites`, `members`, then the `households` row.
+> The 30 days are a grace period for a half-failed or regretted exit, not a
+> restore feature: nothing in the app can undelete a household. This is the
+> one place the server hard-deletes household rows. The last-member confirm
+> copy (`householdLeaveConfirmBodyLastMember`,
+> `accountDeleteConfirmBodyLastMember`) says "hidden from everyone right
+> away and permanently deleted from the server after 30 days". pgTAP:
+> `supabase/tests/007_privacy_and_grants_test.sql` (31 days purged with its
+> children, 1 day untouched, not callable by `authenticated`, job
+> scheduled).
 
 ### 2.5 Existing RPCs need a new guard
 
@@ -313,6 +374,25 @@ Disconnect is unchanged and stays distinct: it is purely local, keeps
 (`lib/application/household_link_service.dart`). The copy must keep the
 two clearly apart.
 
+> **Amendment 2026-10-06 (persona review D9, B4, B5, B8, D13) — terms and
+> consequences.** The Leave row carries the subtitle "Removes you from the
+> household. Your chores and history stay with them." and Disconnect "Stops
+> syncing on this phone only — the household stays online for everyone
+> else." A "How accounts work" link under the sign-in intro
+> (`settings.account.howItWorks`; `welcome.join.howItWorks` on the welcome
+> join subpage) opens a sheet defining Account (your email login on the
+> sync server), Member (a person in the household, with or without an
+> account) and Household (the shared chores and list, on your phone and, once
+> online, on the server). Copy pointing at "Settings → Account" now says
+> "Settings → Household"; the paused notice and the revoked-refresh error
+> say "this phone". The sign-out confirm and the paused notice add that a
+> concurrent edit by someone else is replaced by your version when you sign
+> back in (last write wins, `sync-backend.md` §8). The reset confirm points
+> at Export first, uses an em dash, and its linked variant adds that the
+> account and email stay on the server until Delete my account. The sign-in
+> intro discloses that technical error reports are sent too and can be
+> switched off under About.
+
 ### 3.4 Last-member warning (D-L5)
 
 The Leave confirm needs the count of CLAIMED members to decide whether to
@@ -450,7 +530,8 @@ stale assertion totals in a comment (`54/54` → `69/69`).*
 ## 6. Non-goals
 
 - No role-based enforcement. D1 stands; `members.role` stays vestigial.
-- No pg_cron sweep (§2.4).
+- No pg_cron sweep (§2.4) — superseded 2026-10-06: a nightly 30-day purge
+  of soft-deleted households exists (§2.4 amendment).
 - No change to Disconnect's user-facing behaviour or to the P2d reconnect
   flow beyond §3.1's G-A cleanup.
 - No F12 restore-from-backup.

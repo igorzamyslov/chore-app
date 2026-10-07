@@ -12,6 +12,8 @@
 /// ([NoopAuthGateway]).
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
@@ -21,12 +23,14 @@ import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/application/household_join_service.dart';
 import 'package:chore_app/application/household_link_service.dart';
 import 'package:chore_app/features/settings/account_validation.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/destructive_confirm.dart';
 import 'package:chore_app/features/settings/exit_confirm_sheet.dart';
 import 'package:chore_app/features/settings/invite_flow.dart';
 import 'package:chore_app/features/settings/join_household_sheet.dart';
 import 'package:chore_app/features/settings/last_synced_line.dart';
 import 'package:chore_app/features/settings/membership_revoked_notice.dart';
+import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -88,12 +92,17 @@ class AccountSectionBody extends ConsumerWidget {
       // the signed-in account already has a membership elsewhere, the
       // reconnect row goes FIRST, above both.
       final membership = ref.watch(myMembershipProvider).valueOrNull;
+      // Persona review D8: after leaving, this phone's copy is the leaver's
+      // own. Putting it online again would collide with the household that
+      // is still online for everyone else, so the Adopt row gives way to a
+      // plain notice until something links this phone again (or Reset).
+      final leftAt = ref.watch(settingsProvider).valueOrNull?.syncLeftAt;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SignedInTile(user: user),
           if (membership != null) _ReconnectRow(membership: membership),
-          const _AdoptRow(),
+          if (leftAt == null) const _AdoptRow() else const _LeftNotice(),
           const _JoinRow(),
           // Last in the section, below everything else: the most
           // destructive row here. Present in this UNLINKED branch too --
@@ -118,6 +127,110 @@ class AccountSectionBody extends ConsumerWidget {
   }
 }
 
+/// Shown instead of [_AdoptRow] once this phone has left the household's
+/// online copy (`settings.syncLeftAt`, persona review D8): plain text, no
+/// action -- the old "Put my household online" row was a dead end here.
+class _LeftNotice extends StatelessWidget {
+  const _LeftNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: semantic(
+        'settings.account.leftNotice',
+        child: Text(
+          AppLocalizations.of(context).settingsAccountLeftNotice,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ),
+    );
+  }
+}
+
+/// The "How accounts work" text link under the sign-in intro (persona
+/// review D9): account, member and household were never defined anywhere,
+/// so the four exit rows read as synonyms. Opens [showHowAccountsWorkSheet].
+/// Shared with the welcome join subpage, which passes its own [semanticId].
+class HowAccountsWorkLink extends StatelessWidget {
+  /// Creates the link.
+  const HowAccountsWorkLink({required this.semanticId, super.key});
+
+  /// The link's semantic id (`settings.account.howItWorks` here,
+  /// `welcome.join.howItWorks` on the welcome join subpage).
+  final String semanticId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: semantic(
+        semanticId,
+        child: TextButton(
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          onPressed: () => showHowAccountsWorkSheet(context),
+          child: Text(AppLocalizations.of(context).settingsAccountHowItWorks),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the "How accounts work" sheet: three short definitions -- account,
+/// member, household -- in that order (persona review D9).
+Future<void> showHowAccountsWorkSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      final l10n = AppLocalizations.of(sheetContext);
+      final theme = Theme.of(sheetContext);
+      Widget paragraph(String title, String body) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(body, style: theme.textTheme.bodyMedium),
+          ],
+        ),
+      );
+      return semantic(
+        'settings.account.howItWorks.sheet',
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsAccountHowItWorks,
+                  style: theme.textTheme.titleLarge,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksAccountTitle,
+                  l10n.settingsAccountHowItWorksAccountBody,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksMemberTitle,
+                  l10n.settingsAccountHowItWorksMemberBody,
+                ),
+                paragraph(
+                  l10n.settingsAccountHowItWorksHouseholdTitle,
+                  l10n.settingsAccountHowItWorksHouseholdBody,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// The disabled placeholder row shown when Supabase isn't configured.
 class _ComingSoonTile extends StatelessWidget {
   const _ComingSoonTile();
@@ -139,8 +252,15 @@ class _ComingSoonTile extends StatelessWidget {
 
 /// The signed-in row: account email (plus, once linked, a subtitle naming
 /// the household -- spec §7.3 last paragraph -- and a relative "Last synced"
-/// line, spec `docs/specs/sync-freshness.md` §2.4), with a 'Sign out' action
-/// that opens a confirmation dialog first.
+/// line with a pending-changes count, spec `docs/specs/sync-freshness.md`
+/// §2.4), with a 'Sign out' action that opens a confirmation dialog first.
+///
+/// Once linked the whole tile is tappable and runs a user-initiated sync
+/// (§2.4 amendment 2026-10-06, semantic id `settings.account.syncNow`):
+/// this is the one place that SHOWS whether sync is alive, so it should
+/// also be a place to make it try -- a "3 changes waiting to send" line
+/// with no way to act on it would be the same dead end as a banner without
+/// recourse. The outcome snackbar is the shared `refreshAndReport`.
 class _SignedInTile extends ConsumerWidget {
   const _SignedInTile({required this.user, this.householdName});
 
@@ -156,31 +276,37 @@ class _SignedInTile extends ConsumerWidget {
     final householdName = this.householdName;
     return semantic(
       'settings.account.signedIn',
-      child: ListTile(
-        leading: const Icon(Icons.account_circle_outlined),
-        title: Text(user.email),
-        subtitle: householdName == null
-            ? null
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.settingsAccountLinkedSubtitle(householdName)),
-                  // §2.4's relative last-sync line, read from the
-                  // `syncLastPulledAt` cursor the engine persists on every
-                  // successful pull. Mounted only here, on the linked
-                  // branch, since the cursor is meaningless while unlinked;
-                  // it renders nothing until there is a cursor, and keeps
-                  // its own text fresh while the screen stays open
-                  // (backlog A-2b).
-                  const LastSyncedLine(),
-                ],
-              ),
-        trailing: semantic(
-          'settings.account.signOut',
-          child: TextButton(
-            onPressed: () => _confirmAndSignOut(context, ref),
-            child: Text(l10n.settingsAccountSignOut),
+      child: semantic(
+        'settings.account.syncNow',
+        child: ListTile(
+          onTap: householdName == null
+              ? null
+              : () => refreshAndReport(context, ref),
+          leading: const Icon(Icons.account_circle_outlined),
+          title: Text(user.email),
+          subtitle: householdName == null
+              ? null
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l10n.settingsAccountLinkedSubtitle(householdName)),
+                    // §2.4's relative last-sync line, read from the
+                    // `syncLastPulledAt` cursor the engine persists on every
+                    // successful pull. Mounted only here, on the linked
+                    // branch, since the cursor is meaningless while unlinked;
+                    // it renders nothing until there is a cursor, and keeps
+                    // its own text fresh while the screen stays open
+                    // (backlog A-2b).
+                    const LastSyncedLine(),
+                  ],
+                ),
+          trailing: semantic(
+            'settings.account.signOut',
+            child: TextButton(
+              onPressed: () => _confirmAndSignOut(context, ref),
+              child: Text(l10n.settingsAccountSignOut),
+            ),
           ),
         ),
       ),
@@ -225,9 +351,10 @@ class _SignedInTile extends ConsumerWidget {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSignOut', e, s);
       if (context.mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSignOutError,
+          onRetry: () => unawaited(_signOut(context, ref)),
         );
       }
     }
@@ -323,7 +450,8 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l10n.settingsAccountIntro),
-          const SizedBox(height: 12),
+          const HowAccountsWorkLink(semanticId: 'settings.account.howItWorks'),
+          const SizedBox(height: 4),
           semantic(
             'settings.account.email',
             child: TextField(
@@ -382,7 +510,7 @@ class _SignedOutFormState extends ConsumerState<_SignedOutForm> {
     } on Exception catch (e, s) {
       AppLog.error('ui.accountSendMagicLink', e, s);
       if (mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsAccountSendError,
         );
@@ -467,6 +595,7 @@ class _DisconnectRow extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.link_off),
         title: Text(l10n.settingsAccountDisconnect),
+        subtitle: Text(l10n.settingsAccountDisconnectSubtitle),
         onTap: () => _confirmAndDisconnect(context, ref),
       ),
     );
@@ -552,6 +681,7 @@ class _LeaveRow extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.logout),
         title: Text(l10n.settingsAccountLeave),
+        subtitle: Text(l10n.settingsAccountLeaveSubtitle),
         onTap: () => _leave(context, ref),
       ),
     );
@@ -565,6 +695,8 @@ class _LeaveRow extends ConsumerWidget {
     // not arrived yet), where over-warning about a cascade is much cheaper
     // than silently taking a household down.
     final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    // Rename-on-exit (persona review D8): the leaver's own profile, prefilled.
+    final me = ref.read(claimedMemberProvider);
     final result = await showExitConfirmSheet(
       context,
       title: l10n.householdLeaveConfirmTitle(householdName ?? ''),
@@ -573,16 +705,22 @@ class _LeaveRow extends ConsumerWidget {
           : l10n.householdLeaveConfirmBody,
       actionLabel: l10n.householdLeaveConfirmAction,
       semanticPrefix: 'settings.account.leave',
+      initialName: me?.name,
     );
     if (!result.confirmed) {
       return;
     }
+    final newName = result.newName;
     try {
       await ref
           .read(householdExitServiceProvider)
           .leaveHousehold(
             householdId: householdId,
             alsoDeleteLocalData: result.alsoDeleteLocalData,
+            rename: me == null || newName == null
+                ? null
+                : (memberId: me.id, name: newName),
+            lastClaimedMember: lastClaimed,
           );
     } on Object catch (e, s) {
       AppLog.error('ui.accountLeaveHousehold', e, s);
@@ -598,7 +736,7 @@ class _LeaveRow extends ConsumerWidget {
       // only way to throw after it is a dead local database, which is
       // already a broken-app state rather than a failed leave.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.householdLeaveError);
+        showAppErrorSnackbar(context, message: l10n.householdLeaveError);
       }
       return;
     }
@@ -690,6 +828,10 @@ class _DeleteAccountRow extends ConsumerWidget {
     // loaded, where over-warning is much cheaper than silently taking a
     // household down.
     final lastClaimed = ref.read(claimedMemberCountProvider) <= 1;
+    // Rename-on-exit (persona review D8): delete_account keeps the profile and
+    // its name, so this is the one chance to change it. Only while linked --
+    // unlinked, this phone knows no profile of this account to rename.
+    final me = ref.read(claimedMemberProvider);
     final result = await showExitConfirmSheet(
       context,
       title: l10n.accountDeleteConfirmTitle,
@@ -698,6 +840,7 @@ class _DeleteAccountRow extends ConsumerWidget {
           : l10n.accountDeleteConfirmBody,
       actionLabel: l10n.accountDeleteConfirmAction,
       semanticPrefix: 'settings.account.deleteAccount',
+      initialName: me?.name,
     );
     if (!result.confirmed || !context.mounted) {
       return;
@@ -734,10 +877,16 @@ class _DeleteAccountRow extends ConsumerWidget {
     if (!confirmed || !context.mounted) {
       return;
     }
+    final newName = result.newName;
     try {
       await ref
           .read(householdExitServiceProvider)
-          .deleteAccount(alsoDeleteLocalData: result.alsoDeleteLocalData);
+          .deleteAccount(
+            alsoDeleteLocalData: result.alsoDeleteLocalData,
+            rename: me == null || newName == null
+                ? null
+                : (memberId: me.id, name: newName),
+          );
     } on Object catch (e, s) {
       AppLog.error('ui.accountDeleteAccount', e, s);
       // `on Object`, not `on Exception`. Same reasoning as [_LeaveRow] and
@@ -753,7 +902,7 @@ class _DeleteAccountRow extends ConsumerWidget {
       // way to throw after it is a dead local database, which is already a
       // broken-app state rather than a failed deletion.
       if (context.mounted) {
-        showAppSnackbar(context, message: l10n.accountDeleteError);
+        showAppErrorSnackbar(context, message: l10n.accountDeleteError);
       }
       return;
     }
@@ -811,14 +960,11 @@ class _ReconnectRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }
@@ -861,9 +1007,17 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
   /// server member row). No schema change, no stored flag.
   bool _blocked = false;
 
+  /// The household's name for the confirm sheet title, kept resolved by
+  /// watching it here: nothing else on the unlinked branch watches
+  /// `currentHouseholdProvider`, so a one-off read at tap time could still
+  /// see it loading.
+  String _householdName = '';
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    _householdName =
+        ref.watch(currentHouseholdProvider).valueOrNull?.name ?? '';
     // Four states share one semantic id -- idle, running, failed-retryable,
     // and blocked -- because this is one row, not four. `_blocked` is
     // checked first: it is terminal, so it outranks the retryable error.
@@ -897,9 +1051,72 @@ class _AdoptRowState extends ConsumerState<_AdoptRow> {
               : null,
         ),
         enabled: !_running && !_blocked,
-        onTap: _running || _blocked ? null : _adopt,
+        onTap: _running || _blocked ? null : _confirmAndAdopt,
       ),
     );
+  }
+
+  /// Persona review B6: putting a household online uploads everything, so it
+  /// is never one tap. A confirm sheet says what goes up, where, and how to
+  /// take it down again; only "Put online" runs [_adopt]. A retry after a
+  /// failure skips it -- the user already agreed, and the service resumes a
+  /// half-finished upload.
+  Future<void> _confirmAndAdopt() async {
+    if (_failed) {
+      await _adopt();
+      return;
+    }
+    final householdName = _householdName;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final l10n = AppLocalizations.of(sheetContext);
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsAccountAdoptConfirmTitle(householdName),
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                Text(l10n.settingsAccountAdoptConfirmBody),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    semantic(
+                      'settings.account.adopt.cancel',
+                      child: TextButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(false),
+                        child: Text(l10n.commonCancel),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    semantic(
+                      'settings.account.adopt.confirm',
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(true),
+                        child: Text(l10n.settingsAccountAdoptConfirmAction),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if ((confirmed ?? false) && mounted) {
+      await _adopt();
+    }
   }
 
   Future<void> _adopt() async {
@@ -987,14 +1204,11 @@ class _JoinRow extends ConsumerWidget {
     if (archiveFileName == null) {
       return;
     }
-    ref.invalidate(bootstrapProvider);
+    ref
+      ..invalidate(bootstrapProvider)
+      ..invalidate(householdArchivesProvider);
     if (context.mounted) {
-      showAppSnackbar(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).settingsAccountJoinSuccessSnackbar(archiveFileName),
-      );
+      showArchiveSavedSnackbar(context, archiveFileName);
     }
   }
 }

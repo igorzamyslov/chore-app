@@ -23,7 +23,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await openSettingsTab(tester);
 
-      // Turn both features on so all eight rows exist simultaneously.
+      // Turn both features on so all nine rows exist simultaneously.
       final settings = SettingsRepository(database);
       await settings.setEveningReminderEnabled(enabled: true);
       await settings.setQuietHoursEnabled(enabled: true);
@@ -39,6 +39,7 @@ void main() {
         'settings.digest.time',
         'settings.evening.toggle',
         'settings.evening.time',
+        'settings.choreReminders.toggle',
         'settings.quietHours.toggle',
         'settings.quietHours.start',
         'settings.quietHours.end',
@@ -66,7 +67,7 @@ void main() {
       // plan originally asked for and which CANNOT PASS: "Daily summary" is
       // also `settingsDigestToggleTitle`, the digest toggle ROW's own
       // label, so it is on screen in every correct implementation. What §12
-      // actually forbids is a second GROUP, so assert that: all eight rows
+      // actually forbids is a second GROUP, so assert that: all nine rows
       // are inside the one `SettingsGroup` that holds the digest toggle.
       final group = find.ancestor(
         of: find.bySemanticsIdentifier('settings.digest.toggle'),

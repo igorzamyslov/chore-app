@@ -111,6 +111,7 @@ class DigestCounts {
     required this.dueCount,
     required this.overdueCount,
     this.soleOccurrenceId,
+    this.titles = const [],
   });
 
   /// Occurrences whose projected due date is exactly the queried date.
@@ -133,6 +134,15 @@ class DigestCounts {
   /// vanish in every two-person household.
   final String? soleOccurrenceId;
 
+  /// The titles of every counted occurrence: those due on the queried date
+  /// first, then the overdue ones, each group in the order the occurrences
+  /// were given (persona review 2026-10-06 E8). Decided HERE for the same
+  /// reason [soleOccurrenceId] is -- this is the one place that applies the
+  /// recipient scoping, Rule D and the projected-due-date comparison, so a
+  /// title can never appear in a notification whose count did not include
+  /// it.
+  final List<String> titles;
+
   /// Whether there is nothing at all to say — the spec's "silence is a
   /// feature" condition, evaluated per day.
   bool get isSilent => dueCount == 0 && overdueCount == 0;
@@ -142,15 +152,24 @@ class DigestCounts {
       other is DigestCounts &&
       other.dueCount == dueCount &&
       other.overdueCount == overdueCount &&
-      other.soleOccurrenceId == soleOccurrenceId;
+      other.soleOccurrenceId == soleOccurrenceId &&
+      other.titles.length == titles.length &&
+      [
+        for (var i = 0; i < titles.length; i++) other.titles[i] == titles[i],
+      ].every((same) => same);
 
   @override
-  int get hashCode => Object.hash(dueCount, overdueCount, soleOccurrenceId);
+  int get hashCode => Object.hash(
+    dueCount,
+    overdueCount,
+    soleOccurrenceId,
+    Object.hashAll(titles),
+  );
 
   @override
   String toString() =>
       'DigestCounts(dueCount: $dueCount, overdueCount: $overdueCount, '
-      'soleOccurrenceId: $soleOccurrenceId)';
+      'soleOccurrenceId: $soleOccurrenceId, titles: $titles)';
 }
 
 /// The due date [occurrence] would carry on [date], if the app is never
@@ -213,6 +232,8 @@ DigestCounts projectDigestCounts({
   var dueCount = 0;
   var overdueCount = 0;
   String? lastCountedId;
+  final dueTitles = <String>[];
+  final overdueTitles = <String>[];
   for (final occurrence in occurrences) {
     final assignee = occurrence.assignedMemberId;
     if (recipientMemberId != null &&
@@ -237,9 +258,11 @@ DigestCounts projectDigestCounts({
     if (projected == date) {
       dueCount++;
       lastCountedId = occurrence.id;
+      dueTitles.add(occurrence.choreTitle);
     } else if (projected.isBefore(date)) {
       overdueCount++;
       lastCountedId = occurrence.id;
+      overdueTitles.add(occurrence.choreTitle);
     }
   }
   // Remembering the last counted id and discarding it unless the total is
@@ -251,5 +274,6 @@ DigestCounts projectDigestCounts({
     dueCount: dueCount,
     overdueCount: overdueCount,
     soleOccurrenceId: dueCount + overdueCount == 1 ? lastCountedId : null,
+    titles: [...dueTitles, ...overdueTitles],
   );
 }

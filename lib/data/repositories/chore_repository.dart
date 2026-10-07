@@ -257,6 +257,80 @@ class ChoreRepository {
     });
   }
 
+  /// Removes [memberId] from every assignment in its household, in one
+  /// transaction (extracted from `MemberService.deleteMember`, plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` §2 / W5.6 -- the rules
+  /// moved here unchanged):
+  ///
+  /// - rotation chores containing [memberId] in their assignee order: it is
+  ///   removed from that order; 2 or more remaining stay rotation, exactly
+  ///   1 remaining converts to `fixed`, 0 remaining converts to `anyone`;
+  /// - fixed chores whose single assignee is [memberId] convert to `anyone`;
+  /// - every PENDING occurrence assigned to [memberId] (any chore, any
+  ///   mode) has its `assignedMemberId` cleared -- the step that actually
+  ///   frees the member's current turn, since the list rewrite above only
+  ///   changes future assignment.
+  ///
+  /// History is untouched: closed occurrences keep pointing at the member.
+  /// Does NOT touch the member row itself. A no-op for an unknown id.
+  ///
+  /// Callers: `MemberService.deleteMember` (local removal) and
+  /// `SyncRepository.applyPulledMember` (a pull that soft-deletes a member
+  /// someone else removed, or who left -- `leave_household` soft-deletes
+  /// the leaver since migration `20261006120000_join_funnel.sql`).
+  Future<void> detachMemberFromChores(String memberId) async {
+    await db.transaction(() async {
+      final member = await (db.select(
+        db.members,
+      )..where((tbl) => tbl.id.equals(memberId))).getSingleOrNull();
+      if (member == null) {
+        return;
+      }
+      final activeChores = await getActiveChores(member.householdId);
+      for (final details in activeChores) {
+        final assignees = details.assigneeMemberIds;
+        if (!assignees.contains(memberId)) {
+          continue;
+        }
+        switch (details.chore.assignmentMode) {
+          case AssignmentMode.rotation:
+            final remaining = [
+              for (final id in assignees)
+                if (id != memberId) id,
+            ];
+            if (remaining.length >= 2) {
+              await updateChore(
+                details.chore.id,
+                assigneeMemberIds: remaining,
+              );
+            } else if (remaining.length == 1) {
+              await updateChore(
+                details.chore.id,
+                assignmentMode: AssignmentMode.fixed,
+                assigneeMemberIds: remaining,
+              );
+            } else {
+              await updateChore(
+                details.chore.id,
+                assignmentMode: AssignmentMode.anyone,
+                assigneeMemberIds: const [],
+              );
+            }
+          case AssignmentMode.fixed:
+            await updateChore(
+              details.chore.id,
+              assignmentMode: AssignmentMode.anyone,
+              assigneeMemberIds: const [],
+            );
+          case AssignmentMode.anyone:
+          // Unreachable: `anyone` chores have no assignees, so `assignees
+          // .contains(memberId)` above is always false for this branch.
+        }
+      }
+      await unassignPendingOccurrencesForMember(memberId);
+    });
+  }
+
   /// Soft-deletes a chore and hard-deletes its pending occurrence, if any.
   ///
   /// History occurrences (done/skipped/missed) are kept.
@@ -274,12 +348,19 @@ class ChoreRepository {
     });
   }
 
-  /// Pauses or unpauses a chore.
-  Future<void> setPaused(String id, {required bool paused}) async {
+  /// Pauses or unpauses a chore. [until] is the day a paused chore resumes
+  /// on by itself (`NULL` = until resumed by hand); unpausing always clears
+  /// it (plan `docs/plans/2026-10-06-persona-review-fixes.md` W3).
+  Future<void> setPaused(
+    String id, {
+    required bool paused,
+    PlainDate? until,
+  }) async {
     final now = _isoNow();
     await (db.update(db.chores)..where((tbl) => tbl.id.equals(id))).write(
       ChoresCompanion(
         pausedAt: Value(paused ? now : null),
+        pausedUntil: Value(paused ? until : null),
         updatedAt: Value(now),
         syncDirty: syncDirtyOnWrite,
       ),
@@ -288,48 +369,55 @@ class ChoreRepository {
 
   /// Watches every active chore in [householdId], each joined with its
   /// ordered assignee ids and category.
+  ///
+  /// One joined query (chores, categories, chore_assignees) mapped in Dart
+  /// (technical review 2026-10-06 #15): no per-chore follow-up query, and
+  /// because `chore_assignees` is one of the joined tables the stream
+  /// re-emits when ONLY an assignee row changes (a pulled assignee-set
+  /// change), not just when the chore row's `updated_at` moves.
   Stream<List<ChoreWithDetails>> watchActiveChores(String householdId) {
-    final query =
-        db.select(db.chores).join([
-            leftOuterJoin(
-              db.categories,
-              db.categories.id.equalsExp(db.chores.categoryId),
-            ),
-          ])
-          ..where(
-            db.chores.householdId.equals(householdId) &
-                db.chores.deletedAt.isNull(),
-          )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
-
-    // `asyncMap` re-queries chore_assignees per emission rather than
-    // joining it directly, to avoid a row explosion from the one-to-many
-    // join. This only stays correct because `createChore`/`updateChore`
-    // always bump the chore row's `updated_at` whenever assignees change,
-    // which is what actually drives this stream's re-emission.
-    return query.watch().asyncMap(_choreDetailsFromRows);
+    return _activeChoresQuery(householdId).watch().map(_choreDetailsFromRows);
   }
 
   /// Fetches every active chore in [householdId], each joined with its
   /// ordered assignee ids and category — the one-shot `Future` equivalent
-  /// of [watchActiveChores]'s query (same `WHERE`/`ORDER BY`), with no
-  /// stream. Used by `ChoreService.catchUpOverdue`, which only ever needs a
+  /// of [watchActiveChores] (same query, same mapping), with no stream.
+  /// Used by `ChoreService.catchUpOverdue`, which only ever needs a
   /// single point-in-time read inside its transaction; reading it via
   /// `watchActiveChores(...).first` there was needlessly indirect.
   Future<List<ChoreWithDetails>> getActiveChores(String householdId) async {
-    final query =
-        db.select(db.chores).join([
-            leftOuterJoin(
-              db.categories,
-              db.categories.id.equalsExp(db.chores.categoryId),
-            ),
-          ])
-          ..where(
-            db.chores.householdId.equals(householdId) &
-                db.chores.deletedAt.isNull(),
-          )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
-    return _choreDetailsFromRows(await query.get());
+    return _choreDetailsFromRows(await _activeChoresQuery(householdId).get());
+  }
+
+  /// The query behind [watchActiveChores] and [getActiveChores]: active
+  /// chores left-joined to their category and their assignee rows. A chore
+  /// with N assignees yields N rows; [_choreDetailsFromRows] folds them
+  /// back. Ordered by title, then chore id (so equal titles never
+  /// interleave), then rotation `position`/`memberId` -- the same
+  /// deterministic assignee order [_currentAssigneeIds] uses.
+  JoinedSelectStatement<HasResultSet, dynamic> _activeChoresQuery(
+    String householdId,
+  ) {
+    return db.select(db.chores).join([
+        leftOuterJoin(
+          db.categories,
+          db.categories.id.equalsExp(db.chores.categoryId),
+        ),
+        leftOuterJoin(
+          db.choreAssignees,
+          db.choreAssignees.choreId.equalsExp(db.chores.id),
+        ),
+      ])
+      ..where(
+        db.chores.householdId.equals(householdId) &
+            db.chores.deletedAt.isNull(),
+      )
+      ..orderBy([
+        OrderingTerm(expression: db.chores.title),
+        OrderingTerm(expression: db.chores.id),
+        OrderingTerm(expression: db.choreAssignees.position),
+        OrderingTerm(expression: db.choreAssignees.memberId),
+      ]);
   }
 
   /// Fetches a single chore joined with its ordered assignee ids and
@@ -436,13 +524,49 @@ class ChoreRepository {
   }
 
   /// Returns the pending occurrence of [choreId], or `null` if none.
+  ///
+  /// Tolerant of the invariant being briefly broken (technical review
+  /// 2026-10-06 #6): if two pending rows exist -- a ghost a pull has not
+  /// repaired yet, a join-import copy -- this returns the one with the
+  /// latest `dueDate` (then the latest `updatedAt`) rather than throwing
+  /// `Too many elements` out of bootstrap's catch-up. The repair itself is
+  /// `SyncRepository.repairGhostOccurrences`, which
+  /// `ChoreService.catchUpOverdue` runs first; this is only the read side
+  /// staying up while that happens.
   Future<ChoreOccurrence?> pendingOccurrenceOf(String choreId) {
-    return (db.select(db.choreOccurrences)..where(
-          (tbl) =>
-              tbl.choreId.equals(choreId) &
-              tbl.status.equalsValue(OccurrenceStatus.pending),
-        ))
+    return (db.select(db.choreOccurrences)
+          ..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.status.equalsValue(OccurrenceStatus.pending),
+          )
+          ..orderBy([
+            (tbl) => OrderingTerm.desc(tbl.dueDate),
+            (tbl) => OrderingTerm.desc(tbl.updatedAt),
+          ])
+          ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// Sets [occurrenceId]'s `assignedMemberId` to [memberId] (null =
+  /// unassigned), marking the row dirty so the change syncs.
+  ///
+  /// Only ever applied to a PENDING occurrence by its callers
+  /// (`ChoreService.updateChore`'s holder re-resolution and
+  /// `ChoreService.reassignOccurrence`); history is never rewritten.
+  Future<void> setOccurrenceAssignee(
+    String occurrenceId,
+    String? memberId,
+  ) async {
+    await (db.update(
+      db.choreOccurrences,
+    )..where((tbl) => tbl.id.equals(occurrenceId))).write(
+      ChoreOccurrencesCompanion(
+        assignedMemberId: Value(memberId),
+        updatedAt: Value(_isoNow()),
+        syncDirty: syncDirtyOnWrite,
+      ),
+    );
   }
 
   /// Clears `assignedMemberId` on every PENDING occurrence currently
@@ -590,7 +714,7 @@ class ChoreRepository {
   /// Maps joined occurrence/chore/category/member rows to
   /// [OccurrenceWithChore].
   ///
-  /// Synchronous, unlike [_choreDetailsFromRows], because this needs no
+  /// Synchronous, like [_choreDetailsFromRows], because this needs no
   /// per-row follow-up query.
   List<OccurrenceWithChore> _occurrencesWithChoreFromRows(
     List<TypedResult> rows,
@@ -621,6 +745,47 @@ class ChoreRepository {
     String householdId,
     PlainDate date,
   ) {
+    return _watchClosed(
+      householdId,
+      where: db.choreOccurrences.closedOn.equalsValue(date),
+      orderBy: [OrderingTerm(expression: db.chores.title)],
+    );
+  }
+
+  /// Watches occurrences of active chores in [householdId] closed (done or
+  /// skipped — never missed) on or after [since], newest close day first,
+  /// then by chore title. The same display join as [watchClosedOnDate].
+  ///
+  /// Backs the chores list's "Done recently" section (persona review
+  /// 2026-10-06 E9): the caller passes today minus the look-back window, so
+  /// a mis-tap from yesterday is still on the screen the person looks at.
+  Stream<List<ClosedOccurrenceWithChore>> watchClosedSince(
+    String householdId,
+    PlainDate since,
+  ) {
+    return _watchClosed(
+      householdId,
+      where: db.choreOccurrences.closedOn.isBiggerOrEqualValue(
+        since.toIso8601(),
+      ),
+      orderBy: [
+        OrderingTerm(
+          expression: db.choreOccurrences.closedOn,
+          mode: OrderingMode.desc,
+        ),
+        OrderingTerm(expression: db.chores.title),
+      ],
+    );
+  }
+
+  /// The shared query behind [watchClosedOnDate] and [watchClosedSince]:
+  /// done/skipped occurrences of [householdId]'s active chores matching
+  /// [where] (a condition on `closedOn`), in [orderBy] order.
+  Stream<List<ClosedOccurrenceWithChore>> _watchClosed(
+    String householdId, {
+    required Expression<bool> where,
+    required List<OrderingTerm> orderBy,
+  }) {
     final completedByMember = db.members.createAlias('completed_by_member');
     final query =
         db.select(db.choreOccurrences).join([
@@ -644,7 +809,7 @@ class ChoreRepository {
           ..where(
             db.chores.householdId.equals(householdId) &
                 db.chores.deletedAt.isNull() &
-                db.choreOccurrences.closedOn.equalsValue(date) &
+                where &
                 (db.choreOccurrences.status.equalsValue(
                       OccurrenceStatus.done,
                     ) |
@@ -652,7 +817,7 @@ class ChoreRepository {
                       OccurrenceStatus.skipped,
                     )),
           )
-          ..orderBy([OrderingTerm(expression: db.chores.title)]);
+          ..orderBy(orderBy);
 
     return query.watch().map((rows) {
       return [
@@ -668,26 +833,42 @@ class ChoreRepository {
     });
   }
 
-  /// Maps joined chore/category rows (from [watchActiveChores] or
-  /// [getActiveChores]) to [ChoreWithDetails], resolving each chore's
-  /// ordered assignee ids along the way. Shared so the two query methods
-  /// can't drift apart on how a row becomes a [ChoreWithDetails].
-  Future<List<ChoreWithDetails>> _choreDetailsFromRows(
-    List<TypedResult> rows,
-  ) async {
+  /// Folds [_activeChoresQuery] rows (one per chore-assignee pair) into one
+  /// [ChoreWithDetails] per chore, keeping the query's order. Shared by
+  /// [watchActiveChores] and [getActiveChores] so the two can't drift apart
+  /// on how a row becomes a [ChoreWithDetails].
+  List<ChoreWithDetails> _choreDetailsFromRows(List<TypedResult> rows) {
     final result = <ChoreWithDetails>[];
+    Chore? current;
+    Category? currentCategory;
+    var assigneeIds = <String>[];
+    void flush() {
+      final chore = current;
+      if (chore != null) {
+        result.add(
+          ChoreWithDetails(
+            chore: chore,
+            assigneeMemberIds: assigneeIds,
+            category: currentCategory,
+          ),
+        );
+      }
+    }
+
     for (final row in rows) {
       final chore = row.readTable(db.chores);
-      final category = row.readTableOrNull(db.categories);
-      final assigneeIds = await _currentAssigneeIds(chore.id);
-      result.add(
-        ChoreWithDetails(
-          chore: chore,
-          assigneeMemberIds: assigneeIds,
-          category: category,
-        ),
-      );
+      if (current?.id != chore.id) {
+        flush();
+        current = chore;
+        currentCategory = row.readTableOrNull(db.categories);
+        assigneeIds = <String>[];
+      }
+      final assignee = row.readTableOrNull(db.choreAssignees);
+      if (assignee != null) {
+        assigneeIds.add(assignee.memberId);
+      }
     }
+    flush();
     return result;
   }
 
@@ -709,11 +890,19 @@ class ChoreRepository {
     }
   }
 
+  /// The chore's assignee ids in rotation order. `memberId` breaks a
+  /// `position` tie so the order is deterministic on every device even if
+  /// two rows ever share a position (technical review 2026-10-06 #8 --
+  /// the pull now applies the list as one value, so this is defence in
+  /// depth, not the fix).
   Future<List<String>> _currentAssigneeIds(String choreId) async {
     final rows =
         await (db.select(db.choreAssignees)
               ..where((tbl) => tbl.choreId.equals(choreId))
-              ..orderBy([(tbl) => OrderingTerm(expression: tbl.position)]))
+              ..orderBy([
+                (tbl) => OrderingTerm(expression: tbl.position),
+                (tbl) => OrderingTerm(expression: tbl.memberId),
+              ]))
             .get();
     return [for (final row in rows) row.memberId];
   }

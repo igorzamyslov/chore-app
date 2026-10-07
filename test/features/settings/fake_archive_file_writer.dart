@@ -33,4 +33,18 @@ class FakeArchiveFileWriter extends ArchiveFileWriter {
     }
     writtenFiles[path] = contents;
   }
+
+  @override
+  Future<String> directoryPath() async => '/fake-docs';
+
+  @override
+  Future<List<String>> list() async => [
+    for (final path in writtenFiles.keys)
+      if (path.startsWith('/fake-docs/famdo-archive-')) path,
+  ];
+
+  @override
+  Future<void> delete(String path) async {
+    writtenFiles.remove(path);
+  }
 }

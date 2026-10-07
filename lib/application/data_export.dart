@@ -30,6 +30,13 @@ const int dataExportFormat = 1;
 /// which is worse than losing it. Its absence costs the user nothing they
 /// would notice. See "Closed product decisions" in
 /// `docs/plans/2026-08-30-n2-foundation.md` before adding it.
+///
+/// `settings` is excluded too (persona review D12, 2026-10-06): it is this
+/// DEVICE's configuration, not household data, and it carried sync
+/// identifiers (`sync_household_id`, the pull cursor) and a half-typed
+/// invite code (`pending_join_code`) into a file people share. The Export
+/// row's sub-line promises "members, chores, history and shopping list" --
+/// this list is what keeps that promise.
 const List<String> exportedTableNames = [
   'households',
   'members',
@@ -38,7 +45,6 @@ const List<String> exportedTableNames = [
   'chore_assignees',
   'chore_occurrences',
   'shopping_items',
-  'settings',
 ];
 
 /// Builds the full backup document (spec `docs/specs/polish-round-1.md` B1):

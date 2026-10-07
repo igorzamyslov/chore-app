@@ -19,7 +19,13 @@ void main() {
   // locale override, so the template ARB's text is what renders, and a
   // test reading the same `AppLocalizations` getter the widget reads would
   // pass no matter what that getter returned.
-  const ruleDHint = "This chore won't be counted in the daily summary";
+  const ruleDHint =
+      'Rings on their phone at this time. '
+      "That day's daily summary leaves this chore out.";
+  // Persona review 2026-10-06 B9: the reminder is a property of the shared
+  // chore and rings for whoever it is assigned to, not for the person
+  // editing the form.
+  const toggleLabel = "Remind whoever it's assigned to";
 
   Future<void> pumpRow(
     WidgetTester tester, {
@@ -58,6 +64,7 @@ void main() {
       findsOneWidget,
     );
     expect(toggleOf(tester).value, isFalse);
+    expect(find.text(toggleLabel), findsOneWidget);
     expect(
       find.bySemanticsIdentifier('chore_form.reminder.time'),
       findsNothing,

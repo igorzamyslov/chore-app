@@ -78,11 +78,12 @@ select is(
   null,
   'leaving unclaims the member row');
 
-select is(
+select isnt(
   (select deleted_at from members
    where id = '20000000-0000-0000-0000-0000000000e1'),
   null,
-  'leaving does NOT soft-delete the profile (§2.2: it stays claimable)');
+  'leaving soft-deletes the profile (§2.2 amendment 2026-10-06, migration '
+  '20261006120000_join_funnel.sql)');
 
 select is(
   (select deleted_at from households
@@ -422,7 +423,8 @@ select is(
 
 -- C. After the cascade, the departed account sees no household row either.
 -- Fran left Haus E last, so E cascaded (asserted above). Her members row
--- survives, unclaimed and NOT soft-deleted (leaving keeps it claimable), so
+-- survives, unclaimed and soft-deleted (leave_household stamps deleted_at
+-- since 20261006120000_join_funnel.sql), so
 -- `is_household_member(E)` is false for her and households_select filters
 -- the row out. Asserted as count(*), never as a column against null: a
 -- scalar subquery over no rows yields NULL and pgTAP's is() treats NULL as

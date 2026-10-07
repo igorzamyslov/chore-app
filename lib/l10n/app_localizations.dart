@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'{dueCount, plural, one{1 chore today} other{{dueCount} chores today}} · {overdueCount, plural, one{1 overdue} other{{overdueCount} overdue}}'**
   String notificationDigestBoth(int dueCount, int overdueCount);
 
+  /// Suffix appended to the daily-summary notification body after the first three chore titles when more chores than that are waiting (persona review 2026-10-06 E8): 'Dishes, Bins, Laundry and 2 more'. The leading space is part of the string: it is concatenated directly after the last title.
+  ///
+  /// In en, this message translates to:
+  /// **' and {count} more'**
+  String digestMoreCount(int count);
+
   /// Label of the digest notification's action button, which marks the single chore that notification is about as done without opening the app (spec docs/specs/notifications.md N2, backlog F-1). Attached only when the notification is about exactly one occurrence, so the label always names something unambiguous. Keep it as short as a notification action button allows.
   ///
   /// In en, this message translates to:
@@ -212,11 +218,17 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get commonSave;
 
-  /// Generic 'retry' action shown under a load-error message, on both the chores and shopping list screens.
+  /// Generic 'retry' action shown under a load-error message on the chores and shopping list screens, and as the action on every error snackbar that can be retried (showAppErrorSnackbar).
   ///
   /// In en, this message translates to:
   /// **'Retry'**
   String get commonRetry;
+
+  /// Generic 'share' action that opens the OS share sheet: the snackbar action after a join that saved the old household, and the per-copy button on the saved-copies screen. Ends in an ellipsis because it opens another surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get commonShare;
 
   /// The chores bottom-navigation tab label, and the chores list screen's app bar title.
   ///
@@ -254,6 +266,24 @@ abstract class AppLocalizations {
   /// **'Mark done for…'**
   String get choresMenuMarkDoneFor;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C2, Maria: 'Anna's ill, I just want Ben to take her turn'): hand just this open turn to another member without completing, skipping or editing the chore. Shown when the household has more than one member. 'Turn' because only the current one moves; the chore's assignment stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassign this turn…'**
+  String get choresMenuReassign;
+
+  /// Title of the member picker opened by 'Reassign this turn…' (persona review C2). The member the turn is with now is not listed.
+  ///
+  /// In en, this message translates to:
+  /// **'Who takes this turn?'**
+  String get choresReassignTitle;
+
+  /// Snackbar after handing an open turn to another member (persona review C2); its Undo hands the turn back to whoever had it before.
+  ///
+  /// In en, this message translates to:
+  /// **'Reassigned to {name}'**
+  String choresReassignedSnackbar(String name);
+
   /// Title of the member picker opened by the 'Mark done for…' action-sheet row (A-5). Asks who to CREDIT for this one occurrence; it never changes who the device's user is.
   ///
   /// In en, this message translates to:
@@ -272,11 +302,23 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get choresMenuEdit;
 
+  /// Chore occurrence action-sheet entry (persona review 2026-10-06 C9, Maria: 'I'm typing six chores from scratch'): opens the new-chore form prefilled with every field of this chore, title included; saving creates a second chore.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get choresMenuDuplicate;
+
   /// Chore occurrence action-sheet entry: pause the chore.
   ///
   /// In en, this message translates to:
   /// **'Pause'**
   String get choresMenuPause;
+
+  /// Second paragraph of the chore delete dialog, shown only when the household has more than one member (persona review 2026-10-06 E4; Leon: 'If I delete the bins chore, does anyone even know?'). Any member can delete any chore by design (no roles, decision D1); this line discloses that the deletion is shared, not private.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone in the household will see this.'**
+  String get choresDeleteDialogShared;
 
   /// Title of the chore delete-confirmation dialog.
   ///
@@ -374,6 +416,18 @@ abstract class AppLocalizations {
   /// **'All members'**
   String get choresFilterMemberAll;
 
+  /// Member-filter menu entry for the member this device acts as (the claimed member when signed in, else the app-bar member), shown only in a household of more than one so the person holding the phone can find their own name. Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (you)'**
+  String choresFilterYou(String name);
+
+  /// Chip on a chore tile with no assignee, in the place where the assignee's avatar and name would be. The member filter keeps these tiles (anyone may do them, and the daily summary counts them for every member). Persona review 2026-10-06 E1.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone'**
+  String get choresAssigneeAnyone;
+
   /// Tooltip for the chores list's category-filter button.
   ///
   /// In en, this message translates to:
@@ -404,6 +458,12 @@ abstract class AppLocalizations {
   /// **'Who\'s doing chores right now?'**
   String get actingMemberSheetTitle;
 
+  /// Second line under the acting-member switcher's title (persona review 2026-10-06 C5, Maria P2-F): switching the avatar also changes whose chores the daily summary and reminders cover on this device, which the title alone never said.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit and your daily summary follow this person.'**
+  String get choresActingMemberHint;
+
   /// Tooltip/accessibility label on the chores app-bar avatar once the household is linked and signed in (A-5, docs/feedback/2026-08-07-field-feedback.md B1). The avatar is NOT a switcher in this state: it only states which member this device is.
   ///
   /// In en, this message translates to:
@@ -416,10 +476,10 @@ abstract class AppLocalizations {
   /// **'Manage members'**
   String get actingManageMembers;
 
-  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done').
+  /// Chores list empty-state message, shown when there are chores in the household but none currently pending ('all done'). Plain statement, no praise: a teenager read the old 'nice work' as patronising (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'No chores pending — nice work!'**
+  /// **'Nothing left for today.'**
   String get choresEmptyState;
 
   /// Chores list empty-state titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 6), shown above choresEmptyState when the household has chores but none are currently pending.
@@ -470,11 +530,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
   String choresProgressRemainingToday(int count);
 
-  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today has been completed.
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
-  /// **'That\'s everything — nice work'**
+  /// **'That\'s everything for today.'**
   String get choresProgressAllDoneToday;
+
+  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} to catch up'**
+  String choresProgressCatchUp(int count);
 
   /// Day-progress card's extra bodySmall line (spec docs/specs/theme-v2.md §4.1 item 1, changed 2026-08-07 per triage T1.1/D3), shown only while a member/category filter is active on the chores list: makes explicit that the card's N-of-M counts are the filtered subset, not the whole household's day, so a narrowed '1 of 2' is never mistaken for everyone's progress.
   ///
@@ -518,16 +584,22 @@ abstract class AppLocalizations {
   /// **'Something went wrong setting up your household. Please try again.'**
   String get welcomeCreateError;
 
+  /// Name a household gets when created from the welcome screen (persona review D10: it used to be the English literal 'My household' in every language). Renamable any time under Settings → Household name.
+  ///
+  /// In en, this message translates to:
+  /// **'My household'**
+  String get householdDefaultName;
+
   /// Title of the welcome screen's secondary card (id welcome.join), and the app bar title of the welcome-join subpage it opens. Hidden entirely when Supabase isn't configured (offline/F-Droid builds, tests).
   ///
   /// In en, this message translates to:
   /// **'Join my family\'s household'**
   String get welcomeJoinTitle;
 
-  /// Subtitle of the welcome screen's secondary join card.
+  /// Subtitle of the welcome screen's join card (id welcome.join). Speaks to the person already holding a code (persona review 2026-10-06 D1, Leon A1): the old 'from a family member's device' wording read as a step for someone else, so joiners set up a solo household instead.
   ///
   /// In en, this message translates to:
-  /// **'Sign in and use an invite code from a family member\'s device.'**
+  /// **'Got an invite code? Sign in and enter it here.'**
   String get welcomeJoinSubtitle;
 
   /// Subtitle under the welcome-join subpage's reconnect offer (id welcome.join.reconnect, spec docs/specs/onboarding-v2.md §1/sync-backend.md §7.6), shown when findMyMembership finds the signed-in account already has a membership -- unlike the Settings Account section's equivalent copy (settingsAccountReconnectIntro), this never mentions replacing local data: nothing local exists yet on the welcome path.
@@ -578,11 +650,11 @@ abstract class AppLocalizations {
   /// **'Not now'**
   String get digestPrepromptDismissAction;
 
-  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Deliberately avoids the words 'missed' and 'failed': silent 'missed' rows reading as an accusation is the finding this banner answers, so restating that word here would only move the accusation into the banner. It also avoids claiming the user was away, since catch-up runs on a local day change with the app open too; the closing clause names the actual reassurance, which is that the app keeps at most one overdue occurrence per chore rather than a growing pile. {count} is the number of chores this happened to.
+  /// Catch-up banner copy at the top of the chores list (backlog B-1 / triage T2.1), shown after ChoreService.catchUpOverdue closed at least one stale overdue occurrence as missed and reinserted a fresh one at the most recent slot. Reworded 2026-10-06 (persona review E2) from the mechanism ('moved forward' reads as earlier OR later) to the outcome the reader cares about: the repeating chores now sit on their latest due date and nothing extra counts against them. Still avoids 'missed' as an accusation and any claim the user was away, since catch-up also runs on a local day change with the app open. No count: the sentence reads the same for one chore or many, and the banner covers fewer chores than a count would imply.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{We moved 1 overdue chore forward to its most recent due date, so nothing piled up.} other{We moved {count} overdue chores forward to their most recent due dates, so nothing piled up.}}'**
-  String catchUpBannerMessage(int count);
+  /// **'Your repeating chores jumped ahead to their latest due date — you didn\'t miss anything extra.'**
+  String get catchUpBannerMessage;
 
   /// Tooltip for the catch-up banner's X dismiss button, which resets the count so the banner hides until a genuinely new catch-up run reports one.
   ///
@@ -602,11 +674,17 @@ abstract class AppLocalizations {
   /// **'Done — next due {dueText}'**
   String choresSnackbarDoneNextDue(String dueText);
 
-  /// Undo snackbar shown after completing an occurrence via 'Mark done for…' (A-5): names the member who got the credit, since this is the one path where that isn't the person holding the phone. The UNDO action reopens the occurrence, exactly as on the normal completion path.
+  /// Undo snackbar after completing a one-off occurrence in a household of more than one member, or via 'Mark done for…' (persona review 2026-10-06 C5, replacing choresSnackbarDoneBy): names who got the credit, because the app-bar avatar can be switched and a bare 'Done' hid whose name it went under. The UNDO action reopens the occurrence.
   ///
   /// In en, this message translates to:
   /// **'Done — credited to {name}'**
-  String choresSnackbarDoneBy(String name);
+  String choresDoneCredited(String name);
+
+  /// Undo snackbar after completing a RECURRING occurrence in a household of more than one member, or via 'Mark done for…' (persona review C5): who got the credit, then when the chore is next due. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Jul 31'). Keeps the leading 'Done' so 'Done'-substring checks still match.
+  ///
+  /// In en, this message translates to:
+  /// **'Done — credited to {name}, next due {date}'**
+  String choresDoneCreditedNextDue(String name, String date);
 
   /// Undo snackbar message after skipping a one-off occurrence (no next occurrence is created).
   ///
@@ -638,11 +716,23 @@ abstract class AppLocalizations {
   /// **'This device doesn\'t know who you are yet. Sign in again or reopen the app.'**
   String get choresSnackbarNoActingMember;
 
-  /// Header of the collapsed-by-default 'Done today' section, showing how many occurrences were closed (done or skipped) today.
+  /// Header of the chores list's collapsed Done section (replaces 'Done today ({count})', persona review 2026-10-06 E9): occurrences closed (done or skipped) in the last three days, so a mis-tap from last night can still be found. {count} is how many rows it holds.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{Done today (1)} other{Done today ({count})}}'**
-  String choresDoneHeader(int count);
+  /// **'Done recently ({count})'**
+  String choresDoneRecently(int count);
+
+  /// Day label on a Done-section row closed today. The section spans several days, so each row names its own (persona review 2026-10-06 E9).
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get choresDoneDayToday;
+
+  /// Day label on a Done-section row closed yesterday. Older rows show the weekday name, formatted by the locale.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get choresDoneDayYesterday;
 
   /// Done-today section row marker for an occurrence that was completed, as opposed to skipped.
   ///
@@ -656,6 +746,12 @@ abstract class AppLocalizations {
   /// **'Skipped'**
   String get choresDoneStatusSkipped;
 
+  /// Small tag on a done row in the chores list's Done section when the occurrence was completed before its due date (closed on a day earlier than the due date). Neutral wording, no judgement: completing early is allowed and credited, the tag only keeps an early tick distinguishable from an on-time one (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Done early'**
+  String get choresDoneEarly;
+
   /// Done-today section row: who closed the occurrence. The completing member's name for a done row, or the assigned member's name for a skipped row (skipping doesn't record a dedicated closer).
   ///
   /// In en, this message translates to:
@@ -667,6 +763,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reopen'**
   String get choresDoneReopen;
+
+  /// Snackbar confirming that Reopen on a row of the Done section put the occurrence back on the list. Reopen used to be silent (persona review 2026-10-06 E6).
+  ///
+  /// In en, this message translates to:
+  /// **'Reopened'**
+  String get choresReopenedSnackbar;
+
+  /// Title of the confirmation shown when Reopen is tapped on a done row whose completion is credited to a member other than the one using this device. {name} is the member who completed it.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen {name}\'s completion?'**
+  String choresReopenOthersTitle(String name);
+
+  /// Body of the reopen-someone-else's-completion confirmation: says what is lost (the credit in that member's chore history), so the person does not wipe somebody's credit by accident.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes it from their history.'**
+  String get choresReopenOthersBody;
+
+  /// Confirm button of the reopen-someone-else's-completion dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get choresReopenOthersConfirm;
 
   /// Header of the collapsed-by-default 'Paused' section, showing how many chores are paused.
   ///
@@ -680,6 +800,30 @@ abstract class AppLocalizations {
   /// **'Paused'**
   String get choresPausedBadge;
 
+  /// Paused-section row badge (instead of 'Paused') when the chore was paused until a date, and the pause snackbar in that case (persona review 2026-10-06 C2, 'Pause until'). The chore resumes by itself on that day. {date} is the locale-formatted weekday + month + day, e.g. 'Mon, Oct 12'.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused until {date}'**
+  String choresPausedUntil(String date);
+
+  /// Title of the small sheet the action sheet's 'Pause' opens (persona review C2), asking how long to pause for.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause this chore'**
+  String get choresPauseSheetTitle;
+
+  /// Pause sheet option: pause with no end date; the chore waits in the Paused section until someone taps Resume (the only behaviour before 'Pause until').
+  ///
+  /// In en, this message translates to:
+  /// **'Until I resume it'**
+  String get choresPauseUntilResumed;
+
+  /// Pause sheet option: opens a date picker (earliest day: tomorrow); the chore resumes by itself on the picked day (persona review C2, Maria: 'Pause has no resume date').
+  ///
+  /// In en, this message translates to:
+  /// **'Until a date…'**
+  String get choresPauseUntilDate;
+
   /// Paused-section row action: unpauses the chore via ChoreService.unpauseChore.
   ///
   /// In en, this message translates to:
@@ -691,6 +835,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit chore'**
   String get choreFormEditTitle;
+
+  /// Snackbar on the chores list after saving an edit that left the chore's open turn exactly where it was (persona review 2026-10-06 C6: saving used to be silent). One word, matching the 'Done'/'Skipped' snackbars.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get choreSavedSnackbar;
+
+  /// Snackbar on the chores list after saving an edit that changed the schedule and so regenerated the open turn (persona review C6): says where the chore went, since the tile may jump sections. {date} is the already-localized due text (e.g. 'Tomorrow', 'In 3 days', 'Fri, Oct 10'), same as the Done snackbar's.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — next due {date}'**
+  String choreSavedNextDue(String date);
+
+  /// Snackbar on the chores list after an assignment edit removed the person holding the open turn, so the app moved that turn (persona review C1, Maria: 'I took Anna off the bins and the list still says Anna'). Names who has it now so the change is visible, not silent.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved — today\'s turn is now {name}\'s'**
+  String choreSavedReassigned(String name);
 
   /// Chore form app bar title when creating a new chore.
   ///
@@ -1034,6 +1196,24 @@ abstract class AppLocalizations {
   /// **'Anyone'**
   String get choreFormAssignmentAnyone;
 
+  /// Helper line under the chore form's assignment-mode control while 'Fixed' is selected (persona review 2026-10-06 C7: the three modes were unexplained).
+  ///
+  /// In en, this message translates to:
+  /// **'Always the same person.'**
+  String get choreFormAssignmentHelpFixed;
+
+  /// Helper line under the assignment-mode control while 'Rotation' is selected (persona review C7): the numbered list below IS the turn order, and the member numbered 1 gets the first turn.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes turns in this order, starting at 1.'**
+  String get choreFormAssignmentHelpRotation;
+
+  /// Helper line under the assignment-mode control while 'Anyone' is selected (persona review C7): nobody is assigned; whoever does it gets the credit.
+  ///
+  /// In en, this message translates to:
+  /// **'Whoever gets to it.'**
+  String get choreFormAssignmentHelpAnyone;
+
   /// Rotation-mode assignee chip label showing the member's tap order before their name, e.g. '1. Alex'.
   ///
   /// In en, this message translates to:
@@ -1070,10 +1250,10 @@ abstract class AppLocalizations {
   /// **'Start date'**
   String get choreFormStartDateLabel;
 
-  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Names what the user gets, not the mechanism. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
+  /// Label of the chore form's per-chore reminder switch (spec docs/specs/notifications-n2.md §2.1). Reworded 2026-10-06 (persona review B9) from 'Remind me about this chore': the reminder is a property of the shared chore and rings on the phone of whoever it is assigned to (or of everyone, when unassigned), so it must not read as a personal setting of the person editing the form. Deliberately not 'Alarm' or 'Notify me at': §2.6 makes these one-shot notifications rewritten when the app runs, and the copy must not promise alarm-like behaviour the feature cannot deliver.
   ///
   /// In en, this message translates to:
-  /// **'Remind me about this chore'**
+  /// **'Remind whoever it\'s assigned to'**
   String get choreFormReminderToggle;
 
   /// Micro-label of the chore form's reminder time card, revealed when choreFormReminderToggle is on. Parallel to settingsDigestTimeLabel ('Notification time'), which is the same control one screen over.
@@ -1082,10 +1262,10 @@ abstract class AppLocalizations {
   /// **'Reminder time'**
   String get choreFormReminderTime;
 
-  /// Sub-line under the chore form's reminder time card. The one place Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) is explained to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Copy is quoted verbatim in the spec's §11 and is binding.
+  /// Sub-line under the chore form's reminder time card. Says whose phone rings ('their': whoever the chore is assigned to) and explains Rule D (spec docs/specs/notifications-n2.md §2.4, decision D2) to the person it affects: a chore with an armed reminder is omitted from that date's digest counts, so nobody is told twice. Reworded 2026-10-06 (persona review B9); the copy is quoted verbatim in the spec's §11 amendment and is binding.
   ///
   /// In en, this message translates to:
-  /// **'This chore won\'t be counted in the daily summary'**
+  /// **'Rings on their phone at this time. That day\'s daily summary leaves this chore out.'**
   String get choreFormReminderHint;
 
   /// Shopping list empty-state message, shown when there are no items at all.
@@ -1160,11 +1340,23 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{Cleared 1 item} other{Cleared {count} items}}'**
   String shoppingClearedSnackbar(int count);
 
-  /// Action label of the 'Clear checked' undo snackbar; restores exactly the items that tap cleared, via ShoppingRepository.restoreItems.
+  /// Action label of the shopping list's undo snackbars: after 'Clear checked' it restores exactly the items that tap cleared (ShoppingRepository.restoreItems); after ticking an item it unchecks it again; after 'Put all back' it re-checks exactly the items that tap returned.
   ///
   /// In en, this message translates to:
   /// **'Undo'**
   String get shoppingClearedUndo;
+
+  /// Undo snackbar shown after tapping 'Put all back' in the checked-items section (persona finding F4, tom-shopping PP5): the bulk uncheck used to give no feedback at all, and sat right beside 'Clear checked', so a mis-tap silently reshuffled the whole cart. Names how many items went back; Undo re-checks exactly those.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{Put 1 item back} other{Put {count} items back}}'**
+  String shoppingPutBackSnackbar(int count);
+
+  /// Snackbar shown right after ticking a shopping item (persona finding F3, docs/feedback/2026-10-06-personas/tom-shopping.md PP4): the row moves into the collapsed 'In the cart' section, and without this a stray tap made the item look as if it had vanished. Carries an Undo action that unchecks the item. Phrased as the place the item went, matching the section header.
+  ///
+  /// In en, this message translates to:
+  /// **'In the cart'**
+  String get shoppingCheckedSnackbar;
 
   /// Placeholder hint text of the shopping list's quick-add text field.
   ///
@@ -1183,6 +1375,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Already on the list'**
   String get shoppingAddAlreadyOnList;
+
+  /// First half of the Shopping tab's app-bar status line (persona findings F1/MF2): how many items are still unchecked on the list, so Tom can see 'how much is left' at a glance without the cart count. Deliberately terse — it sits under the screen title. Zero reads 'Nothing left' rather than '0 left'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nothing left} other{{count} left}}'**
+  String shoppingRemainingCount(int count);
+
+  /// Second half of the Shopping tab's status line, shown only while the household is linked and nothing is waiting to send (persona findings F1/F10, PP2: 'did her butter ever reach my phone?'). {relative} is a relative-time phrase such as 'just now', '5 min ago' or 'on Fri, Jul 31' (relativeTimeJustNow and friends). Lowercase because it follows ' · ' on the same line as the remaining count.
+  ///
+  /// In en, this message translates to:
+  /// **'synced {relative}'**
+  String shoppingSyncedAgo(String relative);
+
+  /// A relative-time phrase for something under a minute old, embedded in a larger sentence (the Shopping status line's 'synced just now'). Lowercase, no trailing period.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get relativeTimeJustNow;
+
+  /// A relative-time phrase for something one minute to under an hour old, embedded in a larger sentence. {count} is whole minutes elapsed. Abbreviated because it shares a line with other text.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 min ago} other{{count} min ago}}'**
+  String relativeTimeMinutesAgo(int count);
+
+  /// A relative-time phrase for something one hour to under a day old, embedded in a larger sentence. {count} is whole hours elapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 hour ago} other{{count} hours ago}}'**
+  String relativeTimeHoursAgo(int count);
+
+  /// A relative-time phrase for something a day or more old, embedded in a larger sentence. {date} is a locale-formatted weekday+month+day string (package:intl DateFormat.MMMEd), e.g. 'Fri, Jul 31'.
+  ///
+  /// In en, this message translates to:
+  /// **'on {date}'**
+  String relativeTimeOn(String date);
+
+  /// Tooltip (and accessibility label) of the small clock glyph at the trailing edge of a list row (shopping items; chore occurrences too) that has a local change the server has not received yet (persona finding E10). 'Waiting to send' rather than 'failed' or 'offline': in the normal case the glyph is there for a second or two after every edit, so the wording must not alarm — same stance as syncPendingChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to send'**
+  String get syncPendingItemTooltip;
+
+  /// The only entry of the menu that opens when a suggestion chip under the shopping quick-add field is long-pressed (persona finding F11, tom-shopping MF3: a typo added once stayed proposed forever). Choosing it hides that name from the chips and type-ahead on this device; items already on the list are unaffected.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget this suggestion'**
+  String get shoppingSuggestionForget;
+
+  /// Snackbar shown after the quick-add field is submitted with a comma- or newline-separated list that added more than one NEW item (persona finding F7: a pasted "oat milk, sourdough" used to become one item). Only used for two or more; a single add stays silent. Duplicates in the list are skipped and not counted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items added'**
+  String shoppingAddedCount(int count);
 
   /// Snackbar shown on quick-add submit or suggestion tap when a checked active item with the same normalized name already exists; it's unchecked (restored) instead of adding a new row.
   ///
@@ -1244,6 +1490,12 @@ abstract class AppLocalizations {
   /// **'Only if something is still open today'**
   String get settingsEveningToggleSubtitle;
 
+  /// Label of the device-level master switch for per-chore reminders, in Settings' notifications group (persona review 2026-10-06 E3). Off means no chore reminder rings on THIS phone, whatever the chores say; the daily summary and the evening reminder have their own switches. Ships on, since reminders are opt-in per chore already.
+  ///
+  /// In en, this message translates to:
+  /// **'Chore reminders'**
+  String get settingsChoreRemindersTitle;
+
   /// Title of the settings row holding the evening re-reminder's fire time, revealed under settingsEveningToggle. Shows the chosen time as trailing text via TimeOfDay.format and opens a time picker on tap. Default 20:00, which sits an hour clear of the 22:00 quiet-hours default so the shipped combination does not collide.
   ///
   /// In en, this message translates to:
@@ -1286,6 +1538,60 @@ abstract class AppLocalizations {
   /// **'Export data'**
   String get settingsExportEntry;
 
+  /// Settings -> Data row (persona review B3), shown only when at least one copy exists: opens the list of copies saved inside the app when this device joined or reconnected to a household and its old data was replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved copies of earlier households ({count})'**
+  String settingsArchivesRow(int count);
+
+  /// App-bar title of the saved-copies screen opened from settingsArchivesRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved copies'**
+  String get settingsArchivesTitle;
+
+  /// Explanatory paragraph at the top of the saved-copies screen. States what the file is and, honestly, that the app cannot import it (same stance as settingsExportSubtitle).
+  ///
+  /// In en, this message translates to:
+  /// **'Each copy is a JSON file with everything this device held before it joined or reconnected to a household. The app can\'t open them itself — share one to keep it elsewhere, or delete the ones you no longer need.'**
+  String get settingsArchivesIntro;
+
+  /// Title of one saved copy in the saved-copies list; {when} is the locale-formatted date and time encoded in the file's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on {when}'**
+  String settingsArchivesItemTitle(String when);
+
+  /// Title of the confirmation dialog before deleting one saved copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this saved copy?'**
+  String get settingsArchivesDeleteConfirmTitle;
+
+  /// Body of the confirmation dialog before deleting one saved copy. States the irreversibility; there is no trash.
+  ///
+  /// In en, this message translates to:
+  /// **'The copy is deleted from this device and can\'t be brought back.'**
+  String get settingsArchivesDeleteConfirmBody;
+
+  /// Error snackbar when the share sheet for a saved copy fails or the file is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share that saved copy. Please try again.'**
+  String get settingsArchivesShareError;
+
+  /// Error snackbar when deleting a saved copy fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete that saved copy. Please try again.'**
+  String get settingsArchivesDeleteError;
+
+  /// Sub-line of the Export row (id settings.export): the format, what is in it, and the honest limit that there is no import yet (persona review D12).
+  ///
+  /// In en, this message translates to:
+  /// **'JSON file with your members, chores, history and shopping list. The app can\'t import it yet.'**
+  String get settingsExportSubtitle;
+
   /// Generic error snackbar shown when building or sharing the export document fails (spec docs/specs/polish-round-1.md B1).
   ///
   /// In en, this message translates to:
@@ -1297,6 +1603,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Household'**
   String get settingsHouseholdSectionTitle;
+
+  /// First row of the Settings Household group (id settings.household.name), with the current household name as its value; tapping opens the rename sheet (persona review D10: the name was never asked for and only renamable from inside Members).
+  ///
+  /// In en, this message translates to:
+  /// **'Household name'**
+  String get settingsHouseholdNameRow;
 
   /// Settings screen list entry that opens member management (spec members-management §3), shown above the Categories entry.
   ///
@@ -1310,6 +1622,18 @@ abstract class AppLocalizations {
   /// **'Invite'**
   String get settingsMembersInviteEntry;
 
+  /// Title of the disabled Invite row on the Members screen of a LOCAL (not yet online) household (id settings.members.inviteLocal, persona review D6): shows where inviting will live, instead of hiding the option entirely.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get settingsMembersInviteLocalTitle;
+
+  /// Subtitle of the disabled local-household Invite row: the one step that unlocks inviting.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in first to invite your family'**
+  String get settingsMembersInviteLocalSubtitle;
+
   /// Heading of the bottom sheet opened from the Invite row, showing the newly created code.
   ///
   /// In en, this message translates to:
@@ -1322,16 +1646,52 @@ abstract class AppLocalizations {
   /// **'Share this code — it replaces any earlier code and expires in 7 days.'**
   String get settingsMembersInviteSheetBody;
 
+  /// Hint line in the invite sheet: pre-created profiles are what joiners claim, so adding people first avoids duplicate 'I'm new here' profiles (persona review D3, Maria).
+  ///
+  /// In en, this message translates to:
+  /// **'Add everyone under Members first — they\'ll pick their own name when they join.'**
+  String get settingsMembersInviteHint;
+
+  /// Invite sheet line shown instead of the 'replaces any earlier code' body when the sheet re-shows the household's still-active code (persona review D5: each Invite tap used to silently revoke the code already shared). {date} is DateFormat.yMMMd in the app locale.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid until {date}'**
+  String settingsMembersInviteValidUntil(String date);
+
+  /// Text button in the invite sheet (id settings.members.invite.newCode), shown while re-displaying the active code. Asks for confirmation before revoking it and creating a fresh one.
+  ///
+  /// In en, this message translates to:
+  /// **'New code'**
+  String get settingsMembersInviteNewCode;
+
+  /// Title of the confirm dialog behind the invite sheet's 'New code' button: replacing revokes the code people may already have received.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the shared code?'**
+  String get settingsMembersInviteReplaceTitle;
+
+  /// Body of the replace-invite-code confirm dialog: names the one consequence (the old code stops working).
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone still joining with the old code will need this new one.'**
+  String get settingsMembersInviteReplaceBody;
+
+  /// Confirm button of the replace-invite-code dialog (id settings.members.invite.replace.confirm); Cancel is commonCancel (id settings.members.invite.replace.cancel).
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get settingsMembersInviteReplaceConfirm;
+
   /// Label of the invite-code sheet's share button (share_plus).
   ///
   /// In en, this message translates to:
   /// **'Share'**
   String get settingsMembersInviteShare;
 
-  /// The message text handed to the OS share sheet when the invite-code sheet's share button is tapped.
+  /// The message text handed to the OS share sheet when the invite-code sheet's share button is tapped. Ends with the install link (persona review D7: the recipient may not have the app yet, and Famdo is not in an app store).
   ///
   /// In en, this message translates to:
-  /// **'Join my household on Famdo — enter the code {code} when you sign in.'**
+  /// **'Join my household on Famdo — enter the code {code} when you sign in. Get the app: https://github.com/igorzamyslov/chore-app/releases/latest'**
   String settingsMembersInviteShareText(String code);
 
   /// Snackbar shown when creating an invite code fails; the sheet is never opened in that case.
@@ -1339,6 +1699,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t create an invite. Please try again.'**
   String get settingsMembersInviteError;
+
+  /// Members screen row subtitle (linked households only) for the profile claimed by the signed-in account on this phone (persona review D4: rows used to be avatar + name only).
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get memberStatusYou;
+
+  /// Members screen row subtitle (linked households only) for a profile some other account has claimed — that person joined and marks their own chores.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses Famdo on their own phone'**
+  String get memberStatusLinked;
+
+  /// Members screen row subtitle (linked households only) for a profile nobody has claimed: a joiner can still pick it, and meanwhile anyone can complete that person's chores.
+  ///
+  /// In en, this message translates to:
+  /// **'No phone yet — you can mark their chores'**
+  String get memberStatusUnclaimed;
 
   /// App bar title of the manage-members screen.
   ///
@@ -1403,7 +1781,7 @@ abstract class AppLocalizations {
   /// Replaces the Delete button in the member edit sheet when the member being edited is the signed-in user's own claimed profile (spec docs/specs/household-lifecycle.md §3.2). Mirrors the server's self-removal rejection and points at the right action instead. Replaced memberEditDeleteBlockedClaimed, which said claimed profiles cannot be removed here at all -- no longer true as of F10.
   ///
   /// In en, this message translates to:
-  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.'**
+  /// **'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Household.'**
   String get memberEditDeleteBlockedSelf;
 
   /// Replaces the Delete button when the target is claimed but this device is signed out or unlinked, so the remove_member call cannot be made (spec docs/specs/household-lifecycle.md §3.2).
@@ -1520,6 +1898,30 @@ abstract class AppLocalizations {
   /// **'Color'**
   String get categoryEditColorLabel;
 
+  /// Subtitle of a chore category's row on the Categories screen (persona review 2026-10-06 C10, Maria: 'I want to merge Kitchen into Cleaning'): how many active chores use it, so a merge or delete can be judged before opening it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 chore} other{Used by {count} chores}}'**
+  String categoryUsageCount(int count);
+
+  /// Subtitle of a shopping category's row on the Categories screen (persona review C10): how many shopping items (checked or not) use it.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not used yet} one{Used by 1 item} other{Used by {count} items}}'**
+  String categoryUsageCountShopping(int count);
+
+  /// Label of the dropdown in the category delete dialog, shown when chores or items use the category (persona review C10): where those chores/items go. Defaults to 'Uncategorized'; lists the other categories of the same kind, so deleting can merge one category into another.
+  ///
+  /// In en, this message translates to:
+  /// **'Move them to'**
+  String get categoryDeleteMoveTo;
+
+  /// The default entry of the category delete dialog's 'Move them to' dropdown: the chores/items keep no category.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get categoryDeleteMoveToNone;
+
   /// Title of the category delete-confirmation dialog.
   ///
   /// In en, this message translates to:
@@ -1532,10 +1934,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No chores use it right now.'**
   String categoryDeleteDialogBodyChoresZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore.
+  /// Body of the category delete-confirmation dialog for a chore-kind category currently referenced by at least one active chore. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10; it used to say they would all lose their category).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} chores use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 chore uses it.} other{This deletes \'{categoryName}\'. {count} chores use it.}}'**
   String categoryDeleteDialogBodyChoresCount(String categoryName, int count);
 
   /// Body of the category delete-confirmation dialog for a shopping-kind category that no active shopping item currently references.
@@ -1544,10 +1946,10 @@ abstract class AppLocalizations {
   /// **'This deletes \'{categoryName}\'. No shopping items use it right now.'**
   String categoryDeleteDialogBodyShoppingZero(String categoryName);
 
-  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item.
+  /// Body of the category delete-confirmation dialog for a shopping-kind category currently referenced by at least one active shopping item. Says only how many: where they go is the 'Move them to' dropdown right below (persona review 2026-10-06 C10).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it and will become uncategorized.} other{This deletes \'{categoryName}\'. {count} shopping items use it and will become uncategorized.}}'**
+  /// **'{count, plural, one{This deletes \'{categoryName}\'. 1 shopping item uses it.} other{This deletes \'{categoryName}\'. {count} shopping items use it.}}'**
   String categoryDeleteDialogBodyShoppingCount(String categoryName, int count);
 
   /// Settings screen section header above the Language, Appearance, and Daily summary rows (spec docs/specs/theme-v2.md §4.2).
@@ -1619,8 +2021,50 @@ abstract class AppLocalizations {
   /// Privacy disclosure shown above the email field in the signed-out sign-in form -- BOTH in Settings' Account section and on the welcome screen's join subpage (backlog E-3). Deliberately says 'the sync server', not 'our server': the app is open source, F-Droid-distributed and self-hostable, so there is no single operator to claim. The second sentence is load-bearing, not filler -- it is the fact a first-time reader most needs in order to decide whether to sign in at all. Keep it to these two sentences: a disclosure, not a privacy policy (PRIVACY.md is that).
   ///
   /// In en, this message translates to:
-  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.'**
+  /// **'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device. Technical error reports are sent too — you can switch them off under About.'**
   String get settingsAccountIntro;
+
+  /// Text link under the sign-in intro (ids settings.account.howItWorks / welcome.join.howItWorks) and the title of the sheet it opens, which defines account, member and household (persona review D9: the three terms were never explained).
+  ///
+  /// In en, this message translates to:
+  /// **'How accounts work'**
+  String get settingsAccountHowItWorks;
+
+  /// First heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsAccountHowItWorksAccountTitle;
+
+  /// Paragraph under 'Account' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your email login on the sync server. You only need one to share a household or keep several phones in step.'**
+  String get settingsAccountHowItWorksAccountBody;
+
+  /// Second heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get settingsAccountHowItWorksMemberTitle;
+
+  /// Paragraph under 'Member' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'A person in the household. A member may have their own account and phone, or not — anyone can mark their chores.'**
+  String get settingsAccountHowItWorksMemberBody;
+
+  /// Third heading in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Household'**
+  String get settingsAccountHowItWorksHouseholdTitle;
+
+  /// Paragraph under 'Household' in the 'How accounts work' sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'The shared chores and shopping list. It lives on your phone, and on the sync server too once you put it online.'**
+  String get settingsAccountHowItWorksHouseholdBody;
 
   /// Label of the Account section's signed-out email TextField.
   ///
@@ -1655,7 +2099,7 @@ abstract class AppLocalizations {
   /// Notice shown ABOVE the reused sign-in form in the Account section's honest signed-out-but-linked state (spec docs/feedback/2026-08-07-field-feedback.md A1.1) -- names the still-connected household and states plainly that syncing is paused, replacing what used to render as a bare, indistinguishable-from-never-linked sign-in form.
   ///
   /// In en, this message translates to:
-  /// **'This device is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again.'**
+  /// **'This phone is still connected to {householdName}, but syncing is paused. Changes you make now will be sent once you sign in again. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.'**
   String settingsAccountPausedNotice(String householdName);
 
   /// Label of the Account section's A1.2 disconnect row -- a secondary, clearly non-primary action shown below the reused sign-in form in the signed-out-but-linked state, and below the Invite row in the normal signed-in linked state.
@@ -1663,6 +2107,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disconnect from the online household'**
   String get settingsAccountDisconnect;
+
+  /// Subtitle of the Account section's Disconnect row (id settings.account.disconnect): the purely local exit, worded against Leave (persona review D9).
+  ///
+  /// In en, this message translates to:
+  /// **'Stops syncing on this phone only — the household stays online for everyone else.'**
+  String get settingsAccountDisconnectSubtitle;
 
   /// Title of the A1.2 disconnect confirmation dialog.
   ///
@@ -1688,6 +2138,12 @@ abstract class AppLocalizations {
   /// **'Leave the household'**
   String get settingsAccountLeave;
 
+  /// Subtitle of the Account section's Leave row (id settings.account.leave): what leaving does, in one line, so it reads differently from Disconnect and Delete my account (persona review D9: four exit rows with no subtitles).
+  ///
+  /// In en, this message translates to:
+  /// **'Removes you from the household. Your chores and history stay with them.'**
+  String get settingsAccountLeaveSubtitle;
+
   /// Title of the leave-household confirm sheet.
   ///
   /// In en, this message translates to:
@@ -1700,10 +2156,10 @@ abstract class AppLocalizations {
   /// **'Your profile stays with the household, so the others keep seeing you and everything you\'ve done. This phone stops syncing. You can come back later with a new invite code.'**
   String get householdLeaveConfirmBody;
 
-  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked.
+  /// Body of the leave-household confirm when the caller is the LAST claimed member (spec §3.4, D-L5): warns plainly, then cascades -- it is neither silent nor blocked. Persona review B2: the server soft-deletes the household at once (hidden from everyone) and a nightly job hard-deletes it after 30 days (supabase/migrations/20261006140000_privacy_and_grants.sql), and the copy says exactly that instead of 'removed'.
   ///
   /// In en, this message translates to:
-  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get householdLeaveConfirmBodyLastMember;
 
   /// Confirm button of the leave-household sheet.
@@ -1736,10 +2192,10 @@ abstract class AppLocalizations {
   /// **'Your account and your email address are deleted from the server. This can\'t be undone. Your profile stays with each household you\'re part of, so the others keep their history — you\'re just no longer linked to it.'**
   String get accountDeleteConfirmBody;
 
-  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving.
+  /// Body of the delete-account confirm when the caller is the last claimed member, so §2.4's cascade will fire -- the same plain warning D-L5 requires for leaving. Persona review B2: states the 30-day soft-delete-then-purge window, same as householdLeaveConfirmBodyLastMember.
   ///
   /// In en, this message translates to:
-  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
+  /// **'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.'**
   String get accountDeleteConfirmBodyLastMember;
 
   /// Confirm button of the delete-account sheet. Confirming here opens the final confirmation (D-L6); it does not start the deletion.
@@ -1799,7 +2255,7 @@ abstract class AppLocalizations {
   /// Body of the sign-out confirmation dialog (spec docs/feedback/2026-08-07-field-feedback.md A1.3): states plainly what signing out actually does -- syncing pauses, the household stays on this device, and changes made while signed out are kept and sent on the next sign-in -- replacing the old, less complete 'sign in again anytime' copy.
   ///
   /// In en, this message translates to:
-  /// **'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.'**
+  /// **'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.'**
   String get settingsAccountSignOutConfirmBody;
 
   /// Confirm button of the sign-out confirmation dialog.
@@ -1817,8 +2273,20 @@ abstract class AppLocalizations {
   /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED pull-to-refresh is what discovered that this device's membership was revoked (spec docs/specs/household-lifecycle.md 3.5). SupabaseSyncEngine.refreshNow() has already cleared the sync link by the time it returns false for this case, so syncRefreshError's 'will sync later' would be a promise the app cannot keep.
   ///
   /// In en, this message translates to:
-  /// **'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.'**
+  /// **'This phone was removed from the household, so nothing will sync. Nothing is lost — see Settings → Household to reconnect.'**
   String get syncRefreshErrorRevoked;
+
+  /// Snackbar shown INSTEAD of syncRefreshError when a USER-INITIATED sync (pull-to-refresh, or the Settings -> Account sync tile) finds that the server REFUSED at least one of this phone's rows with a 22/23/42-class Postgres error (SyncEngine.refreshNow() returned RefreshOutcome.rejected; spec docs/specs/sync-backend.md 8.3 amendment 2026-10-06). A retry never fixes such a row, so syncRefreshError's 'will sync later' would be a false promise; this names the honest state (that one change did not go through), the most likely remedy (an outdated app sending a shape the server no longer accepts), and reassures that everything else still syncs because the rejected row is quarantined rather than blocking the rest.
+  ///
+  /// In en, this message translates to:
+  /// **'The household server rejected a change from this phone, so it hasn\'t gone through. Check for an app update; your other changes keep syncing.'**
+  String get syncRefreshErrorRejected;
+
+  /// Settings -> Account: second line under 'Last synced', shown only while this device has unsent changes (dirty synced rows plus pending hard-delete tombstones, SyncRepository.watchDirtyRowCount; spec docs/specs/sync-freshness.md 2.4 amendment 2026-10-06). 'Waiting to send' rather than 'failed': in the normal case the count is nonzero for a couple of seconds after every edit, so the wording must not alarm; a count that stays put is what tells a suspicious user that sync is stuck. The whole tile is tappable to sync now.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 change waiting to send} other{{count} changes waiting to send}}'**
+  String syncPendingChanges(int count);
 
   /// The D-5 can't-reach-the-household banner shown above the chores and shopping lists (spec docs/specs/sync-freshness.md 2.5) whenever syncHealthStatusProvider is unhealthy. Reassuring, not alarming -- same tone as syncRefreshError. Never says 'offline': the device may have a perfectly good connection while still unable to reach the household (e.g. a server-side permissions issue), so a connectivity verdict would be dishonest. Names the user's existing recourse (pull-to-refresh) rather than reporting a problem with no way to act on it (Igor's decision -- a notice with no recourse is the same dead-end class as ticket E-2's startup error screen); deliberately NOT tappable and NOT a second control, since pull-to-refresh already exists on both list screens, so the copy points at it instead of duplicating it.
   ///
@@ -1844,10 +2312,10 @@ abstract class AppLocalizations {
   /// **'Reconnect to {householdName}'**
   String settingsAccountReconnectTitle(String householdName);
 
-  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same backup-file guarantee as join). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
+  /// One-line explanatory copy under the reconnect row's title, stating plainly up front that local data gets replaced (spec §4/§7.6: same saved-copy guarantee as join). Persona review B3: says where the copy lives and how to reach it (Settings -> Data, the saved-copies row) instead of the old 'backup file on this device', which people could not find. Still makes no promise of an in-app restore, which does not exist.
   ///
   /// In en, this message translates to:
-  /// **'Replaces your local data — it\'s saved to a backup file on this device.'**
+  /// **'Replaces your local data — it\'s kept as a saved copy inside the app (Settings → Data).'**
   String get settingsAccountReconnectIntro;
 
   /// Title of the Account section's P2b adopt row (spec docs/specs/sync-backend.md §7.3), shown while signed in and unlinked.
@@ -1856,11 +2324,35 @@ abstract class AppLocalizations {
   /// **'Put my household online'**
   String get settingsAccountAdoptTitle;
 
-  /// One-line explanatory copy under the adopt row's title, in its normal (non-error) state.
+  /// One-line explanatory copy under the adopt row's title, in its normal (non-error) state. Leads with inviting family, the reason most people put a household online (persona review B6/D6: the old 'other devices' wording hid the invite path).
   ///
   /// In en, this message translates to:
-  /// **'Makes your household available on your other devices.'**
+  /// **'Put it online so your family can join with an invite code. Also keeps your other phones in step.'**
   String get settingsAccountAdoptIntro;
+
+  /// Title of the confirm sheet the adopt row opens before uploading anything (persona review B6: adopting used to upload everything on one tap).
+  ///
+  /// In en, this message translates to:
+  /// **'Put \'{household}\' online?'**
+  String settingsAccountAdoptConfirmTitle(String household);
+
+  /// Body of the adopt confirm sheet: what goes up, where, and how to undo it.
+  ///
+  /// In en, this message translates to:
+  /// **'This uploads your members, chores, completion history, notes and shopping list to the sync server, under your account. You can take it down again with Delete my account or Leave the household.'**
+  String get settingsAccountAdoptConfirmBody;
+
+  /// Confirm button of the adopt confirm sheet (id settings.account.adopt.confirm); Cancel is commonCancel (id settings.account.adopt.cancel).
+  ///
+  /// In en, this message translates to:
+  /// **'Put online'**
+  String get settingsAccountAdoptConfirmAction;
+
+  /// Plain notice shown in the Account section INSTEAD of the 'Put my household online' row after this phone left the household (settings.syncLeftAt, id settings.account.leftNotice). Adopting again would collide with the copy still online for the others, so the row was a dead end (persona review D8).
+  ///
+  /// In en, this message translates to:
+  /// **'You left this household\'s online copy. What\'s on this phone stays yours; to share it again, start a new household from it later.'**
+  String get settingsAccountLeftNotice;
 
   /// Title the adopt row switches to after a failed attempt; tapping it retries -- rerunning the adopt flow is always safe.
   ///
@@ -1934,11 +2426,11 @@ abstract class AppLocalizations {
   /// **'Use an invite code from another device — this replaces your local data.'**
   String get settingsAccountJoinIntro;
 
-  /// Snackbar shown after a successful join, naming the archive file the old household was saved to (spec §4/§7.4).
+  /// Snackbar shown after a successful join or reconnect that archived the old household (spec §4/§7.4; persona review B3). It no longer names the file -- a file name in app-private storage is useless to the person -- and instead carries a 'Share...' action (commonShare) that opens the share sheet for the saved copy; the copies are also listed under Settings -> Data (settingsArchivesRow).
   ///
   /// In en, this message translates to:
-  /// **'Your old data was saved to {fileName}.'**
-  String settingsAccountJoinSuccessSnackbar(String fileName);
+  /// **'Your previous data was saved inside the app'**
+  String get settingsAccountJoinSuccessSnackbar;
 
   /// Title of the join sheet's first step: the invite-code entry.
   ///
@@ -1970,17 +2462,23 @@ abstract class AppLocalizations {
   /// **'Couldn\'t check that code. Check your connection and try again.'**
   String get joinHouseholdCodeUnknownError;
 
+  /// Inline error on the join code step when the server answered with an error that is NOT an invalid/expired-code rejection (persona review D5: every server error used to read as 'typo'). Blames neither the code nor the connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check the code right now — try again in a moment.'**
+  String get joinCodeErrorServer;
+
   /// Label of the join sheet's 'Continue' buttons (code entry and the new-member name step).
   ///
   /// In en, this message translates to:
   /// **'Continue'**
   String get joinHouseholdContinue;
 
-  /// Title of the join sheet's chooser step, listing unclaimed member profiles plus 'I'm new here'.
+  /// Title of the join chooser step (welcome join subpage and Settings join sheet), listing unclaimed member profiles plus 'I'm new here'. Names the household the code belongs to (from the peek_invite RPC) so the joiner can tell they are in the right place before claiming anyone (persona review D3).
   ///
   /// In en, this message translates to:
-  /// **'Which profile is yours?'**
-  String get joinHouseholdChooserTitle;
+  /// **'Which one is you in {household}?'**
+  String joinHouseholdChooserTitle(String household);
 
   /// Label of one claimable-member row in the chooser step, naming the unclaimed profile.
   ///
@@ -1993,6 +2491,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I\'m new here'**
   String get joinHouseholdChooserNewMember;
+
+  /// Title of the confirm dialog shown after tapping a claimable profile in the join chooser (persona review D3: claiming used to happen on one tap, with no household name). Names both the household and the profile being claimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {household} as {name}?'**
+  String joinClaimConfirmTitle(String household, String name);
+
+  /// Body of the join claim confirm dialog: says what claiming a profile means in practice (you take over that person's chores) and offers the way back.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll see and mark the chores assigned to {name}. Pick another name if this isn\'t you.'**
+  String joinClaimConfirmBody(String name);
+
+  /// Confirm button of the join claim confirm dialog (id join.claim.confirm). Only this button claims the profile; Cancel (commonCancel, id join.claim.cancel) returns to the chooser.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get joinClaimConfirmJoin;
 
   /// Title of the join sheet's new-member name step (after picking 'I'm new here').
   ///
@@ -2012,10 +2528,10 @@ abstract class AppLocalizations {
   /// **'Bring over your open chores?'**
   String get joinHouseholdImportTitle;
 
-  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and saved to a backup file (spec §4). Wording adjusted (spec docs/feedback/2026-08-01-ux-audit.md A4) to drop 'kept only in an archive file', which implied an in-app restore that doesn't exist yet -- 'saved to a backup file' makes no such promise.
+  /// Body copy of the import-offer step -- states plainly that the old local data is replaced and kept as a saved copy inside the app (spec §4; persona review B3: names Settings -> Data, where the copy can be shared or deleted, instead of an unfindable 'backup file'). Makes no promise of an in-app restore, which does not exist.
   ///
   /// In en, this message translates to:
-  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.'**
+  /// **'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept as a saved copy inside the app (Settings → Data).'**
   String get joinHouseholdImportBody;
 
   /// Accept button of the import-offer step.
@@ -2065,6 +2581,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Since you started, {date}'**
   String statsWindowSinceStart(String date);
+
+  /// Small line under a member's name on the chore-history share card when that member joined partway through the 30-day window (persona review 2026-10-06 E7): their own window starts at the day they joined, so a low count reads as 'just arrived', not 'does nothing'. {date} is a locale-formatted month and day.
+  ///
+  /// In en, this message translates to:
+  /// **'since {date}'**
+  String statsSince(String date);
 
   /// Total completions in the share window; also the single-member household's replacement for the whole share card.
   ///
@@ -2150,6 +2672,24 @@ abstract class AppLocalizations {
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
 
+  /// About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy notes'**
+  String get settingsAboutPrivacy;
+
+  /// About row (id settings.about.source) opening the project's source repository in the browser (persona review D11).
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get settingsAboutSource;
+
+  /// Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync server'**
+  String get settingsAboutSyncServer;
+
   /// Title of the About section's switch row that controls whether technical error details are uploaded to the sync server.
   ///
   /// In en, this message translates to:
@@ -2213,13 +2753,13 @@ abstract class AppLocalizations {
   /// Body of the first reset confirmation dialog on an UNLINKED device, stating the deletion is permanent, there is no cloud copy, and (spec docs/feedback/2026-08-08-prerelease-audit.md P3) any active session on this phone ends too (spec docs/specs/polish-round-1.md B2).
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
+  /// **'Export your data first if you want a copy. This permanently deletes your household, members, chores, and shopping list. There is no cloud backup — this can\'t be undone. If you\'re signed in, this also signs you out of this phone.'**
   String get settingsResetConfirm1Body;
 
   /// Body of the first reset confirmation dialog on a LINKED device (spec docs/feedback/2026-08-01-ux-audit.md A6): replaces the false 'no cloud backup' claim -- the household lives on the server and reconnecting restores it -- while keeping the local-deletion warning, adapted to make clear it's only this phone's local copy.
   ///
   /// In en, this message translates to:
-  /// **'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.'**
+  /// **'Export your data first if you want a copy. Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list. Your account and email stay on the server — Delete my account removes them.'**
   String get settingsResetConfirm1BodyLinked;
 
   /// Confirm button of the first reset dialog; advances to the second, final confirmation rather than deleting anything yet.
@@ -2269,6 +2809,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get exitConfirmCancel;
+
+  /// Label of the optional rename field in the Leave and Delete-account confirm sheets (ids settings.account.leave.name / settings.account.deleteAccount.name), prefilled with the current profile name. Your profile and its history stay with the household after you go, so this is the place to change what they keep calling you (persona review D8).
+  ///
+  /// In en, this message translates to:
+  /// **'Your name in the household\'s history'**
+  String get householdExitNameLabel;
 
   /// Title of the notice shown when a pull discovers this device's membership was removed server-side (spec docs/specs/household-lifecycle.md §3.5).
   ///

@@ -97,6 +97,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String digestMoreCount(int count) {
+    return ' and $count more';
+  }
+
+  @override
   String get notificationActionDone => 'Done';
 
   @override
@@ -110,6 +115,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonRetry => 'Retry';
+
+  @override
+  String get commonShare => 'Share…';
 
   @override
   String get choresTabLabel => 'Chores';
@@ -130,6 +138,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuMarkDoneFor => 'Mark done for…';
 
   @override
+  String get choresMenuReassign => 'Reassign this turn…';
+
+  @override
+  String get choresReassignTitle => 'Who takes this turn?';
+
+  @override
+  String choresReassignedSnackbar(String name) {
+    return 'Reassigned to $name';
+  }
+
+  @override
   String get choresMarkDoneForTitle => 'Who did this one?';
 
   @override
@@ -139,7 +158,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresMenuEdit => 'Edit';
 
   @override
+  String get choresMenuDuplicate => 'Duplicate';
+
+  @override
   String get choresMenuPause => 'Pause';
+
+  @override
+  String get choresDeleteDialogShared =>
+      'Everyone in the household will see this.';
 
   @override
   String get choresDeleteDialogTitle => 'Delete chore?';
@@ -208,6 +234,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresFilterMemberAll => 'All members';
 
   @override
+  String choresFilterYou(String name) {
+    return '$name (you)';
+  }
+
+  @override
+  String get choresAssigneeAnyone => 'Anyone';
+
+  @override
   String get choresFilterCategoryTooltip => 'Filter by category';
 
   @override
@@ -223,6 +257,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actingMemberSheetTitle => 'Who\'s doing chores right now?';
 
   @override
+  String get choresActingMemberHint =>
+      'Credit and your daily summary follow this person.';
+
+  @override
   String actingMemberSignedInAs(String name) {
     return 'You\'re signed in as $name';
   }
@@ -231,7 +269,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actingManageMembers => 'Manage members';
 
   @override
-  String get choresEmptyState => 'No chores pending — nice work!';
+  String get choresEmptyState => 'Nothing left for today.';
 
   @override
   String get choresEmptyDoneHeadline => 'All done for today';
@@ -268,7 +306,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get choresProgressAllDoneToday => 'That\'s everything — nice work';
+  String get choresProgressAllDoneToday => 'That\'s everything for today.';
+
+  @override
+  String choresProgressCatchUp(int count) {
+    return '$count to catch up';
+  }
 
   @override
   String get choresProgressFilterActive => 'Filtered — not the whole household';
@@ -295,11 +338,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong setting up your household. Please try again.';
 
   @override
+  String get householdDefaultName => 'My household';
+
+  @override
   String get welcomeJoinTitle => 'Join my family\'s household';
 
   @override
   String get welcomeJoinSubtitle =>
-      'Sign in and use an invite code from a family member\'s device.';
+      'Got an invite code? Sign in and enter it here.';
 
   @override
   String get welcomeJoinReconnectSubtitle =>
@@ -328,17 +374,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get digestPrepromptDismissAction => 'Not now';
 
   @override
-  String catchUpBannerMessage(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          'We moved $count overdue chores forward to their most recent due dates, so nothing piled up.',
-      one:
-          'We moved 1 overdue chore forward to its most recent due date, so nothing piled up.',
-    );
-    return '$_temp0';
-  }
+  String get catchUpBannerMessage =>
+      'Your repeating chores jumped ahead to their latest due date — you didn\'t miss anything extra.';
 
   @override
   String get catchUpBannerDismissTooltip => 'Dismiss';
@@ -352,8 +389,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String choresSnackbarDoneBy(String name) {
+  String choresDoneCredited(String name) {
     return 'Done — credited to $name';
+  }
+
+  @override
+  String choresDoneCreditedNextDue(String name, String date) {
+    return 'Done — credited to $name, next due $date';
   }
 
   @override
@@ -375,15 +417,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device doesn\'t know who you are yet. Sign in again or reopen the app.';
 
   @override
-  String choresDoneHeader(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Done today ($count)',
-      one: 'Done today (1)',
-    );
-    return '$_temp0';
+  String choresDoneRecently(int count) {
+    return 'Done recently ($count)';
   }
+
+  @override
+  String get choresDoneDayToday => 'Today';
+
+  @override
+  String get choresDoneDayYesterday => 'Yesterday';
 
   @override
   String get choresDoneStatusDone => 'Done';
@@ -392,12 +434,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresDoneStatusSkipped => 'Skipped';
 
   @override
+  String get choresDoneEarly => 'Done early';
+
+  @override
   String choresDoneClosedByLabel(String name) {
     return 'by $name';
   }
 
   @override
   String get choresDoneReopen => 'Reopen';
+
+  @override
+  String get choresReopenedSnackbar => 'Reopened';
+
+  @override
+  String choresReopenOthersTitle(String name) {
+    return 'Reopen $name\'s completion?';
+  }
+
+  @override
+  String get choresReopenOthersBody => 'This removes it from their history.';
+
+  @override
+  String get choresReopenOthersConfirm => 'Reopen';
 
   @override
   String choresPausedHeader(int count) {
@@ -414,10 +473,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choresPausedBadge => 'Paused';
 
   @override
+  String choresPausedUntil(String date) {
+    return 'Paused until $date';
+  }
+
+  @override
+  String get choresPauseSheetTitle => 'Pause this chore';
+
+  @override
+  String get choresPauseUntilResumed => 'Until I resume it';
+
+  @override
+  String get choresPauseUntilDate => 'Until a date…';
+
+  @override
   String get choresPausedResume => 'Resume';
 
   @override
   String get choreFormEditTitle => 'Edit chore';
+
+  @override
+  String get choreSavedSnackbar => 'Saved';
+
+  @override
+  String choreSavedNextDue(String date) {
+    return 'Saved — next due $date';
+  }
+
+  @override
+  String choreSavedReassigned(String name) {
+    return 'Saved — today\'s turn is now $name\'s';
+  }
 
   @override
   String get choreFormNewTitle => 'New chore';
@@ -714,6 +800,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormAssignmentAnyone => 'Anyone';
 
   @override
+  String get choreFormAssignmentHelpFixed => 'Always the same person.';
+
+  @override
+  String get choreFormAssignmentHelpRotation =>
+      'Takes turns in this order, starting at 1.';
+
+  @override
+  String get choreFormAssignmentHelpAnyone => 'Whoever gets to it.';
+
+  @override
   String choreFormAssigneeOrderLabel(int order, String name) {
     return '$order. $name';
   }
@@ -736,14 +832,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get choreFormStartDateLabel => 'Start date';
 
   @override
-  String get choreFormReminderToggle => 'Remind me about this chore';
+  String get choreFormReminderToggle => 'Remind whoever it\'s assigned to';
 
   @override
   String get choreFormReminderTime => 'Reminder time';
 
   @override
   String get choreFormReminderHint =>
-      'This chore won\'t be counted in the daily summary';
+      'Rings on their phone at this time. That day\'s daily summary leaves this chore out.';
 
   @override
   String get shoppingEmptyState => 'Shopping list is empty';
@@ -801,6 +897,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shoppingClearedUndo => 'Undo';
 
   @override
+  String shoppingPutBackSnackbar(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Put $count items back',
+      one: 'Put 1 item back',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shoppingCheckedSnackbar => 'In the cart';
+
+  @override
   String get shoppingAddHint => 'Add item…';
 
   @override
@@ -808,6 +918,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shoppingAddAlreadyOnList => 'Already on the list';
+
+  @override
+  String shoppingRemainingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count left',
+      zero: 'Nothing left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String shoppingSyncedAgo(String relative) {
+    return 'synced $relative';
+  }
+
+  @override
+  String get relativeTimeJustNow => 'just now';
+
+  @override
+  String relativeTimeMinutesAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count min ago',
+      one: '1 min ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeHoursAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours ago',
+      one: '1 hour ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String relativeTimeOn(String date) {
+    return 'on $date';
+  }
+
+  @override
+  String get syncPendingItemTooltip => 'Waiting to send';
+
+  @override
+  String get shoppingSuggestionForget => 'Forget this suggestion';
+
+  @override
+  String shoppingAddedCount(int count) {
+    return '$count items added';
+  }
 
   @override
   String get shoppingAddMovedBack => 'Moved back to the list';
@@ -853,6 +1020,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only if something is still open today';
 
   @override
+  String get settingsChoreRemindersTitle => 'Chore reminders';
+
+  @override
   String get settingsEveningTime => 'Evening time';
 
   @override
@@ -876,6 +1046,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExportEntry => 'Export data';
 
   @override
+  String settingsArchivesRow(int count) {
+    return 'Saved copies of earlier households ($count)';
+  }
+
+  @override
+  String get settingsArchivesTitle => 'Saved copies';
+
+  @override
+  String get settingsArchivesIntro =>
+      'Each copy is a JSON file with everything this device held before it joined or reconnected to a household. The app can\'t open them itself — share one to keep it elsewhere, or delete the ones you no longer need.';
+
+  @override
+  String settingsArchivesItemTitle(String when) {
+    return 'Saved on $when';
+  }
+
+  @override
+  String get settingsArchivesDeleteConfirmTitle => 'Delete this saved copy?';
+
+  @override
+  String get settingsArchivesDeleteConfirmBody =>
+      'The copy is deleted from this device and can\'t be brought back.';
+
+  @override
+  String get settingsArchivesShareError =>
+      'Couldn\'t share that saved copy. Please try again.';
+
+  @override
+  String get settingsArchivesDeleteError =>
+      'Couldn\'t delete that saved copy. Please try again.';
+
+  @override
+  String get settingsExportSubtitle =>
+      'JSON file with your members, chores, history and shopping list. The app can\'t import it yet.';
+
+  @override
   String get settingsExportError =>
       'Couldn\'t export your data. Please try again.';
 
@@ -883,10 +1089,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHouseholdSectionTitle => 'Household';
 
   @override
+  String get settingsHouseholdNameRow => 'Household name';
+
+  @override
   String get settingsMembersEntry => 'Members';
 
   @override
   String get settingsMembersInviteEntry => 'Invite';
+
+  @override
+  String get settingsMembersInviteLocalTitle => 'Invite';
+
+  @override
+  String get settingsMembersInviteLocalSubtitle =>
+      'Sign in first to invite your family';
 
   @override
   String get settingsMembersInviteSheetTitle => 'Invite a household member';
@@ -896,16 +1112,48 @@ class AppLocalizationsEn extends AppLocalizations {
       'Share this code — it replaces any earlier code and expires in 7 days.';
 
   @override
+  String get settingsMembersInviteHint =>
+      'Add everyone under Members first — they\'ll pick their own name when they join.';
+
+  @override
+  String settingsMembersInviteValidUntil(String date) {
+    return 'Valid until $date';
+  }
+
+  @override
+  String get settingsMembersInviteNewCode => 'New code';
+
+  @override
+  String get settingsMembersInviteReplaceTitle => 'Replace the shared code?';
+
+  @override
+  String get settingsMembersInviteReplaceBody =>
+      'Anyone still joining with the old code will need this new one.';
+
+  @override
+  String get settingsMembersInviteReplaceConfirm => 'Replace';
+
+  @override
   String get settingsMembersInviteShare => 'Share';
 
   @override
   String settingsMembersInviteShareText(String code) {
-    return 'Join my household on Famdo — enter the code $code when you sign in.';
+    return 'Join my household on Famdo — enter the code $code when you sign in. Get the app: https://github.com/igorzamyslov/chore-app/releases/latest';
   }
 
   @override
   String get settingsMembersInviteError =>
       'Couldn\'t create an invite. Please try again.';
+
+  @override
+  String get memberStatusYou => 'You';
+
+  @override
+  String get memberStatusLinked => 'Uses Famdo on their own phone';
+
+  @override
+  String get memberStatusUnclaimed =>
+      'No phone yet — you can mark their chores';
 
   @override
   String get manageMembersTitle => 'Members';
@@ -943,7 +1191,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberEditDeleteBlockedSelf =>
-      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Account.';
+      'This is your own profile. To leave the household yourself, use “Leave the household” in Settings → Household.';
 
   @override
   String get memberEditDeleteBlockedOffline =>
@@ -1012,6 +1260,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryEditColorLabel => 'Color';
 
   @override
+  String categoryUsageCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count chores',
+      one: 'Used by 1 chore',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String categoryUsageCountShopping(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Used by $count items',
+      one: 'Used by 1 item',
+      zero: 'Not used yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryDeleteMoveTo => 'Move them to';
+
+  @override
+  String get categoryDeleteMoveToNone => 'Uncategorized';
+
+  @override
   String get categoryDeleteDialogTitle => 'Delete category?';
 
   @override
@@ -1024,10 +1302,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count chores use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 chore uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count chores use it.',
+      one: 'This deletes \'$categoryName\'. 1 chore uses it.',
     );
     return '$_temp0';
   }
@@ -1042,10 +1318,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          'This deletes \'$categoryName\'. $count shopping items use it and will become uncategorized.',
-      one:
-          'This deletes \'$categoryName\'. 1 shopping item uses it and will become uncategorized.',
+      other: 'This deletes \'$categoryName\'. $count shopping items use it.',
+      one: 'This deletes \'$categoryName\'. 1 shopping item uses it.',
     );
     return '$_temp0';
   }
@@ -1085,7 +1359,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountIntro =>
-      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device.';
+      'Signing in stores your email and your household\'s data — chores, shopping list, members — on the sync server, so your devices stay in step. Without an account, everything stays on this device. Technical error reports are sent too — you can switch them off under About.';
+
+  @override
+  String get settingsAccountHowItWorks => 'How accounts work';
+
+  @override
+  String get settingsAccountHowItWorksAccountTitle => 'Account';
+
+  @override
+  String get settingsAccountHowItWorksAccountBody =>
+      'Your email login on the sync server. You only need one to share a household or keep several phones in step.';
+
+  @override
+  String get settingsAccountHowItWorksMemberTitle => 'Member';
+
+  @override
+  String get settingsAccountHowItWorksMemberBody =>
+      'A person in the household. A member may have their own account and phone, or not — anyone can mark their chores.';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdTitle => 'Household';
+
+  @override
+  String get settingsAccountHowItWorksHouseholdBody =>
+      'The shared chores and shopping list. It lives on your phone, and on the sync server too once you put it online.';
 
   @override
   String get settingsAccountEmailLabel => 'Email address';
@@ -1108,12 +1406,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsAccountPausedNotice(String householdName) {
-    return 'This device is still connected to $householdName, but syncing is paused. Changes you make now will be sent once you sign in again.';
+    return 'This phone is still connected to $householdName, but syncing is paused. Changes you make now will be sent once you sign in again. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.';
   }
 
   @override
   String get settingsAccountDisconnect =>
       'Disconnect from the online household';
+
+  @override
+  String get settingsAccountDisconnectSubtitle =>
+      'Stops syncing on this phone only — the household stays online for everyone else.';
 
   @override
   String get settingsAccountDisconnectConfirmTitle =>
@@ -1130,6 +1432,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAccountLeave => 'Leave the household';
 
   @override
+  String get settingsAccountLeaveSubtitle =>
+      'Removes you from the household. Your chores and history stay with them.';
+
+  @override
   String householdLeaveConfirmTitle(String householdName) {
     return 'Leave $householdName?';
   }
@@ -1140,7 +1446,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get householdLeaveConfirmBodyLastMember =>
-      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'You\'re the last person here with an account. Leaving takes the online household with you: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get householdLeaveConfirmAction => 'Leave';
@@ -1161,7 +1467,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountDeleteConfirmBodyLastMember =>
-      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy and its history are removed from the server and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
+      'Your account and your email address are deleted from the server. This can\'t be undone. You\'re the last person here with an account, so the online household goes with it: the shared copy is hidden from everyone right away and permanently deleted from the server after 30 days, and any invite codes stop working. Everything on this phone is unaffected unless you tick the box below.';
 
   @override
   String get accountDeleteConfirmAction => 'Delete account';
@@ -1196,7 +1502,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountSignOutConfirmBody =>
-      'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in.';
+      'Syncing pauses until you sign in again. Your household stays on this device, and any changes you make while signed out are kept and sent once you sign in. If someone else edits the same item meanwhile, your version replaces theirs when you sign back in.';
 
   @override
   String get settingsAccountSignOutConfirmAction => 'Sign out';
@@ -1207,7 +1513,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncRefreshErrorRevoked =>
-      'This device was removed from the household, so nothing will sync. Nothing is lost — see Settings → Account to reconnect.';
+      'This phone was removed from the household, so nothing will sync. Nothing is lost — see Settings → Household to reconnect.';
+
+  @override
+  String get syncRefreshErrorRejected =>
+      'The household server rejected a change from this phone, so it hasn\'t gone through. Check for an app update; your other changes keep syncing.';
+
+  @override
+  String syncPendingChanges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes waiting to send',
+      one: '1 change waiting to send',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get syncHealthBannerMessage =>
@@ -1227,14 +1548,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccountReconnectIntro =>
-      'Replaces your local data — it\'s saved to a backup file on this device.';
+      'Replaces your local data — it\'s kept as a saved copy inside the app (Settings → Data).';
 
   @override
   String get settingsAccountAdoptTitle => 'Put my household online';
 
   @override
   String get settingsAccountAdoptIntro =>
-      'Makes your household available on your other devices.';
+      'Put it online so your family can join with an invite code. Also keeps your other phones in step.';
+
+  @override
+  String settingsAccountAdoptConfirmTitle(String household) {
+    return 'Put \'$household\' online?';
+  }
+
+  @override
+  String get settingsAccountAdoptConfirmBody =>
+      'This uploads your members, chores, completion history, notes and shopping list to the sync server, under your account. You can take it down again with Delete my account or Leave the household.';
+
+  @override
+  String get settingsAccountAdoptConfirmAction => 'Put online';
+
+  @override
+  String get settingsAccountLeftNotice =>
+      'You left this household\'s online copy. What\'s on this phone stays yours; to share it again, start a new household from it later.';
 
   @override
   String get settingsAccountAdoptRetry => 'Try again';
@@ -1297,9 +1634,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use an invite code from another device — this replaces your local data.';
 
   @override
-  String settingsAccountJoinSuccessSnackbar(String fileName) {
-    return 'Your old data was saved to $fileName.';
-  }
+  String get settingsAccountJoinSuccessSnackbar =>
+      'Your previous data was saved inside the app';
 
   @override
   String get joinHouseholdCodeTitle => 'Enter your invite code';
@@ -1320,10 +1656,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t check that code. Check your connection and try again.';
 
   @override
+  String get joinCodeErrorServer =>
+      'Couldn\'t check the code right now — try again in a moment.';
+
+  @override
   String get joinHouseholdContinue => 'Continue';
 
   @override
-  String get joinHouseholdChooserTitle => 'Which profile is yours?';
+  String joinHouseholdChooserTitle(String household) {
+    return 'Which one is you in $household?';
+  }
 
   @override
   String joinHouseholdChooserAreYou(String name) {
@@ -1332,6 +1674,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdChooserNewMember => 'I\'m new here';
+
+  @override
+  String joinClaimConfirmTitle(String household, String name) {
+    return 'Join $household as $name?';
+  }
+
+  @override
+  String joinClaimConfirmBody(String name) {
+    return 'You\'ll see and mark the chores assigned to $name. Pick another name if this isn\'t you.';
+  }
+
+  @override
+  String get joinClaimConfirmJoin => 'Join';
 
   @override
   String get joinHouseholdNewMemberTitle => 'What\'s your name?';
@@ -1344,7 +1699,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get joinHouseholdImportBody =>
-      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is saved to a backup file on this device.';
+      'Your open chores and unchecked shopping items can come with you as new items — without their history. Everything else is replaced: your current household is kept as a saved copy inside the app (Settings → Data).';
 
   @override
   String get joinHouseholdImportAccept => 'Bring them over';
@@ -1372,6 +1727,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String statsWindowSinceStart(String date) {
     return 'Since you started, $date';
+  }
+
+  @override
+  String statsSince(String date) {
+    return 'since $date';
   }
 
   @override
@@ -1449,6 +1809,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open source licenses';
 
   @override
+  String get settingsAboutPrivacy => 'Privacy notes';
+
+  @override
+  String get settingsAboutSource => 'Source code';
+
+  @override
+  String get settingsAboutSyncServer => 'Sync server';
+
+  @override
   String get settingsErrorReportsTitle => 'Send error reports';
 
   @override
@@ -1481,11 +1850,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfirm1Body =>
-      'This permanently deletes your household, members, chores, and shopping list. There is no cloud backup -- this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
+      'Export your data first if you want a copy. This permanently deletes your household, members, chores, and shopping list. There is no cloud backup — this can\'t be undone. If you\'re signed in, this also signs you out of this phone.';
 
   @override
   String get settingsResetConfirm1BodyLinked =>
-      'Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list.';
+      'Export your data first if you want a copy. Your household stays online — this phone just disconnects from it. You can reconnect by signing in again. This still permanently deletes this phone\'s local members, chores, and shopping list. Your account and email stay on the server — Delete my account removes them.';
 
   @override
   String get settingsResetConfirm1Action => 'Continue';
@@ -1513,6 +1882,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitConfirmCancel => 'Cancel';
+
+  @override
+  String get householdExitNameLabel => 'Your name in the household\'s history';
 
   @override
   String get membershipRevokedTitle =>

@@ -45,6 +45,7 @@ class SettingsGroup extends StatelessWidget {
           // "Household", not "HOUSEHOLD".
           child: Semantics(
             label: label,
+            header: true,
             child: ExcludeSemantics(
               child: Text(
                 label.toUpperCase(),

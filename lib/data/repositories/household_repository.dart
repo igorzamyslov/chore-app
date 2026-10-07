@@ -113,8 +113,10 @@ class HouseholdRepository {
     return db.select(db.households).watchSingleOrNull();
   }
 
-  /// Creates the household (named `'My household'`) with ONE admin member
-  /// named [name] (first seed color) -- the welcome screen's explicit
+  /// Creates the household (named [householdName], default
+  /// `'My household'` -- the welcome flow passes the localised
+  /// `householdDefaultName`, persona review D10) with ONE admin member named
+  /// [name] (first seed color) -- the welcome screen's explicit
   /// "Set up a new household" action (spec `docs/specs/onboarding-v2.md`
   /// §1/§2). Replaces the old lazy-creating `ensureLocalHousehold`: a fresh
   /// install now has NO household until the user chooses this (or joins).
@@ -123,7 +125,10 @@ class HouseholdRepository {
   /// a household already exists (e.g. a second, redundant call racing the
   /// first) the existing row is returned untouched -- [name] is only used
   /// the FIRST time this actually creates something.
-  Future<Household> createLocalHousehold(String name) async {
+  Future<Household> createLocalHousehold(
+    String name, {
+    String householdName = 'My household',
+  }) async {
     final existing = await db.select(db.households).getSingleOrNull();
     if (existing != null) {
       return existing;
@@ -136,7 +141,7 @@ class HouseholdRepository {
       final now = _isoNow();
       final household = Household(
         id: newId(),
-        name: 'My household',
+        name: householdName,
         createdAt: now,
         updatedAt: now,
         syncDirty: true,

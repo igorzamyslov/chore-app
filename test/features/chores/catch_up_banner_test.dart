@@ -18,16 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 
-/// The English copy the ARB produces for one and for several chores. Spelled
-/// out here rather than read back from `AppLocalizations`, so a copy edit has
-/// to be made deliberately in both places instead of a test happily asserting
-/// whatever the app now says.
-const _singularCopy =
-    'We moved 1 overdue chore forward to its most recent due date, so '
-    'nothing piled up.';
-const _pluralCopyForTwo =
-    'We moved 2 overdue chores forward to their most recent due dates, so '
-    'nothing piled up.';
+/// The English copy the ARB produces. Spelled out here rather than read back
+/// from `AppLocalizations`, so a copy edit has to be made deliberately in both
+/// places instead of a test happily asserting whatever the app now says.
+///
+/// Persona review 2026-10-06 E2: the sentence states the outcome for the
+/// reader ("jumped ahead", "you didn't miss anything extra") instead of the
+/// mechanism, and no longer carries a count.
+const _copy =
+    "Your repeating chores jumped ahead to their latest due date — you didn't "
+    'miss anything extra.';
 
 void main() {
   final today = DateTime(2026, 7, 24, 9);
@@ -45,25 +45,25 @@ void main() {
   );
 
   testChoreApp(
-    'one chore caught up: singular copy, no bare count',
+    'chores caught up: the outcome sentence, whatever the count',
     today: today,
     overrides: [catchUpBannerCountProvider.overrideWith((ref) => 1)],
     (tester, database) async {
       final handle = tester.ensureSemantics();
 
       expect(find.bySemanticsIdentifier('catchup.banner'), findsOneWidget);
-      expect(find.text(_singularCopy), findsOneWidget);
+      expect(find.text(_copy), findsOneWidget);
 
       handle.dispose();
     },
   );
 
   testChoreApp(
-    'several chores caught up: plural copy naming the number',
+    'several chores caught up read the same: no count in the copy',
     today: today,
     overrides: [catchUpBannerCountProvider.overrideWith((ref) => 2)],
     (tester, database) async {
-      expect(find.text(_pluralCopyForTwo), findsOneWidget);
+      expect(find.text(_copy), findsOneWidget);
     },
   );
 
@@ -91,7 +91,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier('catchup.banner'), findsOneWidget);
-      expect(find.text(_singularCopy), findsOneWidget);
+      expect(find.text(_copy), findsOneWidget);
 
       handle.dispose();
     },
@@ -133,7 +133,7 @@ void main() {
       final handle = tester.ensureSemantics();
 
       expect(find.bySemanticsIdentifier('catchup.banner'), findsOneWidget);
-      expect(find.text(_pluralCopyForTwo), findsOneWidget);
+      expect(find.text(_copy), findsOneWidget);
 
       // Ordering (a recorded decision): somebody coming back after a lapse
       // needs the what-just-happened explanation before the evergreen
@@ -142,7 +142,7 @@ void main() {
       final nameBannerCopy = find.text("Who's doing the chores here?");
       expect(nameBannerCopy, findsOneWidget);
       expect(
-        tester.getTopLeft(find.text(_pluralCopyForTwo)).dy,
+        tester.getTopLeft(find.text(_copy)).dy,
         lessThan(tester.getTopLeft(nameBannerCopy).dy),
       );
 

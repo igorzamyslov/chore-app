@@ -116,9 +116,38 @@ void main() {
         find.text(
           "Signing in stores your email and your household's data — chores, "
           'shopping list, members — on the sync server, so your devices stay '
-          'in step. Without an account, everything stays on this device.',
+          'in step. Without an account, everything stays on this device. '
+          'Technical error reports are sent too — you can switch them off '
+          'under About.',
         ),
         findsOneWidget,
+      );
+
+      // Persona review D9: a "How accounts work" link under the intro
+      // defines the three terms the exit rows rely on.
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.howItWorks'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+        findsOneWidget,
+      );
+      for (final heading in ['Account', 'Member', 'Household']) {
+        expect(
+          find.descendant(
+            of: find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+            matching: find.text(heading),
+          ),
+          findsOneWidget,
+          reason: heading,
+        );
+      }
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.account.howItWorks.sheet'),
+        findsNothing,
       );
 
       FilledButton sendButtonWidget() => tester.widget<FilledButton>(
@@ -330,9 +359,10 @@ void main() {
       );
       expect(
         find.text(
-          'This device is still connected to My household, but syncing is '
+          'This phone is still connected to My household, but syncing is '
           'paused. Changes you make now will be sent once you sign in '
-          'again.',
+          'again. If someone else edits the same item meanwhile, your '
+          'version replaces theirs when you sign back in.',
         ),
         findsOneWidget,
       );
@@ -641,8 +671,31 @@ void main() {
         find.bySemanticsIdentifier('settings.account.adopt'),
         findsOneWidget,
       );
+      expect(
+        find.text(
+          'Put it online so your family can join with an invite code. Also '
+          'keeps your other phones in step.',
+        ),
+        findsOneWidget,
+      );
+
+      // Persona review B6: never one tap. The confirm sheet says what goes
+      // up; Cancel uploads nothing.
+      await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      expect(find.text("Put 'My household' online?"), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.cancel'),
+      );
+      await tester.pumpAndSettle();
+      expect(happyPathGateway.createHouseholdCalls, isEmpty);
+      expect(happyPathGateway.uploadHouseholdDataCalls, isEmpty);
 
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -702,6 +755,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       // First attempt: createHousehold succeeds, upload fails -> inline
@@ -773,6 +830,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('This household is already online'), findsOneWidget);
@@ -850,6 +911,10 @@ void main() {
 
       await openSettingsTab(tester);
       await tester.tap(find.bySemanticsIdentifier('settings.account.adopt'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('settings.account.adopt.confirm'),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -950,15 +1015,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Sheet closed; success snackbar names the archive file.
+      // Sheet closed; the success snackbar says the old data was saved in-app.
       expect(
         find.bySemanticsIdentifier('settings.account.reconnect.sheet'),
         findsNothing,
       );
       expect(
-        find.textContaining('famdo-archive-2026-07-24.json'),
+        find.text('Your previous data was saved inside the app'),
         findsOneWidget,
       );
+      expect(find.text('Share…'), findsOneWidget);
 
       // No claim/join RPC at all -- reconnect already knows its household
       // and member ids.
@@ -967,7 +1033,7 @@ void main() {
       expect(reconnectGateway.downloadHouseholdCalls, ['joined-hh']);
       expect(
         archiveWriter.writtenFiles.keys,
-        contains('/fake-docs/famdo-archive-2026-07-24.json'),
+        contains('/fake-docs/famdo-archive-2026-07-24-090000.json'),
       );
 
       final settings = await database.select(database.settings).getSingle();

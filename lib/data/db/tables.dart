@@ -363,6 +363,22 @@ class Settings extends Table {
   BoolColumn get errorReportsEnabled =>
       boolean().withDefault(const Constant(true))();
 
+  /// Master switch for per-chore reminder notifications (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` §2, read by W4).
+  /// Default `true`, so upgrading to schemaVersion 18 changes the behaviour
+  /// of zero installs. Added in schemaVersion 18; see `AppDatabase.migration`.
+  BoolColumn get choreRemindersEnabled =>
+      boolean().withDefault(const Constant(true))();
+
+  /// ISO-8601 UTC moment this device successfully LEFT the household's
+  /// online copy while other members stayed (spec
+  /// `docs/specs/household-lifecycle.md` §2.2, amendment 2026-10-06), or
+  /// `NULL`. While set, the Account section hides "Put my household online"
+  /// (the local copy is the leaver's own; re-sharing means a new household)
+  /// and shows a plain notice instead. Cleared by Reset app data. Added in
+  /// schemaVersion 18; see `AppDatabase.migration`.
+  TextColumn get syncLeftAt => text().nullable()();
+
   /// ISO-8601 UTC creation timestamp.
   TextColumn get createdAt => text()();
 
@@ -406,6 +422,18 @@ class Chores extends Table with SyncDirtyColumn {
 
   /// Timestamp at which this chore was paused; `NULL` means unpaused.
   TextColumn get pausedAt => text().nullable()();
+
+  /// The local calendar day a paused chore resumes on by itself, or `NULL`
+  /// for "until I resume it" (and always `NULL` on an unpaused chore).
+  /// Plain date `yyyy-MM-dd`, not a timestamp: "until Monday" is a day in
+  /// the household's calendar. `ChoreService.catchUpOverdue` (bootstrap and
+  /// day change) unpauses every chore whose `pausedUntil <= today` (plan
+  /// `docs/plans/2026-10-06-persona-review-fixes.md` W3, persona review
+  /// C2). Household data, synced as `chores.paused_until`. Added in
+  /// schemaVersion 19.
+  TextColumn get pausedUntil => text().nullable().map(
+    const NullAwareTypeConverter.wrap(PlainDateConverter()),
+  )();
 
   /// The per-chore individual reminder's fire time, as minutes since local
   /// midnight, or `NULL` for "no individual reminder" (spec

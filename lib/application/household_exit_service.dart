@@ -25,7 +25,12 @@ import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/application/data_reset.dart';
 import 'package:chore_app/application/household_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+
+/// A rename-on-exit request (persona review D8): the caller's own member row
+/// `memberId` should carry `name` in the household's history from now on.
+typedef ExitRename = ({String memberId, String name});
 
 /// Runs the leave-household and delete-account exits.
 class HouseholdExitService {
@@ -55,9 +60,9 @@ class HouseholdExitService {
 
   /// Leaves [householdId] (spec §2.2, F9).
   ///
-  /// The server unclaims this account's member row and keeps the profile
-  /// active, so the family still sees the person and their history and the
-  /// profile can be claimed again later through an invite. If this account
+  /// The server unclaims AND soft-deletes this account's member row
+  /// (amendment 2026-10-06): the family stops seeing the person in
+  /// rotations, while their history keeps the name. If this account
   /// was the LAST claimed member, the server also cascades the household
   /// (§2.4, D-L5) -- the caller is responsible for having said so in the
   /// confirm (§3.4); this method does not decide, it reports nothing back,
@@ -70,12 +75,24 @@ class HouseholdExitService {
   /// [alsoDeleteLocalData] is the D-L3 opt-in and is `false` in every
   /// default path. Callers must invalidate `settingsProvider` afterwards
   /// when it was `true` (the documented `resetAppData` contract).
+  ///
+  /// [rename], when set, renames the leaver's profile FIRST (see
+  /// [_renameBeforeExit]). Unless [lastClaimedMember] (the cascade case) or
+  /// [alsoDeleteLocalData], a successful leave stamps `settings.syncLeftAt`:
+  /// this phone's copy is now the leaver's own, so the Account section stops
+  /// offering to put it online again (persona review D8).
   Future<void> leaveHousehold({
     required String householdId,
     required bool alsoDeleteLocalData,
+    ExitRename? rename,
+    bool lastClaimedMember = false,
   }) async {
+    await _renameBeforeExit(rename);
     await gateway.leaveHousehold(householdId);
     await _finishLocally(alsoDeleteLocalData: alsoDeleteLocalData);
+    if (!lastClaimedMember && !alsoDeleteLocalData) {
+      await settings.setSyncLeftAt(settings.nowUtc());
+    }
   }
 
   /// Deletes the signed-in account (spec §2.2, F11, D-L4).
@@ -109,7 +126,15 @@ class HouseholdExitService {
   /// and the account, not the user's own device. Callers must invalidate
   /// `settingsProvider` afterwards when it was `true` (the documented
   /// [resetAppData] contract).
-  Future<void> deleteAccount({required bool alsoDeleteLocalData}) async {
+  ///
+  /// [rename], when set, renames the account's profile in the linked
+  /// household FIRST (see [_renameBeforeExit]) -- `delete_account` keeps the
+  /// profile and its display name, so this is the one chance to change it.
+  Future<void> deleteAccount({
+    required bool alsoDeleteLocalData,
+    ExitRename? rename,
+  }) async {
+    await _renameBeforeExit(rename);
     await gateway.deleteAccount();
     try {
       await auth.signOut();
@@ -125,6 +150,25 @@ class HouseholdExitService {
       // fail precisely BECAUSE the account it names no longer exists.
     }
     await _finishLocally(alsoDeleteLocalData: alsoDeleteLocalData);
+  }
+
+  /// Rename-on-exit (persona review D8, Priya): runs BEFORE the exit RPC,
+  /// while this account is still a member and RLS still admits the write --
+  /// afterwards it could not. Server first, through the gateway rather than
+  /// the sync engine, because the exit unlinks this device right after and
+  /// a dirty row would never be pushed; then the local row, through the
+  /// ordinary member update path, so this phone's history agrees.
+  ///
+  /// A failed server rename throws before anything else has happened, so
+  /// the caller's "nothing was changed" error copy stays accurate.
+  Future<void> _renameBeforeExit(ExitRename? rename) async {
+    if (rename == null) {
+      return;
+    }
+    await gateway.renameMember(rename.memberId, rename.name);
+    await HouseholdRepository(
+      database,
+    ).renameMember(rename.memberId, rename.name);
   }
 
   /// Shared local tail of both exits, reached only once the server RPC has

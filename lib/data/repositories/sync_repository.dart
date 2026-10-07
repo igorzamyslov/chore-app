@@ -12,6 +12,7 @@
 library;
 
 import 'package:chore_app/data/db/app_database.dart';
+import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:drift/drift.dart';
 
 /// Data access backing `SupabaseSyncEngine`'s push (dirty-select,
@@ -59,6 +60,46 @@ class SyncRepository {
         )
         .watchSingle()
         .map((row) => row.read<int>('any_dirty') == 1);
+  }
+
+  /// Watches HOW MANY changes this device still owes the server: every
+  /// `syncDirty` row across the seven synced tables plus every pending
+  /// hard-delete tombstone (spec `docs/specs/sync-backend.md` §8.6 -- a
+  /// deleted row has no dirty row of its own, the outbox entry IS the
+  /// unsent change). Backs `syncPendingCountProvider`
+  /// (`lib/app/providers.dart`) and the "N changes waiting to send" line in
+  /// Settings -> Account (spec `docs/specs/sync-freshness.md` §2.4
+  /// amendment 2026-10-06). Re-emits on a write to any of those eight
+  /// tables.
+  ///
+  /// Kept separate from [watchAnyDirty]: that one is an `EXISTS` the health
+  /// check only needs collapsed to a boolean, and SQLite short-circuits it;
+  /// this one has to count.
+  Stream<int> watchDirtyRowCount() {
+    return db
+        .customSelect(
+          'SELECT '
+          '(SELECT COUNT(*) FROM households WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM members WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM categories WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chores WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chore_assignees WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM chore_occurrences WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM shopping_items WHERE sync_dirty = 1) + '
+          '(SELECT COUNT(*) FROM sync_tombstones) AS pending',
+          readsFrom: {
+            db.households,
+            db.members,
+            db.categories,
+            db.chores,
+            db.choreAssignees,
+            db.choreOccurrences,
+            db.shoppingItems,
+            db.syncTombstones,
+          },
+        )
+        .watchSingle()
+        .map((row) => row.read<int>('pending'));
   }
 
   // ---------------------------------------------------------------------
@@ -211,6 +252,7 @@ class SyncRepository {
 
   /// Applies a pulled `households` row, unless the local row is dirty.
   Future<void> applyPulledHousehold(Household pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.households,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -219,16 +261,37 @@ class SyncRepository {
   );
 
   /// Applies a pulled `members` row, unless the local row is dirty.
-  Future<void> applyPulledMember(Member pulled) => _applyPulled(
-    existing: (db.select(
+  ///
+  /// Post-hook (plan `docs/plans/2026-10-06-persona-review-fixes.md` W5.6):
+  /// when the pull is what soft-deletes a member this device still had
+  /// active -- someone removed them, or they left (`leave_household`
+  /// soft-deletes the leaver since migration
+  /// `20261006120000_join_funnel.sql`) -- the member is detached from every
+  /// rotation, fixed assignment and pending occurrence right after the
+  /// write ([ChoreRepository.detachMemberFromChores]), exactly as a local
+  /// removal would. Without it a departed member kept their turns forever.
+  ///
+  /// Same identical-row no-op as [_applyPulled] (spec §8.7 invariant 4): a
+  /// pulled row equal to the local one is not rewritten, so a pull never
+  /// re-emits the table for nothing.
+  Future<void> applyPulledMember(Member pulled) async {
+    final existing = await (db.select(
       db.members,
-    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.members).insertOnConflictUpdate(pulled),
-  );
+    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull();
+    if (existing != null && (existing.syncDirty || existing == pulled)) {
+      return;
+    }
+    await db.into(db.members).insertOnConflictUpdate(pulled);
+    if (pulled.deletedAt != null &&
+        existing != null &&
+        existing.deletedAt == null) {
+      await ChoreRepository(db).detachMemberFromChores(pulled.id);
+    }
+  }
 
   /// Applies a pulled `categories` row, unless the local row is dirty.
   Future<void> applyPulledCategory(Category pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.categories,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -238,6 +301,7 @@ class SyncRepository {
 
   /// Applies a pulled `chores` row, unless the local row is dirty.
   Future<void> applyPulledChore(Chore pulled) => _applyPulled(
+    pulled: pulled,
     existing: (db.select(
       db.chores,
     )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -245,24 +309,70 @@ class SyncRepository {
     write: () => db.into(db.chores).insertOnConflictUpdate(pulled),
   );
 
-  /// Applies a pulled `chore_assignees` row (keyed by `choreId` +
-  /// `memberId`), unless the local row is dirty.
-  Future<void> applyPulledChoreAssignee(ChoreAssignee pulled) => _applyPulled(
-    existing:
-        (db.select(db.choreAssignees)..where(
-              (tbl) =>
-                  tbl.choreId.equals(pulled.choreId) &
-                  tbl.memberId.equals(pulled.memberId),
-            ))
-            .getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.choreAssignees).insertOnConflictUpdate(pulled),
-  );
+  /// Applies everything a pull fetched for ONE chore's `chore_assignees`
+  /// (spec §8.3 amendment 2026-10-06, technical review #8): the assignee
+  /// list is a single LWW value, not a set of independently merged rows.
+  ///
+  /// - If the local chore row is dirty, or any of its local assignee rows
+  ///   is (an edit whose push has not completed), nothing is applied: local
+  ///   dirty wins for the WHOLE list, and the next push settles it. Merging
+  ///   row-by-row here is what produced a union of both devices' edits with
+  ///   duplicate `position`s and a rotation order that differed per device.
+  /// - Otherwise, if [live] is non-empty, the local set is replaced by it
+  ///   (delete then insert, positions exactly as pulled). Every local edit
+  ///   rewrites the full list (`ChoreRepository.updateChore`), so a pull
+  ///   that sees any live row of a chore sees that chore's complete list.
+  /// - Otherwise only [tombstonedMemberIds] are deleted: a pull can land
+  ///   between the other device's live-row push and its tombstone push,
+  ///   and treating "tombstones only" as "the new set is empty" would wipe
+  ///   the chore's assignees.
+  Future<void> applyPulledAssigneeSet(
+    String choreId, {
+    required List<ChoreAssignee> live,
+    required List<String> tombstonedMemberIds,
+  }) async {
+    final chore = await (db.select(
+      db.chores,
+    )..where((tbl) => tbl.id.equals(choreId))).getSingleOrNull();
+    if (chore != null && chore.syncDirty) {
+      return;
+    }
+    final current = await (db.select(
+      db.choreAssignees,
+    )..where((tbl) => tbl.choreId.equals(choreId))).get();
+    if (current.any((row) => row.syncDirty)) {
+      return;
+    }
+    if (live.isNotEmpty) {
+      // Same no-op rule as [_applyPulled]: an unchanged list (a re-fetch
+      // inside the cursor overlap) must not be rewritten, or the write
+      // listener would turn every pull into another push/pull.
+      if (_sameAssigneeSet(current, live)) {
+        return;
+      }
+      await (db.delete(
+        db.choreAssignees,
+      )..where((tbl) => tbl.choreId.equals(choreId))).go();
+      for (final row in live) {
+        await db.into(db.choreAssignees).insert(row);
+      }
+      return;
+    }
+    if (tombstonedMemberIds.isNotEmpty) {
+      await (db.delete(db.choreAssignees)..where(
+            (tbl) =>
+                tbl.choreId.equals(choreId) &
+                tbl.memberId.isIn(tombstonedMemberIds),
+          ))
+          .go();
+    }
+  }
 
   /// Applies a pulled `chore_occurrences` row, unless the local row is
   /// dirty.
   Future<void> applyPulledChoreOccurrence(ChoreOccurrence pulled) =>
       _applyPulled(
+        pulled: pulled,
         existing: (db.select(
           db.choreOccurrences,
         )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
@@ -271,14 +381,51 @@ class SyncRepository {
             db.into(db.choreOccurrences).insertOnConflictUpdate(pulled),
       );
 
-  /// Applies a pulled `shopping_items` row, unless the local row is dirty.
-  Future<void> applyPulledShoppingItem(ShoppingItem pulled) => _applyPulled(
-    existing: (db.select(
+  /// Applies a pulled `shopping_items` row, unless the local row is dirty --
+  /// with one field-level exception (spec `docs/specs/sync-backend.md` §8.8,
+  /// persona finding A9).
+  ///
+  /// When the local row is dirty AND the pulled row's `updatedAt` is later
+  /// than the local one, the other device edited the item after this device
+  /// did. Whole-row "dirty local wins" would then push this device's stale
+  /// `checkedAt`/`deletedAt` over that newer edit (Tom clears "Milch"
+  /// offline; his partner re-adds it; his later push deletes it again). So
+  /// the pulled `checkedAt` and `deletedAt` are written onto the local row,
+  /// while `name`, `quantityNote`, `categoryId` and `updatedAt` stay local
+  /// and `syncDirty` stays `true` (the local fields still have to be
+  /// pushed; keeping the local `updatedAt` keeps the guarded dirty-clear
+  /// after that push matching). A pulled row that is not newer, or a clean
+  /// local row, behaves exactly as in [_applyPulled].
+  Future<void> applyPulledShoppingItem(ShoppingItem pulled) async {
+    final local = await (db.select(
       db.shoppingItems,
-    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull(),
-    isDirty: (row) => row.syncDirty,
-    write: () => db.into(db.shoppingItems).insertOnConflictUpdate(pulled),
-  );
+    )..where((tbl) => tbl.id.equals(pulled.id))).getSingleOrNull();
+    if (local != null && local.syncDirty && local != pulled) {
+      final pulledAt = DateTime.tryParse(pulled.updatedAt);
+      final localAt = DateTime.tryParse(local.updatedAt);
+      final pulledIsNewer =
+          pulledAt != null && localAt != null && pulledAt.isAfter(localAt);
+      if (pulledIsNewer &&
+          (local.checkedAt != pulled.checkedAt ||
+              local.deletedAt != pulled.deletedAt)) {
+        await (db.update(
+          db.shoppingItems,
+        )..where((tbl) => tbl.id.equals(pulled.id))).write(
+          ShoppingItemsCompanion(
+            checkedAt: Value(pulled.checkedAt),
+            deletedAt: Value(pulled.deletedAt),
+          ),
+        );
+      }
+      return;
+    }
+    await _applyPulled(
+      pulled: pulled,
+      existing: Future.value(local),
+      isDirty: (row) => row.syncDirty,
+      write: () => db.into(db.shoppingItems).insertOnConflictUpdate(pulled),
+    );
+  }
 
   // ---------------------------------------------------------------------
   // Hard-delete tombstones (spec `docs/specs/sync-backend.md` §8.6).
@@ -336,30 +483,38 @@ class SyncRepository {
 
   /// Applies a pulled tombstone for the `chore_occurrences` row [id]: a
   /// local hard delete, unless the local row is `syncDirty` (local dirty
-  /// wins, §8.3; its push sends `deleted_at: null`). No tombstone is
+  /// wins, §8.3; its push sends `deleted_at: null`) OR is no longer
+  /// pending (spec §8.6 amendment 2026-10-06, technical review #1: a
+  /// tombstone means "the pending row is gone", and must never erase a
+  /// completion this device recorded and already pushed). No tombstone is
   /// recorded -- the server already knows.
-  Future<void> applyPulledOccurrenceDeletion(String id) => (db.delete(
-    db.choreOccurrences,
-  )..where((tbl) => tbl.id.equals(id) & tbl.syncDirty.equals(false))).go();
-
-  /// Applies a pulled tombstone for the `chore_assignees` row keyed
-  /// [choreId] + [memberId]; same dirty rule as
-  /// [applyPulledOccurrenceDeletion].
-  Future<void> applyPulledAssigneeDeletion(String choreId, String memberId) =>
-      (db.delete(db.choreAssignees)..where(
+  Future<void> applyPulledOccurrenceDeletion(String id) =>
+      (db.delete(db.choreOccurrences)..where(
             (tbl) =>
-                tbl.choreId.equals(choreId) &
-                tbl.memberId.equals(memberId) &
-                tbl.syncDirty.equals(false),
+                tbl.id.equals(id) &
+                tbl.syncDirty.equals(false) &
+                tbl.status.equalsValue(OccurrenceStatus.pending),
           ))
           .go();
 
-  /// Ghost repair (spec §8.6.6): for every chore of [householdId] with MORE
-  /// THAN ONE pending occurrence, keeps the one with the greatest
-  /// `updatedAt` (tie: greater `dueDate`, then greater `id`) and hard-deletes
-  /// the rest through [deleteOccurrencesRecordingTombstones]. The product
-  /// invariant is "at most one pending occurrence per chore", so any extra
-  /// one is a ghost an older client failed to delete on the server.
+  /// Ghost repair (spec §8.6.6, survivor key amended 2026-10-06 -- §8.7):
+  /// for every chore of [householdId] with MORE THAN ONE pending
+  /// occurrence, keeps the one with the greatest `dueDate` (tie: greater
+  /// `id`) and hard-deletes the rest through
+  /// [deleteOccurrencesRecordingTombstones]. The product invariant is "at
+  /// most one pending occurrence per chore", so any extra one is a ghost an
+  /// older client failed to delete on the server, or the other device's
+  /// copy of a catch-up both devices ran the same morning.
+  ///
+  /// `updatedAt` is deliberately NOT part of the key (technical review
+  /// 2026-10-06 #4): a locally written stamp comes from this device's
+  /// clock, a pulled one from the server's, so two devices comparing the
+  /// same two rows could each pick a different survivor and tombstone the
+  /// other's -- leaving the chore with no pending row anywhere. `dueDate`
+  /// and `id` are the only fields both devices see identically, so both
+  /// converge on the same survivor. Callable from anywhere, not only the
+  /// pull transaction: it touches pending rows only and opens its own
+  /// transaction for each deletion (`ChoreService.catchUpOverdue` runs it).
   Future<void> repairGhostOccurrences(
     String householdId,
     String deletedAt,
@@ -387,10 +542,6 @@ class SyncRepository {
         continue;
       }
       group.sort((a, b) {
-        final byUpdated = b.updatedAt.compareTo(a.updatedAt);
-        if (byUpdated != 0) {
-          return byUpdated;
-        }
         final byDue = b.dueDate.toIso8601().compareTo(a.dueDate.toIso8601());
         return byDue != 0 ? byDue : b.id.compareTo(a.id);
       });
@@ -398,18 +549,44 @@ class SyncRepository {
     }
   }
 
+  /// Whether [current] and [pulled] describe the same assignee list
+  /// (same members at the same positions, every row clean), in any order.
+  static bool _sameAssigneeSet(
+    List<ChoreAssignee> current,
+    List<ChoreAssignee> pulled,
+  ) {
+    if (current.length != pulled.length) {
+      return false;
+    }
+    String key(ChoreAssignee row) =>
+        '${row.memberId}:${row.position}:${row.syncDirty}';
+    final currentKeys = current.map(key).toSet();
+    return pulled.every((row) => currentKeys.contains(key(row)));
+  }
+
   /// Shared "replace unless locally dirty" shape for every `applyPulled*`
   /// method above: reads the current local row (if any) via [existing];
   /// if it exists and [isDirty] says it's dirty, does nothing (local dirty
-  /// wins); otherwise runs [write] (an insert-or-replace keyed on the
-  /// table's primary key).
+  /// wins); if it exists and already EQUALS [pulled] (drift data classes
+  /// compare by value, `syncDirty` included), also does nothing; otherwise
+  /// runs [write] (an insert-or-replace keyed on the table's primary key).
+  ///
+  /// The equality short-circuit is load-bearing since the cursor overlap
+  /// (`syncCursorOverlap`, spec §8.3 amendment 2026-10-06): every pull
+  /// re-fetches the rows stamped in the last 30 s of server time, and
+  /// rewriting an unchanged row would fire drift's table-update stream,
+  /// which the engine's write listener turns into a debounced push, whose
+  /// follow-up pull re-fetches the same rows again -- a push/pull loop for
+  /// as long as the rows stay inside the window. A no-op write is not a
+  /// write, so the listener never hears about a re-apply.
   Future<void> _applyPulled<D>({
+    required D pulled,
     required Future<D?> existing,
     required bool Function(D) isDirty,
     required Future<void> Function() write,
   }) async {
     final row = await existing;
-    if (row != null && isDirty(row)) {
+    if (row != null && (isDirty(row) || row == pulled)) {
       return;
     }
     await write();

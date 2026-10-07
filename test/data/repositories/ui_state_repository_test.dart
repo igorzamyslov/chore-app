@@ -50,6 +50,16 @@ void main() {
     expect(await db.select(db.uiState).get(), hasLength(1));
   });
 
+  test('the all-members sentinel round-trips verbatim', () async {
+    await repository.setChoresFilters(
+      memberId: UiStateRepository.allMembersFilter,
+      categoryId: null,
+    );
+
+    final row = await repository.readUiState();
+    expect(row?.choresMemberFilter, 'all');
+  });
+
   test('setChoresFilters leaves last_tab alone', () async {
     await repository.setLastTab('shopping');
     await repository.setChoresFilters(memberId: 'm1', categoryId: null);

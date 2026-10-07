@@ -115,6 +115,18 @@ Deltas vs local:
     not generalise. The app then drops back to local-only mode; local data
     on the user's own device is untouched unless they tick the
     `household-lifecycle.md` §3.3 opt-in (D-L3).
+- **Amendment 2026-10-06 (persona review D3; migration
+  `20261006120000_join_funnel.sql`) — `peek_invite(p_code text) returns
+  text`.** SECURITY DEFINER, `set search_path = public`, EXECUTE revoked
+  from `public`/`anon`, granted to `authenticated` only. Returns the
+  household `name` for a code that is active (not revoked), unexpired and
+  whose household is not cascaded — validation delegated to
+  `_valid_invite`; every rejection raises the single message
+  `'invalid code'`. Reveals nothing `list_claimable_members` does not
+  already give the same code holder. Client: `HouseholdGateway.peekInviteHouseholdName`,
+  called right after `list_claimable_members` succeeds; the join chooser
+  and its new claim confirm ("Join {household} as {name}?", §7.4
+  amendment) show the name. pgTAP: `supabase/tests/006_join_funnel_test.sql`.
 - **Tests: pgTAP** in `supabase/tests/` — the isolation matrix (member of
   A cannot read/write anything of B, for every table and every verb),
   invite lifecycle (expiry, revocation, double-claim rejection), RPC
@@ -141,6 +153,8 @@ Family-scale data (hundreds of rows) permits a simple, robust engine:
   devices editing the same row: last push wins — acceptable for chores
   at family scale; occurrences are mostly-append which limits real
   conflicts. Tombstones (`deleted_at`) replicate exactly like updates.
+  **Exception (amendment 2026-10-06, §8.8):** a newer pulled `shopping_items`
+  row still lends its `checked_at`/`deleted_at` to a dirty local row.
 - **Realtime**: `postgres_changes` subscription per household (filter on
   the denormalized `household_id`), feeding the same apply path as pull.
   REQUIRES the synced tables be in the `supabase_realtime` publication
@@ -303,6 +317,38 @@ A3 -- one live code per household, so creating a new one is how you
 revoke the old one) → `createInvite` → bottom sheet with the code in
 large type + a share button (share_plus).
 
+> **Amendment 2026-10-06 (persona review B6, D6, D7) — signposting.** The
+> adopt row's subtitle now leads with the family: "Put it online so your
+> family can join with an invite code. Also keeps your other phones in
+> step." Adopt is no longer one tap: a confirm sheet "Put '{household}'
+> online?" states what is uploaded (members, chores, completion history,
+> notes, shopping list), where (the sync server, under your account) and how
+> to take it down (Delete my account / Leave the household); only "Put
+> online" (`settings.account.adopt.confirm`; Cancel is
+> `settings.account.adopt.cancel`) runs `HouseholdLinkService.adopt`. A
+> "Try again" after a failed attempt skips the sheet. A LOCAL household's
+> Members screen shows a disabled Invite row (`settings.members.inviteLocal`,
+> "Sign in first to invite your family", no `onTap`) where the real one will
+> be — hidden under the Noop gateway, which has no sign-in. The invite share
+> text ends with the install link
+> `https://github.com/igorzamyslov/chore-app/releases/latest`.
+
+> **Amendment 2026-10-06 (persona review D5) — invite code lifecycle.**
+> `runInviteFlow` first asks `HouseholdGateway.activeInvite(householdId)`
+> (a plain select on `household_invites`: `revoked_at is null and
+> expires_at > now`, newest first). If a code is active, the sheet re-shows
+> THAT code with "Valid until {date}" (`DateFormat.yMMMd`, id
+> `settings.members.invite.validUntil`) and a "New code" text button
+> (`settings.members.invite.newCode`) — nothing is revoked by opening the
+> sheet. "New code" confirms ("Replace the shared code?" / "Anyone still
+> joining with the old code will need this new one.", ids
+> `settings.members.invite.replace.confirm` / `.cancel`) and only then runs
+> the revoke-then-create pair above. With no active code the flow creates
+> one directly, as before. On the join side, `joinCodeErrorMessage` keeps
+> the "typo" copy only for a `PostgrestException` whose message contains
+> `invalid` or `expired`; any other `PostgrestException` reads "Couldn't
+> check the code right now — try again in a moment."
+
 ### 7.4 P2c — join ("Join an existing household")
 
 From the join row: enter code (`settings.account.join.code` field) →
@@ -310,7 +356,8 @@ From the join row: enter code (`settings.account.join.code` field) →
 Anna?") + "I'm new here" → `claimMember` or `joinAsNewMember` (new UUID,
 name prompt, auto color). Then, per §4, strictly in this order:
 1. Automatic JSON export (G8 exporter) written to the app documents dir
-   (filename `famdo-archive-<date>.json`); abort the whole join if this
+   (filename `famdo-archive-<date>.json`, amended 2026-10-06: see the B3
+   block after step 3); abort the whole join if this
    write fails.
 2. Import offer, IN-FLOW (amended 2026-08-01; a post-replace banner
    can't work — the offer's source rows are exactly what step 3
@@ -328,6 +375,31 @@ name prompt, auto color). Then, per §4, strictly in this order:
    replace is one local transaction; the post-replace UI must re-resolve
    the bootstrap household (provider invalidation), since the household
    id changes.
+
+> **Amendment 2026-10-06 (persona review B3) — saved copies are reachable.**
+> The archive filename is `famdo-archive-<yyyy-MM-dd-HHmmss>.json` (device
+> clock, via the injected `Clock`): two joins on one day no longer overwrite
+> each other's copy. The post-join snackbar no longer prints the file name;
+> it says "Your previous data was saved inside the app" with a "Share…"
+> action that opens the OS share sheet for that file. Settings → Data gains
+> "Saved copies of earlier households (N)" (hidden at 0) listing the copies
+> with Share and Delete (confirmed) each, and `resetAppData` deletes every
+> `famdo-archive-*.json` (best effort, logged on failure). The archive is
+> still not importable (backlog G-3); the copy never claims otherwise.
+
+> **Amendment 2026-10-06 (persona review D3) — name the household, confirm
+> the claim.** Once the code is accepted, the client also calls
+> `peekInviteHouseholdName` (§2 amendment). The chooser heading becomes
+> "Which one is you in {household}?" and, on the welcome join subpage, the
+> AppBar title becomes the household name. Tapping a profile no longer
+> claims it: a dialog "Join {household} as {name}?" / "You'll see and mark
+> the chores assigned to {name}. Pick another name if this isn't you."
+> (ids `join.claim.cancel` / `join.claim.confirm`) comes first, and only
+> Join proceeds (to the import offer in the Settings sheet; to the join
+> itself on the welcome subpage). The invite sheet carries the hint "Add
+> everyone under Members first — they'll pick their own name when they
+> join." so joiners claim a pre-created profile instead of duplicating it
+> via "I'm new here".
 
 ### 7.5 Testing
 
@@ -448,6 +520,22 @@ provider `syncEngineProvider` re-evaluates on the linked state
 
 ### 8.3 SupabaseSyncEngine behavior
 
+> **Amendment 2026-10-06 (persona review H4; migration
+> `20261006140000_privacy_and_grants.sql`) — column-scoped grants on
+> `households` and `household_invites`.** The table-level UPDATE on both is
+> revoked; `authenticated` keeps `UPDATE (name)` on `households` and
+> `UPDATE (revoked_at)` on `household_invites` — the only columns the client
+> ever writes. Postgres checks UPDATE privilege on the WHOLE `SET` list at
+> plan time, so the client contract is: `updateHousehold` sends ONLY
+> `{'name': …}` (`householdRow` carries nothing else; `id` is the filter and
+> `updated_at` is trigger-maintained) and `revokeActiveInvites` ONLY
+> `{'revoked_at': …}`; any other column in a payload fails the whole
+> statement with 42501. `chores`, `shopping_items`, `categories`,
+> `chore_assignees` and `chore_occurrences` stay table-level on purpose: they
+> are pushed as full-row upserts. `create_invite` now draws its 8 characters
+> from `gen_random_bytes` (pgcrypto) over the same 32-symbol alphabet instead
+> of `random()`.
+
 - **pushDirty**: per table in FK order, select rows where
   `syncDirty == true`, upsert to the server (members via
   insert-with-ignore + a second UPDATE limited to the granted columns
@@ -482,6 +570,66 @@ provider `syncEngineProvider` re-evaluates on the linked state
 - **Failure posture**: every engine error is swallowed into a silent
   retry-later (log in debug); the app NEVER surfaces sync errors in P3
   (local-first: the UI is always consistent with the local db).
+
+**Amendment 2026-10-06 (persona + technical review, plan
+`docs/plans/2026-10-06-persona-review-fixes.md` W1).** The bullets above
+stand; the following refine them. Findings are numbered as in
+`docs/feedback/2026-10-06-personas/technical-review.md`.
+
+- **Paging (#2).** PostgREST silently truncates every response at
+  `max_rows` (1000). Every full-table read — `SyncTransport.pullTable` and
+  each per-table read in `HouseholdGateway.downloadHousehold` — asks for
+  `syncPageSize` (= 1000) rows at a time, ordered by `updated_at` then the
+  primary key (`id`, or `chore_id, member_id` for `chore_assignees`), and
+  keeps going until a page comes back shorter than the page size. A failure
+  on any page fails the whole pull, so the cursor never advances past rows
+  that were not fetched.
+- **Cursor overlap (#3).** Postgres' `now()` is the transaction START time,
+  so a push whose transaction began before our `server_now()` read and
+  committed after a table read is stamped below an exact cursor and would
+  never be pulled. The cursor is stored as `server_now() − syncCursorOverlap`
+  (30 s). The re-fetch this causes is idempotent: a pulled row that equals
+  the local row (data-class equality) is **not rewritten**, so a re-apply
+  fires no table update and cannot feed the write listener into a
+  push/pull loop.
+- **Per-table push with quarantine (#5).** `_pushAll` never throws. Each
+  table is pushed in its own try/catch and the sequence continues past a
+  failure. A batch the server **rejects** — a `PostgrestException` whose
+  SQLSTATE class is `22`, `23` or `42` — is retried row by row; a row still
+  rejected is *quarantined*: left dirty, skipped for this tick, and recorded
+  once per engine session as `AppLog.error('sync.rejected', …, context:
+  {table, id})` (deduplicated by `table:id`). A rejected tombstone stays in
+  the outbox the same way. Any other failure (network, server down) is
+  retry-later as before and is logged once per tick as `sync.pushDirty`.
+  `pushDirty` skips its follow-up pull only on an ordinary failure, never
+  because of a quarantined row.
+- **`refreshNow()` returns `RefreshOutcome`** (`ok` | `offline` |
+  `rejected`) instead of a bool: `rejected` if any row was quarantined this
+  run, `offline` on any other failure (including a revocation discovered by
+  the pull), else `ok`. The UI mapping is in `sync-freshness.md` §2.3.
+- **One pull in flight; own echo ignored (#17).** `pullSince()` and
+  `refreshNow()` join a running pull instead of starting a second one, so
+  two pulls can never interleave and race each other's cursor write. A
+  realtime `householdChanges` event within `realtimeEchoWindow` (1 s) of our
+  own successful push is dropped as the server echoing rows we just wrote
+  (the push's own follow-up pull already fetched them); a genuine
+  other-device change inside that window is caught by the next poll tick.
+- **A chore's assignee list is one LWW value (#8).** On pull, the
+  `chore_assignees` rows and tombstones are grouped per chore. If the local
+  chore row is dirty — or any of its local assignee rows is — nothing is
+  applied for that chore (local dirty wins for the whole list). Otherwise,
+  if any live row was pulled, the local list is replaced by the pulled list
+  (delete then insert, positions as pulled); if only tombstones were pulled
+  (a pull landing between the other device's row push and its tombstone
+  push), only those members are deleted. Rows are never merged one by one:
+  that produced a union with duplicate `position`s and a per-device
+  rotation order. `_currentAssigneeIds` tie-breaks `position` by `memberId`
+  as defence in depth.
+- **Device-clock pull stamp (#7).** After every successful pull the engine
+  reports `clock.now()` (device time) through `onPullCompleted`;
+  `syncLastPullCompletedAtProvider` holds it for the session. The cursor
+  stays server time for correctness; health and "Last synced" read the
+  device stamp (`sync-freshness.md` §2.5 amendment).
 
 ### 8.4 Testing
 
@@ -582,3 +730,98 @@ no `deletedAt` column, no query changes; a tombstone is an outbox entry.
    `db.yml`) proving `markDeleted` really sets `deleted_at` under RLS and
    that a second client's `pullTable` sees it.
 
+**Amendment 2026-10-06 (technical review #1, #4, #6).**
+
+- **Tombstones only kill the pending row (#1).** Every local site that
+  hard-deletes an occurrence deletes PENDING rows only, so an occurrence
+  tombstone means "the pending row is gone" — not "this id is gone". The
+  push matches `{'id': …, 'status': 'pending'}` (`markDeleted` filters on
+  every entry of the match), and `applyPulledOccurrenceDeletion` adds
+  `status = pending` to its WHERE. Hence a completion recorded and pushed
+  on device A survives a concurrent delete/edit/pause on device B: B's
+  tombstone matches nothing on the server, and B pulls the completion back.
+  Item 5 above reads with that extra condition.
+- **Convergent survivor key (#4).** Item 6's survivor is now the pending
+  occurrence with the greatest `dueDate`, tie-broken by greater `id`.
+  `updatedAt` left the key: a locally written stamp is device time and a
+  pulled one is server time, so two devices comparing the same two rows
+  could each keep a different one and tombstone the other's, leaving the
+  chore with no pending row anywhere. See §8.7.
+- **Timestamps are normalised at the boundary (#4).** Every `*FromRow`
+  mapper rewrites each `*_at` value as
+  `DateTime.parse(s).toUtc().toIso8601String()` (a `Z` suffix, like every
+  local write), so local and pulled stamps share one format wherever they
+  are compared as text (the guarded dirty-clear). A value that does not
+  parse is passed through unchanged rather than failing the pull.
+- **Repair is reachable without a pull (#6).** `repairGhostOccurrences`
+  is callable outside the pull transaction (it only touches pending rows),
+  and `ChoreService.catchUpOverdue` runs it for the household before
+  iterating chores, so an unlinked device — or a race between a local
+  insert and a pull that already repaired — is healed at the next catch-up.
+  `ChoreRepository.pendingOccurrenceOf` is tolerant meanwhile: it orders by
+  `dueDate` desc, `updatedAt` desc and takes one row instead of
+  `getSingleOrNull()`, so two pending rows can no longer throw out of
+  bootstrap.
+
+### 8.7 Invariants (added 2026-10-06)
+
+These hold across every device of a household, and every sync rule above
+must preserve them:
+
+1. **Survivor selection uses only fields both devices see identically
+   (`dueDate`, `id`).** Any rule that picks one row over another for
+   convergence — ghost repair today, anything similar tomorrow — must not
+   read `updatedAt`, `createdAt` or any other stamp that one device wrote
+   from its clock and the other received from the server.
+2. **A tombstone names the state it deletes.** An occurrence tombstone
+   deletes a *pending* row; it never deletes a row that has since become
+   `done`, `skipped` or `missed`. Local hard deletes only ever delete
+   pending occurrences, so this is the semantics the outbox already has.
+3. **The pull cursor never advances past a row that was not applied.** Every
+   page of every table is fetched before the single apply transaction, and
+   the cursor is written only after that transaction commits — with the
+   overlap, so a transaction-start-stamped row is never skipped.
+4. **Re-applying what is already local is a no-op.** A pulled row equal to
+   the local row writes nothing; a pulled assignee list equal to the local
+   list writes nothing. This is what lets the overlap re-fetch be free.
+5. **One bad row never blocks another.** Push proceeds per table and, on
+   rejection, per row; the rejected row is quarantined and reported, the
+   rest keep flowing, and the pull is never conditional on the push.
+
+### 8.8 Shopping field-level merge (amendment 2026-10-06, finding A9)
+
+§8.3's rule "a pulled row never overwrites a locally dirty row" is a
+whole-row, last-PUSH-wins rule: which device's version survives is decided
+by when each device manages to push, not by when the human acted. For most
+tables that is accepted at family scale. For `shopping_items` it loses data
+in an ordinary trip: Tom ticks "Milch" and presses *Clear checked* with no
+reception (row = deleted, dirty); at home his partner re-adds or un-checks
+the same item; Tom's phone reconnects and pushes its older `deleted_at`
+over her newer edit, and her request vanishes without a message on either
+phone.
+
+**Rule.** `SyncRepository.applyPulledShoppingItem`, when the local row is
+dirty AND the pulled row's `updatedAt` (already normalised by `utcIso`, and
+compared as instants) is later than the local `updatedAt`:
+
+- writes the pulled `checkedAt` and `deletedAt` onto the local row;
+- keeps the local `name`, `quantityNote`, `categoryId` and `updatedAt`;
+- keeps `syncDirty = true`, so the local fields still go out on the next push
+  (and the guarded dirty-clear, which matches on `updatedAt`, still matches).
+
+If the pulled row is not newer, or the local row is clean, the §8.3 rules
+apply unchanged (dirty local wins; clean local is replaced).
+
+**Why only those two fields.** `checkedAt` and `deletedAt` are the *state*
+of the item ("is it still wanted, is it in the cart"); the later edit of
+that state is the one that reflects the household's current intent.
+`name`, `quantityNote` and `categoryId` are descriptive; letting a pulled
+value replace a half-typed local rename would be a worse surprise than
+last-push-wins on those fields, which stay as before. Brand-new items are
+separate rows with their own UUIDs and never conflict.
+
+**Residual.** The comparison uses each device's clock for `updatedAt` on
+the local row and the server's for the pulled row, so a badly skewed device
+can pick the wrong side; this is the same exposure §8.7 invariant 1
+documents and is accepted. Test: `test/application/sync_engine_test.dart`,
+group "shopping field-level merge".

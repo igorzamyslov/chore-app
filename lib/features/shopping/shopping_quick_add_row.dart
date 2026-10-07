@@ -9,10 +9,14 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/features/shopping/quick_add_parsing.dart';
 import 'package:chore_app/features/shopping/shopping_suggestions_list.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// What one quick-add part did (see [_ShoppingQuickAddRowState._addOrRestore]).
+enum _AddOutcome { added, alreadyOnList, movedBack }
 
 /// The pinned row above the shopping list: a text field plus a submit
 /// button, with up to 8 type-ahead suggestions shown below it while typing
@@ -109,6 +113,19 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
                       controller: _controller,
                       focusNode: _focusNode,
                       textInputAction: TextInputAction.done,
+                      // F12: German nouns are capitalised; without this the
+                      // list ended up half "milch", half "Milch".
+                      textCapitalization: TextCapitalization.sentences,
+                      // Deliberately single-line. A multi-line field would
+                      // keep pasted newlines for `splitQuickAddInput`, but
+                      // a hardware Enter then INSERTS a newline instead of
+                      // submitting -- `e2e/flows/shell/tab_swipe.yaml` adds
+                      // sixteen items with `pressKey: Enter`, and so does
+                      // anyone with a keyboard. Comma-separated input still
+                      // splits; newline splitting in the parser is kept for
+                      // the future share-to-app path (backlog F-2), where
+                      // the text does not pass through this field.
+                      keyboardType: TextInputType.text,
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
                         hintText: l10n.shoppingAddHint,
@@ -177,6 +194,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
           ShoppingSuggestionsList(
             suggestions: _suggestions,
             onTap: _selectSuggestion,
+            onForget: _forgetSuggestion,
           ),
       ],
     );
@@ -224,26 +242,86 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     setState(() => _suggestions = results);
   }
 
-  Future<void> _submit() => _addOrRestore(_controller.text.trim());
+  /// Typed submit: the input is split on commas and newlines (F7) and each
+  /// part goes through the B3 flow in turn, so a duplicate inside the list
+  /// is caught like any other.
+  Future<void> _submit() async {
+    final names = splitQuickAddInput(_controller.text);
+    if (names.isEmpty) {
+      return;
+    }
+    final outcomes = <_AddOutcome>[];
+    for (final entry in names) {
+      // F6: "2x Milch" / "Milch x2" -> name "Milch", note "2".
+      final parsed = parseQuantity(entry);
+      final outcome = await _addOrRestore(
+        parsed.name,
+        quantityNote: parsed.quantityNote,
+      );
+      if (!mounted) {
+        return;
+      }
+      outcomes.add(outcome);
+    }
+    final added = outcomes.where((o) => o == _AddOutcome.added).length;
+    final l10n = AppLocalizations.of(context);
+    if (names.length == 1) {
+      // Unchanged single-item behaviour: only the duplicate outcomes speak.
+      _announce(outcomes.single, l10n);
+    } else if (added > 1) {
+      _showSnackbar(l10n.shoppingAddedCount(added));
+    } else if (added == 0) {
+      // Nothing new: say why, using the last duplicate outcome.
+      _announce(outcomes.last, l10n);
+    }
+    _afterAdd();
+  }
 
-  Future<void> _selectSuggestion(ShoppingSuggestion suggestion) {
-    return _addOrRestore(
+  Future<void> _selectSuggestion(ShoppingSuggestion suggestion) async {
+    final outcome = await _addOrRestore(
       suggestion.name,
       categoryId: suggestion.categoryId,
       isSuggestionTap: true,
     );
+    if (!mounted) {
+      return;
+    }
+    _announce(outcome, AppLocalizations.of(context));
+    _afterAdd();
+  }
+
+  /// F11: hides [suggestion] from the chips and type-ahead from now on,
+  /// then re-queries so it drops out of the list immediately.
+  Future<void> _forgetSuggestion(ShoppingSuggestion suggestion) async {
+    await ref
+        .read(shoppingRepositoryProvider)
+        .forgetSuggestion(suggestion.name);
+    if (!mounted) {
+      return;
+    }
+    await _updateSuggestions();
+  }
+
+  void _announce(_AddOutcome outcome, AppLocalizations l10n) {
+    switch (outcome) {
+      case _AddOutcome.alreadyOnList:
+        _showSnackbar(l10n.shoppingAddAlreadyOnList);
+      case _AddOutcome.movedBack:
+        _showSnackbar(l10n.shoppingAddMovedBack);
+      case _AddOutcome.added:
+        break;
+    }
   }
 
   /// Implements the B3 duplicate-prevention branch shared by a typed submit
-  /// and a suggestion tap. See the class doc for the three outcomes.
-  Future<void> _addOrRestore(
+  /// and a suggestion tap. See the class doc for the three outcomes. Shows
+  /// nothing itself; the caller announces the outcome(s).
+  Future<_AddOutcome> _addOrRestore(
     String name, {
+    String? quantityNote,
     String? categoryId,
     bool isSuggestionTap = false,
   }) async {
-    if (name.isEmpty) {
-      return;
-    }
     final householdId = ref.read(bootstrapProvider).requireValue;
     final repository = ref.read(shoppingRepositoryProvider);
     final normalizedName = normalizeShoppingItemName(name);
@@ -253,40 +331,38 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
       normalizedName,
     );
     if (!mounted) {
-      return;
+      return _AddOutcome.alreadyOnList;
     }
 
     if (existing != null) {
       if (existing.item.checkedAt == null) {
-        _showSnackbar(AppLocalizations.of(context).shoppingAddAlreadyOnList);
-      } else {
-        await repository.setChecked(existing.item.id, checked: false);
-        if (!mounted) {
-          return;
-        }
-        _showSnackbar(AppLocalizations.of(context).shoppingAddMovedBack);
+        return _AddOutcome.alreadyOnList;
       }
-    } else {
-      final resolvedCategoryId = isSuggestionTap
-          ? categoryId
-          : await repository.mostRecentCategoryIdForNormalizedName(
-              householdId,
-              normalizedName,
-            );
-      if (!mounted) {
-        return;
-      }
-      await repository.addItem(
-        householdId,
-        name: name,
-        categoryId: resolvedCategoryId,
-        addedBy: ref.read(actingMemberProvider)?.id,
-      );
+      await repository.setChecked(existing.item.id, checked: false);
+      return _AddOutcome.movedBack;
     }
-
+    final resolvedCategoryId = isSuggestionTap
+        ? categoryId
+        : await repository.mostRecentCategoryIdForNormalizedName(
+            householdId,
+            normalizedName,
+          );
     if (!mounted) {
-      return;
+      return _AddOutcome.alreadyOnList;
     }
+    await repository.addItem(
+      householdId,
+      name: name,
+      quantityNote: quantityNote,
+      categoryId: resolvedCategoryId,
+      addedBy: ref.read(actingMemberProvider)?.id,
+    );
+    return _AddOutcome.added;
+  }
+
+  /// Clears the field and keeps focus after every outcome, so entry can
+  /// continue right away.
+  void _afterAdd() {
     _controller.clear();
     _focusNode.requestFocus();
     // Bug 4 (field feedback round 2,

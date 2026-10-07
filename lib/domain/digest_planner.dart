@@ -27,6 +27,7 @@ class DigestPlan {
     required this.dueTodayCount,
     required this.overdueCount,
     this.soleOccurrenceId,
+    this.titles = const [],
   });
 
   /// The device-local moment the notification should fire.
@@ -61,22 +62,50 @@ class DigestPlan {
   /// be a second copy of both rules.
   final String? soleOccurrenceId;
 
+  /// The titles of the chores this slot counted, due-on-the-day first and
+  /// then overdue (persona review 2026-10-06 E8), so the notification can
+  /// name what is waiting instead of only counting it. Empty when the caller
+  /// did not supply them, in which case the notification keeps its
+  /// count-only shape.
+  ///
+  /// Chore titles are user data, carried verbatim and never localized.
+  final List<String> titles;
+
   @override
   bool operator ==(Object other) =>
       other is DigestPlan &&
       other.fireAt == fireAt &&
       other.dueTodayCount == dueTodayCount &&
       other.overdueCount == overdueCount &&
-      other.soleOccurrenceId == soleOccurrenceId;
+      other.soleOccurrenceId == soleOccurrenceId &&
+      _sameTitles(other.titles, titles);
 
   @override
-  int get hashCode =>
-      Object.hash(fireAt, dueTodayCount, overdueCount, soleOccurrenceId);
+  int get hashCode => Object.hash(
+    fireAt,
+    dueTodayCount,
+    overdueCount,
+    soleOccurrenceId,
+    Object.hashAll(titles),
+  );
 
   @override
   String toString() =>
       'DigestPlan(fireAt: $fireAt, dueTodayCount: $dueTodayCount, '
-      'overdueCount: $overdueCount, soleOccurrenceId: $soleOccurrenceId)';
+      'overdueCount: $overdueCount, soleOccurrenceId: $soleOccurrenceId, '
+      'titles: $titles)';
+}
+
+bool _sameTitles(List<String> a, List<String> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// The next digest slot after [now]: today at the wall-clock time
@@ -243,13 +272,15 @@ List<DateTime> digestSlots({
 ///
 /// [soleOccurrenceId] is threaded through untouched; this function does not
 /// decide it and applies no invariant to it — see
-/// [DigestPlan.soleOccurrenceId].
+/// [DigestPlan.soleOccurrenceId]. [titles] likewise (see
+/// [DigestPlan.titles]).
 DigestPlan? planDigestSlot({
   required DateTime fireAt,
   required bool enabled,
   required int dueTodayCount,
   required int overdueCount,
   String? soleOccurrenceId,
+  List<String> titles = const [],
 }) {
   if (!enabled) {
     return null;
@@ -262,6 +293,7 @@ DigestPlan? planDigestSlot({
     dueTodayCount: dueTodayCount,
     overdueCount: overdueCount,
     soleOccurrenceId: soleOccurrenceId,
+    titles: titles,
   );
 }
 

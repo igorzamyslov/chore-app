@@ -1,6 +1,8 @@
 /// The item edit bottom sheet: rename, adjust quantity/category, or delete.
 library;
 
+import 'dart:async';
+
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -82,91 +84,165 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
       }
     });
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          semantic(
-            'shopping.edit.name',
-            child: TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: l10n.shoppingEditNameLabel,
-                errorText: _nameError == null
-                    ? null
-                    : l10n.shoppingEditNameRequiredError,
+    return PopScope(
+      // F14: leaving the sheet any way but Save or Delete (drag it down, tap
+      // outside, system back) saves a pending edit instead of silently
+      // throwing it away. `canPop` stays true: this never blocks the pop.
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _onDismissed();
+        }
+      },
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            semantic(
+              'shopping.edit.name',
+              child: TextField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: l10n.shoppingEditNameLabel,
+                  errorText: switch (_nameError) {
+                    null => null,
+                    ItemNameError.required =>
+                      l10n.shoppingEditNameRequiredError,
+                    // Same copy and meaning as the quick-add's duplicate
+                    // snackbar, so the existing key is reused.
+                    ItemNameError.duplicate => l10n.shoppingAddAlreadyOnList,
+                  },
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          semantic(
-            'shopping.edit.quantity',
-            child: TextField(
-              controller: _quantityController,
-              decoration: InputDecoration(
-                labelText: l10n.shoppingEditQuantityLabel,
+            const SizedBox(height: 16),
+            semantic(
+              'shopping.edit.quantity',
+              child: TextField(
+                controller: _quantityController,
+                decoration: InputDecoration(
+                  labelText: l10n.shoppingEditQuantityLabel,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          semantic(
-            'shopping.edit.category',
-            child: CategoryPicker(
-              categories: categories,
-              selectedCategoryId: _categoryId,
-              onChanged: (value) => setState(() => _categoryId = value),
-              idPrefix: 'shopping.edit.category',
-              kind: CategoryKind.shopping,
+            const SizedBox(height: 16),
+            semantic(
+              'shopping.edit.category',
+              child: CategoryPicker(
+                categories: categories,
+                selectedCategoryId: _categoryId,
+                onChanged: (value) => setState(() => _categoryId = value),
+                idPrefix: 'shopping.edit.category',
+                kind: CategoryKind.shopping,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              semantic(
-                'shopping.edit.delete',
-                child: TextButton(
-                  onPressed: _delete,
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                semantic(
+                  'shopping.edit.delete',
+                  child: TextButton(
+                    onPressed: _delete,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    child: Text(l10n.commonDelete),
                   ),
-                  child: Text(l10n.commonDelete),
                 ),
-              ),
-              const Spacer(),
-              semantic(
-                'shopping.edit.save',
-                child: FilledButton(
-                  onPressed: _save,
-                  child: Text(l10n.commonSave),
+                const Spacer(),
+                semantic(
+                  'shopping.edit.save',
+                  child: FilledButton(
+                    onPressed: _save,
+                    child: Text(l10n.commonSave),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _save() async {
+  /// Set once the sheet is on its way out by Save, Delete or an
+  /// already-handled dismissal, so [_onDismissed] never saves twice (or
+  /// resurrects edits after a Delete).
+  bool _closing = false;
+
+  /// Whether the fields differ from the item the sheet was opened with.
+  bool get _hasChanges {
+    final item = widget.item.item;
+    final quantity = _quantityController.text.trim();
+    return _nameController.text.trim() != item.name ||
+        (quantity.isEmpty ? null : quantity) != item.quantityNote ||
+        _categoryId != item.categoryId;
+  }
+
+  /// The sheet was popped by something other than Save/Delete (F14): save a
+  /// changed, valid, non-duplicate edit through the same path as Save,
+  /// silently otherwise. Everything the save needs is read BEFORE the first
+  /// await -- the route is already leaving, so by the time the write
+  /// finishes this State may be disposed.
+  void _onDismissed() {
+    if (_closing) {
+      return;
+    }
+    _closing = true;
+    if (_hasChanges) {
+      unawaited(_commit());
+    }
+  }
+
+  /// Validates and writes the fields. Returns the validation error that
+  /// stopped it, or `null` when the item was saved. Touches no widget state
+  /// after an await, so it is safe to run while the sheet is being
+  /// dismissed ([_onDismissed]); [_save] maps a returned error onto the
+  /// name field.
+  Future<ItemNameError?> _commit() async {
     final name = _nameController.text.trim();
     final nameError = validateItemName(name);
     if (nameError != null) {
-      setState(() => _nameError = nameError);
-      return;
+      return nameError;
     }
+    final repository = ref.read(shoppingRepositoryProvider);
+    final item = widget.item.item;
     final quantityNote = _quantityController.text.trim();
-    await ref
-        .read(shoppingRepositoryProvider)
-        .updateItem(
-          widget.item.item.id,
-          name: name,
-          quantityNote: Value(quantityNote.isEmpty ? null : quantityNote),
-          categoryId: Value(_categoryId),
-        );
+    final categoryId = _categoryId;
+    // F7: a rename runs the same duplicate check as quick-add, folding case
+    // and diacritics. Only when the normalized name actually changed, so
+    // editing just the quantity (or the casing) of an item that already
+    // shares a name with another is never blocked.
+    final normalized = normalizeShoppingItemName(name);
+    if (normalized != normalizeShoppingItemName(item.name)) {
+      final existing = await repository.findActiveByNormalizedName(
+        item.householdId,
+        normalized,
+      );
+      if (existing != null && existing.item.id != item.id) {
+        return ItemNameError.duplicate;
+      }
+    }
+    await repository.updateItem(
+      item.id,
+      name: name,
+      quantityNote: Value(quantityNote.isEmpty ? null : quantityNote),
+      categoryId: Value(categoryId),
+    );
+    return null;
+  }
+
+  Future<void> _save() async {
+    final error = await _commit();
     if (!mounted) {
       return;
     }
+    if (error != null) {
+      setState(() => _nameError = error);
+      return;
+    }
+    _closing = true;
     Navigator.of(context).pop();
   }
 
@@ -180,6 +256,10 @@ class _ShoppingEditSheetState extends ConsumerState<_ShoppingEditSheet> {
     // button is the ONLY door into it — which is why this sheet must stay
     // reachable by long-press from both the aisle list and the cart
     // section.
+    //
+    // A delete discards pending edits: mark the sheet as closing first so
+    // the dismissal hook does not write them back over the deleted row.
+    _closing = true;
     await deleteShoppingItemWithUndo(
       context,
       ref,

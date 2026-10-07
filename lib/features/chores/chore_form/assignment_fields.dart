@@ -90,6 +90,20 @@ class AssignmentFields extends StatelessWidget {
           selected: {mode},
           onSelectionChanged: (selection) => onModeChanged(selection.first),
         ),
+        // C7 (persona review 2026-10-06): one line saying what the picked
+        // mode means -- "Fixed | Rotation | Anyone" alone left Maria
+        // guessing, especially that the rotation list order is the turn
+        // order.
+        const SizedBox(height: 4),
+        semantic(
+          'chore_form.assignment.help',
+          child: Text(
+            _modeHelp(context, mode),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
         if (mode == AssignmentMode.rotation) ...[
           const SizedBox(height: 8),
           _RotationAssigneeControls(
@@ -141,6 +155,15 @@ class AssignmentFields extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  String _modeHelp(BuildContext context, AssignmentMode mode) {
+    final l10n = AppLocalizations.of(context);
+    return switch (mode) {
+      AssignmentMode.fixed => l10n.choreFormAssignmentHelpFixed,
+      AssignmentMode.rotation => l10n.choreFormAssignmentHelpRotation,
+      AssignmentMode.anyone => l10n.choreFormAssignmentHelpAnyone,
+    };
   }
 
   String _modeLabel(BuildContext context, AssignmentMode mode) {

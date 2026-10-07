@@ -56,6 +56,9 @@ Future<void> _pumpCard(
 /// household would look younger than the chore completions it supposedly
 /// recorded. That is incoherent data, not a scenario worth testing: the
 /// share window would clamp to the household's start and count nothing.
+/// The same goes for the bootstrap member's own `created_at` (each member's
+/// window starts at the day they joined, persona review 2026-10-06 E7), so
+/// the members are backdated too.
 Future<String> seedDoneChore(
   AppDatabase database, {
   required String title,
@@ -67,6 +70,11 @@ Future<String> seedDoneChore(
     database.households,
   )..where((tbl) => tbl.id.equals(householdId))).write(
     const HouseholdsCompanion(createdAt: Value('2026-01-01T00:00:00.000Z')),
+  );
+  await (database.update(
+    database.members,
+  )..where((tbl) => tbl.householdId.equals(householdId))).write(
+    const MembersCompanion(createdAt: Value('2026-01-01T00:00:00.000Z')),
   );
   final member = await (database.select(
     database.members,
@@ -124,6 +132,32 @@ void main() {
       expect(find.text('3 chores done'), findsOneWidget);
       expect(find.text('Anna'), findsOneWidget);
       expect(find.text('Ben'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    'a member who joined mid-window gets a "since {date}" line under their '
+    'name; a member with no clamp does not (persona review E7)',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await _pumpCard(
+        tester,
+        shares: [
+          MemberShare(member: _member('anna', 'Anna'), doneCount: 9),
+          MemberShare(
+            member: _member('leon', 'Leon'),
+            doneCount: 1,
+            since: PlainDate(2026, 8, 6),
+          ),
+        ],
+        totalDone: 10,
+        clamped: false,
+      );
+
+      expect(find.text('since August 6'), findsOneWidget);
 
       handle.dispose();
     },

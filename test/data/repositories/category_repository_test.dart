@@ -1,8 +1,11 @@
+import 'dart:ui' show Locale;
+
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,8 +44,61 @@ void main() {
   tearDown(() => db.close());
 
   group('seedDefaults', () {
+    Future<List<String>> seededNames(CategoryKind kind) async {
+      final rows =
+          await (db.select(db.categories)
+                ..where(
+                  (tbl) =>
+                      tbl.householdId.equals(householdId) &
+                      tbl.kind.equalsValue(kind),
+                )
+                ..orderBy([(tbl) => OrderingTerm(expression: tbl.sortOrder)]))
+              .get();
+      return rows.map((row) => row.name).toList();
+    }
+
+    test('a German locale seeds German names, index for index with the '
+        'English seeds (persona review D10)', () async {
+      await repo.seedDefaults(householdId, locale: const Locale('de', 'AT'));
+
+      expect(await seededNames(CategoryKind.chore), [
+        'Putzen',
+        'Küche',
+        'Wäsche',
+        'Garten',
+        'Haustiere',
+        'Instandhaltung',
+        'Besorgungen',
+      ]);
+      expect(await seededNames(CategoryKind.shopping), [
+        'Obst & Gemüse',
+        'Milchprodukte',
+        'Fleisch & Fisch',
+        'Backwaren',
+        'Tiefkühl',
+        'Getränke',
+        'Haushalt',
+        'Sonstiges',
+      ]);
+    });
+
+    test('any other locale falls back to the English seeds', () async {
+      await repo.seedDefaults(householdId, locale: const Locale('fr'));
+
+      expect(await seededNames(CategoryKind.chore), [
+        'Cleaning',
+        'Kitchen',
+        'Laundry',
+        'Garden',
+        'Pets',
+        'Maintenance',
+        'Errands',
+      ]);
+      expect((await seededNames(CategoryKind.shopping)).first, 'Produce');
+    });
+
     test('inserts the correct counts per kind and is idempotent', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
 
       final choreCats = await repo
           .watchCategories(householdId, CategoryKind.chore)
@@ -53,7 +109,7 @@ void main() {
       expect(choreCats, hasLength(7));
       expect(shoppingCats, hasLength(8));
 
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
 
       final choreCatsAgain = await repo
           .watchCategories(householdId, CategoryKind.chore)
@@ -66,7 +122,7 @@ void main() {
     });
 
     test('reseeds a kind independently once it becomes empty', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
       final choreCats = await repo
           .watchCategories(householdId, CategoryKind.chore)
           .first;
@@ -74,7 +130,7 @@ void main() {
         await repo.softDeleteCategory(category.id);
       }
 
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
 
       final choreCatsAfter = await repo
           .watchCategories(householdId, CategoryKind.chore)
@@ -258,7 +314,7 @@ void main() {
 
   group('reorderCategories', () {
     test('persists the given order as 0-based sort_order', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
       final before = await repo
           .watchCategories(householdId, CategoryKind.chore)
           .first;
@@ -276,7 +332,7 @@ void main() {
     });
 
     test('throws ArgumentError and writes nothing for an unknown id', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
       final before = await repo
           .watchCategories(householdId, CategoryKind.chore)
           .first;
@@ -297,9 +353,9 @@ void main() {
       'throws ArgumentError for a category belonging to a different '
       'household',
       () async {
-        await repo.seedDefaults(householdId);
+        await repo.seedDefaults(householdId, locale: const Locale('en'));
         final otherHouseholdId = await _insertHousehold(db, 'h2');
-        await repo.seedDefaults(otherHouseholdId);
+        await repo.seedDefaults(otherHouseholdId, locale: const Locale('en'));
         final otherChoreCats = await repo
             .watchCategories(otherHouseholdId, CategoryKind.chore)
             .first;
@@ -316,7 +372,7 @@ void main() {
     test(
       'throws ArgumentError for a category of the wrong kind',
       () async {
-        await repo.seedDefaults(householdId);
+        await repo.seedDefaults(householdId, locale: const Locale('en'));
         final shoppingCats = await repo
             .watchCategories(householdId, CategoryKind.shopping)
             .first;
@@ -331,7 +387,7 @@ void main() {
     );
 
     test('throws ArgumentError for a soft-deleted category', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
       final before = await repo
           .watchCategories(householdId, CategoryKind.chore)
           .first;

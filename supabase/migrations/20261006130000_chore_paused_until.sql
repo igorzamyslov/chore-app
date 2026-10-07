@@ -1,0 +1,18 @@
+-- "Pause until" (plan docs/plans/2026-10-06-persona-review-fixes.md W3,
+-- persona review C2): the local calendar day a paused chore resumes on by
+-- itself, NULL = "until I resume it" (and always NULL on an unpaused
+-- chore). A plain date, not a timestamp: "until Monday" is a day in the
+-- household's calendar, and the client stores it as `yyyy-MM-dd` (drift
+-- schema v19, `chores.pausedUntil`). Each device's catch-up unpauses a
+-- chore whose paused_until <= its local today.
+--
+-- No RLS change: the column sits inside a row whose access is already
+-- decided by household_id (chores_select/insert/update in the initial
+-- schema). No grant change either: `chores` carries a TABLE-level grant to
+-- authenticated, so a new column is covered automatically and the sync
+-- engine's upsert of `chores` needs no change -- same reasoning as
+-- 20260830120000_chore_reminder_minutes.sql.
+--
+-- Nullable and undefaulted on purpose: a client on drift schema <= 18
+-- never sends the key, and NULL already means "no resume date".
+alter table public.chores add column paused_until date null;

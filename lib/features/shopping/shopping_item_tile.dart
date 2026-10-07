@@ -2,7 +2,10 @@
 library;
 
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/features/members/member_avatar.dart';
+import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// A row for one active [ShoppingItemWithCategory].
@@ -42,6 +45,8 @@ class ShoppingItemTile extends StatelessWidget {
     required this.item,
     required this.onCheckedChanged,
     required this.onLongPress,
+    this.addedBy,
+    this.waitingToSend = false,
     super.key,
   });
 
@@ -60,6 +65,21 @@ class ShoppingItemTile extends StatelessWidget {
   /// edit sheet (`shopping_edit_sheet.dart`), where rename, quantity,
   /// category and Delete live.
   final VoidCallback onLongPress;
+
+  /// The member who added this item, when it was NOT the acting member --
+  /// shown as a 16 dp avatar after the name, tooltip = their name (persona
+  /// finding F1: Tom could not tell which items had just arrived from his
+  /// partner). `null` for the viewer's own items, for items with no known
+  /// adder, and for an adder who is no longer a member: the list stays quiet
+  /// unless there is someone else to attribute.
+  final Member? addedBy;
+
+  /// Whether to show the small "waiting to send" clock at the row's trailing
+  /// edge (persona finding E10): the caller passes `true` only while the
+  /// household is linked AND this row is `syncDirty`. Without it a change
+  /// made on a weak connection looked identical to one the partner already
+  /// has.
+  final bool waitingToSend;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +106,7 @@ class ShoppingItemTile extends StatelessWidget {
               children: [
                 _CheckRing(
                   identifier: 'shopping.item.${shoppingItem.id}.check',
+                  label: shoppingItem.name,
                   checked: checked,
                   onChanged: onCheckedChanged,
                 ),
@@ -97,19 +118,36 @@ class ShoppingItemTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          shoppingItem.name,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            decoration: checked
-                                ? TextDecoration.lineThrough
-                                : null,
-                            color: checked ? mutedColor : null,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                shoppingItem.name,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  decoration: checked
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: checked ? mutedColor : null,
+                                ),
+                              ),
+                            ),
+                            if (addedBy != null) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: addedBy!.name,
+                                child: MemberAvatar(
+                                  member: addedBy!,
+                                  radius: 8,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         if (quantityNote != null && quantityNote.isNotEmpty)
                           Text(
                             quantityNote,
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: mutedColor,
                               decoration: checked
                                   ? TextDecoration.lineThrough
@@ -120,6 +158,16 @@ class ShoppingItemTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (waitingToSend)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, right: 12),
+                    child: Tooltip(
+                      message: AppLocalizations.of(
+                        context,
+                      ).syncPendingItemTooltip,
+                      child: Icon(Icons.schedule, size: 14, color: mutedColor),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -138,11 +186,16 @@ class ShoppingItemTile extends StatelessWidget {
 class _CheckRing extends StatelessWidget {
   const _CheckRing({
     required this.identifier,
+    required this.label,
     required this.checked,
     required this.onChanged,
   });
 
   final String identifier;
+
+  /// The item's name: without it the ring is an unnamed checkbox to a
+  /// screen reader (G1, persona review 2026-10-06).
+  final String label;
   final bool checked;
   final ValueChanged<bool> onChanged;
 
@@ -152,6 +205,7 @@ class _CheckRing extends StatelessWidget {
     return Semantics(
       identifier: identifier,
       container: true,
+      label: label,
       button: true,
       checked: checked,
       onTap: () => onChanged(!checked),

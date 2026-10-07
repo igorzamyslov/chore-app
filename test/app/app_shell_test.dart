@@ -1,5 +1,7 @@
 import 'package:chore_app/app/providers.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/settings_repository.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -218,6 +220,57 @@ void main() {
       expect(badgeUnder('shell.tab.settings'), findsOneWidget);
 
       await settingsRepository.setDigestEnabled(enabled: false);
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsIdentifier(badgeId), findsNothing);
+
+      handle.dispose();
+    },
+  );
+
+  // Persona review 2026-10-06 E3 (Leon A6): the dot is a "persistent
+  // signal, not nagging" only for as long as the person could still act on
+  // it; a week after the pre-prompt it goes quiet on its own (the Settings
+  // sub-line keeps saying it).
+  Future<void> stampPreprompt(AppDatabase database, DateTime shownAt) async {
+    await database
+        .update(database.settings)
+        .write(
+          SettingsCompanion(
+            digestPrepromptShownAt: Value(shownAt.toUtc().toIso8601String()),
+          ),
+        );
+  }
+
+  testChoreApp(
+    'attention badge is still there six days after the pre-prompt',
+    today: DateTime(2026, 7, 24, 9),
+    overrides: [
+      notificationPermissionGrantedProvider.overrideWith((ref) => false),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await stampPreprompt(database, DateTime(2026, 7, 18, 9));
+      await tester.pumpAndSettle();
+
+      expect(badgeUnder('shell.tab.settings'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'attention badge is gone once the pre-prompt is more than seven days '
+    'old, with the digest still on and the permission still denied',
+    today: DateTime(2026, 7, 24, 9),
+    overrides: [
+      notificationPermissionGrantedProvider.overrideWith((ref) => false),
+    ],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final settings = await database.select(database.settings).getSingle();
+      expect(settings.digestEnabled, isTrue);
+      await stampPreprompt(database, DateTime(2026, 7, 16, 8));
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsIdentifier(badgeId), findsNothing);

@@ -3,13 +3,16 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/app/supabase_config.dart';
 import 'package:chore_app/domain/reminder_planner.dart';
 import 'package:chore_app/features/settings/about_section.dart';
 import 'package:chore_app/features/settings/account_section.dart';
 import 'package:chore_app/features/settings/appearance_section.dart';
+import 'package:chore_app/features/settings/archives_screen.dart';
 import 'package:chore_app/features/settings/digest_section.dart';
 import 'package:chore_app/features/settings/evening_section.dart';
 import 'package:chore_app/features/settings/export_row.dart';
+import 'package:chore_app/features/settings/household_rename_sheet.dart';
 import 'package:chore_app/features/settings/language_section.dart';
 import 'package:chore_app/features/settings/manage_categories_screen.dart';
 import 'package:chore_app/features/settings/manage_members_screen.dart';
@@ -21,6 +24,31 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+/// The Household group's first row (persona review D10): the household's
+/// name as the row's value, tapping opens the same rename sheet the Members
+/// screen's header row uses. The name used to be the English literal
+/// "My household", never asked for and only renamable from inside Members.
+class _HouseholdNameRow extends ConsumerWidget {
+  const _HouseholdNameRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final name = ref.watch(currentHouseholdProvider).valueOrNull?.name;
+    return semantic(
+      'settings.household.name',
+      child: SettingsRow(
+        icon: Icons.home_outlined,
+        label: l10n.settingsHouseholdNameRow,
+        value: name ?? '',
+        onTap: name == null
+            ? null
+            : () => showHouseholdRenameSheet(context, currentName: name),
+      ),
+    );
+  }
+}
 
 /// The Settings tab (spec `docs/specs/theme-v2.md` §4.2: labelled groups --
 /// Household, Preferences, Data, About, in that order -- each a card of
@@ -52,6 +80,10 @@ class SettingsScreen extends ConsumerWidget {
     final settingsAsync = ref.watch(settingsProvider);
     final permissionGranted = ref.watch(notificationPermissionGrantedProvider);
     final settingsRepository = ref.read(settingsRepositoryProvider);
+    // Persona review B3: the saved-copies row exists only once a join or
+    // reconnect has actually left a copy behind.
+    final archiveCount =
+        ref.watch(householdArchivesProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.settingsTabLabel)),
@@ -65,6 +97,7 @@ class SettingsScreen extends ConsumerWidget {
           SettingsGroup(
             label: l10n.settingsHouseholdSectionTitle,
             children: [
+              const _HouseholdNameRow(),
               const AccountSectionBody(),
               semantic(
                 'settings.members',
@@ -159,6 +192,20 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       onChanged: settingsRepository.setEveningReminderTime,
                     ),
+                  // Device-level master switch for per-chore reminders
+                  // (persona review 2026-10-06 E3). Placed with the other
+                  // notification rows but AFTER the evening pair, so D12's
+                  // "evening sits directly beneath the digest time" holds.
+                  semantic(
+                    'settings.choreReminders.toggle',
+                    child: SettingsRow(
+                      icon: Icons.alarm_outlined,
+                      label: l10n.settingsChoreRemindersTitle,
+                      switchValue: settings.choreRemindersEnabled,
+                      onSwitchChanged: (enabled) => settingsRepository
+                          .setChoreRemindersEnabled(enabled: enabled),
+                    ),
+                  ),
                   QuietHoursToggleTile(
                     value: settings.quietHoursEnabled,
                     // A direct comparison rather than a call into
@@ -217,7 +264,11 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SettingsGroup(
             label: l10n.settingsDataSectionTitle,
-            children: const [ExportDataTile(), ResetDataTile()],
+            children: [
+              const ExportDataTile(),
+              if (archiveCount > 0) ArchivesTile(count: archiveCount),
+              const ResetDataTile(),
+            ],
           ),
           SettingsGroup(
             label: l10n.settingsAboutSectionTitle,
@@ -225,6 +276,9 @@ class SettingsScreen extends ConsumerWidget {
               AboutVersionTile(),
               AboutErrorReportsTile(),
               AboutLicensesTile(),
+              AboutPrivacyTile(),
+              AboutSourceTile(),
+              if (supabaseConfigured) AboutSyncServerTile(),
               AboutDonateTile(),
             ],
           ),

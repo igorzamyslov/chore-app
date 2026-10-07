@@ -13,6 +13,8 @@
 /// than riding on a flag that was already true from an earlier insert.
 library;
 
+import 'dart:ui' show Locale;
+
 import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
@@ -189,7 +191,7 @@ void main() {
     });
 
     test('seedDefaults marks every seeded category dirty', () async {
-      await repo.seedDefaults(householdId);
+      await repo.seedDefaults(householdId, locale: const Locale('en'));
 
       final rows = await db.select(db.categories).get();
       expect(rows, isNotEmpty);

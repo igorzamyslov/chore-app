@@ -1,4 +1,5 @@
 import 'package:chore_app/app/app.dart';
+import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
@@ -61,6 +62,33 @@ void main() {
   );
 
   testFreshChoreApp(
+    'the create and join cards render identically -- same elevation, same '
+    'outline (onboarding-v2 §1 amendment 2026-10-06, persona review D1)',
+    today: today,
+    overrides: [authGatewayProvider.overrideWithValue(FakeAuthGateway())],
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+
+      DepthCard cardOf(String id) => tester.widget<DepthCard>(
+        find.ancestor(
+          of: find.bySemanticsIdentifier(id),
+          matching: find.byType(DepthCard),
+        ),
+      );
+      final create = cardOf('welcome.create');
+      final join = cardOf('welcome.join');
+      expect(create.shadow, join.shadow);
+      expect(create.borderColor, join.borderColor);
+      expect(
+        find.text('Got an invite code? Sign in and enter it here.'),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    },
+  );
+
+  testFreshChoreApp(
     'create path: typing a name and confirming creates the household with '
     'ONE named admin member (first seed color), seeds default categories, '
     'marks the onboarding name-prompt flag (so the banner never appears), '
@@ -91,6 +119,8 @@ void main() {
       final households = await database.select(database.households).get();
       expect(households, hasLength(1));
       final householdId = households.single.id;
+      // The localised default name (householdDefaultName), not a literal.
+      expect(households.single.name, 'My household');
 
       final members = await database.select(database.members).get();
       expect(members, hasLength(1));

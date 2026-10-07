@@ -62,7 +62,7 @@ void main() {
       // the Overdue section (its only pending occurrence) is gone.
       expect(find.text('OVERDUE'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       // Collapsed by default; no pending occurrences remain (one-off, no
       // next slot), so the empty state shows alongside the collapsed Done
       // section -- same pattern as done_today_test.dart.
@@ -138,7 +138,7 @@ void main() {
       // is what drives this section, not due date.
       expect(find.text('TOMORROW'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
@@ -217,7 +217,7 @@ void main() {
 
       expect(find.text('OVERDUE'), findsNothing);
       expect(find.text('TOMORROW'), findsNothing);
-      expect(find.text('Done today (2)'), findsOneWidget);
+      expect(find.text('Done recently (2)'), findsOneWidget);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
@@ -239,7 +239,7 @@ void main() {
       expect(find.bySemanticsIdentifier('chores.empty'), findsNothing);
       expect(find.text('OVERDUE'), findsOneWidget);
       expect(find.text('Overdue chore'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
 
       final futureStillClosed = await repo.latestClosedOccurrence(
         futureChore.id,

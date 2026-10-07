@@ -206,7 +206,7 @@ void main() {
         await tester.pump(digestRescheduleDebounce);
       }
       expect(
-        plugin.pending[digestNotificationIdBase]!.body,
+        plugin.pending[digestNotificationIdBase]!.title,
         '1 chore today',
         reason:
             'the horizon must be armed before the ping, or the count '
@@ -254,7 +254,7 @@ void main() {
         reason: 'the ping must reach DigestRescheduleController',
       );
       expect(
-        plugin.pending[digestNotificationIdBase]!.body,
+        plugin.pending[digestNotificationIdBase]!.title,
         '1 chore today',
         reason:
             'the recompute reads the same unchanged data, so the horizon '

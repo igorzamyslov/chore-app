@@ -106,4 +106,37 @@ void main() {
       expect(choreFromRow(row).reminderMinutes, 1080);
     },
   );
+
+  // Plan docs/plans/2026-10-06-persona-review-fixes.md W3 (schema v19):
+  // "pause until" is household data and travels both ways.
+  test('choreRow carries paused_until, and choreFromRow round-trips it', () {
+    final chore = Chore(
+      id: 'ch1',
+      householdId: 'h1',
+      title: 'Bins',
+      startDate: PlainDate(2026, 1, 5),
+      assignmentMode: AssignmentMode.anyone,
+      pausedAt: '2026-01-05T08:00:00.000Z',
+      pausedUntil: PlainDate(2026, 1, 12),
+      createdAt: 't0',
+      updatedAt: 't0',
+      syncDirty: true,
+    );
+
+    final row = choreRow(chore);
+    expect(row['paused_until'], '2026-01-12');
+
+    final pulled = choreFromRow(
+      _serverChoreRow(extra: {'paused_until': '2026-01-12'}),
+    );
+    expect(pulled.pausedUntil, PlainDate(2026, 1, 12));
+  });
+
+  test('a missing or NULL paused_until pulls as null', () {
+    expect(choreFromRow(_serverChoreRow()).pausedUntil, isNull);
+    expect(
+      choreFromRow(_serverChoreRow(extra: {'paused_until': null})).pausedUntil,
+      isNull,
+    );
+  });
 }

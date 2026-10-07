@@ -8,9 +8,11 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/app_log.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/application/sync_engine.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/ui_state_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/chores/acting_member_sheet.dart';
 import 'package:chore_app/features/chores/active_chores_presence.dart';
@@ -28,6 +30,8 @@ import 'package:chore_app/features/chores/digest_preprompt_banner.dart';
 import 'package:chore_app/features/chores/due_tone.dart';
 import 'package:chore_app/features/chores/mark_done_for_sheet.dart';
 import 'package:chore_app/features/chores/onboarding_name_banner.dart';
+import 'package:chore_app/features/chores/pause_chore_sheet.dart';
+import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -52,6 +56,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   String? _memberFilter;
   String? _categoryFilter;
 
+  // E1 (persona review 2026-10-06): whether the "default to my chores"
+  // decision has been made. True from the start when a filter was stored,
+  // and from the first manual filter change; otherwise settled by [build]
+  // once the device's identity resolves.
+  bool _defaultSettled = false;
+
+  // E1 follow-up: the user explicitly chose "All members" (or "Show
+  // everything"). Stored as [UiStateRepository.allMembersFilter] so the next
+  // cold start can tell it from "never chosen" and does not re-apply the
+  // claimed-member default.
+  bool _allMembersChosen = false;
+
   @override
   void initState() {
     super.initState();
@@ -59,8 +75,42 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // this one-shot read, so the first frame is already filtered. A missing
     // or errored read means no filters.
     final stored = ref.read(uiStateProvider).valueOrNull;
-    _memberFilter = stored?.choresMemberFilter;
+    final storedMember = stored?.choresMemberFilter;
+    _allMembersChosen = storedMember == UiStateRepository.allMembersFilter;
+    _memberFilter = _allMembersChosen ? null : storedMember;
     _categoryFilter = stored?.choresCategoryFilter;
+    _defaultSettled = storedMember != null || _categoryFilter != null;
+  }
+
+  /// E1: a signed-in member's list opens on THEIR chores (plus unassigned
+  /// ones) when nothing was stored. Settles the first time identity is
+  /// known: pinned with a resolved claim applies and stores the default;
+  /// an unlinked household has nobody to default to. A still-resolving
+  /// identity waits, so a late claim cannot override a manual pick (which
+  /// settles it too).
+  void _settleDefaultFilter() {
+    if (_defaultSettled) {
+      return;
+    }
+    switch (ref.watch(memberIdentityModeProvider)) {
+      case MemberIdentityMode.unknown:
+        return;
+      case MemberIdentityMode.switching:
+        _defaultSettled = true;
+      case MemberIdentityMode.pinned:
+        final claimed = ref.watch(claimedMemberProvider);
+        if (claimed == null) {
+          return;
+        }
+        _defaultSettled = true;
+        _memberFilter = claimed.id;
+        // Not inside build: a blind write, after this frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _persistFilters();
+          }
+        });
+    }
   }
 
   /// Writes the current filters to `ui_state`, blind and fire-and-forget.
@@ -69,7 +119,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       ref
           .read(uiStateRepositoryProvider)
           .setChoresFilters(
-            memberId: _memberFilter,
+            memberId:
+                _memberFilter ??
+                (_allMembersChosen ? UiStateRepository.allMembersFilter : null),
             categoryId: _categoryFilter,
           )
           .catchError((Object error, StackTrace stackTrace) {
@@ -80,6 +132,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _settleDefaultFilter();
     // Stale stored ids degrade to "All" at read time; nothing is written
     // back. While members/categories have no value yet the stored id is kept,
     // so there is no unfiltered flash before they load.
@@ -94,7 +147,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         ? null
         : _categoryFilter;
     final occurrencesAsync = ref.watch(pendingOccurrencesProvider);
-    final closedToday = ref.watch(closedTodayOccurrencesProvider).value;
+    final closedRecently = ref.watch(closedRecentlyOccurrencesProvider).value;
     final paused = ref.watch(pausedChoresProvider).value;
     final hasActiveChores = ref.watch(hasActiveChoresProvider).value ?? true;
     // todayProvider, not a one-shot clock read: this is what re-buckets the
@@ -118,7 +171,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     // today" while a member filter showed a list of 2 underneath, which is
     // exactly the "a number disagrees with the list beneath it" failure
     // mode this app exists to avoid. `_filterOccurrences`/
-    // `_filterClosedToday` below are the SAME functions `_Body` uses to
+    // `_filterClosed` below are the SAME functions `_Body` uses to
     // build the sections themselves, so the card's numbers and the list can
     // never disagree -- and when a filter is active, the card says so (see
     // ChoreProgressCard.filterActive).
@@ -128,18 +181,27 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final filteredClosedTodayForCount = _filterClosedToday(
-      closedToday ?? const [],
+    final filteredClosedForCount = _filterClosed(
+      closedRecently ?? const [],
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
-    final completedToday = filteredClosedTodayForCount
+    // The recent window reaches back three days (E9); the card counts only
+    // what was completed TODAY.
+    final completedToday = filteredClosedForCount
         .where(
-          (occurrence) => occurrence.occurrence.status == OccurrenceStatus.done,
+          (occurrence) =>
+              occurrence.occurrence.status == OccurrenceStatus.done &&
+              occurrence.occurrence.closedOn == today,
         )
         .length;
-    final pendingDueOrOverdue = filteredOccurrencesForCount
-        .where((occurrence) => !occurrence.occurrence.dueDate.isAfter(today))
+    // E5 (persona review 2026-10-06): the overdue pile is not part of
+    // "today" -- it is reported beside it as "N to catch up".
+    final pendingDueToday = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate == today)
+        .length;
+    final overdueCount = filteredOccurrencesForCount
+        .where((occurrence) => occurrence.occurrence.dueDate.isBefore(today))
         .length;
 
     return Scaffold(
@@ -150,14 +212,21 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           MemberFilterButton(
             selected: memberFilter,
             onChanged: (value) {
-              setState(() => _memberFilter = value);
+              setState(() {
+                _memberFilter = value;
+                _allMembersChosen = value == null;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
           CategoryFilterButton(
             selected: categoryFilter,
             onChanged: (value) {
-              setState(() => _categoryFilter = value);
+              setState(() {
+                _categoryFilter = value;
+                _defaultSettled = true;
+              });
               _persistFilters();
             },
           ),
@@ -168,11 +237,13 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           const _BannerRegion(),
           // Only once occurrences have actually loaded -- avoids a
           // zero-count flash while pendingOccurrencesProvider's stream is
-          // still resolving. ChoreProgressCard hides itself when M == 0.
+          // still resolving. ChoreProgressCard hides itself when M == 0 and
+          // nothing is overdue.
           if (occurrencesAsync.hasValue)
             ChoreProgressCard(
               completedToday: completedToday,
-              pendingDueOrOverdue: pendingDueOrOverdue,
+              pendingDueToday: pendingDueToday,
+              overdueCount: overdueCount,
               today: today,
               filterActive: filterActive,
             ),
@@ -181,9 +252,10 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
               data: (occurrences) {
                 final body = _Body(
                   occurrences: occurrences,
-                  closedToday: closedToday ?? const [],
+                  closedRecently: closedRecently ?? const [],
                   paused: paused ?? const [],
                   hasActiveChores: hasActiveChores,
+                  syncLinked: syncLinked,
                   today: today,
                   memberFilter: memberFilter,
                   categoryFilter: categoryFilter,
@@ -191,6 +263,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
                   onOpenMenu: _openMenu,
                   onReopen: _reopen,
                   onResume: _resume,
+                  onOpenPausedMenu: _openPausedMenu,
                   onClearFilters: _clearFilters,
                 );
                 if (!syncLinked) {
@@ -265,7 +338,7 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       if (!mounted) {
         return;
       }
-      showAppSnackbar(
+      showAppErrorSnackbar(
         context,
         message: AppLocalizations.of(context).choresSnackbarNoActingMember,
       );
@@ -284,7 +357,19 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     if (!mounted) {
       return;
     }
-    await _showCloseSnackbar(occurrence: occurrence, skipped: false);
+    // C5 (persona review 2026-10-06): in a household of more than one the
+    // Done snackbar names who got the credit -- the acting member can be
+    // switched from the app bar, so a bare "Done" hid whose name it went
+    // under. A household of one has nobody else it could have gone to.
+    final members = ref.read(membersProvider).value ?? const <Member>[];
+    final credited = members.length > 1
+        ? members.where((m) => m.id == completedBy).firstOrNull
+        : null;
+    await _showCloseSnackbar(
+      occurrence: occurrence,
+      skipped: false,
+      creditedTo: credited,
+    );
   }
 
   /// The rare "I finished something for someone else" path (A-5, spec
@@ -298,10 +383,15 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// `settings.actingMemberId` — crediting somebody is not becoming them.
   Future<void> _markDoneFor(OccurrenceWithChore occurrence) async {
     final members = ref.read(membersProvider).value ?? const <Member>[];
+    // The person holding the phone: the claimed member when signed in to
+    // a linked household, else the local acting member (C5 offers this row
+    // in local households too).
     final picked = await showMarkDoneForSheet(
       context,
       members: members,
-      excludeMemberId: ref.read(claimedMemberProvider)?.id,
+      excludeMemberId:
+          ref.read(claimedMemberProvider)?.id ??
+          ref.read(actingMemberProvider)?.id,
     );
     if (!mounted || picked == null) {
       return;
@@ -321,16 +411,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   }
 
   Future<void> _openMenu(OccurrenceWithChore occurrence) async {
-    // A-5 gate (spec docs/feedback/2026-08-07-field-feedback.md B1):
-    // "Mark done for…" replaces the app-bar switcher, so it is offered in
-    // exactly the state where that switcher is gone -- and only when there
-    // is somebody else to credit.
-    final pinned =
-        ref.read(memberIdentityModeProvider) == MemberIdentityMode.pinned;
+    // A-5 (spec docs/feedback/2026-08-07-field-feedback.md B1), widened by
+    // persona review 2026-10-06 C5: "Mark done for…" is offered whenever
+    // there is somebody else to credit, linked or not. In a local household
+    // it is the way to credit someone WITHOUT switching the app-bar avatar,
+    // which also re-scopes this device's daily summary and reminders.
     final memberCount = ref.read(membersProvider).value?.length ?? 0;
     final action = await showChoreActionSheet(
       context,
-      showMarkDoneFor: pinned && memberCount > 1,
+      showMarkDoneFor: memberCount > 1,
+      // C2 (persona review 2026-10-06): same gate -- somebody else to hand
+      // the turn to.
+      showReassign: memberCount > 1,
     );
     if (!mounted || action == null) {
       return;
@@ -338,6 +430,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     switch (action) {
       case ChoreMenuAction.markDoneFor:
         await _markDoneFor(occurrence);
+      case ChoreMenuAction.reassign:
+        await _reassign(occurrence);
       case ChoreMenuAction.skip:
         await ref
             .read(choreServiceProvider)
@@ -347,25 +441,120 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
         }
         await _showCloseSnackbar(occurrence: occurrence, skipped: true);
       case ChoreMenuAction.edit:
+        await _edit(occurrence.chore.id);
+      case ChoreMenuAction.duplicate:
+        // C9 (persona review 2026-10-06): the create form, prefilled.
+        // Saving creates a second chore; like any create, it pops silently.
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
-            builder: (_) => ChoreFormScreen(choreId: occurrence.chore.id),
+            builder: (_) =>
+                ChoreFormScreen(duplicateOfChoreId: occurrence.chore.id),
           ),
         );
       case ChoreMenuAction.pause:
         await _pause(occurrence);
+      case ChoreMenuAction.resume:
+        // Only the paused variant of the sheet offers Resume.
+        break;
       case ChoreMenuAction.delete:
-        final confirmed = await showChoreDeleteDialog(
-          context,
-          choreTitle: occurrence.chore.title,
-        );
-        if (!mounted || !confirmed) {
-          return;
-        }
-        await ref
-            .read(choreRepositoryProvider)
-            .softDeleteChore(occurrence.chore.id);
+        await _delete(occurrence.chore);
     }
+  }
+
+  /// The paused row's sheet (persona review 2026-10-06 C4): Resume, Edit
+  /// and Delete, without having to resume the chore first.
+  Future<void> _openPausedMenu(ChoreWithDetails details) async {
+    final action = await showChoreActionSheet(
+      context,
+      showMarkDoneFor: false,
+      paused: true,
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case ChoreMenuAction.resume:
+        await _resume(details);
+      case ChoreMenuAction.edit:
+        await _edit(details.chore.id);
+      case ChoreMenuAction.delete:
+        await _delete(details.chore);
+      case ChoreMenuAction.markDoneFor:
+      case ChoreMenuAction.reassign:
+      case ChoreMenuAction.skip:
+      case ChoreMenuAction.duplicate:
+      case ChoreMenuAction.pause:
+        // Not offered on the paused sheet: there is no open turn.
+        break;
+    }
+  }
+
+  /// "Reassign this turn…" (persona review 2026-10-06 C2): pick a member,
+  /// hand them this one open turn, confirm with an Undo that hands it back.
+  /// The chore's own assignment is untouched; rotation continues from the
+  /// new holder (spec `docs/specs/occurrence-lifecycle.md`,
+  /// reassignOccurrence).
+  Future<void> _reassign(OccurrenceWithChore occurrence) async {
+    final previous = occurrence.occurrence.assignedMemberId;
+    final picked = await showReassignTurnSheet(
+      context,
+      members: ref.read(membersProvider).value ?? const <Member>[],
+      currentHolderId: previous,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    final occurrenceId = occurrence.occurrence.id;
+    final service = ref.read(choreServiceProvider);
+    await service.reassignOccurrence(occurrenceId, picked.id);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.choresReassignedSnackbar(picked.name),
+      action: SnackBarAction(
+        label: l10n.choresSnackbarUndo,
+        onPressed: () {
+          unawaited(service.reassignOccurrence(occurrenceId, previous));
+        },
+      ),
+    );
+  }
+
+  /// Opens [choreId] in the edit form and, if it was saved, confirms the
+  /// save in words (persona review 2026-10-06 C1/C6).
+  Future<void> _edit(String choreId) async {
+    final saved = await Navigator.of(context).push<ChoreUpdateResult>(
+      MaterialPageRoute(builder: (_) => ChoreFormScreen(choreId: choreId)),
+    );
+    if (!mounted || saved == null) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: choreSavedMessage(
+        AppLocalizations.of(context),
+        Localizations.localeOf(context).toString(),
+        today: ref.read(todayProvider),
+        result: saved,
+      ),
+    );
+  }
+
+  /// Confirms, then soft-deletes [chore].
+  Future<void> _delete(Chore chore) async {
+    final confirmed = await showChoreDeleteDialog(
+      context,
+      choreTitle: chore.title,
+      // E4 (persona review 2026-10-06): disclose that the delete is shared.
+      shared: (ref.read(membersProvider).value?.length ?? 0) > 1,
+    );
+    if (!mounted || !confirmed) {
+      return;
+    }
+    await ref.read(choreRepositoryProvider).softDeleteChore(chore.id);
   }
 
   /// Pauses [occurrence]'s chore and confirms it with a snackbar whose
@@ -375,16 +564,35 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   /// only -- easy to miss -- recovery path. Built the same way as
   /// [_showCloseSnackbar]: [showAppSnackbar] with an action, which is
   /// `persist: false` internally so the bar still auto-dismisses.
+  ///
+  /// Persona review 2026-10-06 C2 ("Pause until"): a small sheet asks how
+  /// long first -- until resumed by hand, or until a date, after which
+  /// `ChoreService.catchUpOverdue` resumes it by itself.
   Future<void> _pause(OccurrenceWithChore occurrence) async {
     final choreId = occurrence.chore.id;
-    await ref.read(choreServiceProvider).pauseChore(choreId);
+    final choice = await showPauseChoreSheet(
+      context,
+      today: ref.read(todayProvider),
+    );
+    if (!mounted || choice == null) {
+      return;
+    }
+    final until = choice.until;
+    await ref.read(choreServiceProvider).pauseChore(choreId, until: until);
     if (!mounted) {
       return;
     }
     final l10n = AppLocalizations.of(context);
     showAppSnackbar(
       context,
-      message: l10n.choresSnackbarPaused,
+      message: until == null
+          ? l10n.choresSnackbarPaused
+          : l10n.choresPausedUntil(
+              pausedUntilText(
+                Localizations.localeOf(context).toString(),
+                until,
+              ),
+            ),
       action: SnackBarAction(
         label: l10n.choresSnackbarUndo,
         onPressed: () {
@@ -416,29 +624,18 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     }
 
     final l10n = AppLocalizations.of(context);
-    // A-5: on the "Mark done for…" path the credited member is NOT the
-    // person holding the phone, so the confirmation says whose credit it
-    // was. The next-due variants are skipped here deliberately — WHO got
-    // the credit is the fact worth confirming on this path, and the chore's
-    // next occurrence is visible in the list behind the bar anyway.
-    if (creditedTo != null) {
-      showAppSnackbar(
-        context,
-        message: l10n.choresSnackbarDoneBy(creditedTo.name),
-        action: SnackBarAction(
-          label: l10n.choresSnackbarUndo,
-          onPressed: () {
-            unawaited(
-              ref.read(choreServiceProvider).reopenOccurrence(occurrenceId),
-            );
-          },
-        ),
-      );
-      return;
-    }
+    // [creditedTo] is set on the "Mark done for…" path (A-5) and, since
+    // persona review 2026-10-06 C5, on every completion in a household of
+    // more than one: the confirmation says whose credit it was, then (for a
+    // recurring chore) when it is next due. Every variant keeps the leading
+    // "Done" that E2E substring checks rely on.
     final String message;
     if (nextPending == null) {
-      message = skipped ? l10n.choresSnackbarSkipped : l10n.choresSnackbarDone;
+      message = skipped
+          ? l10n.choresSnackbarSkipped
+          : creditedTo != null
+          ? l10n.choresDoneCredited(creditedTo.name)
+          : l10n.choresSnackbarDone;
     } else {
       final localeName = Localizations.localeOf(context).toString();
       // The same "today" the list itself is bucketing on, so the snackbar's
@@ -453,6 +650,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
       );
       message = skipped
           ? l10n.choresSnackbarSkippedNextDue(dueText)
+          : creditedTo != null
+          ? l10n.choresDoneCreditedNextDue(creditedTo.name, dueText)
           : l10n.choresSnackbarDoneNextDue(dueText);
     }
 
@@ -470,10 +669,32 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
     );
   }
 
-  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) {
-    return ref
+  /// Reopens a done/skipped row (persona review 2026-10-06 E6): asks first
+  /// when the completion is credited to somebody other than the person
+  /// holding this device -- it removes the credit from THEIR history --
+  /// and confirms in words afterwards (Reopen used to be silent).
+  Future<void> _reopen(ClosedOccurrenceWithChore occurrence) async {
+    final completer = occurrence.completedByMember;
+    final actingId = ref.read(actingMemberProvider)?.id;
+    if (completer != null && completer.id != actingId) {
+      final confirmed = await showReopenOthersDialog(
+        context,
+        completerName: completer.name,
+      );
+      if (!mounted || !confirmed) {
+        return;
+      }
+    }
+    await ref
         .read(choreServiceProvider)
         .reopenOccurrence(occurrence.occurrence.id);
+    if (!mounted) {
+      return;
+    }
+    showAppSnackbar(
+      context,
+      message: AppLocalizations.of(context).choresReopenedSnackbar,
+    );
   }
 
   Future<void> _resume(ChoreWithDetails details) {
@@ -485,7 +706,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
   void _clearFilters() {
     setState(() {
       _memberFilter = null;
+      _allMembersChosen = true;
       _categoryFilter = null;
+      _defaultSettled = true;
     });
     _persistFilters();
   }
@@ -539,47 +762,11 @@ class _BannerRegion extends StatelessWidget {
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
-/// `docs/specs/sync-freshness.md` §2.3).
-///
-/// Uses `refreshNow()`, not `pushDirty()`: the latter swallows every error
-/// by contract (spec `sync-backend.md` §8.3), so the indicator used to spin
-/// and stop identically whether the sync worked or the phone was offline --
-/// found by the 2026-08-07 persona walkthrough. Success stays silent; the
-/// list simply updates, which is the platform convention.
-Future<void> _refresh(BuildContext context, WidgetRef ref) async {
-  final ok = await ref.read(syncEngineProvider).refreshNow();
-  if (ok || !context.mounted) {
-    return;
-  }
-  // WHEN THIS BRANCH IS ACTUALLY REACHED, which is narrower than it looks:
-  // `syncEngineProvider` is gated on `settings.syncHouseholdId`, and the
-  // engine's own startup pull and 60s poll run this same revocation probe. So
-  // in the common case the ENGINE notices first, calls `clearSyncLink()`, and
-  // `syncEngineProvider` becomes a `NoopSyncEngine` whose `refreshNow()`
-  // returns true -- meaning a later pull-to-refresh reports success and says
-  // nothing. That is not a gap: a device that has been revoked is told so by
-  // the revocation notice (spec `docs/specs/household-lifecycle.md` §3.5),
-  // which is the primary surface. This string covers the narrower race where
-  // the user's own gesture is the first probe after the server-side removal,
-  // and it exists because in exactly that case `syncRefreshError`'s "will
-  // sync later" is a promise the app has already made false.
-  // refreshNow() returns false for two different situations, and only one of
-  // them is a delay. If the failure was a revocation, `_pullSinceInner` has
-  // ALREADY called setMembershipRevoked() and clearSyncLink() before
-  // returning -- so syncRefreshError's "will sync later" is not optimism, it
-  // is false. Read the just-written row with a one-shot query rather than
-  // settingsProvider's stream, which may not have re-emitted the write yet.
-  final revoked = (await ref.read(settingsRepositoryProvider).ensureSettings())
-      .membershipRevoked;
-  if (!context.mounted) {
-    return;
-  }
-  final l10n = AppLocalizations.of(context);
-  showAppSnackbar(
-    context,
-    message: revoked ? l10n.syncRefreshErrorRevoked : l10n.syncRefreshError,
-  );
-}
+/// `docs/specs/sync-freshness.md` §2.3) through the shared
+/// `refreshAndReport` (`lib/features/sync/refresh_outcome_snackbar.dart`),
+/// which owns the `RefreshOutcome` -> snackbar mapping for every surface.
+Future<void> _refresh(BuildContext context, WidgetRef ref) =>
+    refreshAndReport(context, ref);
 
 /// Filters [occurrences] to the active member/category filter (`null` for
 /// either means "no restriction") -- shared by the day-progress card's
@@ -592,7 +779,12 @@ List<OccurrenceWithChore> _filterOccurrences(
   required String? categoryFilter,
 }) {
   return occurrences.where((occurrence) {
-    if (memberFilter != null && occurrence.assignedMember?.id != memberFilter) {
+    // E1: an unassigned occurrence is anyone's, so it passes every member
+    // filter -- the daily summary counts it for each member too.
+    final assignee = occurrence.assignedMember;
+    if (memberFilter != null &&
+        assignee != null &&
+        assignee.id != memberFilter) {
       return false;
     }
     if (categoryFilter != null && occurrence.category?.id != categoryFilter) {
@@ -602,22 +794,24 @@ List<OccurrenceWithChore> _filterOccurrences(
   }).toList();
 }
 
-/// Filters [closedToday] the same way (see [_filterOccurrences]), matching
-/// each row's DISPLAYED member -- the completer for a done row, the
-/// assignee for a skipped one (skipping doesn't record a dedicated closer).
-List<ClosedOccurrenceWithChore> _filterClosedToday(
-  List<ClosedOccurrenceWithChore> closedToday, {
+/// Filters [closedRecently] (done/skipped in the last few days) the same way
+/// (see [_filterOccurrences]), matching each row's DISPLAYED member -- the
+/// completer for a done row, the assignee for a skipped one (skipping
+/// doesn't record a dedicated closer).
+List<ClosedOccurrenceWithChore> _filterClosed(
+  List<ClosedOccurrenceWithChore> closedRecently, {
   required String? memberFilter,
   required String? categoryFilter,
 }) {
-  return closedToday.where((row) {
+  return closedRecently.where((row) {
     if (categoryFilter != null && row.category?.id != categoryFilter) {
       return false;
     }
     if (memberFilter != null) {
       final displayedMemberId =
           row.occurrence.completedBy ?? row.assignedMember?.id;
-      if (displayedMemberId != memberFilter) {
+      // E1: no displayed member means unassigned: kept, like pending rows.
+      if (displayedMemberId != null && displayedMemberId != memberFilter) {
         return false;
       }
     }
@@ -628,9 +822,10 @@ List<ClosedOccurrenceWithChore> _filterClosedToday(
 class _Body extends StatelessWidget {
   const _Body({
     required this.occurrences,
-    required this.closedToday,
+    required this.closedRecently,
     required this.paused,
     required this.hasActiveChores,
+    required this.syncLinked,
     required this.today,
     required this.memberFilter,
     required this.categoryFilter,
@@ -638,18 +833,23 @@ class _Body extends StatelessWidget {
     required this.onOpenMenu,
     required this.onReopen,
     required this.onResume,
+    required this.onOpenPausedMenu,
     required this.onClearFilters,
   });
 
   final List<OccurrenceWithChore> occurrences;
-  final List<ClosedOccurrenceWithChore> closedToday;
+  final List<ClosedOccurrenceWithChore> closedRecently;
   final List<ChoreWithDetails> paused;
 
   /// Whether the household has any active (non-deleted) chore at all —
-  /// unfiltered, unlike [occurrences]/[closedToday]/[paused] above — the
+  /// unfiltered, unlike [occurrences]/[closedRecently]/[paused] above — the
   /// signal that distinguishes the "fresh install" empty state from "all
   /// done" (spec `docs/specs/polish-round-1.md` A1).
   final bool hasActiveChores;
+
+  /// Whether the household is linked: a still-`syncDirty` row then shows
+  /// the "waiting to send" clock (persona review 2026-10-06 E10).
+  final bool syncLinked;
   final PlainDate today;
   final String? memberFilter;
   final String? categoryFilter;
@@ -657,6 +857,7 @@ class _Body extends StatelessWidget {
   final ValueChanged<OccurrenceWithChore> onOpenMenu;
   final ValueChanged<ClosedOccurrenceWithChore> onReopen;
   final ValueChanged<ChoreWithDetails> onResume;
+  final ValueChanged<ChoreWithDetails> onOpenPausedMenu;
 
   /// Resets both filters (spec `docs/feedback/2026-08-01-ux-audit.md` B1's
   /// "Show everything" action, wired to the filtered-empty state below).
@@ -678,8 +879,8 @@ class _Body extends StatelessWidget {
     // contradict each other. Member semantics per section: done rows match
     // the person they display (completer for done, assignee for skipped);
     // paused chores match "member is among the assignees".
-    final filteredClosedToday = _filterClosedToday(
-      closedToday,
+    final filteredClosed = _filterClosed(
+      closedRecently,
       memberFilter: memberFilter,
       categoryFilter: categoryFilter,
     );
@@ -687,7 +888,9 @@ class _Body extends StatelessWidget {
       if (categoryFilter != null && details.category?.id != categoryFilter) {
         return false;
       }
+      // E1: a chore nobody is assigned to is anyone's, so it stays.
       if (memberFilter != null &&
+          details.assigneeMemberIds.isNotEmpty &&
           !details.assigneeMemberIds.contains(memberFilter)) {
         return false;
       }
@@ -695,19 +898,21 @@ class _Body extends StatelessWidget {
     }).toList();
 
     final hasCollapsedSections =
-        filteredPaused.isNotEmpty || filteredClosedToday.isNotEmpty;
+        filteredPaused.isNotEmpty || filteredClosed.isNotEmpty;
 
     if (filtered.isEmpty && !hasCollapsedSections) {
       // B1 (spec docs/feedback/2026-08-01-ux-audit.md): a filter hiding
       // EVERYTHING is not the same as genuinely nothing pending -- the
-      // unfiltered lists above (occurrences/closedToday/paused) are the
+      // unfiltered lists above (occurrences/closedRecently/paused) are the
       // "would something show without the filter" signal; only when a
       // filter is active AND clearing it would actually reveal something
       // does the honest "nothing here for this filter" state replace the
       // fresh/done praise copy.
       final filterActive = memberFilter != null || categoryFilter != null;
       final hasUnfilteredContent =
-          occurrences.isNotEmpty || closedToday.isNotEmpty || paused.isNotEmpty;
+          occurrences.isNotEmpty ||
+          closedRecently.isNotEmpty ||
+          paused.isNotEmpty;
       final empty = filterActive && hasUnfilteredContent
           ? _ChoresEmptyFilteredState(onClear: onClearFilters)
           : _ChoresEmptyState(fresh: !hasActiveChores);
@@ -757,19 +962,27 @@ class _Body extends StatelessWidget {
                   occurrence: occurrence,
                   today: today,
                   section: section,
+                  waitingToSend: syncLinked && occurrence.occurrence.syncDirty,
                   onComplete: () => onComplete(occurrence),
                   onOpenMenu: () => onOpenMenu(occurrence),
                 ),
             ],
         if (filteredPaused.isNotEmpty)
-          ChorePausedSection(chores: filteredPaused, onResume: onResume),
-        if (filteredClosedToday.isNotEmpty)
+          ChorePausedSection(
+            chores: filteredPaused,
+            onResume: onResume,
+            onOpenMenu: onOpenPausedMenu,
+          ),
+        if (filteredClosed.isNotEmpty)
           ChoreDoneSection(
-            occurrences: filteredClosedToday,
-            // Computed from the UNFILTERED closedToday (see that
+            occurrences: filteredClosed,
+            today: today,
+            syncLinked: syncLinked,
+            // Computed from the UNFILTERED closedRecently (see that
             // function's doc comment on why filters mustn't affect it).
             reopenableOccurrenceIds: latestClosedTodayOccurrenceIds(
-              closedToday,
+              closedRecently,
+              today: today,
             ),
             onReopen: onReopen,
           ),

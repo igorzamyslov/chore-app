@@ -775,7 +775,8 @@ plural over the number of chores that did not fit, with the limit as a second
 placeholder — §3.2), `choreFormReminderToggle`, `choreFormReminderTime`,
 `choreFormReminderHint` ("This chore won't be counted in the daily summary" /
 "Diese Aufgabe taucht dann nicht in der Tageszusammenfassung auf" — the one
-place Rule D is explained to the person it affects).
+place Rule D is explained to the person it affects; **reworded 2026-10-06, see
+the amendment at the end of this section**).
 
 **`settingsEveningToggle` is binding copy, not a suggestion** (D12, §5.1):
 **"Remind me again in the evening"** / **"Abends noch mal erinnern"**, with the
@@ -790,6 +791,51 @@ quiet-hours rows join the existing **Preferences** group, where the digest rows
 already live, rather than founding a second one (§5.1, §12 — and see §12's
 2026-08-30 correction: there is no "Daily summary" section, and none must be
 created).
+
+> **Amendment 2026-10-06 (persona review E3, E8, B9, Leon A6/B2; plan
+> `docs/plans/2026-10-06-persona-review-fixes.md` W4).**
+>
+> - **Chore-reminders master switch (E3).** `settingsChoreRemindersTitle`
+>   ("Chore reminders" / "Aufgaben-Erinnerungen", id
+>   `settings.choreReminders.toggle`) is a device-level switch bound to
+>   `Settings.choreRemindersEnabled` (schema v18, default on). Off arms NO
+>   individual reminder on this device: `planReminders` takes
+>   `{required bool enabled}` and returns an empty result — no armed
+>   reminders and no `overflowCount` — and `buildNotificationPlans` passes
+>   `settings.choreRemindersEnabled`. Because Rule D (§2.4) reads the armed
+>   set, an empty set means the digest counts those chores again: a device
+>   that muted reminders must not also lose them from its summary. The
+>   evening re-reminder and the digest keep their own switches. The row sits
+>   in the Preferences group AFTER the evening pair and BEFORE quiet hours
+>   (it is a notification row, and quiet hours govern the reminders it
+>   switches), so D12's order for the existing rows is unchanged (§12's list
+>   gains it as item 4a).
+> - **The Settings-tab dot expires (E3).** The ambient attention dot
+>   (`notifications.md`, "Saying so when the digest cannot be delivered") is
+>   hidden once `digestPrepromptShownAt` is more than seven days old, by the
+>   injected clock. The Settings sub-line keeps stating the fact; only the
+>   persistent signal on the tab bar stops, because to a reluctant user a
+>   permanent dot reads as nagging.
+> - **The digest names chores (E8).** `DigestCounts` and `DigestPlan` carry
+>   `titles`: the counted chores' titles, due-on-the-day first and then
+>   overdue, each group in input order, decided inside `projectDigestCounts`
+>   so scoping, Rule D and the projected-due-date comparison apply to titles
+>   exactly as they do to counts. The notification **title is now the count
+>   line** (`notificationDigestDueOnly` / `...OverdueOnly` / `...Both`) and the
+>   **body lists up to three titles** — "Dishes, Bins, Laundry" — followed by
+>   `digestMoreCount` (" and {count} more" / " und {count} weitere", leading
+>   space included, concatenated directly) when more are waiting. A plan
+>   without titles keeps the old shape (app title, count line as the body).
+>   Titles are user data: verbatim, never localized.
+> - **Reminder form copy (B9).** `choreFormReminderToggle` →
+>   **"Remind whoever it's assigned to"** / **"Erinnere, wer dran ist"**
+>   (the reminder is a property of the shared chore and rings for whoever it
+>   is assigned to, not for the person editing the form).
+>   `choreFormReminderHint` → **"Rings on their phone at this time. That
+>   day's daily summary leaves this chore out."** / **"Klingelt um diese Zeit
+>   auf ihrem Handy. Die Tagesübersicht lässt diese Aufgabe an dem Tag
+>   aus."** This supersedes the hint quoted above; the Rule D explanation it
+>   carried is intact.
 
 ## 12. UI surfaces and semantic ids
 
@@ -812,6 +858,9 @@ exactly this order:
 2. `settings.digest.time` (existing)
 3. `settings.evening.toggle` — **directly beneath the digest time**
 4. `settings.evening.time` (revealed when 3 is on)
+4a. `settings.choreReminders.toggle` (added 2026-10-06, persona review E3 —
+    see the §11 amendment; it moves no other row relative to its neighbours,
+    and 3 stays directly beneath the digest time)
 5. `settings.quietHours.toggle`
 6. `settings.quietHours.start`, `settings.quietHours.end` (revealed when 5 is on)
 7. `settings.digest.permission` (existing inline hint row, stays last)

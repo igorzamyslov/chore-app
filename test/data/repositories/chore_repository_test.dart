@@ -1,5 +1,6 @@
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/data/repositories/sync_repository.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -257,6 +258,89 @@ void main() {
         );
       },
     );
+  });
+
+  group('watchActiveChores', () {
+    test('folds the joined rows: ordered assignees per chore, equal titles '
+        'never interleave, a chore without assignees still appears', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final m3 = await _insertMember(db, 'm3', householdId);
+      Future<Chore> create(String title, List<String> assignees) =>
+          repo.createChore(
+            householdId: householdId,
+            title: title,
+            startDate: PlainDate(2026, 1, 1),
+            assignmentMode: assignees.isEmpty
+                ? AssignmentMode.anyone
+                : AssignmentMode.rotation,
+            assigneeMemberIds: assignees,
+          );
+      await create('Same', [m3, m1, m2]);
+      await create('Same', [m2, m3]);
+      await create('Alone', const []);
+
+      final active = await repo.watchActiveChores(householdId).first;
+
+      expect(active.map((c) => c.chore.title), ['Alone', 'Same', 'Same']);
+      expect(active.first.assigneeMemberIds, isEmpty);
+      expect(
+        active.skip(1).map((c) => c.assigneeMemberIds).toList(),
+        unorderedEquals([
+          [m3, m1, m2],
+          [m2, m3],
+        ]),
+      );
+      expect(
+        (await repo.getActiveChores(householdId)).map((c) => c.chore.id),
+        active.map((c) => c.chore.id),
+      );
+    });
+
+    test('re-emits when only a pulled assignee row changes (H7)', () async {
+      final m1 = await _insertMember(db, 'm1', householdId);
+      final m2 = await _insertMember(db, 'm2', householdId);
+      final chore = await repo.createChore(
+        householdId: householdId,
+        title: 'T',
+        startDate: PlainDate(2026, 1, 1),
+        assignmentMode: AssignmentMode.fixed,
+        assigneeMemberIds: [m1],
+      );
+      // Clean state, as after a push: the pull may then apply the set.
+      await (db.update(db.chores)..where((tbl) => tbl.id.equals(chore.id)))
+          .write(const ChoresCompanion(syncDirty: Value(false)));
+      await db
+          .update(db.choreAssignees)
+          .write(const ChoreAssigneesCompanion(syncDirty: Value(false)));
+
+      final emissions = <List<String>>[];
+      final subscription = repo
+          .watchActiveChores(householdId)
+          .listen((chores) => emissions.add(chores.single.assigneeMemberIds));
+      addTearDown(subscription.cancel);
+      await pumpEventQueue();
+      expect(emissions.last, [m1]);
+
+      final emittedBefore = emissions.length;
+      // The chore row itself is NOT touched: only chore_assignees changes.
+      await SyncRepository(db).applyPulledAssigneeSet(
+        chore.id,
+        live: [
+          ChoreAssignee(
+            choreId: chore.id,
+            memberId: m2,
+            position: 0,
+            syncDirty: false,
+          ),
+        ],
+        tombstonedMemberIds: const [],
+      );
+      await pumpEventQueue();
+
+      expect(emissions.length, greaterThan(emittedBefore));
+      expect(emissions.last, [m2]);
+    });
   });
 
   group('softDeleteChore', () {
@@ -854,6 +938,63 @@ void main() {
 
       expect(emissions.last, 1);
     });
+  });
+
+  group('watchClosedSince', () {
+    test(
+      'returns done/skipped rows closed on or after the cutoff, newest day '
+      'first, then by title; excludes older closes and pending rows',
+      () async {
+        final cutoff = PlainDate(2026, 1, 7);
+
+        Future<void> closed(
+          String title,
+          PlainDate closedOn, {
+          OccurrenceStatus status = OccurrenceStatus.done,
+        }) async {
+          final chore = await repo.createChore(
+            householdId: householdId,
+            title: title,
+            startDate: PlainDate(2026, 1, 1),
+            assignmentMode: AssignmentMode.anyone,
+          );
+          final occurrence = await repo.insertOccurrence(
+            choreId: chore.id,
+            dueDate: closedOn,
+          );
+          await repo.closeOccurrence(
+            occurrence.id,
+            status: status,
+            closedOn: closedOn,
+          );
+        }
+
+        await closed('Today B', PlainDate(2026, 1, 10));
+        await closed('Today A', PlainDate(2026, 1, 10));
+        await closed('Yesterday', PlainDate(2026, 1, 9));
+        await closed('On the cutoff', cutoff, status: OccurrenceStatus.skipped);
+        await closed('Too old', PlainDate(2026, 1, 6));
+        final pendingChore = await repo.createChore(
+          householdId: householdId,
+          title: 'Still pending',
+          startDate: PlainDate(2026, 1, 1),
+          assignmentMode: AssignmentMode.anyone,
+        );
+        await repo.insertOccurrence(
+          choreId: pendingChore.id,
+          dueDate: PlainDate(2026, 1, 10),
+        );
+
+        final rows = await repo.watchClosedSince(householdId, cutoff).first;
+
+        expect(rows.map((r) => r.chore.title), [
+          'Today A',
+          'Today B',
+          'Yesterday',
+          'On the cutoff',
+        ]);
+      },
+    );
   });
 
   group('hard-delete tombstones (spec sync-backend.md §8.6.2)', () {

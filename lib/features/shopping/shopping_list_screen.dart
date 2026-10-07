@@ -9,12 +9,15 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/sync_engine.dart';
+import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
 import 'package:chore_app/features/shopping/shopping_edit_sheet.dart';
 import 'package:chore_app/features/shopping/shopping_item_tile.dart';
 import 'package:chore_app/features/shopping/shopping_quick_add_row.dart';
+import 'package:chore_app/features/shopping/shopping_status_line.dart';
+import 'package:chore_app/features/sync/refresh_outcome_snackbar.dart';
 import 'package:chore_app/features/sync/sync_health_banner.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +32,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// on it and it feels that it just disappears)"*. The WRITE is not delayed —
 /// only the move is.
 const shoppingCheckedMoveDelay = Duration(milliseconds: 350);
+
+/// How long the Clear-checked and Put-all-back Undo snackbars stay up
+/// (persona finding F4: 4 s was gone before Tom looked up from the shelf).
+const _bulkSnackbarDuration = Duration(seconds: 8);
 
 /// Lists the household's shared shopping list: a pinned quick-add row above
 /// unchecked items (grouped by category, in repository order) and a
@@ -84,6 +91,42 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
   final Map<String, Timer> _heldMoves = {};
   final Map<String, bool> _heldBuckets = {};
 
+  /// The collapsed aisles (category ids, or [uncategorizedCollapseKey]),
+  /// seeded from `ui_state` in [initState] (persona finding F9). Empty until
+  /// that read lands, i.e. everything starts expanded for a frame at most.
+  /// Writes are blind and fire-and-forget, like the Chores filters: the
+  /// screen owns the value after the first read.
+  Set<String> _collapsed = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCollapsed());
+  }
+
+  Future<void> _loadCollapsed() async {
+    final stored = await ref
+        .read(shoppingRepositoryProvider)
+        .collapsedCategoryKeys();
+    if (mounted && stored.isNotEmpty) {
+      setState(() => _collapsed = {..._collapsed, ...stored});
+    }
+  }
+
+  void _toggleCategory(String key) {
+    final collapse = !_collapsed.contains(key);
+    setState(
+      () => _collapsed = collapse
+          ? {..._collapsed, key}
+          : ({..._collapsed}..remove(key)),
+    );
+    unawaited(
+      ref
+          .read(shoppingRepositoryProvider)
+          .setCategoryCollapsed(key, collapsed: collapse),
+    );
+  }
+
   @override
   void dispose() {
     // Cancelled, not flushed: there is nothing to flush. Also what keeps
@@ -136,10 +179,29 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // comment and syncEngineProvider's own doc comment
     // (lib/app/providers.dart) for why.
     final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
+    // F1: rows added by a member other than the one acting show that
+    // member's avatar. Resolved once here, not per row.
+    final membersById = {
+      for (final member
+          in ref.watch(membersProvider).valueOrNull ?? const <Member>[])
+        member.id: member,
+    };
+    final actingMemberId = ref.watch(actingMemberProvider)?.id;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context).shoppingTabLabel),
+        // F1/F10: the title with a one-line status subtitle (remaining
+        // count, sync freshness). The extra height keeps the two lines
+        // clear of each other at the default text scale.
+        toolbarHeight: 64,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(AppLocalizations.of(context).shoppingTabLabel),
+            const ShoppingStatusLine(),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -196,6 +258,11 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
                   final body = _Body(
                     items: items,
+                    membersById: membersById,
+                    collapsedCategories: _collapsed,
+                    onToggleCategory: _toggleCategory,
+                    syncLinked: syncLinked,
+                    actingMemberId: actingMemberId,
                     heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
@@ -233,7 +300,14 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                         ],
                       ),
                     ),
-                    onUncheckAll: () => _uncheckAll(ref),
+                    onUncheckAll: () => unawaited(
+                      _uncheckAll(ref, [
+                        // Captured NOW for the same reason as onClear's ids:
+                        // Undo re-checks exactly what this tap put back.
+                        for (final item in items)
+                          if (item.item.checkedAt != null) item.item.id,
+                      ]),
+                    ),
                   );
                   if (!syncLinked) {
                     return body;
@@ -277,6 +351,24 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // once the write is confirmed, rather than in the tile's onTap, so it
     // fires exactly once per real check/uncheck.
     unawaited(HapticFeedback.selectionClick());
+    // F3 (persona review 2026-10-06, tom-shopping PP4): ticking moves the
+    // row into the collapsed cart, so offer an Undo right where the eye is.
+    // Only for a TICK: unticking is itself the undo. Latest-wins is fine
+    // (showAppSnackbar replaces whatever is showing), so ticking a second
+    // item simply moves the Undo to that one.
+    if (checked && mounted) {
+      final l10n = AppLocalizations.of(context);
+      showAppSnackbar(
+        context,
+        message: l10n.shoppingCheckedSnackbar,
+        action: SnackBarAction(
+          label: l10n.shoppingClearedUndo,
+          onPressed: () => unawaited(
+            ref.read(shoppingRepositoryProvider).setChecked(id, checked: false),
+          ),
+        ),
+      );
+    }
   }
 
   /// Clears every checked item, then shows an undo snackbar restoring
@@ -293,6 +385,8 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     showAppSnackbar(
       context,
       message: l10n.shoppingClearedSnackbar(checkedIds.length),
+      // F4: bulk actions keep their Undo up for 8 s, not 4.
+      duration: _bulkSnackbarDuration,
       action: SnackBarAction(
         label: l10n.shoppingClearedUndo,
         onPressed: () => unawaited(repository.restoreItems(checkedIds)),
@@ -300,58 +394,43 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     );
   }
 
-  Future<void> _uncheckAll(WidgetRef ref) {
+  /// Unchecks everything, then shows a counted snackbar whose Undo re-checks
+  /// exactly [checkedIds] (F4).
+  Future<void> _uncheckAll(WidgetRef ref, List<String> checkedIds) async {
     final householdId = ref.read(bootstrapProvider).requireValue;
-    return ref.read(shoppingRepositoryProvider).uncheckAll(householdId);
+    final repository = ref.read(shoppingRepositoryProvider);
+    await repository.uncheckAll(householdId);
+    if (!mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    showAppSnackbar(
+      context,
+      message: l10n.shoppingPutBackSnackbar(checkedIds.length),
+      duration: _bulkSnackbarDuration,
+      action: SnackBarAction(
+        label: l10n.shoppingClearedUndo,
+        onPressed: () => unawaited(repository.checkItems(checkedIds)),
+      ),
+    );
   }
 }
 
 /// Runs a USER-INITIATED sync and reports failure (spec
-/// `docs/specs/sync-freshness.md` §2.3).
-///
-/// Uses `refreshNow()`, not `pushDirty()`: the latter swallows every error
-/// by contract (spec `sync-backend.md` §8.3), so the indicator used to spin
-/// and stop identically whether the sync worked or the phone was offline --
-/// found by the 2026-08-07 persona walkthrough. Success stays silent; the
-/// list simply updates, which is the platform convention.
-Future<void> _refresh(BuildContext context, WidgetRef ref) async {
-  final ok = await ref.read(syncEngineProvider).refreshNow();
-  if (ok || !context.mounted) {
-    return;
-  }
-  // WHEN THIS BRANCH IS ACTUALLY REACHED, which is narrower than it looks:
-  // `syncEngineProvider` is gated on `settings.syncHouseholdId`, and the
-  // engine's own startup pull and 60s poll run this same revocation probe. So
-  // in the common case the ENGINE notices first, calls `clearSyncLink()`, and
-  // `syncEngineProvider` becomes a `NoopSyncEngine` whose `refreshNow()`
-  // returns true -- meaning a later pull-to-refresh reports success and says
-  // nothing. That is not a gap: a device that has been revoked is told so by
-  // the revocation notice (spec `docs/specs/household-lifecycle.md` §3.5),
-  // which is the primary surface. This string covers the narrower race where
-  // the user's own gesture is the first probe after the server-side removal,
-  // and it exists because in exactly that case `syncRefreshError`'s "will
-  // sync later" is a promise the app has already made false.
-  // refreshNow() returns false for two different situations, and only one of
-  // them is a delay. If the failure was a revocation, `_pullSinceInner` has
-  // ALREADY called setMembershipRevoked() and clearSyncLink() before
-  // returning -- so syncRefreshError's "will sync later" is not optimism, it
-  // is false. Read the just-written row with a one-shot query rather than
-  // settingsProvider's stream, which may not have re-emitted the write yet.
-  final revoked = (await ref.read(settingsRepositoryProvider).ensureSettings())
-      .membershipRevoked;
-  if (!context.mounted) {
-    return;
-  }
-  final l10n = AppLocalizations.of(context);
-  showAppSnackbar(
-    context,
-    message: revoked ? l10n.syncRefreshErrorRevoked : l10n.syncRefreshError,
-  );
-}
+/// `docs/specs/sync-freshness.md` §2.3) through the shared
+/// `refreshAndReport` (`lib/features/sync/refresh_outcome_snackbar.dart`),
+/// which owns the `RefreshOutcome` -> snackbar mapping for every surface.
+Future<void> _refresh(BuildContext context, WidgetRef ref) =>
+    refreshAndReport(context, ref);
 
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
+    required this.membersById,
+    required this.collapsedCategories,
+    required this.onToggleCategory,
+    required this.syncLinked,
+    required this.actingMemberId,
     required this.heldBuckets,
     required this.cartExpanded,
     required this.onCartExpansionChanged,
@@ -362,6 +441,20 @@ class _Body extends StatelessWidget {
   });
 
   final List<ShoppingItemWithCategory> items;
+
+  /// The collapsed aisles' keys (F9) and the callback that toggles one.
+  final Set<String> collapsedCategories;
+  final ValueChanged<String> onToggleCategory;
+
+  /// Every household member by id, to resolve a row's `addedBy`.
+  final Map<String, Member> membersById;
+
+  /// Whether the household is linked and signed in (E10: only then can a
+  /// dirty row be "waiting to send").
+  final bool syncLinked;
+
+  /// The acting (or claimed) member's id; their own additions get no avatar.
+  final String? actingMemberId;
 
   /// Item ids whose row is held in a section that no longer matches their
   /// database state, valued by the section they are drawn in (`true` = the
@@ -447,9 +540,19 @@ class _Body extends StatelessWidget {
         group.add(unchecked[index]);
         index++;
       }
-      children
-        ..add(ShoppingCategoryHeader(category: group.first.category))
-        ..add(_aisleCard(group));
+      final key = categoryId ?? uncategorizedCollapseKey;
+      final collapsed = collapsedCategories.contains(key);
+      children.add(
+        ShoppingCategoryHeader(
+          category: group.first.category,
+          collapsed: collapsed,
+          itemCount: group.length,
+          onToggle: () => onToggleCategory(key),
+        ),
+      );
+      if (!collapsed) {
+        children.add(_aisleCard(group));
+      }
     }
     return children;
   }
@@ -470,10 +573,22 @@ class _Body extends StatelessWidget {
     );
   }
 
+  /// The adder to show an avatar for, or `null` (see
+  /// [ShoppingItemTile.addedBy]).
+  Member? _addedByOther(ShoppingItemWithCategory item) {
+    final addedById = item.item.addedBy;
+    if (addedById == null || addedById == actingMemberId) {
+      return null;
+    }
+    return membersById[addedById];
+  }
+
   Widget _tileFor(ShoppingItemWithCategory item) {
     return ShoppingItemTile(
       key: ValueKey(item.item.id),
       item: item,
+      addedBy: _addedByOther(item),
+      waitingToSend: syncLinked && item.item.syncDirty,
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),
       onLongPress: () => onLongPressItem(item),

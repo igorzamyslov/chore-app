@@ -1,14 +1,26 @@
 /// The collapsed-by-default 'Paused (N)' section: paused chores, each with
-/// a Resume action.
+/// a Resume action; tapping or long-pressing a row opens its action sheet
+/// (persona review 2026-10-06 C4).
 library;
 
 import 'package:chore_app/app/depth_card.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/data/repositories/chore_repository.dart';
+import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/features/categories/category_badge.dart';
 import 'package:chore_app/features/chores/recurrence_sentence.dart';
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+/// The resume day of a "Pause until" (persona review 2026-10-06 C2) as the
+/// locale's weekday + month + day, e.g. 'Mon, Oct 12' -- the same
+/// `DateFormat.MMMEd` the due chip uses for far-off dates.
+String pausedUntilText(String localeName, PlainDate until) {
+  return DateFormat.MMMEd(
+    localeName,
+  ).format(DateTime.utc(until.year, until.month, until.day));
+}
 
 /// The 'Paused' section: a collapsed-by-default [ExpansionTile] headed
 /// 'Paused (N)', holding one row per paused chore in [chores].
@@ -20,6 +32,7 @@ class ChorePausedSection extends StatelessWidget {
   const ChorePausedSection({
     required this.chores,
     required this.onResume,
+    required this.onOpenMenu,
     super.key,
   });
 
@@ -28,6 +41,12 @@ class ChorePausedSection extends StatelessWidget {
 
   /// Called with the tapped row's chore when its Resume action fires.
   final ValueChanged<ChoreWithDetails> onResume;
+
+  /// Called with the row's chore when the row is tapped or long-pressed:
+  /// opens the paused variant of the action sheet (Resume / Edit / Delete),
+  /// so a paused chore can be changed or removed without resuming it first
+  /// (persona review 2026-10-06 C4).
+  final ValueChanged<ChoreWithDetails> onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +73,7 @@ class ChorePausedSection extends StatelessWidget {
             _PausedRow(
               details: chores[i],
               onResume: () => onResume(chores[i]),
+              onOpenMenu: () => onOpenMenu(chores[i]),
             ),
           ],
         ],
@@ -63,10 +83,15 @@ class ChorePausedSection extends StatelessWidget {
 }
 
 class _PausedRow extends StatelessWidget {
-  const _PausedRow({required this.details, required this.onResume});
+  const _PausedRow({
+    required this.details,
+    required this.onResume,
+    required this.onOpenMenu,
+  });
 
   final ChoreWithDetails details;
   final VoidCallback onResume;
+  final VoidCallback onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -82,43 +107,58 @@ class _PausedRow extends StatelessWidget {
     final chore = details.chore;
     final recurrence = chore.recurrence;
 
-    return ListTile(
-      title: Text(chore.title),
-      subtitle: DefaultTextStyle.merge(
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (category != null) CategoryBadge(category: category),
-            if (recurrence != null)
-              Text(
-                recurrenceSentence(
-                  l10n,
-                  Localizations.localeOf(context).toString(),
-                  interval: recurrence.interval,
-                  unit: recurrence.unit,
-                  anchor: recurrence.anchor,
-                  weekdays: recurrence.weekdays,
-                  monthlyMode: recurrence.monthlyMode,
-                  startDate: chore.startDate,
-                  monthlyDayOfMonth: recurrence.monthlyDayOfMonth,
-                  monthlyOrdinal: recurrence.monthlyOrdinal,
-                  monthlyWeekday: recurrence.monthlyWeekday,
+    return semantic(
+      'chores.paused.${chore.id}',
+      child: ListTile(
+        onTap: onOpenMenu,
+        onLongPress: onOpenMenu,
+        title: Text(chore.title),
+        subtitle: DefaultTextStyle.merge(
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (category != null) CategoryBadge(category: category),
+              if (recurrence != null)
+                Text(
+                  recurrenceSentence(
+                    l10n,
+                    Localizations.localeOf(context).toString(),
+                    interval: recurrence.interval,
+                    unit: recurrence.unit,
+                    anchor: recurrence.anchor,
+                    weekdays: recurrence.weekdays,
+                    monthlyMode: recurrence.monthlyMode,
+                    startDate: chore.startDate,
+                    monthlyDayOfMonth: recurrence.monthlyDayOfMonth,
+                    monthlyOrdinal: recurrence.monthlyOrdinal,
+                    monthlyWeekday: recurrence.monthlyWeekday,
+                  ),
                 ),
+              Text(
+                switch (chore.pausedUntil) {
+                  null => l10n.choresPausedBadge,
+                  final until => l10n.choresPausedUntil(
+                    pausedUntilText(
+                      Localizations.localeOf(context).toString(),
+                      until,
+                    ),
+                  ),
+                },
               ),
-            Text(l10n.choresPausedBadge),
-          ],
+            ],
+          ),
         ),
-      ),
-      trailing: semantic(
-        'chores.paused.${details.chore.id}.resume',
-        child: TextButton(
-          onPressed: onResume,
-          child: Text(l10n.choresPausedResume),
+        trailing: semantic(
+          'chores.paused.${details.chore.id}.resume',
+          child: TextButton(
+            onPressed: onResume,
+            child: Text(l10n.choresPausedResume),
+          ),
         ),
       ),
     );

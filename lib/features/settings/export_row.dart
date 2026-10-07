@@ -5,6 +5,7 @@
 /// backup of every table and hands it to the OS share sheet.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:chore_app/app/providers.dart';
@@ -27,7 +28,7 @@ import 'package:share_plus/share_plus.dart';
 /// name is set via `ShareParams.fileNameOverrides` -- `XFile.fromData`'s own
 /// `name` argument is ignored on every platform except web). Any failure
 /// (building the document, or the share sheet itself) shows a generic
-/// error via [showAppSnackbar] rather than crashing or silently doing
+/// error via [showAppErrorSnackbar] rather than crashing or silently doing
 /// nothing.
 class ExportDataTile extends ConsumerWidget {
   /// Creates the export row.
@@ -41,6 +42,7 @@ class ExportDataTile extends ConsumerWidget {
       child: SettingsRow(
         icon: Icons.ios_share_outlined,
         label: l10n.settingsExportEntry,
+        sublabel: l10n.settingsExportSubtitle,
         onTap: () => _export(context, ref),
       ),
     );
@@ -73,9 +75,10 @@ class ExportDataTile extends ConsumerWidget {
       // (as opposed to Exceptions) are left to propagate/crash -- those
       // indicate a programming bug, not an expected runtime failure.
       if (context.mounted) {
-        showAppSnackbar(
+        showAppErrorSnackbar(
           context,
           message: AppLocalizations.of(context).settingsExportError,
+          onRetry: () => unawaited(_export(context, ref)),
         );
       }
     }

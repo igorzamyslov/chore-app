@@ -258,6 +258,9 @@ and must survive; ids marked *(new)* are to be added.
    nice work"), an optional `bodySmall` filter-active line, and a 58dp
    progress ring on the right (`CustomPainter`, `outlineVariant` track +
    `primary` arc + centered percentage).
+   - *Amended 2026-10-06 (persona review E5, see `ui-foundation-chores.md`):
+     overdue occurrences are no longer part of **M**; they appear as "N to
+     catch up" on the sub-line, and the praise copy ("nice work") is gone.*
    - **M** = still-pending occurrences due today or overdue **plus**
      occurrences completed today. **N** = occurrences completed today. Both
      are computed from the SAME member/category-filtered collections the

@@ -1,4 +1,5 @@
-/// The skip/edit/pause/delete action sheet for a chore occurrence tile.
+/// The action sheet for a chore: a pending occurrence's tile, or a paused
+/// chore's row.
 library;
 
 import 'package:chore_app/app/semantics.dart';
@@ -13,22 +14,41 @@ enum ChoreMenuAction {
   /// `showMarkDoneFor` is true.
   markDoneFor,
 
+  /// Hand the open turn to another member (persona review 2026-10-06 C2).
+  /// Offered only when `showReassign` is true.
+  reassign,
+
   /// Skip the pending occurrence.
   skip,
 
   /// Open the chore in the edit form.
   edit,
 
+  /// Open the form in create mode, prefilled from this chore (persona
+  /// review 2026-10-06 C9). Pending variant only.
+  duplicate,
+
   /// Pause the chore (removing its pending occurrence).
   pause,
+
+  /// Resume a paused chore (persona review 2026-10-06 C4). Offered only on
+  /// the paused variant of the sheet.
+  resume,
 
   /// Delete the chore, after confirmation.
   delete,
 }
 
-/// Shows the tile-level bottom sheet offering (optionally) mark-done-for,
-/// then skip/edit/pause/delete, and resolves to the chosen
+/// Shows the chore's bottom sheet and resolves to the chosen
 /// [ChoreMenuAction] (or `null` if dismissed).
+///
+/// Two variants:
+///
+/// - a pending occurrence (the default): optionally mark-done-for and
+///   reassign, then skip/edit/duplicate/pause/delete;
+/// - [paused] (persona review 2026-10-06 C4): resume/edit/delete only — a
+///   paused chore has no open turn to skip, mark done or pause again, but
+///   it can still be changed or removed without resuming it first.
 ///
 /// Rows are full-width with 22dp icons and a ≥48dp height (spec
 /// `docs/specs/theme-v2.md` §4.5); delete sits last, in `error`. The drag
@@ -40,62 +60,89 @@ enum ChoreMenuAction {
 /// nothing more than that: the constraint on this feature is that it stays
 /// rare — no tile placement, no prompt on the common path, no banner, and
 /// completing a chore as yourself stays exactly one tap. The caller
-/// computes the gate (linked + signed in, ≥2 members) so this sheet stays
-/// Riverpod-free.
+/// computes the gate so this sheet stays Riverpod-free. Ignored when
+/// [paused]. [showReassign] adds "Reassign this turn…" right below it, on
+/// the same terms (persona review 2026-10-06 C2: somebody else to hand the
+/// turn to).
 Future<ChoreMenuAction?> showChoreActionSheet(
   BuildContext context, {
   required bool showMarkDoneFor,
+  bool showReassign = false,
+  bool paused = false,
 }) {
   return showModalBottomSheet<ChoreMenuAction>(
     context: context,
     builder: (sheetContext) {
       final errorColor = Theme.of(sheetContext).colorScheme.error;
       final l10n = AppLocalizations.of(sheetContext);
+      Widget row(
+        ChoreMenuAction action, {
+        required String id,
+        required IconData icon,
+        required String label,
+      }) {
+        return semantic(
+          id,
+          child: ListTile(
+            leading: Icon(icon, size: 22),
+            title: Text(label),
+            onTap: () => Navigator.pop(sheetContext, action),
+          ),
+        );
+      }
+
       return SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (showMarkDoneFor)
-              semantic(
-                'chores.menu.markDoneFor',
-                child: ListTile(
-                  leading: const Icon(Icons.how_to_reg_outlined, size: 22),
-                  title: Text(l10n.choresMenuMarkDoneFor),
-                  onTap: () {
-                    Navigator.pop(sheetContext, ChoreMenuAction.markDoneFor);
-                  },
-                ),
+            if (paused)
+              row(
+                ChoreMenuAction.resume,
+                id: 'chores.menu.resume',
+                icon: Icons.play_circle_outline,
+                label: l10n.choresPausedResume,
               ),
-            semantic(
-              'chores.menu.skip',
-              child: ListTile(
-                leading: const Icon(Icons.skip_next_outlined, size: 22),
-                title: Text(l10n.choresMenuSkip),
-                onTap: () {
-                  Navigator.pop(sheetContext, ChoreMenuAction.skip);
-                },
+            if (!paused && showMarkDoneFor)
+              row(
+                ChoreMenuAction.markDoneFor,
+                id: 'chores.menu.markDoneFor',
+                icon: Icons.how_to_reg_outlined,
+                label: l10n.choresMenuMarkDoneFor,
               ),
+            if (!paused && showReassign)
+              row(
+                ChoreMenuAction.reassign,
+                id: 'chores.menu.reassign',
+                icon: Icons.swap_horiz,
+                label: l10n.choresMenuReassign,
+              ),
+            if (!paused)
+              row(
+                ChoreMenuAction.skip,
+                id: 'chores.menu.skip',
+                icon: Icons.skip_next_outlined,
+                label: l10n.choresMenuSkip,
+              ),
+            row(
+              ChoreMenuAction.edit,
+              id: 'chores.menu.edit',
+              icon: Icons.edit_outlined,
+              label: l10n.choresMenuEdit,
             ),
-            semantic(
-              'chores.menu.edit',
-              child: ListTile(
-                leading: const Icon(Icons.edit_outlined, size: 22),
-                title: Text(l10n.choresMenuEdit),
-                onTap: () {
-                  Navigator.pop(sheetContext, ChoreMenuAction.edit);
-                },
+            if (!paused)
+              row(
+                ChoreMenuAction.duplicate,
+                id: 'chores.menu.duplicate',
+                icon: Icons.copy_outlined,
+                label: l10n.choresMenuDuplicate,
               ),
-            ),
-            semantic(
-              'chores.menu.pause',
-              child: ListTile(
-                leading: const Icon(Icons.pause_circle_outlined, size: 22),
-                title: Text(l10n.choresMenuPause),
-                onTap: () {
-                  Navigator.pop(sheetContext, ChoreMenuAction.pause);
-                },
+            if (!paused)
+              row(
+                ChoreMenuAction.pause,
+                id: 'chores.menu.pause',
+                icon: Icons.pause_circle_outlined,
+                label: l10n.choresMenuPause,
               ),
-            ),
             semantic(
               'chores.menu.delete',
               child: ListTile(

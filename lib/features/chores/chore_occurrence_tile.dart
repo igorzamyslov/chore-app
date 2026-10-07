@@ -65,9 +65,9 @@ String overdueDueText(
 /// Tiles due today or overdue additionally tint their container (design
 /// option C, see [dueTone]): a container ground, an outline border, and a
 /// 3dp accent left edge -- success when due today, warning when overdue by
-/// fewer than 7 days, error from 7 days on. Tapping the trailing menu
-/// button or long-pressing anywhere on the tile opens the
-/// skip/edit/pause/delete action sheet via [onOpenMenu].
+/// fewer than 7 days, error from 7 days on. Tapping the tile body or the
+/// trailing menu button, or long-pressing anywhere on the tile, opens the
+/// action sheet via [onOpenMenu] (tap added 2026-10-06, persona review C3).
 class ChoreOccurrenceTile extends StatelessWidget {
   /// Creates a tile for [occurrence].
   const ChoreOccurrenceTile({
@@ -76,6 +76,7 @@ class ChoreOccurrenceTile extends StatelessWidget {
     required this.section,
     required this.onComplete,
     required this.onOpenMenu,
+    this.waitingToSend = false,
     super.key,
   });
 
@@ -95,9 +96,16 @@ class ChoreOccurrenceTile extends StatelessWidget {
   /// Called when the leading complete button is tapped.
   final VoidCallback onComplete;
 
-  /// Called when the trailing menu button is tapped, or the tile is
-  /// long-pressed.
+  /// Called when the tile body or the trailing menu button is tapped, or
+  /// the tile is long-pressed.
   final VoidCallback onOpenMenu;
+
+  /// Whether to show the small "waiting to send" clock before the menu
+  /// button (persona review 2026-10-06 E10): the caller passes `true` only
+  /// while the household is linked AND this occurrence is `syncDirty`, so
+  /// a change made on a weak connection does not look identical to one the
+  /// rest of the household already has.
+  final bool waitingToSend;
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +126,11 @@ class ChoreOccurrenceTile extends StatelessWidget {
     final tile = semantic(
       'chores.occurrence.${chore.id}',
       child: InkWell(
+        // Persona review 2026-10-06 C3: a tap on the body opens the same
+        // sheet as the kebab -- tapping a chore to change it is the first
+        // thing people try, and shopping rows already open on tap. The
+        // complete ring and the kebab keep their own tap targets.
+        onTap: onOpenMenu,
         onLongPress: onOpenMenu,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -134,10 +147,23 @@ class ChoreOccurrenceTile extends StatelessWidget {
                 ),
               semantic(
                 'chores.occurrence.${chore.id}.complete',
-                child: IconButton(
-                  icon: const _CompleteRing(),
-                  tooltip: l10n.choresOccurrenceCompleteTooltip,
-                  onPressed: onComplete,
+                // G1 (persona review 2026-10-06): a screen reader walking a
+                // list of identical "Complete" buttons cannot tell which
+                // chore each one belongs to, so the label names it. The
+                // inner IconButton's own tooltip semantics are excluded to
+                // avoid announcing "Complete" twice.
+                child: Semantics(
+                  label:
+                      '${l10n.choresOccurrenceCompleteTooltip}: '
+                      '${chore.title}',
+                  button: true,
+                  excludeSemantics: true,
+                  onTap: onComplete,
+                  child: IconButton(
+                    icon: const _CompleteRing(),
+                    tooltip: l10n.choresOccurrenceCompleteTooltip,
+                    onPressed: onComplete,
+                  ),
                 ),
               ),
               Expanded(
@@ -163,12 +189,29 @@ class ChoreOccurrenceTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (waitingToSend)
+                Tooltip(
+                  message: l10n.syncPendingItemTooltip,
+                  child: Icon(
+                    Icons.schedule,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               semantic(
                 'chores.occurrence.${chore.id}.menu',
-                child: IconButton(
-                  icon: const Icon(Icons.more_vert),
-                  tooltip: l10n.choresOccurrenceMoreActionsTooltip,
-                  onPressed: onOpenMenu,
+                child: Semantics(
+                  label:
+                      '${l10n.choresOccurrenceMoreActionsTooltip}: '
+                      '${chore.title}',
+                  button: true,
+                  excludeSemantics: true,
+                  onTap: onOpenMenu,
+                  child: IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: l10n.choresOccurrenceMoreActionsTooltip,
+                    onPressed: onOpenMenu,
+                  ),
                 ),
               ),
             ],
@@ -263,7 +306,10 @@ class _MetadataRow extends StatelessWidget {
         children: [
           // Assignee first: "whose is this" is what a scan of the list
           // looks for, so it sits at a fixed left position on every tile.
-          if (assignee != null) _MemberAvatarName(member: assignee),
+          if (assignee != null)
+            _MemberAvatarName(member: assignee)
+          else
+            const _AnyoneChip(),
           if (category != null) _CategoryDotName(category: category),
           if (_showsDueText)
             _DueChip(
@@ -340,6 +386,29 @@ class _DueChip extends StatelessWidget {
   }
 }
 
+/// The chip standing in for the assignee on an unassigned tile (persona
+/// review 2026-10-06 E1): anyone may do it, and the member filter keeps it.
+class _AnyoneChip extends StatelessWidget {
+  const _AnyoneChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.group_outlined,
+          size: 16,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 4),
+        Text(AppLocalizations.of(context).choresAssigneeAnyone),
+      ],
+    );
+  }
+}
+
 /// A circular avatar in [member]'s color with their initial, followed by
 /// their first name.
 class _MemberAvatarName extends StatelessWidget {
@@ -382,7 +451,10 @@ class _NoteLine extends StatelessWidget {
         Expanded(
           child: Text(
             note,
-            maxLines: 1,
+            // G2 (persona review 2026-10-06): at large text sizes one
+            // ellipsized line shows barely a word, so the note gets a
+            // second line.
+            maxLines: MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 2 : 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(color: color),
           ),

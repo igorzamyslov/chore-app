@@ -153,6 +153,31 @@ void main() {
     },
   );
 
+  test(
+    'checkItems re-checks exactly the given active items and is a no-op '
+    'for an empty list',
+    () async {
+      final a = await repo.addItem(householdId, name: 'A');
+      final b = await repo.addItem(householdId, name: 'B');
+      final gone = await repo.addItem(householdId, name: 'Gone');
+      await repo.deleteItem(gone.id);
+      clock.advance(const Duration(minutes: 1));
+
+      await repo.checkItems(const []);
+      expect((await row(a.id)).checkedAt, isNull);
+
+      await repo.checkItems([a.id, gone.id]);
+      expect((await row(a.id)).checkedAt, isNotNull);
+      expect((await row(a.id)).syncDirty, isTrue);
+      expect((await row(b.id)).checkedAt, isNull);
+      expect(
+        (await row(gone.id)).checkedAt,
+        isNull,
+        reason: 'a soft-deleted row is never re-checked',
+      );
+    },
+  );
+
   test('restoreItems is a no-op for an empty id list', () async {
     final item = await repo.addItem(householdId, name: 'A');
     await repo.deleteItem(item.id);
@@ -284,12 +309,186 @@ void main() {
     });
   });
 
+  group('grouped history query (H6-query)', () {
+    test(
+      'spellings that normalize alike (case, diacritics, spacing) count as '
+      'one name and the newest spelling wins',
+      () async {
+        await repo.addItem(householdId, name: 'Müsli');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'MÜSLI');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'musli ');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'Muesli');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'Mulch');
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'mulch');
+
+        final names = [
+          for (final s in await repo.suggestions(householdId, 'mu')) s.name,
+        ];
+
+        // musli x3 beats mulch x2 beats muesli x1: frequency first, and the
+        // three spellings of musli are ONE entry showing the newest one.
+        expect(names, ['musli ', 'mulch', 'Muesli']);
+      },
+    );
+
+    test(
+      'the most recent non-null category survives a newer uncategorized row '
+      'and spellings in different SQL groups',
+      () async {
+        final produce = await createCategory(
+          id: 'cat-produce',
+          name: 'Produce',
+          sortOrder: 0,
+        );
+        final dairy = await createCategory(
+          id: 'cat-dairy',
+          name: 'Dairy',
+          sortOrder: 1,
+        );
+        await repo.addItem(householdId, name: 'Käse', categoryId: produce.id);
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'KÄSE', categoryId: dairy.id);
+        clock.advance(const Duration(minutes: 1));
+        await repo.addItem(householdId, name: 'kase');
+
+        expect(
+          await repo.mostRecentCategoryIdForNormalizedName(householdId, 'kase'),
+          dairy.id,
+        );
+        final suggestion = (await repo.suggestions(householdId, 'ka')).single;
+        expect(suggestion.name, 'kase');
+        expect(suggestion.categoryId, dairy.id);
+        expect(suggestion.category?.name, 'Dairy');
+        expect(
+          await repo.mostRecentCategoryIdForNormalizedName(householdId, 'nope'),
+          isNull,
+        );
+      },
+    );
+
+    test("another household's history never leaks in", () async {
+      await db
+          .into(db.households)
+          .insert(
+            HouseholdsCompanion.insert(
+              id: 'h2',
+              name: 'Other',
+              createdAt: 't0',
+              updatedAt: 't0',
+            ),
+          );
+      await repo.addItem('h2', name: 'Secret');
+
+      expect(await repo.suggestions(householdId, 'se'), isEmpty);
+    });
+  });
+
+  group('device UI memory in ui_state (F9, F11)', () {
+    test(
+      'collapsed categories round-trip and are wiped with ui_state',
+      () async {
+        expect(await repo.collapsedCategoryKeys(), isEmpty);
+
+        await repo.setCategoryCollapsed('cat-a', collapsed: true);
+        await repo.setCategoryCollapsed('cat-b', collapsed: true);
+        await repo.setCategoryCollapsed(
+          uncategorizedCollapseKey,
+          collapsed: true,
+        );
+        expect(await repo.collapsedCategoryKeys(), {
+          'cat-a',
+          'cat-b',
+          uncategorizedCollapseKey,
+        });
+
+        await repo.setCategoryCollapsed('cat-a', collapsed: false);
+        expect(await repo.collapsedCategoryKeys(), {
+          'cat-b',
+          uncategorizedCollapseKey,
+        });
+
+        // Extra keys never disturb the single 'device' row the shell reads.
+        expect(
+          await (db.select(
+            db.uiState,
+          )..where((tbl) => tbl.id.equals('device'))).getSingleOrNull(),
+          isNull,
+        );
+
+        await db.delete(db.uiState).go();
+        expect(await repo.collapsedCategoryKeys(), isEmpty);
+      },
+    );
+
+    test('forgotten suggestions are stored normalised, once each', () async {
+      expect(await repo.forgottenSuggestionNames(), isEmpty);
+
+      await repo.forgetSuggestion('  MÜSLI ');
+      await repo.forgetSuggestion('musli');
+      await repo.forgetSuggestion('Milk');
+
+      expect(await repo.forgottenSuggestionNames(), {'musli', 'milk'});
+    });
+
+    test('a forgotten name no longer appears in suggestions', () async {
+      await repo.addItem(householdId, name: 'Typo mlik');
+      await repo.addItem(householdId, name: 'Milk');
+      await repo.addItem(householdId, name: 'Milk');
+      final typo = await repo.findActiveByNormalizedName(
+        householdId,
+        'typo mlik',
+      );
+      await repo.deleteItem(typo!.item.id);
+
+      await repo.forgetSuggestion('typo mlik');
+
+      expect(
+        [for (final s in await repo.suggestions(householdId, 'ty')) s.name],
+        isEmpty,
+      );
+      expect(
+        [for (final s in await repo.suggestions(householdId, 'mi')) s.name],
+        ['Milk'],
+      );
+    });
+  });
+
   group('normalizeShoppingItemName', () {
     test('trims, lowercases, and collapses inner whitespace', () {
       expect(normalizeShoppingItemName('  Milk  '), 'milk');
       expect(normalizeShoppingItemName('Oat   Milk'), 'oat milk');
       expect(normalizeShoppingItemName('MILK'), 'milk');
       expect(normalizeShoppingItemName('   '), '');
+    });
+
+    test('folds diacritics so Müsli matches Musli (F7)', () {
+      expect(normalizeShoppingItemName('Müsli'), 'musli');
+      expect(normalizeShoppingItemName('MUSLI'), 'musli');
+      expect(normalizeShoppingItemName('Äpfel'), 'apfel');
+      expect(normalizeShoppingItemName('Öl'), 'ol');
+      expect(normalizeShoppingItemName('Soße'), 'sosse');
+      expect(normalizeShoppingItemName('Straße'), 'strasse');
+      expect(normalizeShoppingItemName('Café  Crème'), 'cafe creme');
+      expect(normalizeShoppingItemName('Jalapeño'), 'jalapeno');
+      expect(normalizeShoppingItemName('Crêpe à la Façon'), 'crepe a la facon');
+    });
+  });
+
+  group('duplicate lookup folds diacritics (F7)', () {
+    test('findActiveByNormalizedName finds Müsli for musli', () async {
+      await repo.addItem(householdId, name: 'Müsli');
+
+      final hit = await repo.findActiveByNormalizedName(
+        householdId,
+        normalizeShoppingItemName('Musli'),
+      );
+
+      expect(hit?.item.name, 'Müsli');
     });
   });
 
@@ -590,5 +789,81 @@ void main() {
         );
       },
     );
+  });
+
+  group('compactHistory', () {
+    Future<void> softDelete(
+      String id,
+      String deletedAt, {
+      required bool dirty,
+    }) {
+      return (db.update(
+        db.shoppingItems,
+      )..where((tbl) => tbl.id.equals(id))).write(
+        ShoppingItemsCompanion(
+          deletedAt: Value(deletedAt),
+          syncDirty: Value(dirty),
+        ),
+      );
+    }
+
+    Future<bool> exists(String id) async => (await (db.select(
+      db.shoppingItems,
+    )..where((tbl) => tbl.id.equals(id))).get()).isNotEmpty;
+
+    test('hard-deletes only old, already-synced soft-deleted rows', () async {
+      final cutoff = DateTime.utc(2026, 6);
+      final oldSynced = await repo.addItem(householdId, name: 'Old synced');
+      final oldDirty = await repo.addItem(householdId, name: 'Old dirty');
+      final recent = await repo.addItem(householdId, name: 'Recent');
+      final active = await repo.addItem(householdId, name: 'Active');
+      await softDelete(
+        oldSynced.id,
+        DateTime.utc(2025, 5).toIso8601String(),
+        dirty: false,
+      );
+      // Server-style offset notation must compare by instant, not as text.
+      await softDelete(
+        oldDirty.id,
+        '2025-05-01T00:00:00+00:00',
+        dirty: true,
+      );
+      await softDelete(
+        recent.id,
+        DateTime.utc(2026, 7).toIso8601String(),
+        dirty: false,
+      );
+      await (db.update(db.shoppingItems)
+            ..where((tbl) => tbl.id.equals(active.id)))
+          .write(const ShoppingItemsCompanion(syncDirty: Value(false)));
+
+      final removed = await repo.compactHistory(before: cutoff);
+
+      expect(removed, 1);
+      expect(await exists(oldSynced.id), isFalse);
+      expect(await exists(oldDirty.id), isTrue);
+      expect(await exists(recent.id), isTrue);
+      expect(await exists(active.id), isTrue);
+    });
+
+    test('parses offset timestamps by instant', () async {
+      final item = await repo.addItem(householdId, name: 'Server written');
+      await softDelete(item.id, '2025-05-01T00:00:00+00:00', dirty: false);
+
+      expect(await repo.compactHistory(before: DateTime.utc(2026)), 1);
+      expect(await exists(item.id), isFalse);
+    });
+
+    test('a cutoff before everything removes nothing', () async {
+      final item = await repo.addItem(householdId, name: 'Kept');
+      await softDelete(
+        item.id,
+        DateTime.utc(2025, 5).toIso8601String(),
+        dirty: false,
+      );
+
+      expect(await repo.compactHistory(before: DateTime.utc(2025)), 0);
+      expect(await exists(item.id), isTrue);
+    });
   });
 }

@@ -84,6 +84,10 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
   String? _inlineError;
 
   String _code = '';
+
+  /// The joined household's display name (`peek_invite`), known once the
+  /// server has accepted the code (persona review D3).
+  String _householdName = '';
   List<ClaimableMember> _claimableMembers = const [];
   JoinChoice? _choice;
 
@@ -159,14 +163,15 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
       _inlineError = null;
     });
     try {
-      final members = await ref
-          .read(householdGatewayProvider)
-          .listClaimableMembers(code);
+      final gateway = ref.read(householdGatewayProvider);
+      final members = await gateway.listClaimableMembers(code);
+      final householdName = await gateway.peekInviteHouseholdName(code);
       if (!mounted) {
         return;
       }
       setState(() {
         _code = code;
+        _householdName = householdName;
         _claimableMembers = members;
         _step = _Step.chooser;
         _busy = false;
@@ -190,6 +195,7 @@ class _JoinHouseholdSheetState extends ConsumerState<_JoinHouseholdSheet> {
 
   Widget _buildChooserStep(BuildContext context) {
     return JoinChooserStep(
+      householdName: _householdName,
       claimableMembers: _claimableMembers,
       onClaim: _chooseExistingMember,
       onNewMember: () => setState(() => _step = _Step.newMemberName),

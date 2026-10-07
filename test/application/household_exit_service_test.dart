@@ -212,4 +212,81 @@ void main() {
       expect(row.membershipRevoked, isFalse);
     },
   );
+
+  test(
+    'a non-last leave stamps settings.syncLeftAt; linking again clears it '
+    '(persona review D8)',
+    () async {
+      await service.leaveHousehold(
+        householdId: household.id,
+        alsoDeleteLocalData: false,
+      );
+      expect((await settings.ensureSettings()).syncLeftAt, isNotNull);
+
+      await settings.setSyncLinked(
+        householdId: household.id,
+        linkedAt: DateTime.utc(2026, 2),
+      );
+      expect((await settings.ensureSettings()).syncLeftAt, isNull);
+    },
+  );
+
+  test(
+    'the last claimed member leaving does NOT stamp syncLeftAt: the '
+    'household cascaded, nothing is left online to collide with',
+    () async {
+      await service.leaveHousehold(
+        householdId: household.id,
+        alsoDeleteLocalData: false,
+        lastClaimedMember: true,
+      );
+      expect((await settings.ensureSettings()).syncLeftAt, isNull);
+    },
+  );
+
+  test(
+    'rename-on-exit: leave renames the profile on the server BEFORE the RPC, '
+    'and locally too (persona review D8)',
+    () async {
+      final me = (await db.select(db.members).get()).single;
+
+      await service.leaveHousehold(
+        householdId: household.id,
+        alsoDeleteLocalData: false,
+        rename: (memberId: me.id, name: 'P.'),
+      );
+
+      expect(gateway.renameMemberCalls, [(memberId: me.id, name: 'P.')]);
+      expect(gateway.exitCallOrder, ['rename', 'leave']);
+      final stored = (await db.select(db.members).get()).single;
+      expect(stored.name, 'P.');
+    },
+  );
+
+  test(
+    'rename-on-exit: delete account renames first too; a failed rename '
+    'changes nothing and never reaches the delete RPC',
+    () async {
+      final me = (await db.select(db.members).get()).single;
+      gateway.renameMemberError = Exception('offline');
+
+      await expectLater(
+        service.deleteAccount(
+          alsoDeleteLocalData: false,
+          rename: (memberId: me.id, name: 'P.'),
+        ),
+        throwsA(isA<Exception>()),
+      );
+      expect(gateway.deleteAccountCallCount, 0);
+      expect((await db.select(db.members).get()).single.name, me.name);
+      expect((await settings.ensureSettings()).syncHouseholdId, household.id);
+
+      gateway.renameMemberError = null;
+      await service.deleteAccount(
+        alsoDeleteLocalData: false,
+        rename: (memberId: me.id, name: 'P.'),
+      );
+      expect(gateway.exitCallOrder, ['rename', 'rename', 'deleteAccount']);
+    },
+  );
 }

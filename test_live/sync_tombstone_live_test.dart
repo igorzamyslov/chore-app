@@ -188,6 +188,8 @@ void main() {
           table,
           householdId: householdId,
           since: null,
+          offset: 0,
+          limit: syncPageSize,
         );
         return rows.singleWhere(match);
       }
@@ -258,11 +260,15 @@ void main() {
         'chore_occurrences',
         householdId: householdId,
         since: since,
+        offset: 0,
+        limit: syncPageSize,
       );
       final assigneesSeen = await transport.pullTable(
         'chore_assignees',
         householdId: householdId,
         since: since,
+        offset: 0,
+        limit: syncPageSize,
       );
       expect(
         occurrencesSeen.singleWhere(

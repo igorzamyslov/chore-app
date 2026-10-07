@@ -21,6 +21,8 @@
 /// engine rather than duplicated here.
 library;
 
+import 'package:chore_app/application/sync_engine.dart'
+    show pageOrderKeyColumns, syncPageSize;
 import 'package:chore_app/data/repositories/household_repository.dart'
     show HouseholdSnapshot;
 import 'package:chore_app/data/sync/row_mappers.dart' as row_mappers;
@@ -59,6 +61,32 @@ class ClaimableMember {
 
   @override
   String toString() => 'ClaimableMember($memberId, $name, $color)';
+}
+
+/// The household's currently shareable invite code (persona review D5): not
+/// revoked and not yet expired, as read by [HouseholdGateway.activeInvite].
+@immutable
+class ActiveInvite {
+  /// Creates an active-invite result.
+  const ActiveInvite({required this.code, required this.expiresAt});
+
+  /// The 8-character invite code.
+  final String code;
+
+  /// When the code stops working (server `expires_at`, UTC).
+  final DateTime expiresAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ActiveInvite &&
+      other.code == code &&
+      other.expiresAt == expiresAt;
+
+  @override
+  int get hashCode => Object.hash(code, expiresAt);
+
+  @override
+  String toString() => 'ActiveInvite($code, $expiresAt)';
 }
 
 /// The caller's own already-claimed member profile, as found by
@@ -173,6 +201,13 @@ abstract class HouseholdGateway {
   /// [householdId] (member-only).
   Future<String> createInvite(String householdId);
 
+  /// PostgREST select of `household_invites` (SELECT is granted to members):
+  /// the newest invite for [householdId] that is neither revoked nor
+  /// expired, or `null` when there is none. Lets the invite flow re-show the
+  /// code already shared instead of silently revoking it on every tap
+  /// (persona review D5).
+  Future<ActiveInvite?> activeInvite(String householdId);
+
   /// PostgREST update of `household_invites`: stamps `revoked_at` (a
   /// client-authored ISO timestamp -- acceptable for an audit column like
   /// this one) on every currently-active invite (`revoked_at is null`) for
@@ -185,6 +220,14 @@ abstract class HouseholdGateway {
   /// RPC `list_claimable_members`: the unclaimed member profiles [code]'s
   /// household offers for the P2c "Are you Anna?" claiming step.
   Future<List<ClaimableMember>> listClaimableMembers(String code);
+
+  /// RPC `peek_invite` (migration `20261006120000_join_funnel.sql`): the
+  /// display name of the household [code] would join, so the claim step can
+  /// say WHICH household before anyone commits (persona review D3). Throws
+  /// (a `PostgrestException` whose message contains `invalid`) for an
+  /// unknown, revoked or expired code -- the same rejection
+  /// [listClaimableMembers] gives.
+  Future<String> peekInviteHouseholdName(String code);
 
   /// RPC `claim_member`: links the caller's `user_id` to the unclaimed
   /// [memberId] profile redeemed via [code]; returns the household id.
@@ -210,10 +253,20 @@ abstract class HouseholdGateway {
   /// partial failure is safe.
   Future<void> removeMember(String memberId);
 
+  /// PostgREST update of `members.name` (UPDATE is granted on `name`) for
+  /// the caller's own [memberId]: the rename-on-exit step (persona review
+  /// D8) that runs BEFORE [leaveHousehold] / [deleteAccount], while the
+  /// caller is still a member and RLS still lets the write through. Direct
+  /// rather than through the sync engine because the exit unlinks this
+  /// device right afterwards, so a dirty row would never be pushed.
+  Future<void> renameMember(String memberId, String name);
+
   /// RPC `leave_household` (spec `docs/specs/household-lifecycle.md` §2.2,
-  /// F9): unclaims the caller's own member row in [householdId] and NOTHING
-  /// else -- the profile stays active, so the family keeps seeing the person
-  /// and their history, and they can claim it again later through an invite.
+  /// F9): unclaims AND soft-deletes the caller's own member row in
+  /// [householdId] (amendment 2026-10-06, migration
+  /// `20261006120000_join_funnel.sql`) -- the family stops seeing the person
+  /// in rotations, their history keeps the name. Rejoining means "I'm new
+  /// here" or an unclaimed profile; there is no reclaim path any more.
   ///
   /// If that leaves the household with no claimed members at all, the server
   /// cascades it (§2.4, D-L5): the online household and its shared history
@@ -301,8 +354,14 @@ class NoopHouseholdGateway implements HouseholdGateway {
   Future<void> revokeActiveInvites(String householdId) => _unreachable();
 
   @override
+  Future<ActiveInvite?> activeInvite(String householdId) => _unreachable();
+
+  @override
   Future<List<ClaimableMember>> listClaimableMembers(String code) =>
       _unreachable();
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) => _unreachable();
 
   @override
   Future<String> claimMember(String code, String memberId) => _unreachable();
@@ -317,6 +376,9 @@ class NoopHouseholdGateway implements HouseholdGateway {
 
   @override
   Future<void> removeMember(String memberId) => _unreachable();
+
+  @override
+  Future<void> renameMember(String memberId, String name) => _unreachable();
 
   @override
   Future<void> leaveHousehold(String householdId) => _unreachable();
@@ -453,6 +515,29 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
   }
 
   @override
+  Future<ActiveInvite?> activeInvite(String householdId) async {
+    final rows = await _client
+        .from('household_invites')
+        .select('code, expires_at')
+        .eq('household_id', householdId)
+        .isFilter('revoked_at', null)
+        // Device clock, not server clock: a few minutes of skew only moves
+        // the moment a nearly-expired code stops being re-offered, and the
+        // server re-validates expiry on every redemption anyway.
+        .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) {
+      return null;
+    }
+    final row = rows.first;
+    return ActiveInvite(
+      code: row['code'] as String,
+      expiresAt: DateTime.parse(row['expires_at'] as String).toUtc(),
+    );
+  }
+
+  @override
   Future<void> revokeActiveInvites(String householdId) async {
     await _client
         .from('household_invites')
@@ -475,6 +560,15 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
           color: (row['member_color'] as num).toInt(),
         ),
     ];
+  }
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) async {
+    final result = await _client.rpc<dynamic>(
+      'peek_invite',
+      params: {'p_code': code},
+    );
+    return result as String;
   }
 
   @override
@@ -514,6 +608,11 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
   }
 
   @override
+  Future<void> renameMember(String memberId, String name) async {
+    await _client.from('members').update({'name': name}).eq('id', memberId);
+  }
+
+  @override
   Future<void> leaveHousehold(String householdId) async {
     await _client.rpc<dynamic>(
       'leave_household',
@@ -537,38 +636,54 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
         .select()
         .eq('id', householdId)
         .limit(1);
-    final members = await _client
-        .from('members')
-        .select()
-        .eq('household_id', householdId);
-    final categories = await _client
-        .from('categories')
-        .select()
-        .eq('household_id', householdId);
-    final chores = await _client
-        .from('chores')
-        .select()
-        .eq('household_id', householdId);
-    final choreAssignees = await _client
-        .from('chore_assignees')
-        .select()
-        .eq('household_id', householdId)
-        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
-        // hard-deleted locally and must not be downloaded. `isFilter`, never
-        // `.eq(..., null)`, which renders `= null` and matches nothing.
-        .isFilter('deleted_at', null);
-    final choreOccurrences = await _client
-        .from('chore_occurrences')
-        .select()
-        .eq('household_id', householdId)
-        // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
-        // hard-deleted locally and must not be downloaded. `isFilter`, never
-        // `.eq(..., null)`, which renders `= null` and matches nothing.
-        .isFilter('deleted_at', null);
-    final shoppingItems = await _client
-        .from('shopping_items')
-        .select()
-        .eq('household_id', householdId);
+    // Every per-table read below is PAGED (spec `docs/specs/sync-backend.md`
+    // §8.3 amendment 2026-10-06, technical review #2): PostgREST silently
+    // caps a response at `max_rows` (1000), so a bare `select()` over a
+    // household's history handed a joining device the oldest thousand rows
+    // of each table and dropped the current ones -- see `syncPageSize`.
+    final members = await _selectAllPages(
+      'members',
+      () => _client.from('members').select().eq('household_id', householdId),
+    );
+    final categories = await _selectAllPages(
+      'categories',
+      () => _client.from('categories').select().eq('household_id', householdId),
+    );
+    final chores = await _selectAllPages(
+      'chores',
+      () => _client.from('chores').select().eq('household_id', householdId),
+    );
+    final choreAssignees = await _selectAllPages(
+      'chore_assignees',
+      () => _client
+          .from('chore_assignees')
+          .select()
+          .eq('household_id', householdId)
+          // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+          // hard-deleted locally and must not be downloaded. `isFilter`,
+          // never `.eq(..., null)`, which renders `= null` and matches
+          // nothing.
+          .isFilter('deleted_at', null),
+    );
+    final choreOccurrences = await _selectAllPages(
+      'chore_occurrences',
+      () => _client
+          .from('chore_occurrences')
+          .select()
+          .eq('household_id', householdId)
+          // Tombstoned rows (spec `docs/specs/sync-backend.md` §8.6.5) are
+          // hard-deleted locally and must not be downloaded. `isFilter`,
+          // never `.eq(..., null)`, which renders `= null` and matches
+          // nothing.
+          .isFilter('deleted_at', null),
+    );
+    final shoppingItems = await _selectAllPages(
+      'shopping_items',
+      () => _client
+          .from('shopping_items')
+          .select()
+          .eq('household_id', householdId),
+    );
 
     return HouseholdSnapshot(
       household: householdRows.isEmpty
@@ -590,6 +705,30 @@ class SupabaseHouseholdGateway implements HouseholdGateway {
         for (final row in shoppingItems) row_mappers.shoppingItemFromRow(row),
       ],
     );
+  }
+
+  /// Every row [query] matches, fetched `syncPageSize` at a time in
+  /// `updated_at` + primary-key order until a short page -- the same paging
+  /// contract as `SupabaseSyncTransport.pullTable`. [query] is a factory
+  /// because a PostgREST builder is consumed by its transform calls.
+  Future<List<Map<String, dynamic>>> _selectAllPages(
+    String table,
+    supabase.PostgrestFilterBuilder<supabase.PostgrestList> Function() query,
+  ) async {
+    final rows = <Map<String, dynamic>>[];
+    var offset = 0;
+    while (true) {
+      var ordered = query().order('updated_at', ascending: true);
+      for (final column in pageOrderKeyColumns(table)) {
+        ordered = ordered.order(column, ascending: true);
+      }
+      final page = await ordered.range(offset, offset + syncPageSize - 1);
+      rows.addAll(page);
+      if (page.length < syncPageSize) {
+        return rows;
+      }
+      offset += syncPageSize;
+    }
   }
 
   /// **The `deleted_at` predicates here are defense in depth, and are

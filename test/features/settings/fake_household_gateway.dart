@@ -79,6 +79,18 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// Every [createInvite] call's household id, in call order.
   final List<String> createInviteCalls = [];
 
+  /// What [activeInvite] returns unless [activeInviteError] is set;
+  /// `null` (the default) means "no active code", i.e. the create-directly
+  /// path.
+  ActiveInvite? activeInviteResult;
+
+  /// Set to make the next [activeInvite] call throw this instead of
+  /// succeeding.
+  Exception? activeInviteError;
+
+  /// Every [activeInvite] call's household id, in call order.
+  final List<String> activeInviteCalls = [];
+
   /// Every [revokeActiveInvites] call's household id, in call order.
   final List<String> revokeActiveInvitesCalls = [];
 
@@ -108,6 +120,17 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// Set to make the next [listClaimableMembers] call throw this instead of
   /// succeeding.
   Exception? listClaimableMembersError;
+
+  /// The household name [peekInviteHouseholdName] returns unless
+  /// [peekInviteError] is set.
+  String peekHouseholdName = 'The Testers';
+
+  /// Set to make the next [peekInviteHouseholdName] call throw this instead
+  /// of succeeding.
+  Exception? peekInviteError;
+
+  /// Every [peekInviteHouseholdName] call's code, in call order.
+  final List<String> peekInviteCalls = [];
 
   /// The household id [claimMember] returns unless [claimMemberError] is
   /// set.
@@ -148,6 +171,17 @@ class FakeHouseholdGateway implements HouseholdGateway {
   /// `docs/specs/household-lifecycle.md` §3.2) is the one place in this app a
   /// failed action must be shown inline, so tests need to force it.
   Exception? removeMemberError;
+
+  /// Every [renameMember] call, in call order.
+  final List<({String memberId, String name})> renameMemberCalls = [];
+
+  /// Set to make the next [renameMember] call throw this instead of
+  /// succeeding.
+  Exception? renameMemberError;
+
+  /// Every exit-related call ('rename', 'leave', 'deleteAccount') in call
+  /// order -- lets a test assert rename-on-exit runs BEFORE the exit RPC.
+  final List<String> exitCallOrder = [];
 
   /// Every [leaveHousehold] call's household id, in call order.
   final List<String> leaveHouseholdCalls = [];
@@ -208,6 +242,16 @@ class FakeHouseholdGateway implements HouseholdGateway {
   }
 
   @override
+  Future<ActiveInvite?> activeInvite(String householdId) async {
+    activeInviteCalls.add(householdId);
+    final error = activeInviteError;
+    if (error != null) {
+      throw error;
+    }
+    return activeInviteResult;
+  }
+
+  @override
   Future<void> revokeActiveInvites(String householdId) async {
     revokeActiveInvitesCalls.add(householdId);
     inviteCallOrder.add('revoke');
@@ -225,6 +269,16 @@ class FakeHouseholdGateway implements HouseholdGateway {
       throw error;
     }
     return claimableMembers;
+  }
+
+  @override
+  Future<String> peekInviteHouseholdName(String code) async {
+    peekInviteCalls.add(code);
+    final error = peekInviteError;
+    if (error != null) {
+      throw error;
+    }
+    return peekHouseholdName;
   }
 
   @override
@@ -267,8 +321,19 @@ class FakeHouseholdGateway implements HouseholdGateway {
   }
 
   @override
+  Future<void> renameMember(String memberId, String name) async {
+    renameMemberCalls.add((memberId: memberId, name: name));
+    exitCallOrder.add('rename');
+    final error = renameMemberError;
+    if (error != null) {
+      throw error;
+    }
+  }
+
+  @override
   Future<void> leaveHousehold(String householdId) async {
     leaveHouseholdCalls.add(householdId);
+    exitCallOrder.add('leave');
     final error = leaveHouseholdError;
     if (error != null) {
       throw error;
@@ -278,6 +343,7 @@ class FakeHouseholdGateway implements HouseholdGateway {
   @override
   Future<void> deleteAccount() async {
     deleteAccountCallCount++;
+    exitCallOrder.add('deleteAccount');
     final error = deleteAccountError;
     if (error != null) {
       throw error;

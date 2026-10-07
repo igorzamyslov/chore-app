@@ -8,6 +8,7 @@ library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/auth_gateway.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/features/members/member_avatar.dart';
 import 'package:chore_app/features/settings/household_rename_sheet.dart';
@@ -31,24 +32,35 @@ class ManageMembersScreen extends ConsumerWidget {
     final membersAsync = ref.watch(membersProvider);
     final linked =
         ref.watch(settingsProvider).valueOrNull?.syncHouseholdId != null;
+    final myUserId = ref.watch(currentAuthUserProvider).valueOrNull?.id;
+    // Persona review D6: a local household shows WHERE inviting lives (a
+    // disabled row naming the missing step) instead of hiding it. Not under
+    // the Noop gateway -- there is no sign-in to point at in those builds.
+    final showLocalInvite =
+        !linked && ref.watch(authGatewayProvider) is! NoopAuthGateway;
+    final hasInviteRow = linked || showLocalInvite;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.manageMembersTitle)),
       body: membersAsync.when(
         data: (members) => ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: members.length + 1 + (linked ? 1 : 0),
+          itemCount: members.length + 1 + (hasInviteRow ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == 0) {
               return const _HouseholdNameRow();
             }
             final afterHeader = index - 1;
-            if (linked && afterHeader == 0) {
-              return const _InviteRow();
+            if (hasInviteRow && afterHeader == 0) {
+              return linked ? const _InviteRow() : const _InviteLocalRow();
             }
-            final member = members[linked ? afterHeader - 1 : afterHeader];
+            final member =
+                members[hasInviteRow ? afterHeader - 1 : afterHeader];
             return _MemberRow(
               member: member,
+              status: linked
+                  ? _statusLine(l10n, member: member, myUserId: myUserId)
+                  : null,
               onTap: () => showMemberEditSheet(context, member: member),
             );
           },
@@ -66,6 +78,25 @@ class ManageMembersScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The linked-household status line under a member row (persona review D4):
+/// who is "you", who has joined on their own phone, who has no phone yet.
+/// Only meaningful once the household is online -- a local household has no
+/// accounts at all, so the caller passes no status there.
+String _statusLine(
+  AppLocalizations l10n, {
+  required Member member,
+  required String? myUserId,
+}) {
+  final userId = member.userId;
+  if (userId == null) {
+    return l10n.memberStatusUnclaimed;
+  }
+  if (userId == myUserId) {
+    return l10n.memberStatusYou;
+  }
+  return l10n.memberStatusLinked;
 }
 
 /// The editable household-name row (spec
@@ -124,16 +155,43 @@ class _InviteRow extends ConsumerWidget {
   }
 }
 
-/// One member row: avatar + name, tappable to open the edit sheet.
+/// The local-household stand-in for [_InviteRow] (persona review D6):
+/// disabled, no `onTap`, naming the one step that unlocks inviting.
+class _InviteLocalRow extends StatelessWidget {
+  const _InviteLocalRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.members.inviteLocal',
+      child: ListTile(
+        enabled: false,
+        leading: const Icon(Icons.person_add_alt_outlined),
+        title: Text(l10n.settingsMembersInviteLocalTitle),
+        subtitle: Text(l10n.settingsMembersInviteLocalSubtitle),
+      ),
+    );
+  }
+}
+
+/// One member row: avatar + name (+ the linked-household [status] line,
+/// semantic id `members.row.<memberId>.status`), tappable to open the edit
+/// sheet.
 ///
 /// Row semantic id is `members.row.<memberId>`, not `members.row.<name>` —
 /// names aren't unique (duplicates are allowed by design, spec §3) — so
 /// E2E flows select rows by their visible name text instead, matching the
 /// manage-categories screen's convention.
 class _MemberRow extends StatelessWidget {
-  const _MemberRow({required this.member, required this.onTap});
+  const _MemberRow({
+    required this.member,
+    required this.status,
+    required this.onTap,
+  });
 
   final Member member;
+  final String? status;
   final VoidCallback onTap;
 
   @override
@@ -144,6 +202,12 @@ class _MemberRow extends StatelessWidget {
         // 42px, the design canvas's members-row avatar (G-4).
         leading: MemberAvatar(member: member, radius: 21),
         title: Text(member.name),
+        subtitle: status == null
+            ? null
+            : semantic(
+                'members.row.${member.id}.status',
+                child: Text(status!),
+              ),
         onTap: onTap,
       ),
     );

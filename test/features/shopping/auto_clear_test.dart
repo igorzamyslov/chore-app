@@ -82,4 +82,64 @@ void main() {
       expect(await isDeleted(database, staleItem.id), isTrue);
     },
   );
+
+  testChoreApp(
+    'bootstrap compacts shopping tombstones older than a year, and keeps '
+    'newer ones and dirty ones',
+    today: today,
+    (tester, database) async {
+      final householdId = await currentHouseholdId(database);
+      final repo = ShoppingRepository(database);
+      Future<String> deleted(
+        String name,
+        DateTime deletedAt, {
+        required bool dirty,
+      }) async {
+        final item = await repo.addItem(householdId, name: name);
+        await (database.update(
+          database.shoppingItems,
+        )..where((tbl) => tbl.id.equals(item.id))).write(
+          ShoppingItemsCompanion(
+            deletedAt: Value(deletedAt.toUtc().toIso8601String()),
+            syncDirty: Value(dirty),
+          ),
+        );
+        return item.id;
+      }
+
+      final ancient = await deleted(
+        'Ancient',
+        today.subtract(const Duration(days: 400)),
+        dirty: false,
+      );
+      final ancientDirty = await deleted(
+        'Ancient dirty',
+        today.subtract(const Duration(days: 400)),
+        dirty: true,
+      );
+      final recent = await deleted(
+        'Recent',
+        today.subtract(const Duration(days: 30)),
+        dirty: false,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            clockProvider.overrideWithValue(Clock.fixed(today)),
+          ],
+          child: const ChoreApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Future<bool> exists(String id) async => (await (database.select(
+        database.shoppingItems,
+      )..where((tbl) => tbl.id.equals(id))).get()).isNotEmpty;
+      expect(await exists(ancient), isFalse);
+      expect(await exists(ancientDirty), isTrue);
+      expect(await exists(recent), isTrue);
+    },
+  );
 }

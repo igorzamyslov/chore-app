@@ -35,8 +35,10 @@ class ScrubbedError {
   final String? stack;
 
   /// The call site's context: at most 10 entries, keys at most 40 and values
-  /// at most 100 characters. Call sites may only put ids, enum names, table
-  /// names and counts into it; this class only bounds it, it cannot tell.
+  /// at most 100 characters. Call sites should only put ids, enum names,
+  /// table names and counts into it; as a second line of defence every value
+  /// also goes through the same message rules as the error text (emails,
+  /// quoted spans and long digit runs are replaced; UUIDs are kept).
   final Map<String, String> context;
 
   /// [context] as a JSON object string, or `null` when it is empty.
@@ -88,6 +90,12 @@ abstract final class ErrorScrubber {
     if (error is AuthException) {
       return 'auth status=${error.statusCode} code=${error.code}';
     }
+    // `FormatException.toString` appends the offending source text ("Invalid
+    // JSON ... at character 12 <the input>"), which can be a chore title or
+    // a pasted invite code: keep the parser's own `message` only.
+    if (error is FormatException) {
+      return _scrubText(error.message);
+    }
     String raw;
     try {
       raw = error.toString();
@@ -95,6 +103,14 @@ abstract final class ErrorScrubber {
       // A throwing `toString` must not defeat the report.
       return 'unprintable error';
     }
+    return _scrubText(raw);
+  }
+
+  /// The message rules shared by error messages and call-site context
+  /// values: drop SQL statements, then replace emails, quoted spans and long
+  /// digit runs, keeping UUIDs.
+  static String _scrubText(String input) {
+    var raw = input;
     // sqlite3's `SqliteException.toString` appends the failing SQL and its
     // bound parameters UNQUOTED ("parameters: Clean Anna's room, ..."), so
     // the quote rule below cannot catch them. Drop everything from that
@@ -146,7 +162,10 @@ abstract final class ErrorScrubber {
     }
     return {
       for (final entry in context.entries.take(_maxContextEntries))
-        _cap(entry.key, _maxContextKey): _cap(entry.value, _maxContextValue),
+        _cap(entry.key, _maxContextKey): _cap(
+          _scrubText(entry.value),
+          _maxContextValue,
+        ),
     };
   }
 

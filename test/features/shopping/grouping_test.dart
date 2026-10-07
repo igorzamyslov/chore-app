@@ -80,6 +80,8 @@ void main() {
             ),
           )
           .map((icon) => icon.icon)
+          // Each header also carries a collapse chevron (F9).
+          .where((icon) => icon != Icons.expand_more)
           .toList();
 
       expect(headerIcons, [Icons.label_outlined, Icons.eco, Icons.egg]);

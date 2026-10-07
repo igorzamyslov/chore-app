@@ -12,6 +12,11 @@ library;
 enum ItemNameError {
   /// The already-trimmed name is empty.
   required,
+
+  /// The name (normalized) is already used by another active item — set by
+  /// the sheet after a repository lookup, never by [validateItemName]
+  /// itself, which stays a pure, synchronous rule (persona finding F7).
+  duplicate,
 }
 
 /// [ItemNameError.required] if the already-trimmed [name] is empty, else

@@ -96,8 +96,8 @@ class HouseholdJoinResult {
   /// `settings.syncHouseholdId`.
   final String householdId;
 
-  /// The archive file's name (spec §4: "Your old data was saved to
-  /// famdo-archive-2026-08-01.json"), for the caller's post-join snackbar.
+  /// The archive file's name (`famdo-archive-<yyyy-MM-dd-HHmmss>.json`), so
+  /// the caller's post-join snackbar can offer to share that very file.
   final String archiveFileName;
 }
 

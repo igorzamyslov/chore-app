@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
+import 'package:chore_app/application/chore_service.dart';
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/domain/recurrence/plain_date.dart';
 import 'package:chore_app/domain/recurrence/recurrence.dart';
@@ -19,13 +20,16 @@ import 'package:chore_app/features/chores/chore_form/repeat_section.dart'
 import 'package:chore_app/features/chores/chore_form/start_date_field.dart';
 import 'package:chore_app/features/chores/chore_form/title_notes_fields.dart';
 import 'package:chore_app/features/chores/chore_form_discard_dialog.dart';
+import 'package:chore_app/features/chores/chore_occurrence_tile.dart'
+    show futureDueText;
 import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Creates a new chore, or edits an existing one when [choreId] is given.
+/// Creates a new chore, or edits an existing one when [choreId] is given,
+/// or creates a copy of one when [duplicateOfChoreId] is given.
 ///
 /// Saving an edit routes through `ChoreService.updateChore` rather than
 /// `ChoreRepository.updateChore` directly: per
@@ -34,11 +38,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// `unpauseChore`), so that rule needs to live at the service layer.
 class ChoreFormScreen extends ConsumerStatefulWidget {
   /// Creates the form. Omit [choreId] to create a new chore; pass an
-  /// existing chore's id to edit it.
-  const ChoreFormScreen({this.choreId, super.key});
+  /// existing chore's id to edit it. Pass [duplicateOfChoreId] (and no
+  /// [choreId]) to create a new chore prefilled from that one.
+  const ChoreFormScreen({this.choreId, this.duplicateOfChoreId, super.key})
+    : assert(
+        choreId == null || duplicateOfChoreId == null,
+        'Edit or duplicate, not both',
+      );
 
   /// The chore being edited, or `null` when creating a new one.
   final String? choreId;
+
+  /// The chore to copy (persona review 2026-10-06 C9, "Duplicate"): the
+  /// form opens in CREATE mode prefilled with every field of that chore,
+  /// title included, and saving creates a second chore. The one field that
+  /// may move is a start date in the past -- see `_floorDuplicateStartDate`.
+  final String? duplicateOfChoreId;
 
   @override
   ConsumerState<ChoreFormScreen> createState() => _ChoreFormScreenState();
@@ -70,6 +85,12 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
   late PlainDate _startDate;
   AssignmentMode _assignmentMode = AssignmentMode.anyone;
   List<String> _selectedMemberIds = [];
+  // C7 (persona review 2026-10-06): each mode's own selection, so switching
+  // Rotation -> Fixed -> Rotation gives back the ordered list just built
+  // instead of wiping it. `_selectedMemberIds` stays the live selection of
+  // the CURRENT mode; these hold the other modes' picks while away.
+  String? _fixedMemberId;
+  List<String> _rotationMemberIds = [];
 
   TitleError? _titleError;
   IntervalError? _intervalError;
@@ -174,10 +195,10 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     // `canPop` is only as fresh as the widget's last build.
     _titleController.addListener(_onDirtyTrackedFieldChanged);
     _notesController.addListener(_onDirtyTrackedFieldChanged);
-    final choreId = widget.choreId;
-    if (choreId != null) {
+    final sourceId = widget.choreId ?? widget.duplicateOfChoreId;
+    if (sourceId != null) {
       _loading = true;
-      unawaited(_loadExisting(choreId));
+      unawaited(_loadExisting(sourceId));
     } else {
       _captureInitialSnapshot();
     }
@@ -243,6 +264,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         _monthlyOrdinal = recurrence.monthlyOrdinal ?? _monthlyOrdinal;
         _monthlyWeekday = recurrence.monthlyWeekday ?? _monthlyWeekday;
         _intervalController.text = recurrence.interval.toString();
+      }
+      if (widget.duplicateOfChoreId != null) {
+        _floorDuplicateStartDate();
       }
       _loading = false;
     });
@@ -446,6 +470,27 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     }
   }
 
+  /// C9 (persona review 2026-10-06): a copy keeps every field, except that
+  /// a start date already in the past moves to today -- otherwise the copy
+  /// would be born overdue (its first slot computed from a months-old
+  /// anchor). A monthly day-of-month rule then re-aligns the date onto its
+  /// day, forwards, keeping the OPD-1 start-date mirror intact (see
+  /// [_onMonthlyDayOfMonthChanged]). Weekly and nth-weekday rules carry
+  /// their pattern explicitly, so moving the anchor does not change them.
+  void _floorDuplicateStartDate() {
+    final today = ref.read(todayProvider);
+    if (!_startDate.isBefore(today)) {
+      return;
+    }
+    _startDate =
+        _repeatEnabled &&
+            _unit == RecurrenceUnit.month &&
+            _anchor == RecurrenceAnchor.schedule &&
+            _monthlyMode == MonthlyMode.dayOfMonth
+        ? alignStartDateToMonthlyDay(today, _monthlyDayOfMonth)
+        : today;
+  }
+
   /// Fills every directly-editable pattern field from [_startDate].
   ///
   /// This reproduces exactly what the engine used to derive silently, so
@@ -563,10 +608,25 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     });
   }
 
+  /// Switches the assignment mode, parking the outgoing mode's selection
+  /// and restoring the incoming one's (C7, persona review 2026-10-06).
   void _onAssignmentModeChanged(AssignmentMode mode) {
     setState(() {
+      switch (_assignmentMode) {
+        case AssignmentMode.fixed:
+          _fixedMemberId = _selectedMemberIds.firstOrNull;
+        case AssignmentMode.rotation:
+          _rotationMemberIds = List.of(_selectedMemberIds);
+        case AssignmentMode.anyone:
+          break;
+      }
       _assignmentMode = mode;
-      _selectedMemberIds = [];
+      final fixed = _fixedMemberId;
+      _selectedMemberIds = switch (mode) {
+        AssignmentMode.fixed => [?fixed],
+        AssignmentMode.rotation => List.of(_rotationMemberIds),
+        AssignmentMode.anyone => [],
+      };
       _assignmentError = null;
     });
   }
@@ -643,8 +703,9 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
         : null;
     final notes = _notesController.text.trim();
 
+    ChoreUpdateResult? result;
     if (_isEditing) {
-      await ref
+      result = await ref
           .read(choreServiceProvider)
           .updateChore(
             widget.choreId!,
@@ -680,6 +741,31 @@ class _ChoreFormScreenState extends ConsumerState<ChoreFormScreen> {
     if (!mounted) {
       return;
     }
-    Navigator.of(context).pop();
+    // An edit pops WITH its result so the chores list (which owns the
+    // snackbar's ScaffoldMessenger) can confirm the save in words -- see
+    // [choreSavedMessage]. A create pops with nothing, as before.
+    Navigator.of(context).pop(result);
   }
+}
+
+/// The snackbar text confirming a saved chore edit (persona review
+/// 2026-10-06 C1/C6): who holds the open turn now if the edit moved it,
+/// else when it is next due if the schedule changed, else plain "Saved".
+String choreSavedMessage(
+  AppLocalizations l10n,
+  String localeName, {
+  required PlainDate today,
+  required ChoreUpdateResult result,
+}) {
+  final name = result.reassignedToName;
+  if (name != null) {
+    return l10n.choreSavedReassigned(name);
+  }
+  final nextDue = result.nextDue;
+  if (nextDue != null && !nextDue.isBefore(today)) {
+    return l10n.choreSavedNextDue(
+      futureDueText(l10n, localeName, today: today, dueDate: nextDue),
+    );
+  }
+  return l10n.choreSavedSnackbar;
 }

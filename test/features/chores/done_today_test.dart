@@ -7,13 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../test_utils/pump_app.dart';
 
-/// Widget coverage for the collapsed 'Done today (N)' section and its
+/// Widget coverage for the collapsed 'Done recently (N)' section and its
 /// Reopen action (see `docs/specs/ux-round-2.md` A3).
 void main() {
   final today = DateTime(2026, 7, 22, 9);
 
   testChoreApp(
-    'a completed one-off chore appears collapsed under "Done today (1)", '
+    'a completed one-off chore appears collapsed under "Done recently (1)", '
     'with the closer shown, and Reopen restores it to pending',
     today: today,
     (tester, database) async {
@@ -42,7 +42,7 @@ void main() {
       // Collapsed by default: the header shows the count, but the row
       // itself (and its title text) isn't in the tree yet.
       expect(find.bySemanticsIdentifier('chores.done.header'), findsOneWidget);
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       expect(find.text('One-off chore'), findsNothing);
       expect(find.bySemanticsIdentifier('chores.empty'), findsOneWidget);
 
@@ -95,7 +95,7 @@ void main() {
       await service.skipOccurrence(pending!.id);
       await tester.pumpAndSettle();
 
-      expect(find.text('Done today (1)'), findsOneWidget);
+      expect(find.text('Done recently (1)'), findsOneWidget);
       await tester.tap(find.bySemanticsIdentifier('chores.done.header'));
       await tester.pumpAndSettle();
 

@@ -72,6 +72,7 @@ class SettingsRepository {
         eveningReminderEnabled: false,
         eveningReminderMinutes: 1200,
         errorReportsEnabled: true,
+        choreRemindersEnabled: true,
         createdAt: now,
         updatedAt: now,
       );
@@ -95,6 +96,21 @@ class SettingsRepository {
     )..where((tbl) => tbl.id.equals(deviceId))).write(
       SettingsCompanion(
         digestEnabled: Value(enabled),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
+  }
+
+  /// Turns this device's per-chore reminders on or off (persona review
+  /// 2026-10-06 E3). Off arms none of them -- see `planReminders` -- while
+  /// the digest and the evening re-reminder keep their own switches.
+  Future<void> setChoreRemindersEnabled({required bool enabled}) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        choreRemindersEnabled: Value(enabled),
         updatedAt: Value(_isoNow()),
       ),
     );
@@ -322,6 +338,9 @@ class SettingsRepository {
         syncHouseholdId: Value(householdId),
         syncLinkedAt: Value(linkedAt.toUtc().toIso8601String()),
         membershipRevoked: const Value(false),
+        // Linking again (adopt, join, reconnect) ends the "you left" state
+        // (spec household-lifecycle.md §2.2, amendment 2026-10-06).
+        syncLeftAt: const Value(null),
         updatedAt: Value(_isoNow()),
       ),
     );
@@ -431,6 +450,24 @@ class SettingsRepository {
           .update(db.members)
           .write(const MembersCompanion(userId: Value(null)));
     });
+  }
+
+  /// Records ([at] non-null) or clears ([at] `null`) that this device left
+  /// the household's online copy while other members stayed (spec
+  /// `docs/specs/household-lifecycle.md` §2.2, amendment 2026-10-06). While
+  /// set, the Account section hides "Put my household online". Set by
+  /// `HouseholdExitService.leave` on a non-last leave; cleared by Reset app
+  /// data (which deletes the whole row anyway).
+  Future<void> setSyncLeftAt(DateTime? at) async {
+    await ensureSettings();
+    await (db.update(
+      db.settings,
+    )..where((tbl) => tbl.id.equals(deviceId))).write(
+      SettingsCompanion(
+        syncLeftAt: Value(at?.toUtc().toIso8601String()),
+        updatedAt: Value(_isoNow()),
+      ),
+    );
   }
 
   /// Records that this device's household membership was revoked
