@@ -150,12 +150,47 @@ void main() {
   );
 
   testChoreApp(
-    'tapping the licenses row opens the license page',
+    'About keeps version, error reports, ONE Technical details row and '
+    'donate; the four moved rows are no longer on the screen '
+    '(Amendment 2026-10-07)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
+      tester.view.physicalSize = const Size(800, 4000);
       await openSettingsTab(tester);
 
+      for (final id in [
+        'settings.about.version',
+        'settings-error-reports-switch',
+        'settings.about.technical',
+        'settings.about.donate',
+      ]) {
+        expect(find.bySemanticsIdentifier(id), findsOneWidget, reason: id);
+      }
+      for (final id in [
+        'settings.about.licenses',
+        'settings.about.privacy',
+        'settings.about.source',
+        'settings.about.syncServer',
+      ]) {
+        expect(find.bySemanticsIdentifier(id), findsNothing, reason: id);
+      }
+      expect(find.text('Technical details'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'tapping the licenses tile in Technical details opens the license page',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      tester.view.physicalSize = const Size(800, 4000);
+      await openSettingsTab(tester);
+
+      await tester.tap(find.bySemanticsIdentifier('settings.about.technical'));
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('settings.about.licenses'));
       await tester.pumpAndSettle();
 
@@ -221,14 +256,22 @@ void main() {
   );
 
   testChoreApp(
-    'About links the privacy notes and the source code; the sync-server row '
-    'is absent in a build without a sync server (persona review D11)',
+    'Technical details links the privacy notes and the source code; the '
+    'sync-server tile is absent in a build without a sync server (persona '
+    'review D11)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
       // Tall enough that the whole About group is laid out at once.
       tester.view.physicalSize = const Size(800, 4000);
       await openSettingsTab(tester);
+
+      await tester.tap(find.bySemanticsIdentifier('settings.about.technical'));
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('settings.about.technical.sheet'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.bySemanticsIdentifier('settings.about.privacy'));
       await tester.pumpAndSettle();
@@ -258,23 +301,63 @@ void main() {
     },
   );
 
-  testWidgets('the sync-server row shows only the host of the configured URL', (
+  testWidgets(
+    'the sync-server tile is two lines -- label, then the host of the '
+    'configured URL as selectable text -- with no chevron',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: AboutSyncServerTile(
+              serverUrl: 'https://abcdefgh.supabase.co',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sync server'), findsOneWidget);
+      expect(find.text('abcdefgh.supabase.co'), findsOneWidget);
+      expect(find.byType(SelectableText), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+      // Label above host, not side by side.
+      expect(
+        tester.getTopLeft(find.text('abcdefgh.supabase.co')).dy,
+        greaterThan(tester.getTopLeft(find.text('Sync server')).dy),
+      );
+    },
+  );
+
+  testWidgets('the technical-details sheet lists the sync server when asked', (
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: AboutSyncServerTile(
-            serverUrl: 'https://abcdefgh.supabase.co',
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () =>
+                  showTechnicalDetailsSheet(context, showSyncServer: true),
+              child: const Text('open'),
+            ),
           ),
         ),
       ),
     );
+    await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sync server'), findsOneWidget);
-    expect(find.text('abcdefgh.supabase.co'), findsOneWidget);
+    for (final label in [
+      'Privacy notes',
+      'Source code',
+      'Open source licenses',
+      'Sync server',
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
   });
 }

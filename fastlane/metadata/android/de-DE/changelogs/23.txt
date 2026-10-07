@@ -1,0 +1,3 @@
+Aufgeräumtere Einstellungen, Zähler mit Überfälligem.
+
+Eine Zeile „Technische Details“ in den Einstellungen, „Verbindung trennen“ nur noch, wenn du abgemeldet bist. Der Aufgabenzähler rechnet Überfälliges wieder mit. Die Markierung, wer einen Einkaufsartikel hinzugefügt hat, ist weg.

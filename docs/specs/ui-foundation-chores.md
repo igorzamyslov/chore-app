@@ -204,7 +204,8 @@ the whole bug report.
 >   to their latest due date — you didn't miss anything extra." / "Deine
 >   wiederkehrenden Aufgaben sind zu ihrem neuesten Fälligkeitstermin
 >   gesprungen — du hast nichts zusätzlich verpasst."
-> - **Progress card (E5; amends `theme-v2.md` §4.1 item 1).** `M` = pending
+> - **Progress card (E5; amends `theme-v2.md` §4.1 item 1) — SUPERSEDED by
+>   Amendment 2026-10-07 below.** `M` = pending
 >   occurrences due **today** + occurrences completed today; the overdue pile
 >   is no longer part of it. Overdue is shown beside the sub-line as
 >   `choresProgressCatchUp` ("{count} to catch up" / "{count} nachzuholen"),
@@ -240,6 +241,20 @@ the whole bug report.
 >   `syncPendingItemTooltip` ("Waiting to send").
 > - **Reminder label (B9).** See `notifications-n2.md` §11's 2026-10-06
 >   amendment for `choreFormReminderToggle` / `choreFormReminderHint`.
+>
+> **Amendment 2026-10-07 (first-use feedback on 0.15.0) — overdue is part of
+> today's load again; supersedes the E5 progress-card rule above and its
+> 2026-10-07 "overdue-only" follow-up.** `M` = pending due **today** +
+> pending **overdue** + done today; headline `choresProgressTitle` "{done} of
+> {M} done today"; ring = done / M; sub-line `choresProgressRemainingToday`
+> "{M − done} still to go" and, when overdue > 0, ` · ` plus
+> `choresProgressCatchUp` "{overdue} to catch up" (one line of text, not two
+> chips). The card hides only when `M == 0`; an overdue-only pile has `M > 0`
+> by construction, so the special catch-up-only headline and ring-less card
+> are removed. When everything is done, `choresProgressAllDoneToday` shows
+> (no overdue can remain by then). Reason (Igor): skipping is always
+> available, so an overdue chore is part of today's load — keeping it out
+> read as "0 of 2 done today" next to a list of 3 open chores.
 
 - Empty state (no pending occurrences at all): centered friendly message +
   `semantic('chores.empty')` + the add FAB remains.

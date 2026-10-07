@@ -195,8 +195,9 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
               occurrence.occurrence.closedOn == today,
         )
         .length;
-    // E5 (persona review 2026-10-06): the overdue pile is not part of
-    // "today" -- it is reported beside it as "N to catch up".
+    // Overdue counts into the card's total again (first-use feedback on
+    // 0.15.0, 2026-10-07; supersedes persona review E5): skipping is always
+    // available, so an overdue chore is part of today's load.
     final pendingDueToday = filteredOccurrencesForCount
         .where((occurrence) => occurrence.occurrence.dueDate == today)
         .length;
@@ -237,8 +238,8 @@ class _ChoresListScreenState extends ConsumerState<ChoresListScreen> {
           const _BannerRegion(),
           // Only once occurrences have actually loaded -- avoids a
           // zero-count flash while pendingOccurrencesProvider's stream is
-          // still resolving. ChoreProgressCard hides itself when M == 0 and
-          // nothing is overdue.
+          // still resolving. ChoreProgressCard hides itself when its total
+          // is 0.
           if (occurrencesAsync.hasValue)
             ChoreProgressCard(
               completedToday: completedToday,

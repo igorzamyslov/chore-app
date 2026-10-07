@@ -72,8 +72,8 @@ void main() {
   }
 
   testChoreApp(
-    'linked + signed in: the Leave row is offered beside Disconnect; '
-    'unlinked it is not (spec §3.3)',
+    'linked + signed in: the Leave row is offered and Disconnect is not '
+    '(Amendment 2026-10-07); unlinked Leave is not offered (spec §3.3)',
     today: today,
     overrides: [
       authGatewayProvider.overrideWithValue(FakeAuthGateway(currentUser: me)),
@@ -96,8 +96,8 @@ void main() {
       );
       expect(
         find.bySemanticsIdentifier('settings.account.disconnect'),
-        findsOneWidget,
-        reason: 'Disconnect is a different, purely local action and stays',
+        findsNothing,
+        reason: 'Disconnect shows only while signed out (2026-10-07)',
       );
       // Persona review D9: each exit row says what it does in one line.
       expect(
@@ -112,7 +112,7 @@ void main() {
           'Stops syncing on this phone only — the household stays online '
           'for everyone else.',
         ),
-        findsOneWidget,
+        findsNothing,
       );
 
       handle.dispose();

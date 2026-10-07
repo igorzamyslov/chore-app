@@ -1,15 +1,11 @@
-/// Persona findings F1/F10 (the app-bar status line), the `addedBy` avatar
-/// on rows a different member added, and E10 (the "waiting to send" glyph on
-/// a dirty row) -- see `docs/specs/ui-shopping.md` amendment 2026-10-06.
+/// Persona findings F1/F10 (the app-bar status line) and E10 (the "waiting to
+/// send" glyph on a dirty row) -- see `docs/specs/ui-shopping.md` amendments
+/// 2026-10-06 and 2026-10-07 (the per-row added-by mark was removed).
 library;
 
 import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/application/sync_engine.dart';
-import 'package:chore_app/data/db/app_database.dart';
-import 'package:chore_app/data/repositories/household_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
-import 'package:chore_app/features/members/member_avatar.dart';
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -151,71 +147,4 @@ void main() {
       handle.dispose();
     },
   );
-
-  group('addedBy avatar', () {
-    Future<ShoppingItem> addAs(
-      AppDatabase database,
-      String householdId,
-      String name,
-      String? memberId,
-    ) => ShoppingRepository(
-      database,
-    ).addItem(householdId, name: name, addedBy: memberId);
-
-    Finder avatarsIn(String itemId) => find.descendant(
-      of: find.bySemanticsIdentifier('shopping.item.$itemId'),
-      matching: find.byType(MemberAvatar),
-    );
-
-    testChoreApp(
-      "a row added by someone else shows that member's 16 dp avatar with "
-      'their name as tooltip; own and unknown rows show none (F1)',
-      today: today,
-      (tester, database) async {
-        final handle = tester.ensureSemantics();
-        final householdId = await currentHouseholdId(database);
-        final me = await (database.select(
-          database.members,
-        )..where((tbl) => tbl.householdId.equals(householdId))).getSingle();
-        final anna = await HouseholdRepository(
-          database,
-        ).addMember(householdId, name: 'Anna', color: 0xFF8C7BC9);
-        final byAnna = await addAs(database, householdId, 'Butter', anna.id);
-        final byMe = await addAs(database, householdId, 'Bread', me.id);
-        final byNobody = await addAs(database, householdId, 'Eggs', null);
-        // A member who has since been removed (soft-deleted).
-        final gone = await HouseholdRepository(
-          database,
-        ).addMember(householdId, name: 'Gone', color: 0xFF8C7BC9);
-        final byGone = await addAs(database, householdId, 'Jam', gone.id);
-        await (database.update(
-          database.members,
-        )..where((tbl) => tbl.id.equals(gone.id))).write(
-          MembersCompanion(
-            deletedAt: Value(DateTime.utc(2026).toIso8601String()),
-          ),
-        );
-
-        await openShoppingTab(tester);
-
-        expect(avatarsIn(byAnna.id), findsOneWidget);
-        expect(avatarsIn(byMe.id), findsNothing);
-        expect(avatarsIn(byNobody.id), findsNothing);
-        expect(avatarsIn(byGone.id), findsNothing);
-
-        final avatar = tester.widget<MemberAvatar>(avatarsIn(byAnna.id));
-        expect(avatar.member.id, anna.id);
-        expect(avatar.radius, 8);
-        expect(
-          find.descendant(
-            of: find.bySemanticsIdentifier('shopping.item.${byAnna.id}'),
-            matching: find.byTooltip('Anna'),
-          ),
-          findsOneWidget,
-        );
-
-        handle.dispose();
-      },
-    );
-  });
 }

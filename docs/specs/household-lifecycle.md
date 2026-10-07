@@ -393,6 +393,18 @@ two clearly apart.
 > intro discloses that technical error reports are sent too and can be
 > switched off under About.
 
+> **Amendment 2026-10-07 (first-use feedback on 0.15.0) — Disconnect only
+> when signed out.** The "beside the existing Disconnect row" placement above
+> is superseded. While signed in and linked, the Household group lists Leave
+> the household and Delete my account only; the Disconnect row
+> (`settings.account.disconnect`) is shown **only** in the signed-out-but-
+> linked state (`_SignedOutLinkedSection`), where it was introduced by the
+> 2026-08-07 A1 decision (A1.1/A1.2) and where Leave is impossible (it needs
+> a session). Reason (Igor): next to Leave it was a second exit with no
+> visible difference. Disconnect's behaviour, copy and confirm dialog are
+> unchanged; a signed-in user who wants out has Leave, and Delete my
+> account for erasure.
+
 ### 3.4 Last-member warning (D-L5)
 
 The Leave confirm needs the count of CLAIMED members to decide whether to

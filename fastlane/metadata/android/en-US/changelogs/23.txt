@@ -1,0 +1,3 @@
+Tidier Settings, and the chores counter includes overdue.
+
+Settings has one "Technical details" row, and "Disconnect" shows only when you are signed out. The chores counter counts overdue chores again, so it matches your list. The "who added it" mark on shopping items is gone.

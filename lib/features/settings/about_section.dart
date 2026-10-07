@@ -1,8 +1,9 @@
 /// The settings screen's 'About' section (spec `docs/next-session-plan.md`
-/// #5): app name/version, the licenses page entry, links to the privacy
-/// notes and the source code, the sync server's host (persona review D11),
-/// and a donate row that opens a sheet linking to the developer's
-/// Ko-fi/PayPal pages.
+/// #5): app name/version, the error-reports switch, ONE 'Technical details'
+/// row opening a sheet with the privacy notes, the source code, the licenses
+/// page and the sync server's host (persona review D11; grouped behind one
+/// row by Amendment 2026-10-07, `docs/specs/theme-v2.md`), and a donate row
+/// that opens a sheet linking to the developer's Ko-fi/PayPal pages.
 library;
 
 import 'package:chore_app/app/providers.dart';
@@ -146,13 +147,16 @@ class AboutSourceTile extends StatelessWidget {
   }
 }
 
-/// Non-tappable row naming the sync server's host (persona review D11), so
-/// "the sync server" in the sign-in disclosure points somewhere concrete.
-/// The settings screen only mounts it when `supabaseConfigured`; [serverUrl]
-/// defaults to the configured URL and is a parameter only so a test can
-/// render it in a build without one.
+/// Non-tappable two-line tile naming the sync server's host (persona review
+/// D11), so "the sync server" in the sign-in disclosure points somewhere
+/// concrete. The label sits on the first line and the host on the second, as
+/// selectable text: a trailing value squeezed the label into "Syn c ser ver"
+/// (Amendment 2026-10-07). No chevron -- nothing opens. The technical-details
+/// sheet only mounts it when `supabaseConfigured`; [serverUrl] defaults to the
+/// configured URL and is a parameter only so a test can render it in a build
+/// without one.
 class AboutSyncServerTile extends StatelessWidget {
-  /// Creates the sync-server row.
+  /// Creates the sync-server tile.
   const AboutSyncServerTile({this.serverUrl = supabaseUrl, super.key});
 
   /// The configured Supabase URL; only its host is shown.
@@ -160,12 +164,102 @@ class AboutSyncServerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return semantic(
       'settings.about.syncServer',
+      child: ListTile(
+        leading: Icon(
+          Icons.dns_outlined,
+          size: 21,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          AppLocalizations.of(context).settingsAboutSyncServer,
+          style: theme.textTheme.titleSmall,
+        ),
+        subtitle: SelectableText(
+          Uri.tryParse(serverUrl)?.host ?? serverUrl,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The About row (`settings.about.technical`) that opens
+/// [showTechnicalDetailsSheet]: the project/legal/plumbing entries that used
+/// to be four separate rows (Amendment 2026-10-07).
+class AboutTechnicalTile extends StatelessWidget {
+  /// Creates the technical-details row.
+  const AboutTechnicalTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return semantic(
+      'settings.about.technical',
       child: SettingsRow(
-        icon: Icons.dns_outlined,
-        label: AppLocalizations.of(context).settingsAboutSyncServer,
-        value: Uri.tryParse(serverUrl)?.host ?? serverUrl,
+        icon: Icons.build_outlined,
+        label: AppLocalizations.of(context).settingsAboutTechnicalTitle,
+        showChevron: true,
+        onTap: () => showTechnicalDetailsSheet(
+          context,
+          showSyncServer: supabaseConfigured,
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens the technical-details sheet: Privacy notes, Source code, Open source
+/// licenses and, when [showSyncServer] (the caller passes
+/// `supabaseConfigured`), the Sync server's host. The tiles keep their
+/// pre-grouping semantic ids.
+Future<void> showTechnicalDetailsSheet(
+  BuildContext context, {
+  required bool showSyncServer,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) => _TechnicalDetailsSheet(
+      showSyncServer: showSyncServer,
+    ),
+  );
+}
+
+class _TechnicalDetailsSheet extends StatelessWidget {
+  const _TechnicalDetailsSheet({required this.showSyncServer});
+
+  final bool showSyncServer;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return semantic(
+      'settings.about.technical.sheet',
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Text(
+                  l10n.settingsAboutTechnicalTitle,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              const AboutPrivacyTile(),
+              const AboutSourceTile(),
+              const AboutLicensesTile(),
+              if (showSyncServer) const AboutSyncServerTile(),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1809,6 +1809,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAboutLicensesEntry => 'Open source licenses';
 
   @override
+  String get settingsAboutTechnicalTitle => 'Technical details';
+
+  @override
   String get settingsAboutPrivacy => 'Privacy notes';
 
   @override

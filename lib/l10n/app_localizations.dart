@@ -518,25 +518,25 @@ abstract class AppLocalizations {
   /// **'Could not load your chores.'**
   String get choresErrorMessage;
 
-  /// Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences due today, overdue, or already completed today. The whole card is hidden when m is 0.
+  /// Day-progress card's titleLarge headline (spec docs/specs/theme-v2.md §4.1 item 1): n occurrences completed today out of m occurrences that are due today, overdue (skipping is always available, so overdue is part of today's load), or already completed today. The whole card is hidden when m is 0.
   ///
   /// In en, this message translates to:
   /// **'{n} of {m} done today'**
   String choresProgressTitle(int n, int m);
 
-  /// Day-progress card's bodySmall sub-line shown when at least one of today's counted occurrences is still open: how many remain.
+  /// Day-progress card's bodySmall sub-line shown when at least one of the counted occurrences (due today or overdue) is still open: how many remain, overdue included.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, one{1 still to go} other{{count} still to go}}'**
   String choresProgressRemainingToday(int count);
 
-  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
+  /// Day-progress card's bodySmall sub-line shown instead of choresProgressRemainingToday once every occurrence counted for today (due today, overdue or already done today) has been completed. Plain statement, no praise (persona review 2026-10-06 E5).
   ///
   /// In en, this message translates to:
   /// **'That\'s everything for today.'**
   String get choresProgressAllDoneToday;
 
-  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many still-pending occurrences are overdue. The overdue pile is deliberately NOT part of the N-of-M count (persona review 2026-10-06 E5): a backlog should not read as 0% of 'today'. Shown only when count is above 0.
+  /// Day-progress card's sub-line segment, next to the 'still to go' / 'everything' text, giving how many of the still-to-go occurrences are overdue; appended after ' · '. The overdue pile IS part of the N-of-M count (2026-10-07, superseding persona review E5). Shown only when count is above 0.
   ///
   /// In en, this message translates to:
   /// **'{count} to catch up'**
@@ -2666,25 +2666,31 @@ abstract class AppLocalizations {
   /// **'Version {version} ({buildNumber})'**
   String settingsAboutVersionLabel(String version, String buildNumber);
 
-  /// About section row that opens Flutter's built-in showLicensePage.
+  /// Technical-details sheet tile (id settings.about.licenses) that opens Flutter's built-in showLicensePage.
   ///
   /// In en, this message translates to:
   /// **'Open source licenses'**
   String get settingsAboutLicensesEntry;
 
-  /// About row (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
+  /// About row (id settings.about.technical) that opens a bottom sheet with Privacy notes, Source code, Open source licenses and the sync server host; also that sheet's title (2026-10-07 amendment: one row instead of four).
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get settingsAboutTechnicalTitle;
+
+  /// Technical-details sheet tile (id settings.about.privacy) opening PRIVACY.md in the project repository in the browser (persona review D11: no in-app way to read what is stored where).
   ///
   /// In en, this message translates to:
   /// **'Privacy notes'**
   String get settingsAboutPrivacy;
 
-  /// About row (id settings.about.source) opening the project's source repository in the browser (persona review D11).
+  /// Technical-details sheet tile (id settings.about.source) opening the project's source repository in the browser (persona review D11).
   ///
   /// In en, this message translates to:
   /// **'Source code'**
   String get settingsAboutSource;
 
-  /// Non-tappable About row (id settings.about.syncServer) whose value is the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
+  /// Non-tappable two-line tile in the technical-details sheet (id settings.about.syncServer): this label on the first line, the host name as selectable text on the second -- the host name of the configured Supabase server, so users can see where synced data goes (persona review D11). Hidden in builds without a sync server.
   ///
   /// In en, this message translates to:
   /// **'Sync server'**

@@ -9,7 +9,6 @@ import 'package:chore_app/app/providers.dart';
 import 'package:chore_app/app/semantics.dart';
 import 'package:chore_app/app/snackbars.dart';
 import 'package:chore_app/application/sync_engine.dart';
-import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
 import 'package:chore_app/features/shopping/shopping_category_header.dart';
 import 'package:chore_app/features/shopping/shopping_checked_section.dart';
@@ -179,14 +178,6 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
     // comment and syncEngineProvider's own doc comment
     // (lib/app/providers.dart) for why.
     final syncLinked = ref.watch(syncEngineProvider) is! NoopSyncEngine;
-    // F1: rows added by a member other than the one acting show that
-    // member's avatar. Resolved once here, not per row.
-    final membersById = {
-      for (final member
-          in ref.watch(membersProvider).valueOrNull ?? const <Member>[])
-        member.id: member,
-    };
-    final actingMemberId = ref.watch(actingMemberProvider)?.id;
 
     return Scaffold(
       appBar: AppBar(
@@ -258,11 +249,9 @@ class _ShoppingListScreenState extends ConsumerState<ShoppingListScreen> {
                   }
                   final body = _Body(
                     items: items,
-                    membersById: membersById,
                     collapsedCategories: _collapsed,
                     onToggleCategory: _toggleCategory,
                     syncLinked: syncLinked,
-                    actingMemberId: actingMemberId,
                     heldBuckets: _heldBuckets,
                     cartExpanded: _cartExpanded,
                     onCartExpansionChanged: (value) =>
@@ -426,11 +415,9 @@ Future<void> _refresh(BuildContext context, WidgetRef ref) =>
 class _Body extends StatelessWidget {
   const _Body({
     required this.items,
-    required this.membersById,
     required this.collapsedCategories,
     required this.onToggleCategory,
     required this.syncLinked,
-    required this.actingMemberId,
     required this.heldBuckets,
     required this.cartExpanded,
     required this.onCartExpansionChanged,
@@ -446,15 +433,9 @@ class _Body extends StatelessWidget {
   final Set<String> collapsedCategories;
   final ValueChanged<String> onToggleCategory;
 
-  /// Every household member by id, to resolve a row's `addedBy`.
-  final Map<String, Member> membersById;
-
   /// Whether the household is linked and signed in (E10: only then can a
   /// dirty row be "waiting to send").
   final bool syncLinked;
-
-  /// The acting (or claimed) member's id; their own additions get no avatar.
-  final String? actingMemberId;
 
   /// Item ids whose row is held in a section that no longer matches their
   /// database state, valued by the section they are drawn in (`true` = the
@@ -573,21 +554,10 @@ class _Body extends StatelessWidget {
     );
   }
 
-  /// The adder to show an avatar for, or `null` (see
-  /// [ShoppingItemTile.addedBy]).
-  Member? _addedByOther(ShoppingItemWithCategory item) {
-    final addedById = item.item.addedBy;
-    if (addedById == null || addedById == actingMemberId) {
-      return null;
-    }
-    return membersById[addedById];
-  }
-
   Widget _tileFor(ShoppingItemWithCategory item) {
     return ShoppingItemTile(
       key: ValueKey(item.item.id),
       item: item,
-      addedBy: _addedByOther(item),
       waitingToSend: syncLinked && item.item.syncDirty,
       onCheckedChanged: (value) =>
           onCheckedChanged(item.item.id, checked: value),

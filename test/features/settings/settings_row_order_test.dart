@@ -148,4 +148,38 @@ void main() {
       handle.dispose();
     },
   );
+
+  testChoreApp(
+    'the About rows render in the order Amendment 2026-10-07 binds: version, '
+    'error reports, Technical details, donate',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      await openSettingsTab(tester);
+      tester.view.physicalSize = const Size(800, 4000);
+      await tester.pumpAndSettle();
+
+      const ids = [
+        'settings.about.version',
+        'settings-error-reports-switch',
+        'settings.about.technical',
+        'settings.about.donate',
+      ];
+      final tops = <String, double>{};
+      for (final id in ids) {
+        final finder = find.bySemanticsIdentifier(id);
+        expect(finder, findsOneWidget, reason: '$id must be on screen');
+        tops[id] = tester.getTopLeft(finder.first).dy;
+      }
+      for (var i = 1; i < ids.length; i++) {
+        expect(
+          tops[ids[i]],
+          greaterThan(tops[ids[i - 1]]!),
+          reason: '${ids[i]} must render below ${ids[i - 1]}',
+        );
+      }
+
+      handle.dispose();
+    },
+  );
 }

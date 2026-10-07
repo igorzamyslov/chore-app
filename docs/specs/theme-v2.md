@@ -259,8 +259,12 @@ and must survive; ids marked *(new)* are to be added.
    progress ring on the right (`CustomPainter`, `outlineVariant` track +
    `primary` arc + centered percentage).
    - *Amended 2026-10-06 (persona review E5, see `ui-foundation-chores.md`):
-     overdue occurrences are no longer part of **M**; they appear as "N to
-     catch up" on the sub-line, and the praise copy ("nice work") is gone.*
+     overdue occurrences were taken out of **M**, shown as "N to catch up"
+     on the sub-line; the praise copy ("nice work") is gone.*
+   - **Amendment 2026-10-07 (first-use feedback on 0.15.0):** the E5 split is
+     reversed — **M** = pending due today + pending overdue + done today
+     again; ring = done / M; sub-line "K still to go" followed by " · N to
+     catch up" when overdue > 0. See `ui-foundation-chores.md`.
    - **M** = still-pending occurrences due today or overdue **plus**
      occurrences completed today. **N** = occurrences completed today. Both
      are computed from the SAME member/category-filtered collections the
@@ -335,6 +339,26 @@ Rows show their **current value on the right** (`English`, `System`,
 switch, or a chevron — never two. About stays a real group (the design's
 version footer omits licenses/donate, which the MIT+F-Droid release
 requires).
+
+> **Amendment 2026-10-07 (first-use feedback on 0.15.0) — About is four
+> rows.** The About group lists **Famdo version**, **Send error reports**,
+> **Technical details** and **Support the app**, in that order. Reason
+> (Igor): seven rows was a lot of plumbing for a screen people open rarely,
+> and the long sync-server host squeezed its own label into "Syn c ser ver".
+> *Technical details* (`settingsAboutTechnicalTitle`, DE "Technische
+> Details"; `settings.about.technical`; chevron) opens a bottom sheet
+> (`settings.about.technical.sheet`, same style as the other settings
+> sheets) with: Privacy notes (`settings.about.privacy`, opens the existing
+> URL), Source code (`settings.about.source`), Open source licenses
+> (`settings.about.licenses`, pushes the licence page) and, only when
+> `supabaseConfigured`, Sync server (`settings.about.syncServer`) as a
+> two-line, chevron-less tile — label on the first line, the host as
+> selectable text on the second. The four tiles keep their semantic ids and
+> destinations; only their home moved. This supersedes the 2026-10-06 D11
+> placement of Privacy / Source / Sync server as About rows, and the
+> "above the licenses row" placement of the error-reports switch in
+> `client-error-reporting.md` §6 (it now sits directly under the version
+> row).
 
 ### 4.3 Shopping (wave T4)
 
