@@ -62,6 +62,9 @@ shipped except the "Opened" items below; rows that shipped only in part say so.*
 
 ### Opened 2026-10-06 (deferred from that review)
 
+*Superseded 2026-10-09 by the prioritised consolidated list in
+`feedback/2026-10-09-open-items.md`; the rows below stay for the ids.*
+
 | Item | Review id | Notes |
 | --- | --- | --- |
 | Reminder notification Done/Snooze actions (G-6 slice 7) | E8 | Needs a real phone to verify; stays G-6's remaining slice |
