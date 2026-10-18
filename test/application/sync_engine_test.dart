@@ -160,6 +160,16 @@ class _RevocationProbeFailsTransport extends FakeSyncTransport {
   }
 }
 
+/// A [FakeSyncTransport] whose session refresh itself fails -- the network
+/// is gone, so the expired token cannot be exchanged either.
+class _RefreshFailsTransport extends FakeSyncTransport {
+  @override
+  Future<void> refreshSession() async {
+    refreshSessionCalls++;
+    throw Exception('simulated network failure during refresh');
+  }
+}
+
 void main() {
   group('NoopSyncEngine', () {
     test('every method is a true no-op and never throws', () async {
@@ -728,6 +738,78 @@ void main() {
         expect(sink.sources, contains('sync.pullSince'));
       },
     );
+
+    group('expired session (PGRST303)', () {
+      test('a pull refreshes the session once and then succeeds -- the '
+          'resume race is not a failure', () async {
+        final sink = _RecordingSink();
+        AppLog.attach(sink);
+        addTearDown(AppLog.detach);
+        transport.sessionExpired = true;
+
+        await engine.pullSince();
+        await pumpEventQueue();
+
+        expect(transport.refreshSessionCalls, 1);
+        expect(transport.serverNowCalls, 1, reason: 'the pull ran to the end');
+        expect(sink.sources, isEmpty, reason: 'nothing is reported');
+      });
+
+      test(
+        'a push refreshes the session once and the row goes through',
+        () async {
+          await categories.createCategory(
+            household.id,
+            kind: CategoryKind.chore,
+            name: 'Kitchen',
+            icon: 'a',
+            color: 1,
+          );
+          transport.sessionExpired = true;
+
+          await engine.pushDirty();
+
+          expect(transport.refreshSessionCalls, 1);
+          expect(transport.serverRows['categories'], hasLength(1));
+        },
+      );
+
+      test('a refresh that does not help is tried once per attempt, never '
+          'in a loop, and the failure is still reported', () async {
+        final sink = _RecordingSink();
+        AppLog.attach(sink);
+        addTearDown(AppLog.detach);
+        transport
+          ..sessionExpired = true
+          ..refreshClearsExpiry = false;
+
+        await engine.pullSince();
+        await pumpEventQueue();
+
+        expect(transport.refreshSessionCalls, 1);
+        expect(sink.sources, contains('sync.pullSince'));
+      });
+
+      test('a failing refresh (offline) is reported as that failure and the '
+          'device stays linked', () async {
+        await settings.setSyncLinked(
+          householdId: household.id,
+          linkedAt: DateTime.utc(2026),
+        );
+        final offline = _RefreshFailsTransport()..sessionExpired = true;
+        final offlineEngine = SupabaseSyncEngine(
+          db: db,
+          transport: offline,
+          settings: settings,
+          householdId: household.id,
+        );
+        addTearDown(offlineEngine.stop);
+
+        await offlineEngine.pullSince();
+
+        expect((await settings.ensureSettings()).syncHouseholdId, isNotNull);
+      });
+    });
 
     test(
       'a pull whose membership probe comes back false clears the sync link '

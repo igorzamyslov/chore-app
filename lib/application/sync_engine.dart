@@ -282,6 +282,12 @@ abstract class SyncTransport {
   /// sizes the sync budget (poll interval, realtime fan-out) should not
   /// have to discover that by reading every `_pullSinceInner` call site.
   Future<bool> hasMembership(String householdId);
+
+  /// Exchanges the stored refresh token for a fresh access token. The
+  /// engine calls this once, and retries, when a request is answered with
+  /// an expired-token error (`PGRST303`) -- see
+  /// [SupabaseSyncEngine._retryAfterSessionRefresh].
+  Future<void> refreshSession();
 }
 
 /// The production [SyncEngine]: LWW push/pull over a [SyncTransport], with
@@ -528,7 +534,9 @@ class SupabaseSyncEngine implements SyncEngine {
       _pushTombstones,
     ]) {
       try {
-        report.pushedAny |= await step(report);
+        report.pushedAny |= await _retryAfterSessionRefresh(
+          () => step(report),
+        );
       } on Object catch (error, stackTrace) {
         // Catches `Error` subclasses too, not just `Exception` -- spec
         // §8.3's "every engine error is swallowed" is read literally here:
@@ -696,9 +704,35 @@ class SupabaseSyncEngine implements SyncEngine {
   /// one finished gets a fresh pull, while every caller that arrived during
   /// it shares this one's result -- including its error, which each
   /// caller's own try/catch then handles.
-  Future<bool> _pull() => _inFlightPull ??= _pullSinceInner().whenComplete(
-    () => _inFlightPull = null,
-  );
+  Future<bool> _pull() => _inFlightPull ??= _retryAfterSessionRefresh(
+    _pullSinceInner,
+  ).whenComplete(() => _inFlightPull = null);
+
+  /// Whether [error] is PostgREST refusing an EXPIRED access token
+  /// (`PGRST303`, HTTP 401). Seen in the field on app resume: the resume
+  /// sync fires before the Supabase client has refreshed a token that
+  /// lapsed while the app was in the background.
+  static bool _isSessionExpired(Object error) =>
+      error is supabase.PostgrestException && error.code == 'PGRST303';
+
+  /// Runs [operation]; if the server answers with an expired token,
+  /// refreshes the session and runs it ONE more time. Only once: a refresh
+  /// that does not help (revoked refresh token) must surface as the failure
+  /// it is, not spin. If the refresh itself fails (no network) that error
+  /// propagates instead. [operation] must be safe to re-run from the top --
+  /// every push step re-reads its own dirty rows, and a pull restarts at
+  /// the revocation probe, before anything is applied.
+  Future<T> _retryAfterSessionRefresh<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on Object catch (error) {
+      if (!_isSessionExpired(error)) {
+        rethrow;
+      }
+      await transport.refreshSession();
+      return operation();
+    }
+  }
 
   /// The pull itself -- THROWS on failure. [pullSince] swallows that;
   /// [refreshNow] reports it. Returns whether this pull discovered
@@ -1160,6 +1194,11 @@ class SupabaseSyncTransport implements SyncTransport {
     await _client.from(table).update({'deleted_at': deletedAt}).match({
       for (final entry in match.entries) entry.key: entry.value!,
     });
+  }
+
+  @override
+  Future<void> refreshSession() async {
+    await _client.auth.refreshSession();
   }
 
   @override

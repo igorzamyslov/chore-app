@@ -14,6 +14,7 @@ library;
 import 'dart:async';
 
 import 'package:chore_app/application/sync_engine.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 class FakeSyncTransport implements SyncTransport {
   /// The fake server's current clock -- returned by [serverNow] and
@@ -47,8 +48,38 @@ class FakeSyncTransport implements SyncTransport {
   /// the server-side removal this device has not noticed yet.
   bool membershipPresent = true;
 
+  /// While `true`, [hasMembership] and [upsertRows] fail exactly like
+  /// PostgREST answering an expired access token (`PGRST303`, HTTP 401) --
+  /// what a device sees when the app resumes before the Supabase client has
+  /// refreshed its session.
+  bool sessionExpired = false;
+
+  /// Whether [refreshSession] ends the expiry. `false` models a refresh
+  /// that "succeeds" but still leaves every request refused.
+  bool refreshClearsExpiry = true;
+
+  /// How many times the engine asked for a session refresh.
+  int refreshSessionCalls = 0;
+
+  void _requireLiveSession() {
+    if (sessionExpired) {
+      throw const PostgrestException(message: 'JWT expired', code: 'PGRST303');
+    }
+  }
+
   @override
-  Future<bool> hasMembership(String householdId) async => membershipPresent;
+  Future<void> refreshSession() async {
+    refreshSessionCalls++;
+    if (refreshClearsExpiry) {
+      sessionExpired = false;
+    }
+  }
+
+  @override
+  Future<bool> hasMembership(String householdId) async {
+    _requireLiveSession();
+    return membershipPresent;
+  }
 
   @override
   Future<DateTime> serverNow() async {
@@ -115,6 +146,7 @@ class FakeSyncTransport implements SyncTransport {
     if (rows.isEmpty) {
       return;
     }
+    _requireLiveSession();
     final hook = beforeUpsert;
     if (hook != null) {
       await hook();
