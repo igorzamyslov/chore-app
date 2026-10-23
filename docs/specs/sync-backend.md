@@ -631,6 +631,17 @@ stand; the following refine them. Findings are numbered as in
   stays server time for correctness; health and "Last synced" read the
   device stamp (`sync-freshness.md` §2.5 amendment).
 
+- **Expired session: refresh once, retry once (field errors 2026-10).** A
+  request answered with `PGRST303` (expired access token) — seen about daily
+  per device on app resume, where the resume sync beats the Supabase
+  client's own token refresh — makes the engine call
+  `SyncTransport.refreshSession()` and re-run the failed unit once: each
+  push step (`_pushAll`) and the whole pull (`_pull`, from the revocation
+  probe). Never a loop: if the retry fails too, it is logged as any other
+  failure. If the refresh itself fails (offline) that error is the one
+  logged. `PGRST303` is not a revocation signal; only an empty probe result
+  is (§3.5 of `household-lifecycle.md`).
+
 ### 8.4 Testing
 
 - Unit/widget: FakeSyncEngine recording calls; engine logic tested

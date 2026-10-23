@@ -1,0 +1,3 @@
+Reibungsloserer Abgleich beim Öffnen der App.
+
+War die App länger geschlossen, konnte der erste Abgleich nach dem Öffnen mit einem harmlosen Fehler („Sitzung abgelaufen“) scheitern. Jetzt wird die Sitzung erneuert und der Abgleich läuft weiter.

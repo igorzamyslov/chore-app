@@ -1,0 +1,3 @@
+Smoother sync when you reopen the app.
+
+If the app had been closed for a while, the first sync after opening it could fail with a harmless "session expired" error. It now renews the session and carries on.
