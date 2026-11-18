@@ -44,7 +44,7 @@ enum _AddOutcome { added, alreadyOnList, movedBack }
 /// what's usually bought, before the user has typed anything. Typing a
 /// prefix seamlessly narrows to the existing type-ahead behavior; clearing
 /// the field back to empty while still focused returns to the focus view.
-/// However many there are, the chips take at most two and a half rows of
+/// However many there are, the chips take at most three and a half rows of
 /// the screen and scroll inside that ([ShoppingSuggestionsList]).
 /// Losing focus always hides the list, however it got there.
 class ShoppingQuickAddRow extends ConsumerStatefulWidget {

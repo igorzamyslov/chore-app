@@ -432,7 +432,7 @@ void main() {
       tester.state<ScrollableState>(inArea(find.byType(Scrollable))).position;
 
   testChoreApp(
-    'more suggestions than fit: the area is capped at two and a half chip '
+    'more suggestions than fit: the area is capped at three and a half chip '
     'rows and fades at the bottom; dragging the chips scrolls them without '
     'unfocusing the field, and a chip from the scrolled part can be tapped '
     'without losing the position',
@@ -442,7 +442,7 @@ void main() {
       final householdId = await currentHouseholdId(database);
       final names = [
         for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
-          'Staple ${i.toString().padLeft(2, '0')}',
+          'Weekly staple ${i.toString().padLeft(2, '0')}',
       ];
       await seedBoughtHistory(database, householdId, names);
 
@@ -465,18 +465,18 @@ void main() {
         findsNothing,
       );
 
-      // Capped: two full rows plus half of a third (spacing 8 between rows),
-      // plus the area's own 8 bottom padding -- far less than the wrap.
+      // Capped: three full rows plus half of a fourth (spacing 8 between
+      // rows), plus the area's own 8 bottom padding -- less than the wrap.
       final chipHeight = tester
           .getSize(find.bySemanticsIdentifier('shopping.suggestion.0'))
           .height;
       final areaHeight = tester.getSize(suggestionsArea()).height;
-      expect(areaHeight, moreOrLessEquals(chipHeight * 2.5 + 2 * 8 + 8));
+      expect(areaHeight, moreOrLessEquals(chipHeight * 3.5 + 3 * 8 + 8));
       expect(
         tester.getSize(inArea(find.byType(Wrap))).height,
-        greaterThan(chipHeight * 4),
+        greaterThan(areaHeight + chipHeight),
       );
-      // The cut row is what says "more": a chip in the THIRD row straddles
+      // The cut row is what says "more": a chip in the FOURTH row straddles
       // the bottom edge of the visible area.
       final areaBottom = tester.getBottomLeft(suggestionsArea()).dy - 8;
       final straddling = [
@@ -522,8 +522,8 @@ void main() {
   );
 
   testChoreApp(
-    'when the suggestions fit, the area is exactly as tall as its chips and '
-    'shows no fade',
+    'when the suggestions fit, the area is exactly as tall as its chips, '
+    'shows no fade, and starts at the left gutter',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
@@ -540,6 +540,14 @@ void main() {
         moreOrLessEquals(tester.getSize(inArea(find.byType(Wrap))).height + 8),
       );
       expect(fading(tester), isFalse);
+      // Left-aligned with the area's 16 dp gutter, not centred: a centred
+      // wrap shrinks to its widest run, so its left edge moved per query.
+      expect(
+        tester
+            .getTopLeft(find.bySemanticsIdentifier('shopping.suggestion.0'))
+            .dx,
+        16,
+      );
 
       handle.dispose();
     },
@@ -554,7 +562,7 @@ void main() {
       final householdId = await currentHouseholdId(database);
       await seedBoughtHistory(database, householdId, [
         for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
-          'Bean ${i.toString().padLeft(2, '0')}',
+          'Bean variety ${i.toString().padLeft(2, '0')}',
       ]);
 
       await openShoppingTab(tester);

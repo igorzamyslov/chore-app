@@ -207,8 +207,11 @@ wins.
 - **Height cap.** The chips keep their wrap (same chip, same order, same
   keys, same `shopping.suggestion.<i>` ids). The wrap now sits in its own
   vertical scroll area (`shopping.suggestions`) whose height is the content's
-  height, capped at **two full chip rows plus half of a third**
-  (`2.5 × chip height + 2 × run spacing`). The chip height is measured from
+  height, capped at **three full chip rows plus half of a fourth**
+  (`3.5 × chip height + 3 × run spacing`). Three full rows is what the old
+  type-ahead cap of 8 chips filled, so the strip never shows fewer chips at
+  once than before; a 2.5-row cap was tried first and hid the 7th match of
+  a one-letter query behind a scroll. The chip height is measured from
   the first laid-out chip, so the cut lands mid-row at any text scale. The
   half-visible row is what says "there is more"; it is the only cue.
 - **Fade.** While content remains below the visible part, the bottom 24 dp of
@@ -227,7 +230,7 @@ wins.
   up, as before.
 
 Tests: `test/features/shopping/suggestions_test.dart` (limit on both paths,
-cap at 2.5 rows with the last chip reachable by scrolling, no cap when it
+cap at 3.5 rows with the last chip reachable by scrolling, no cap when it
 fits, fade only while more is below, scroll resets on a new query).
 
 ## Placement

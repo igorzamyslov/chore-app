@@ -28,8 +28,10 @@ const shoppingSuggestionLimit = 20;
 ///
 /// **Height cap** (`docs/specs/ui-shopping.md`, Amendment 2026-11-18): the
 /// wrap scrolls vertically inside an area as tall as its content but no
-/// taller than [visibleRows] chip rows -- two full rows and half of a third,
-/// so the cut row itself says "there is more". While content remains below,
+/// taller than [visibleRows] chip rows -- three full rows and half of a
+/// fourth, so the cut row itself says "there is more". Three full rows is
+/// what the old type-ahead cap of 8 chips filled, so the strip never shows
+/// fewer chips at once than before. While content remains below,
 /// the bottom [fadeExtent] fades out. A horizontal strip was rejected: a
 /// horizontal drag on this screen belongs to the shell's tab `PageView`.
 ///
@@ -50,8 +52,8 @@ class ShoppingSuggestionsList extends StatefulWidget {
     super.key,
   });
 
-  /// Chip rows visible before the area scrolls: two full, half of a third.
-  static const visibleRows = 2.5;
+  /// Chip rows visible before the area scrolls: three full, half a fourth.
+  static const visibleRows = 3.5;
 
   /// Height of the bottom fade shown while more chips sit below.
   static const fadeExtent = 24.0;
@@ -190,7 +192,14 @@ class _ShoppingSuggestionsListState extends State<ShoppingSuggestionsList> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
+          // Full width, so the chips start at the field's left edge. Left
+          // loose, the wrap shrank to its widest run and the quick-add
+          // row's Column centred it -- the block's left edge then moved
+          // with every query, now that more chips make that visible.
+          constraints: BoxConstraints(
+            minWidth: double.infinity,
+            maxHeight: maxHeight,
+          ),
           child: NotificationListener<ScrollMetricsNotification>(
             onNotification: (notification) => _onMetrics(notification.metrics),
             child: NotificationListener<ScrollNotification>(
