@@ -190,6 +190,62 @@ line ("7 left · synced 2 min ago"), the E10 "waiting to send" glyph, and the
 should the idea return. Where the 2026-10-06 block describes a per-row mark,
 this block wins.
 
+## Amendment 2026-11-18 — more suggestions, in a capped strip
+
+**Ask (Igor):** see more suggestion options under the quick-add field,
+without them taking the whole screen. Where `ux-round-2.md` B2 ("top 8"),
+the F1 feedback note ("top 5") or the widget docs say otherwise, this block
+wins.
+
+- **Count — pages, not a cap.** Both paths — focus on the empty field (F1)
+  and type-ahead (B2) — show the first `shoppingSuggestionPageSize` = **20**
+  suggestions. Scrolling the chips to within one chip row of the end asks
+  for the next 20 (the query's `limit` grows by a page), and so on until a
+  page comes back short: the whole ranked history is reachable by scrolling
+  (Igor, same day: "what if I want to keep scrolling?"). Only the user's
+  scrolling pages — never a layout change, or a first page barely taller
+  than the cap would pull in the second unasked. Ranking and the
+  exclusion rules are unchanged. The screen space is bounded by the height
+  cap below, not by the count, so "quiet" no longer needs a small count.
+  This **reverses** B2's standing "no browsable full-history list" decision
+  for the chip strip: what it feared was a wall of 900 entries taking the
+  screen, which the cap rules out, and the history itself is bounded to a
+  year by `compactHistory`. Cost: `suggestions` already ranks every distinct
+  name before taking `limit`, so a bigger page costs no extra query work.
+- **Reset.** A new query (typing or clearing) and losing focus go back to
+  the first page. A re-query for the SAME text — after a chip tap or a
+  forget — keeps every page loaded so far.
+- **Height cap.** The chips keep their wrap (same chip, same order, same
+  keys, same `shopping.suggestion.<i>` ids). The wrap now sits in its own
+  vertical scroll area (`shopping.suggestions`) whose height is the content's
+  height, capped at **three full chip rows plus half of a fourth**
+  (`3.5 × chip height + 3 × run spacing`). Three full rows is what the old
+  type-ahead cap of 8 chips filled, so the strip never shows fewer chips at
+  once than before; a 2.5-row cap was tried first and hid the 7th match of
+  a one-letter query behind a scroll. The chip height is measured from
+  the first laid-out chip, so the cut lands mid-row at any text scale. The
+  half-visible row is what says "there is more"; it is the only cue.
+- **Fade.** While content remains below the visible part, the bottom 24 dp of
+  the area fades out (a mask, not a drawn element) — it goes away once
+  scrolled to the end, and is never shown when everything fits. No scrollbar,
+  no "more" chip, no count: nothing to explain (product taste, 2026-10-07).
+- **Not horizontal.** A one-row horizontal strip was rejected: a horizontal
+  drag on this screen belongs to the shell's tab `PageView` (Amendment
+  2026-09-19), and one row shows fewer chips at once than today.
+- **Scrolling the chips** neither unfocuses the field (Bug 3 is about the
+  list, not the chips) nor tints the app bar: the area's scroll
+  notifications stop at the area.
+- **Position.** A new query (typing or clearing) jumps the area back to the
+  top. Tapping a chip keeps the position, so several staples can be tapped in
+  a row from the scrolled part; the tapped one drops out and the rest close
+  up, as before.
+
+Tests: `test/features/shopping/suggestions_test.dart` (first page on both
+paths, next page on scrolling near the end until the history runs out,
+loaded pages kept across a chip tap and reset by a new query or blur, cap at
+3.5 rows, no cap when it fits, fade only while more is below, scroll resets
+on a new query).
+
 ## Placement
 
 | What | Where |

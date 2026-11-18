@@ -81,7 +81,8 @@ automatically (it already sorts by sort_order).
 
 ### B2. Suggestions / reuse ("how do I restore Milk?")
 Type-ahead suggestions under the quick-add field while typing (≥ 1 char):
-top 8 matches from **all** items ever added in the household (including
+top 8 (amended 2026-11-18: pages of 20 in a height-capped strip that loads
+more on scroll — see `ui-shopping.md`) matches from **all** items ever added in the household (including
 soft-deleted/cleared), ranked by frequency then recency, deduplicated by
 normalized name, each showing name + its most recent category. Tapping a
 suggestion adds it immediately **with that category**. This is the
@@ -90,6 +91,9 @@ suggestion adds it immediately **with that category**. This is the
 - New repository query `suggestions(householdId, prefix, {limit})`.
 - NO browsable full-history list (standing decision: no walls of 900
   entries — suggestions + B3 cover reuse without one).
+  *Reversed for the chip strip 2026-11-18 (`ui-shopping.md`): the strip is
+  height-capped, so scrolling it through the whole ranked history is not a
+  wall.*
 
 ### B3. Duplicate prevention on add
 On quick-add submit (and suggestion tap), match normalized name against
