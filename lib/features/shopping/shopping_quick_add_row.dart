@@ -19,8 +19,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 enum _AddOutcome { added, alreadyOnList, movedBack }
 
 /// The pinned row above the shopping list: a text field plus a submit
-/// button, with up to 8 type-ahead suggestions shown below it while typing
-/// (spec `docs/specs/ux-round-2.md` B2).
+/// button, with up to [shoppingSuggestionLimit] type-ahead suggestions
+/// shown below it while typing (spec `docs/specs/ux-round-2.md` B2, limit
+/// amended in `docs/specs/ui-shopping.md` 2026-11-18).
 ///
 /// Submitting (button tap, keyboard action, or tapping a suggestion) trims
 /// the input and matches its normalized name against ACTIVE items in the
@@ -37,12 +38,14 @@ enum _AddOutcome { added, alreadyOnList, movedBack }
 /// continue right away. Suggestions are re-queried on every keystroke via
 /// `ShoppingRepository.suggestions`.
 ///
-/// Focusing the field while it's still empty shows the top 5 suggestions by
-/// the same ranking (field feedback F1,
-/// `docs/feedback/2026-08-01-field-feedback.md`) — a quiet nudge toward
+/// Focusing the field while it's still empty shows the top
+/// [shoppingSuggestionLimit] suggestions by the same ranking (field feedback
+/// F1, `docs/feedback/2026-08-01-field-feedback.md`) — a quiet nudge toward
 /// what's usually bought, before the user has typed anything. Typing a
 /// prefix seamlessly narrows to the existing type-ahead behavior; clearing
-/// the field back to empty while still focused returns to the top-5 view.
+/// the field back to empty while still focused returns to the focus view.
+/// However many there are, the chips take at most two and a half rows of
+/// the screen and scroll inside that ([ShoppingSuggestionsList]).
 /// Losing focus always hides the list, however it got there.
 class ShoppingQuickAddRow extends ConsumerStatefulWidget {
   /// Creates the quick-add row.
@@ -57,6 +60,9 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   List<ShoppingSuggestion> _suggestions = const [];
+
+  /// The field text [_suggestions] were queried for.
+  String _suggestionsQuery = '';
 
   @override
   void initState() {
@@ -193,6 +199,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
         if (_suggestions.isNotEmpty)
           ShoppingSuggestionsList(
             suggestions: _suggestions,
+            query: _suggestionsQuery,
             onTap: _selectSuggestion,
             onForget: _forgetSuggestion,
           ),
@@ -204,7 +211,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     unawaited(_updateSuggestions());
   }
 
-  /// Shows the top-5 focus-suggestions (F1) when focus is gained while the
+  /// Shows the focus-suggestions (F1) when focus is gained while the
   /// field is still empty; hides whatever's showing as soon as focus is
   /// lost, regardless of how it got there (typed prefix or empty-focus).
   void _onFocusChanged() {
@@ -219,7 +226,7 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
   /// result if the text or focus state has since changed (e.g. it raced
   /// with a submit that cleared the field, or with a blur).
   ///
-  /// An empty query only queries (the F1 top-5) while the field still has
+  /// An empty query only queries (the F1 focus view) while the field still has
   /// focus; an empty, unfocused field hides the list instead, same as
   /// clearing the text always did.
   Future<void> _updateSuggestions() async {
@@ -233,13 +240,16 @@ class _ShoppingQuickAddRowState extends ConsumerState<ShoppingQuickAddRow> {
     final householdId = ref.read(bootstrapProvider).requireValue;
     final results = await ref
         .read(shoppingRepositoryProvider)
-        .suggestions(householdId, query, limit: query.isEmpty ? 5 : 8);
+        .suggestions(householdId, query, limit: shoppingSuggestionLimit);
     if (!mounted ||
         _controller.text != query ||
         (query.isEmpty && !_focusNode.hasFocus)) {
       return;
     }
-    setState(() => _suggestions = results);
+    setState(() {
+      _suggestions = results;
+      _suggestionsQuery = query;
+    });
   }
 
   /// Typed submit: the input is split on commas and newlines (F7) and each

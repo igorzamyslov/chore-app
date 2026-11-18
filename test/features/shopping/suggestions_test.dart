@@ -1,6 +1,7 @@
 import 'package:chore_app/data/db/app_database.dart';
 import 'package:chore_app/data/repositories/category_repository.dart';
 import 'package:chore_app/data/repositories/shopping_repository.dart';
+import 'package:chore_app/features/shopping/shopping_suggestions_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -199,7 +200,7 @@ void main() {
   );
 
   testChoreApp(
-    'focusing the empty quick-add field shows the top-5 suggestions by the '
+    'focusing the empty quick-add field shows the top suggestions by the '
     'same ranking, excluding a name that currently has an active item on '
     'the list; typing a prefix still narrows as before',
     today: today,
@@ -224,8 +225,8 @@ void main() {
       // up the highest-frequency name overall but is left ACTIVE
       // (currently on the list) — everything else is soft-deleted
       // (cleared) history, same as other suggestion tests. Without
-      // exclusion, "Milk" would rank #2 overall and bump "Butter" out of
-      // the top 5; with exclusion, "Butter" must appear instead.
+      // exclusion, "Milk" would rank #2 overall and push every name after
+      // Bananas down a slot; with exclusion, it must not appear at all.
       final butter = await addAt('Butter'); // freq 1, oldest of the trio
       final eggs = await addAt('Eggs'); // freq 1, middle
       final cheese = await addAt('Cheese'); // freq 1, most recent of trio
@@ -275,9 +276,9 @@ void main() {
         matching: find.text(text),
       );
 
-      // Top 5 by frequency (Bananas 4, Bread 2, then the freq-1 trio by
-      // recency), with "Milk" excluded even though it would otherwise
-      // outrank everything but Bananas.
+      // Every eligible name by frequency (Bananas 4, Bread 2, then the
+      // freq-1 trio by recency), with "Milk" excluded even though it would
+      // otherwise outrank everything but Bananas -- so there is no 6th.
       expect(suggestionText(0, 'Bananas'), findsOneWidget);
       expect(suggestionText(1, 'Bread'), findsOneWidget);
       expect(suggestionText(2, 'Cheese'), findsOneWidget);
@@ -362,32 +363,22 @@ void main() {
   );
 
   testChoreApp(
-    'tapping a proposal removes it from the top-5 and pulls in the next '
-    'candidate (bug 4, field feedback round 2)',
+    'tapping a proposal removes it from the shown suggestions and pulls in '
+    'the next candidate (bug 4, field feedback round 2)',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
 
-      var clockTime = DateTime.utc(2026, 7);
-      var nextId = 0;
-      final repo = ShoppingRepository(
-        database,
-        newId: () => 'seed-${nextId++}',
-        nowUtc: () => clockTime,
-      );
-
-      // Six distinct, equal-frequency (1 each) names, seeded oldest first
-      // so recency ranks them newest-first: item5 > item4 > ... > item0.
-      // Each is bought-then-cleared so all six are eligible focus
-      // suggestions, with "item0" left just outside the initial top 5.
-      final names = ['Item0', 'Item1', 'Item2', 'Item3', 'Item4', 'Item5'];
-      for (final name in names) {
-        final item = await repo.addItem(householdId, name: name);
-        await repo.setChecked(item.id, checked: true);
-        await repo.deleteItem(item.id);
-        clockTime = clockTime.add(const Duration(minutes: 1));
-      }
+      // One more equal-frequency (1 each) name than the limit, seeded
+      // oldest first so recency ranks them newest-first: the last one
+      // seeded is #0 and "Item00" (oldest) is left just outside the limit.
+      final names = [
+        for (var i = 0; i <= shoppingSuggestionLimit; i++)
+          'Item${i.toString().padLeft(2, '0')}',
+      ];
+      await seedBoughtHistory(database, householdId, names);
+      final newest = names.last;
 
       await openShoppingTab(tester);
       await tester.pumpAndSettle();
@@ -398,31 +389,202 @@ void main() {
         of: find.bySemanticsIdentifier('shopping.suggestion.$index'),
         matching: find.text(text),
       );
+      const last = shoppingSuggestionLimit - 1;
 
-      // Top 5 newest-first; "Item0" (oldest) is the 6th, not shown yet.
-      expect(suggestionText(0, 'Item5'), findsOneWidget);
-      expect(suggestionText(1, 'Item4'), findsOneWidget);
-      expect(suggestionText(2, 'Item3'), findsOneWidget);
-      expect(suggestionText(3, 'Item2'), findsOneWidget);
-      expect(suggestionText(4, 'Item1'), findsOneWidget);
+      // Newest-first up to the limit; "Item00" (oldest) is not shown yet.
+      expect(suggestionText(0, newest), findsOneWidget);
+      expect(suggestionText(last, names[1]), findsOneWidget);
       expect(
-        find.bySemanticsIdentifier('shopping.suggestion.5'),
+        find.bySemanticsIdentifier(
+          'shopping.suggestion.$shoppingSuggestionLimit',
+        ),
         findsNothing,
       );
+      expect(find.text('Item00'), findsNothing);
 
-      // Tap the top suggestion ("Item5"): it gets added (now active), so
-      // it drops out of the candidate pool entirely, and "Item0" — the
-      // previously-excluded 6th — moves into the newly-opened 5th slot.
+      // Tap the top suggestion: it gets added (now active), so it drops out
+      // of the candidate pool entirely, everything closes up one slot, and
+      // "Item00" -- the previously-excluded one -- moves into the last slot.
       await tester.tap(find.bySemanticsIdentifier('shopping.suggestion.0'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Item5'), findsOneWidget); // now on the list
-      expect(suggestionText(0, 'Item5'), findsNothing);
-      expect(suggestionText(0, 'Item4'), findsOneWidget);
-      expect(suggestionText(1, 'Item3'), findsOneWidget);
-      expect(suggestionText(2, 'Item2'), findsOneWidget);
-      expect(suggestionText(3, 'Item1'), findsOneWidget);
-      expect(suggestionText(4, 'Item0'), findsOneWidget);
+      expect(find.text(newest), findsOneWidget); // now on the list
+      expect(suggestionText(0, newest), findsNothing);
+      expect(suggestionText(0, names[names.length - 2]), findsOneWidget);
+      expect(suggestionText(last, 'Item00'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  // Amendment 2026-11-18 (`docs/specs/ui-shopping.md`): more suggestions,
+  // without them taking the whole screen.
+  Finder suggestionsArea() =>
+      find.bySemanticsIdentifier('shopping.suggestions');
+  Finder inArea(Finder matching) =>
+      find.descendant(of: suggestionsArea(), matching: matching);
+  // The mask is always in the tree (so the scroll view never remounts);
+  // whether it fades is its blend mode.
+  bool fading(WidgetTester tester) =>
+      tester.widget<ShaderMask>(inArea(find.byType(ShaderMask))).blendMode ==
+      BlendMode.dstIn;
+  ScrollPosition areaPosition(WidgetTester tester) =>
+      tester.state<ScrollableState>(inArea(find.byType(Scrollable))).position;
+
+  testChoreApp(
+    'more suggestions than fit: the area is capped at two and a half chip '
+    'rows and fades at the bottom; dragging the chips scrolls them without '
+    'unfocusing the field, and a chip from the scrolled part can be tapped '
+    'without losing the position',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      final names = [
+        for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
+          'Staple ${i.toString().padLeft(2, '0')}',
+      ];
+      await seedBoughtHistory(database, householdId, names);
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+
+      // The limit applies to the focus path: exactly that many chips.
+      expect(
+        find.bySemanticsIdentifier(
+          'shopping.suggestion.${shoppingSuggestionLimit - 1}',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier(
+          'shopping.suggestion.$shoppingSuggestionLimit',
+        ),
+        findsNothing,
+      );
+
+      // Capped: two full rows plus half of a third (spacing 8 between rows),
+      // plus the area's own 8 bottom padding -- far less than the wrap.
+      final chipHeight = tester
+          .getSize(find.bySemanticsIdentifier('shopping.suggestion.0'))
+          .height;
+      final areaHeight = tester.getSize(suggestionsArea()).height;
+      expect(areaHeight, moreOrLessEquals(chipHeight * 2.5 + 2 * 8 + 8));
+      expect(
+        tester.getSize(inArea(find.byType(Wrap))).height,
+        greaterThan(chipHeight * 4),
+      );
+      // The cut row is what says "more": a chip in the THIRD row straddles
+      // the bottom edge of the visible area.
+      final areaBottom = tester.getBottomLeft(suggestionsArea()).dy - 8;
+      final straddling = [
+        for (var i = 0; i < shoppingSuggestionLimit; i++)
+          tester.getRect(find.bySemanticsIdentifier('shopping.suggestion.$i')),
+      ].where((r) => r.top < areaBottom && r.bottom > areaBottom);
+      expect(straddling, isNotEmpty);
+      // ...and the fade is on while more sits below.
+      expect(fading(tester), isTrue);
+
+      // Drag the chips to the end: they scroll, the fade goes, and the
+      // field keeps focus (the list's Bug 3 unfocus is not triggered).
+      await tester.drag(
+        inArea(find.byType(SingleChildScrollView)),
+        const Offset(0, -1000),
+      );
+      await tester.pumpAndSettle();
+      final position = areaPosition(tester);
+      expect(position.pixels, greaterThan(0));
+      expect(position.extentAfter, moreOrLessEquals(0));
+      expect(fading(tester), isFalse);
+      expect(tester.testTextInput.isVisible, isTrue);
+
+      // The last chip is now in view and tappable; tapping it adds it and
+      // keeps the scrolled position (same query), so the next one is a tap
+      // away too.
+      const lastId = 'shopping.suggestion.${shoppingSuggestionLimit - 1}';
+      final lastName = tester
+          .widget<Text>(
+            find.descendant(
+              of: find.bySemanticsIdentifier(lastId),
+              matching: find.byType(Text),
+            ),
+          )
+          .data!;
+      await tester.tap(find.bySemanticsIdentifier(lastId));
+      await tester.pumpAndSettle();
+      expect(find.text(lastName), findsOneWidget); // on the list, not a chip
+      expect(areaPosition(tester).pixels, greaterThan(0));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'when the suggestions fit, the area is exactly as tall as its chips and '
+    'shows no fade',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await seedBoughtHistory(database, householdId, ['Bread', 'Eggs', 'Tea']);
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSize(suggestionsArea()).height,
+        moreOrLessEquals(tester.getSize(inArea(find.byType(Wrap))).height + 8),
+      );
+      expect(fading(tester), isFalse);
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'a new query scrolls the suggestions back to the top; the type-ahead '
+    'path uses the same limit',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      await seedBoughtHistory(database, householdId, [
+        for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
+          'Bean ${i.toString().padLeft(2, '0')}',
+      ]);
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      await tester.drag(
+        inArea(find.byType(SingleChildScrollView)),
+        const Offset(0, -1000),
+      );
+      await tester.pumpAndSettle();
+      expect(areaPosition(tester).pixels, greaterThan(0));
+
+      await tester.enterText(quickAddInput(), 'be');
+      await tester.pumpAndSettle();
+
+      expect(areaPosition(tester).pixels, 0);
+      expect(
+        find.bySemanticsIdentifier(
+          'shopping.suggestion.${shoppingSuggestionLimit - 1}',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsIdentifier(
+          'shopping.suggestion.$shoppingSuggestionLimit',
+        ),
+        findsNothing,
+      );
+      expect(fading(tester), isTrue);
 
       handle.dispose();
     },
@@ -627,4 +789,27 @@ void main() {
       handle.dispose();
     },
   );
+}
+
+/// Seeds [names] as bought-then-cleared history (one row each, oldest
+/// first, a minute apart), so every one is an eligible focus-suggestion and
+/// recency ranks them newest-first.
+Future<void> seedBoughtHistory(
+  AppDatabase database,
+  String householdId,
+  List<String> names,
+) async {
+  var clockTime = DateTime.utc(2026, 7);
+  var nextId = 0;
+  final repo = ShoppingRepository(
+    database,
+    newId: () => 'seed-${nextId++}',
+    nowUtc: () => clockTime,
+  );
+  for (final name in names) {
+    final item = await repo.addItem(householdId, name: name);
+    await repo.setChecked(item.id, checked: true);
+    await repo.deleteItem(item.id);
+    clockTime = clockTime.add(const Duration(minutes: 1));
+  }
 }

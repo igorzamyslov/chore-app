@@ -190,6 +190,46 @@ line ("7 left · synced 2 min ago"), the E10 "waiting to send" glyph, and the
 should the idea return. Where the 2026-10-06 block describes a per-row mark,
 this block wins.
 
+## Amendment 2026-11-18 — more suggestions, in a capped strip
+
+**Ask (Igor):** see more suggestion options under the quick-add field,
+without them taking the whole screen. Where `ux-round-2.md` B2 ("top 8"),
+the F1 feedback note ("top 5") or the widget docs say otherwise, this block
+wins.
+
+- **Count.** Both paths — focus on the empty field (F1) and type-ahead (B2) —
+  now ask `ShoppingRepository.suggestions` for up to `shoppingSuggestionLimit`
+  = **20**. Ranking and the exclusion rules are unchanged; only the limit
+  moves. One number for both paths: the screen space is now bounded by the
+  height cap below, not by the count, so "quiet" no longer needs a small
+  count. Still a cap, not a history browser: B2's standing "no walls of 900
+  entries" decision holds.
+- **Height cap.** The chips keep their wrap (same chip, same order, same
+  keys, same `shopping.suggestion.<i>` ids). The wrap now sits in its own
+  vertical scroll area (`shopping.suggestions`) whose height is the content's
+  height, capped at **two full chip rows plus half of a third**
+  (`2.5 × chip height + 2 × run spacing`). The chip height is measured from
+  the first laid-out chip, so the cut lands mid-row at any text scale. The
+  half-visible row is what says "there is more"; it is the only cue.
+- **Fade.** While content remains below the visible part, the bottom 24 dp of
+  the area fades out (a mask, not a drawn element) — it goes away once
+  scrolled to the end, and is never shown when everything fits. No scrollbar,
+  no "more" chip, no count: nothing to explain (product taste, 2026-10-07).
+- **Not horizontal.** A one-row horizontal strip was rejected: a horizontal
+  drag on this screen belongs to the shell's tab `PageView` (Amendment
+  2026-09-19), and one row shows fewer chips at once than today.
+- **Scrolling the chips** neither unfocuses the field (Bug 3 is about the
+  list, not the chips) nor tints the app bar: the area's scroll
+  notifications stop at the area.
+- **Position.** A new query (typing or clearing) jumps the area back to the
+  top. Tapping a chip keeps the position, so several staples can be tapped in
+  a row from the scrolled part; the tapped one drops out and the rest close
+  up, as before.
+
+Tests: `test/features/shopping/suggestions_test.dart` (limit on both paths,
+cap at 2.5 rows with the last chip reachable by scrolling, no cap when it
+fits, fade only while more is below, scroll resets on a new query).
+
 ## Placement
 
 | What | Where |
