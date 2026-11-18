@@ -10,11 +10,12 @@ import 'package:chore_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-/// How many suggestions the quick-add row asks for, on both the
-/// focus-on-empty path (F1) and the type-ahead path (B2). See
+/// How many suggestions one page holds, on both the focus-on-empty path (F1)
+/// and the type-ahead path (B2): the quick-add row asks for one page, then
+/// one more each time [ShoppingSuggestionsList.onNearEnd] fires. See
 /// `docs/specs/ui-shopping.md`, Amendment 2026-11-18: the screen space is
 /// bounded by [ShoppingSuggestionsList]'s height cap, not by this count.
-const shoppingSuggestionLimit = 20;
+const shoppingSuggestionPageSize = 20;
 
 /// Renders [suggestions] (already ranked and limited by
 /// `ShoppingRepository.suggestions`) as a wrap of tappable pill chips below
@@ -35,6 +36,9 @@ const shoppingSuggestionLimit = 20;
 /// the bottom [fadeExtent] fades out. A horizontal strip was rejected: a
 /// horizontal drag on this screen belongs to the shell's tab `PageView`.
 ///
+/// Scrolling to within one chip row of the end calls [onNearEnd], once per
+/// list length, so the caller can load the next page.
+///
 /// Tapping a chip calls [onTap] with that suggestion; the caller (the
 /// quick-add row) adds it immediately, subject to the same duplicate
 /// prevention as a typed submit. See `docs/specs/ux-round-2.md` B2/B3.
@@ -49,6 +53,7 @@ class ShoppingSuggestionsList extends StatefulWidget {
     required this.onTap,
     required this.onForget,
     this.query = '',
+    this.onNearEnd,
     super.key,
   });
 
@@ -73,6 +78,12 @@ class ShoppingSuggestionsList extends StatefulWidget {
   /// Called with the suggestion the user chose to forget.
   final ValueChanged<ShoppingSuggestion> onForget;
 
+  /// Called when the area has been scrolled to within one chip row of its
+  /// end: the caller's cue to load the next page. Fires at most once per
+  /// [suggestions] length, so a page that comes back no longer (the
+  /// history ran out) does not ask again.
+  final VoidCallback? onNearEnd;
+
   @override
   State<ShoppingSuggestionsList> createState() =>
       _ShoppingSuggestionsListState();
@@ -90,6 +101,9 @@ class _ShoppingSuggestionsListState extends State<ShoppingSuggestionsList> {
   final GlobalKey _wrapKey = GlobalKey();
   double _chipHeight = _defaultChipHeight;
   bool _moreBelow = false;
+
+  /// The suggestions length `onNearEnd` last fired for.
+  int? _nearEndFiredFor;
 
   @override
   void didUpdateWidget(ShoppingSuggestionsList oldWidget) {
@@ -122,11 +136,27 @@ class _ShoppingSuggestionsListState extends State<ShoppingSuggestionsList> {
     }
   }
 
-  /// Tracks whether chips remain below the visible part (the fade's cue).
-  bool _onMetrics(ScrollMetrics metrics) {
+  /// Tracks whether chips remain below the visible part (the fade's cue),
+  /// and -- for a [scrolled] update, i.e. the user moving the chips, not a
+  /// layout change -- asks for the next page near the end. Layout alone
+  /// never pages: a first page barely taller than the cap would otherwise
+  /// pull in the second before anyone scrolled.
+  bool _onMetrics(ScrollMetrics metrics, {bool scrolled = false}) {
     final moreBelow = metrics.extentAfter > 0.5;
     if (moreBelow != _moreBelow) {
       setState(() => _moreBelow = moreBelow);
+    }
+    final onNearEnd = widget.onNearEnd;
+    final length = widget.suggestions.length;
+    // A list that fits cannot be scrolled, so it never pages either: the
+    // history could not fill it.
+    if (scrolled &&
+        onNearEnd != null &&
+        metrics.maxScrollExtent > 0 &&
+        metrics.extentAfter <= _chipHeight + _spacing &&
+        _nearEndFiredFor != length) {
+      _nearEndFiredFor = length;
+      onNearEnd();
     }
     // Stop here: the area's scrolling is not the list's. Bubbling on would
     // reach the Scaffold's scroll observer and tint the app bar as if the
@@ -203,8 +233,10 @@ class _ShoppingSuggestionsListState extends State<ShoppingSuggestionsList> {
           child: NotificationListener<ScrollMetricsNotification>(
             onNotification: (notification) => _onMetrics(notification.metrics),
             child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) =>
-                  _onMetrics(notification.metrics),
+              onNotification: (notification) => _onMetrics(
+                notification.metrics,
+                scrolled: notification is ScrollUpdateNotification,
+              ),
               child: area,
             ),
           ),

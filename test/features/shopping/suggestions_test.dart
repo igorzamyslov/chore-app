@@ -374,7 +374,7 @@ void main() {
       // oldest first so recency ranks them newest-first: the last one
       // seeded is #0 and "Item00" (oldest) is left just outside the limit.
       final names = [
-        for (var i = 0; i <= shoppingSuggestionLimit; i++)
+        for (var i = 0; i <= shoppingSuggestionPageSize; i++)
           'Item${i.toString().padLeft(2, '0')}',
       ];
       await seedBoughtHistory(database, householdId, names);
@@ -389,14 +389,14 @@ void main() {
         of: find.bySemanticsIdentifier('shopping.suggestion.$index'),
         matching: find.text(text),
       );
-      const last = shoppingSuggestionLimit - 1;
+      const last = shoppingSuggestionPageSize - 1;
 
       // Newest-first up to the limit; "Item00" (oldest) is not shown yet.
       expect(suggestionText(0, newest), findsOneWidget);
       expect(suggestionText(last, names[1]), findsOneWidget);
       expect(
         find.bySemanticsIdentifier(
-          'shopping.suggestion.$shoppingSuggestionLimit',
+          'shopping.suggestion.$shoppingSuggestionPageSize',
         ),
         findsNothing,
       );
@@ -440,8 +440,10 @@ void main() {
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
+      // Exactly one page of history, so the end of the strip is the end of
+      // the history (paging has its own test below).
       final names = [
-        for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
+        for (var i = 0; i < shoppingSuggestionPageSize; i++)
           'Weekly staple ${i.toString().padLeft(2, '0')}',
       ];
       await seedBoughtHistory(database, householdId, names);
@@ -451,16 +453,16 @@ void main() {
       await tester.tap(quickAddInput());
       await tester.pumpAndSettle();
 
-      // The limit applies to the focus path: exactly that many chips.
+      // One page on the focus path: exactly that many chips.
       expect(
         find.bySemanticsIdentifier(
-          'shopping.suggestion.${shoppingSuggestionLimit - 1}',
+          'shopping.suggestion.${shoppingSuggestionPageSize - 1}',
         ),
         findsOneWidget,
       );
       expect(
         find.bySemanticsIdentifier(
-          'shopping.suggestion.$shoppingSuggestionLimit',
+          'shopping.suggestion.$shoppingSuggestionPageSize',
         ),
         findsNothing,
       );
@@ -480,7 +482,7 @@ void main() {
       // the bottom edge of the visible area.
       final areaBottom = tester.getBottomLeft(suggestionsArea()).dy - 8;
       final straddling = [
-        for (var i = 0; i < shoppingSuggestionLimit; i++)
+        for (var i = 0; i < shoppingSuggestionPageSize; i++)
           tester.getRect(find.bySemanticsIdentifier('shopping.suggestion.$i')),
       ].where((r) => r.top < areaBottom && r.bottom > areaBottom);
       expect(straddling, isNotEmpty);
@@ -503,7 +505,7 @@ void main() {
       // The last chip is now in view and tappable; tapping it adds it and
       // keeps the scrolled position (same query), so the next one is a tap
       // away too.
-      const lastId = 'shopping.suggestion.${shoppingSuggestionLimit - 1}';
+      const lastId = 'shopping.suggestion.${shoppingSuggestionPageSize - 1}';
       final lastName = tester
           .widget<Text>(
             find.descendant(
@@ -516,6 +518,84 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(lastName), findsOneWidget); // on the list, not a chip
       expect(areaPosition(tester).pixels, greaterThan(0));
+
+      handle.dispose();
+    },
+  );
+
+  testChoreApp(
+    'scrolling near the end of the chips loads the next page until the '
+    'history runs out; a chip tap keeps the loaded pages, a new query and '
+    'losing focus go back to the first page',
+    today: today,
+    (tester, database) async {
+      final handle = tester.ensureSemantics();
+      final householdId = await currentHouseholdId(database);
+      // Two full pages and a short third one.
+      const total = shoppingSuggestionPageSize * 2 + 5;
+      await seedBoughtHistory(database, householdId, [
+        for (var i = 0; i < total; i++)
+          'Pantry item ${i.toString().padLeft(2, '0')}',
+      ]);
+      Finder chip(int index) =>
+          find.bySemanticsIdentifier('shopping.suggestion.$index');
+      Future<void> dragToEnd() async {
+        await tester.drag(
+          inArea(find.byType(SingleChildScrollView)),
+          const Offset(0, -3000),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await openShoppingTab(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(chip(shoppingSuggestionPageSize - 1), findsOneWidget);
+      expect(chip(shoppingSuggestionPageSize), findsNothing);
+
+      // Near the end: the next page arrives, appended below what was there
+      // (same order, so the user's place is undisturbed), and there is more
+      // to scroll again.
+      await dragToEnd();
+      expect(chip(shoppingSuggestionPageSize * 2 - 1), findsOneWidget);
+      expect(chip(shoppingSuggestionPageSize * 2), findsNothing);
+      expect(areaPosition(tester).extentAfter, greaterThan(0));
+      expect(fading(tester), isTrue);
+
+      // Again: the short last page, and then the end really is the end.
+      await dragToEnd();
+      expect(chip(total - 1), findsOneWidget);
+      expect(chip(total), findsNothing);
+      await dragToEnd();
+      expect(chip(total - 1), findsOneWidget);
+      expect(chip(total), findsNothing);
+      expect(areaPosition(tester).extentAfter, moreOrLessEquals(0));
+      expect(fading(tester), isFalse);
+
+      // A chip tap re-queries the same (empty) text: everything loaded so
+      // far stays, minus the one just added.
+      await tester.tap(chip(total - 1));
+      await tester.pumpAndSettle();
+      expect(chip(total - 2), findsOneWidget);
+      expect(chip(total - 1), findsNothing);
+
+      // A new query starts over at one page...
+      await tester.enterText(quickAddInput(), 'pan');
+      await tester.pumpAndSettle();
+      expect(chip(shoppingSuggestionPageSize - 1), findsOneWidget);
+      expect(chip(shoppingSuggestionPageSize), findsNothing);
+
+      // ...and so does coming back after losing focus.
+      await tester.enterText(quickAddInput(), '');
+      await dragToEnd();
+      expect(chip(shoppingSuggestionPageSize), findsOneWidget);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.tap(quickAddInput());
+      await tester.pumpAndSettle();
+      expect(chip(shoppingSuggestionPageSize - 1), findsOneWidget);
+      expect(chip(shoppingSuggestionPageSize), findsNothing);
 
       handle.dispose();
     },
@@ -555,13 +635,13 @@ void main() {
 
   testChoreApp(
     'a new query scrolls the suggestions back to the top; the type-ahead '
-    'path uses the same limit',
+    'path uses the same page size',
     today: today,
     (tester, database) async {
       final handle = tester.ensureSemantics();
       final householdId = await currentHouseholdId(database);
       await seedBoughtHistory(database, householdId, [
-        for (var i = 0; i < shoppingSuggestionLimit + 5; i++)
+        for (var i = 0; i < shoppingSuggestionPageSize + 5; i++)
           'Bean variety ${i.toString().padLeft(2, '0')}',
       ]);
 
@@ -582,13 +662,13 @@ void main() {
       expect(areaPosition(tester).pixels, 0);
       expect(
         find.bySemanticsIdentifier(
-          'shopping.suggestion.${shoppingSuggestionLimit - 1}',
+          'shopping.suggestion.${shoppingSuggestionPageSize - 1}',
         ),
         findsOneWidget,
       );
       expect(
         find.bySemanticsIdentifier(
-          'shopping.suggestion.$shoppingSuggestionLimit',
+          'shopping.suggestion.$shoppingSuggestionPageSize',
         ),
         findsNothing,
       );

@@ -197,13 +197,24 @@ without them taking the whole screen. Where `ux-round-2.md` B2 ("top 8"),
 the F1 feedback note ("top 5") or the widget docs say otherwise, this block
 wins.
 
-- **Count.** Both paths — focus on the empty field (F1) and type-ahead (B2) —
-  now ask `ShoppingRepository.suggestions` for up to `shoppingSuggestionLimit`
-  = **20**. Ranking and the exclusion rules are unchanged; only the limit
-  moves. One number for both paths: the screen space is now bounded by the
-  height cap below, not by the count, so "quiet" no longer needs a small
-  count. Still a cap, not a history browser: B2's standing "no walls of 900
-  entries" decision holds.
+- **Count — pages, not a cap.** Both paths — focus on the empty field (F1)
+  and type-ahead (B2) — show the first `shoppingSuggestionPageSize` = **20**
+  suggestions. Scrolling the chips to within one chip row of the end asks
+  for the next 20 (the query's `limit` grows by a page), and so on until a
+  page comes back short: the whole ranked history is reachable by scrolling
+  (Igor, same day: "what if I want to keep scrolling?"). Only the user's
+  scrolling pages — never a layout change, or a first page barely taller
+  than the cap would pull in the second unasked. Ranking and the
+  exclusion rules are unchanged. The screen space is bounded by the height
+  cap below, not by the count, so "quiet" no longer needs a small count.
+  This **reverses** B2's standing "no browsable full-history list" decision
+  for the chip strip: what it feared was a wall of 900 entries taking the
+  screen, which the cap rules out, and the history itself is bounded to a
+  year by `compactHistory`. Cost: `suggestions` already ranks every distinct
+  name before taking `limit`, so a bigger page costs no extra query work.
+- **Reset.** A new query (typing or clearing) and losing focus go back to
+  the first page. A re-query for the SAME text — after a chip tap or a
+  forget — keeps every page loaded so far.
 - **Height cap.** The chips keep their wrap (same chip, same order, same
   keys, same `shopping.suggestion.<i>` ids). The wrap now sits in its own
   vertical scroll area (`shopping.suggestions`) whose height is the content's
@@ -229,9 +240,11 @@ wins.
   a row from the scrolled part; the tapped one drops out and the rest close
   up, as before.
 
-Tests: `test/features/shopping/suggestions_test.dart` (limit on both paths,
-cap at 3.5 rows with the last chip reachable by scrolling, no cap when it
-fits, fade only while more is below, scroll resets on a new query).
+Tests: `test/features/shopping/suggestions_test.dart` (first page on both
+paths, next page on scrolling near the end until the history runs out,
+loaded pages kept across a chip tap and reset by a new query or blur, cap at
+3.5 rows, no cap when it fits, fade only while more is below, scroll resets
+on a new query).
 
 ## Placement
 
