@@ -104,7 +104,7 @@ jobs:
       - uses: supabase/setup-cli@v1
         if: steps.scope.outputs.run == 'true'
         with:
-          version: 2.114.0
+          version: 2.122.1
 
       # pgTAP itself needs Postgres, not the Flutter SDK. The Flutter setup
       # further down is for the live smoke only, and sits after the SQL suite
