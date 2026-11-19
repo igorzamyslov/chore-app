@@ -282,7 +282,7 @@ jobs:
       - name: Cache the simulator app (A-6 amplifier)
         if: fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
         id: ios_app_cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/ios/iphonesimulator
           key: ios-sim-app-${{ github.sha }}
