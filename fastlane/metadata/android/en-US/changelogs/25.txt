@@ -1,0 +1,5 @@
+More shopping suggestions, and smoother sync when you reopen the app.
+
+Tapping the empty add field now shows your usual items in a strip of up to three and a half rows. Scroll it to see more: it keeps loading until your whole shopping history is there. Typing narrows it as before.
+
+If the app had been closed for a while, the first sync after opening it could fail with a harmless "session expired" error. It now renews the session and carries on.

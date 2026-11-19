@@ -1,0 +1,5 @@
+Mehr Einkaufsvorschläge, reibungsloserer Abgleich beim Öffnen.
+
+Tippst du ins leere Eingabefeld, zeigt eine Leiste von bis zu dreieinhalb Zeilen deine üblichen Artikel. Scroll sie für mehr: Sie lädt weiter, bis dein ganzer Einkaufsverlauf da ist. Beim Tippen grenzt sie wie bisher ein.
+
+War die App länger geschlossen, konnte der erste Abgleich mit einem harmlosen Fehler („Sitzung abgelaufen“) scheitern. Jetzt wird die Sitzung erneuert und der Abgleich läuft weiter.
