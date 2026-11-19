@@ -11,7 +11,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           # PINNED, not floating `stable` (2026-08-13). An unpinned stable

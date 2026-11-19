@@ -29,7 +29,7 @@ jobs:
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify the tag matches pubspec.yaml
         # Technical review 2026-10-06 #10: nothing tied the pushed tag to the
         # version the APK is built with, so tagging v0.15.0 while pubspec
