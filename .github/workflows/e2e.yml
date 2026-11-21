@@ -116,7 +116,7 @@ jobs:
         # Failure screenshots + view hierarchies + maestro.log — without
         # these, CI-only failures are undebuggable (learned 2026-08-01).
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maestro-debug-android
           path: ~/.maestro/tests/
@@ -314,7 +314,7 @@ jobs:
             --env APP_ID=io.github.igorzamyslov.famdo e2e/flows
       - name: Upload Maestro debug artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: maestro-debug-ios
           path: ~/.maestro/tests/
@@ -704,7 +704,7 @@ jobs:
           cat "$OUT/results.csv"
       - name: Upload A-6 amplifier artifacts
         if: always() && fromJSON(inputs.ios_blank_frame_cycles || '0') > 0
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a6-amplifier-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/a6-amplifier
