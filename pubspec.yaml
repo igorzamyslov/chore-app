@@ -29,7 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   clock: ^1.1.2
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^2.0.0
   drift: ^2.34.2
   drift_flutter: ^0.3.1
   flutter:
